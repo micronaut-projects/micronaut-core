@@ -1,0 +1,86 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.management.endpoint.routes
+
+import groovy.json.JsonSlurper
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
+import spock.lang.Specification
+
+/**
+ * @author James Kleeh
+ * @since 1.0
+ */
+class RoutesEndpointSpec extends Specification {
+
+    void "test routes endpoint"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName])
+        OkHttpClient client = new OkHttpClient()
+
+        when:
+        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/routes")).build()).execute()
+        def result = new JsonSlurper().parseText(response.body().string())
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; io.micronaut.management.endpoint.refresh.RefreshEndpoint.refresh()"
+        result['{[/test],method=[GET],produces=[application/json]}']['method'] == "java.lang.String io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.index()"
+        result['{[/test/generics],method=[PUT],produces=[application/json]}']['method'] == "java.util.Map<java.lang.String, java.lang.Integer> io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.generics()"
+        result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "org.reactivestreams.Publisher io.micronaut.management.endpoint.routes.RoutesEndpoint.getRoutes()"
+        result['{[/test/post],method=[POST],produces=[application/json]}']['method'] == "io.micronaut.http.HttpResponse io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.post(java.lang.Integer number, java.lang.String text)"
+
+        cleanup:
+        embeddedServer?.close()
+    }
+
+    @Controller("/test")
+    @Requires(property = 'spec.name', value = 'RoutesEndpointSpec')
+    static class TestController {
+
+        @Get('/')
+        String index() {
+            ""
+        }
+
+        @Post
+        HttpResponse post(Integer number, String text) {
+            HttpResponse.ok()
+        }
+
+        @Put
+        Map<String, Integer> generics() {
+            Collections.emptyMap()
+        }
+    }
+}

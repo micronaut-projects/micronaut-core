@@ -4,8 +4,8 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.env.Environment;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
 
 public class BaseApplication extends Application {
 

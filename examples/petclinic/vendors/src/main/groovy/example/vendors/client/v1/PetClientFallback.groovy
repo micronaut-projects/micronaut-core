@@ -19,9 +19,9 @@ import example.api.v1.Pet
 import example.api.v1.PetOperations
 import io.reactivex.Maybe
 import io.reactivex.Single
-import org.particleframework.http.annotation.Body
-import org.particleframework.http.annotation.Get
-import org.particleframework.retry.annotation.Fallback
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Get
+import io.micronaut.retry.annotation.Fallback
 
 import javax.inject.Singleton
 import javax.validation.Valid

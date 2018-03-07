@@ -15,13 +15,15 @@
  */
 package example.offers;
 
-import org.particleframework.context.event.ApplicationEventListener;
-import org.particleframework.runtime.ParticleApplication;
-import org.particleframework.runtime.server.event.ServerStartupEvent;
-import org.particleframework.scheduling.Schedulers;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.runtime.Micronaut;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
+import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskScheduler;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -31,25 +33,25 @@ import java.util.concurrent.TimeUnit;
  */
 @Singleton
 public class Application implements ApplicationEventListener<ServerStartupEvent> {
-    private final ScheduledExecutorService executorService;
+    private final TaskScheduler taskScheduler;
     private final OffersRepository offersRepository;
 
 
     public Application(
-            @Named(Schedulers.SCHEDULED) ScheduledExecutorService executorService,
+            TaskScheduler taskScheduler,
             OffersRepository offersRepository) {
-        this.executorService = executorService;
+        this.taskScheduler = taskScheduler;
         this.offersRepository = offersRepository;
     }
 
     public static void main(String... args) {
-        ParticleApplication.run(Application.class);
+        Micronaut.run(Application.class);
     }
 
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
         // this is not really representative of a real system where data would probably exist,
         // but we need this delay as pets are created on startup in pets service
-        executorService.schedule(offersRepository::createInitialOffers, 20, TimeUnit.SECONDS);
+        taskScheduler.schedule(Duration.ofSeconds(20), offersRepository::createInitialOffers);
     }
 }

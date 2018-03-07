@@ -47,7 +47,7 @@ include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
 <2> The link:{api}/org/particleframework/web/router/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/org/particleframework/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
 <3> The value of the URI variable is referenced in the implementation
 
-Particle will map the URI `/issues/issue/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
+Micronaut will map the URI `/issues/issue/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
 
 .Testing URI Variables
 [source,java]
@@ -65,7 +65,7 @@ include::{testsuite}/server/routes/IssuesControllerTest.java[tags=test, indent=4
 <2> The tests sends a request to the URI `/issues/show/12`
 <3> And then asserts the response is "Issue # 12"
 
-If you invoke the previous endpoint without the required URI variable or with an invalid type, Particle responds with the appropriate HTTP failure codes as illustrated in the next Spock test.
+If you invoke the previous endpoint without the required URI variable or with an invalid type, Micronaut responds with the appropriate HTTP failure codes as illustrated in the next Spock test.
 
 .Testing Missing URI Variables
 [source,java]
@@ -125,7 +125,7 @@ String hello() {
 
 === Building Routes Programmatically
 
-If you prefer to not use annotations and declare all of your routes in code then never fear, Particle has a flexible link:{api}/org/particleframework/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
+If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/org/particleframework/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 
 To start off with you should subclass link:{api}/org/particleframework/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and then simply inject the controller you wish to route to into the method and define your routes:
 

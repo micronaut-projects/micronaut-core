@@ -1,6 +1,6 @@
 The classic requirement of dependency injection is the interface and multiple possible implementations.
 
-Once again Particle leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
+Once again Micronaut leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
 
 === Qualifying By Name
 

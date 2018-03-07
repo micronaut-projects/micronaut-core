@@ -2,10 +2,10 @@ package example.storefront.client.v1
 
 import example.api.v1.CommentOperations
 import example.api.v1.HealthStatusOperation
-import org.particleframework.http.HttpStatus
-import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Post
-import org.particleframework.http.client.Client
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.Client
 
 /**
  * @author zacharyklein

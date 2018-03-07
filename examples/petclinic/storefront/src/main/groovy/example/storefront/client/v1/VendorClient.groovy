@@ -18,7 +18,7 @@ package example.storefront.client.v1
 import example.api.v1.Vendor
 import example.api.v1.VendorOperations
 import io.reactivex.Single
-import org.particleframework.http.client.Client
+import io.micronaut.http.client.Client
 
 /**
  * @author graemerocher

@@ -1,8 +1,8 @@
 The examples so far have dealt with simply text based responses, but the most common data interchange format nowadays is JSON.
 
-In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Particle consume and produce JSON by default.
+In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
 
-In order do so in a non-blocking manner Particle builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+In order do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
 
 === Binding using Reactive Frameworks
 
@@ -51,7 +51,7 @@ Note however, that if your method does not do any blocking I/O then you can just
 include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
 ----
 
-Particle will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.
+Micronaut will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.
 
 In other words, as a rule reactive types should be used when you plan to do further downstream I/O operations in which case they can greatly simplify composing operations.
 

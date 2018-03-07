@@ -1,4 +1,4 @@
-Similar to Spring and Grails, Particle provides a set of caching annotations within the link:{api}/org/particleframework/cache/package-summary.html[org.particleframework.cache] package.
+Similar to Spring and Grails, Micronaut provides a set of caching annotations within the link:{api}/org/particleframework/cache/package-summary.html[io.micronaut.cache] package.
 
 The link:{api}/org/particleframework/cache/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
 
@@ -37,14 +37,14 @@ The above example will configure a cache called "myCache" with a maximum size of
 
 === Caching with Redis
 
-If you wish to use Redis to cache results then you need to add the Lettuce configuration to your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Particle provides an implementation that allows cached results to be read reactively. To configure the Lettuce configuration add the following dependency to your application:
+If you wish to use Redis to cache results then you need to add the Lettuce configuration to your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Micronaut provides an implementation that allows cached results to be read reactively. To configure the Lettuce configuration add the following dependency to your application:
 
 .Lettuce Configuration build.gradle
 [source,groovy,subs="attributes"]
 ----
 dependencies {
     ...
-    compile "org.particleframework.configurations:redis-lettuce:{version}"
+    compile "io.micronaut.configurations:redis-lettuce:{version}"
     ...
 }
 ----

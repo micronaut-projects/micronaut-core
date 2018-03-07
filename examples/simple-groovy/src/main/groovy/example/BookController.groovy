@@ -16,10 +16,10 @@
 package example
 
 import grails.gorm.transactions.Transactional
-import org.particleframework.context.annotation.Value
-import org.particleframework.http.MediaType
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Get
+import io.micronaut.context.annotation.Value
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject

@@ -56,7 +56,7 @@ def targetDir = new File(project.buildDir, "jarjar")
 def targetFile = new File(targetDir, "asm.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(jar.outputs.files)
-    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
+    classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
     destinationDir = targetDir
     destinationName = targetFile.name
 }

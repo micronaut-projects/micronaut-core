@@ -1,7 +1,7 @@
-Particle includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty]. A "Hello World" server application written in Java can be seen below:
+Micronaut includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty]. A "Hello World" server application written in Java can be seen below:
 
 
-.Particle Server Hello World
+.Micronaut Server Hello World
 [source,java]
 ----
 include::{testsuite}/server/intro/HelloController.java[tags=imports, indent=0]

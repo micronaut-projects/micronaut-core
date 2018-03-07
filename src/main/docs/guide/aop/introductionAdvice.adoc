@@ -5,4 +5,4 @@ Examples of introduction advice include things like http://gorm.grails.org[GORM]
 TODO: Introduction advice example
 
 
-The following sections cover core advice types that are built into Particle and provided by the framework.
+The following sections cover core advice types that are built into Micronaut and provided by the framework.

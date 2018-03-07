@@ -1,8 +1,8 @@
-# Particle Requirements
+# Micronaut Requirements
 
 ## Minimum Feature Set
 
-The following features are a TODO list of things to do on Particle before launching
+The following features are a TODO list of things to do on Micronaut before launching
 
 ### Core Features
 
@@ -99,7 +99,7 @@ WebSocket Support must be implemented
 
 #### Support for Views
 
-Some view technology support and port GSON views to Particle.
+Some view technology support and port GSON views to micronaut.
 
 ### HTTP Client
 

@@ -16,8 +16,8 @@
 package example.api.v1;
 
 import io.reactivex.Single;
-import org.particleframework.http.annotation.Get;
-import org.particleframework.http.annotation.Post;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 
 import java.util.List;
 

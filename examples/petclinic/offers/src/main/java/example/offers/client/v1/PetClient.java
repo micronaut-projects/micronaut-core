@@ -18,8 +18,8 @@ package example.offers.client.v1;
 import example.api.v1.Pet;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
-import org.particleframework.http.annotation.Get;
-import org.particleframework.http.client.Client;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.client.Client;
 
 import java.util.List;
 

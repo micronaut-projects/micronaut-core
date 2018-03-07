@@ -18,11 +18,11 @@ package example.comments
 import grails.neo4j.Path
 import groovy.json.JsonOutput
 import org.grails.datastore.mapping.validation.ValidationException
-import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
-import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.socket.SocketUtils
-import org.particleframework.http.HttpStatus
-import org.particleframework.runtime.server.EmbeddedServer
+import io.micronaut.configuration.neo4j.bolt.Neo4jBoltSettings
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.HttpStatus
+import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

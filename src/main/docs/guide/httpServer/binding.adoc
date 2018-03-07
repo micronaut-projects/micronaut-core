@@ -1,10 +1,10 @@
-The examples in the previous section demonstrates how Particle allows you to bind method parameters from URI path variables.
+The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables.
 
 === Binding Annotations
 
 You can customize the name of the variable bound with the link:{api}/org/particleframework/http/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
-In addition, there are other annotations within the link:{api}/org/particleframework/http/annotation/package-summary.html[org.particleframework.http.annotation] package to bind from different sources.
+In addition, there are other annotations within the link:{api}/org/particleframework/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
 The following table summarizes the annotations, their purpose and provides an example:
 

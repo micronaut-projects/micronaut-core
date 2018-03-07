@@ -3,8 +3,8 @@ package example.mail.ses;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.context.annotation.Value;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Value;
 import javax.inject.Singleton;
 
 @Singleton

@@ -4,8 +4,8 @@ import junit.framework.TestCase;
 import org.atinject.tck.auto.accessories.Cupholder;
 import org.atinject.tck.auto.accessories.RoundThing;
 import org.atinject.tck.auto.accessories.SpareTire;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.DefaultBeanContext;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DefaultBeanContext;
 
 import javax.inject.Inject;
 import javax.inject.Named;

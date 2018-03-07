@@ -4,8 +4,8 @@ import com.sendgrid.*;
 import example.api.v1.Email;
 import example.mail.EmailService;
 import example.mail.MailController;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.context.annotation.Value;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

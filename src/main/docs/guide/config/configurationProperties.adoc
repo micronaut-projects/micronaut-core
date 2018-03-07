@@ -1,6 +1,6 @@
 Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
 
-Unlike the aforementioned frameworks, however, Particle uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
+Unlike the aforementioned frameworks, however, Micronaut uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
 
 An example of a configuration class can be seen below:
 
@@ -42,7 +42,7 @@ To support the ability for a builder style class to be populated with configurat
 
 One or more method prefixes can be specified in the annotation to support builder methods like "withXxx" or "setXxx". If the builder methods have no prefix, assign an empty string to the parameter.
 
-A configuration prefix can also be specified to tell Particle where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
+A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 
 For example:
 

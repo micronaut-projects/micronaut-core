@@ -5,11 +5,11 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpResponse;
-import org.particleframework.http.client.HttpClient;
-import org.particleframework.runtime.server.EmbeddedServer;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.runtime.server.EmbeddedServer;
 
 import java.util.Collections;
 

@@ -34,16 +34,16 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    compileOnly "org.particleframework:inject-java:${projectVersion}"
-    compile "org.particleframework:inject-groovy:${projectVersion}"
-    compile "org.particleframework:function-groovy:${projectVersion}"
+    compileOnly "io.micronaut:inject-java:${projectVersion}"
+    compile "io.micronaut:inject-groovy:${projectVersion}"
+    compile "io.micronaut:function-groovy:${projectVersion}"
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
 
 
-    testCompile "org.particleframework:http-client:${projectVersion}"
-    testRuntime "org.particleframework:http-server-netty:${projectVersion}"
-    testRuntime "org.particleframework:function-web:${projectVersion}"
+    testCompile "io.micronaut:http-client:${projectVersion}"
+    testRuntime "io.micronaut:http-server-netty:${projectVersion}"
+    testRuntime "io.micronaut:function-web:${projectVersion}"
 
 
     testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
@@ -57,8 +57,8 @@ shadowJar {
 
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "particle-function"
-//  To deploy ParticleRequestStreamHandler uncomment function-aws dependency
-//  handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+//  To deploy MicronautRequestStreamHandler uncomment function-aws dependency
+//  handler = "io.micronaut.function.aws.MicronautRequestStreamHandler"
     handler = "example.UpperCaseTitleFunction::toUpperCase"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8

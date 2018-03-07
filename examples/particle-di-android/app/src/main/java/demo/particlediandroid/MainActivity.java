@@ -4,7 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
-import org.particleframework.context.annotation.Bean;
+import io.micronaut.context.annotation.Bean;
 import java.util.List;
 import javax.inject.Inject;
 

@@ -1,1 +1,1 @@
-Particle features an extensible bean scoping mechanism based on JSR-303. The following default scopes are supported:
+Micronaut features an extensible bean scoping mechanism based on JSR-303. The following default scopes are supported:

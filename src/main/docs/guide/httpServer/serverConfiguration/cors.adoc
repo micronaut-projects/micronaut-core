@@ -1,4 +1,4 @@
-Particle supports CORS(link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+Micronaut supports CORS(link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
 
 .CORS Configuration Example
 [source,yaml]
@@ -29,7 +29,7 @@ particle:
                     ...
 ----
 
-In the above example, three configurations are being provided. Their names (`all`, `web`, `mobile`) are not important and have no significance inside Particle. They are there purely to be able to easily recognize the intended user of the configuration.
+In the above example, three configurations are being provided. Their names (`all`, `web`, `mobile`) are not important and have no significance inside micronaut. They are there purely to be able to easily recognize the intended user of the configuration.
 
 The same configuration properties can be applied to each configuration. See link:{api}/org/particleframework/http/server/cors/CorsOriginConfiguration.html[CorsOriginConfiguration] for the reference of properties that can be defined. Each configuration supplied will have its values default to the default values of the corresponding fields.
 

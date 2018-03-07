@@ -62,13 +62,13 @@ dependencies {
 
 }
 
-// This logic handles rewriting the dependencies on org.objectweb.asm.** to org.particleframework.asm.**
+// This logic handles rewriting the dependencies on org.objectweb.asm.** to io.micronaut.asm.**
 
 def targetDir = new File(project.buildDir, "jarjar")
 def targetFile = new File(targetDir, "jarjar.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
-    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
+    classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
     destinationDir = targetDir
     destinationName = targetFile.name
 }

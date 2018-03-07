@@ -1,4 +1,4 @@
-As mentioned previously, Particle is built on Netty and therefore from an I/O perspective it is designed to be used in a non-blocking manner.
+As mentioned previously, Micronaut is built on Netty and therefore from an I/O perspective it is designed to be used in a non-blocking manner.
 
 Most the of the examples you have seen so far return simple string responses that do not block and do not parse the request body (an operation that requires I/O).
 

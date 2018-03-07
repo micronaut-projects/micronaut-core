@@ -15,7 +15,7 @@
  */
 package example;
 
-import org.particleframework.function.executor.FunctionInitializer;
+import io.micronaut.function.executor.FunctionInitializer;
 
 import javax.inject.Inject;
 import java.io.IOException;

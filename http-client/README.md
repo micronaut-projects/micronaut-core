@@ -1,6 +1,6 @@
-# Particle HTTP Client
+# Micronaut HTTP Client
 
-This module provides a Reactive HTTP client based on the Particle and Reactive streams APIs.
+This module provides a Reactive HTTP client based on the Micronaut and Reactive streams APIs.
 
 # TODO Items
 

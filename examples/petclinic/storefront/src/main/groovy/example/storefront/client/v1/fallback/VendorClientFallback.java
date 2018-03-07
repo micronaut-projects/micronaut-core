@@ -18,7 +18,7 @@ package example.storefront.client.v1.fallback;
 import example.api.v1.Vendor;
 import example.api.v1.VendorOperations;
 import io.reactivex.Single;
-import org.particleframework.retry.annotation.Fallback;
+import io.micronaut.retry.annotation.Fallback;
 
 import java.util.Collections;
 import java.util.List;

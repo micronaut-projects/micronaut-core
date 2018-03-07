@@ -15,11 +15,11 @@
  */
 package example.function.tweet
 
-import org.particleframework.context.ApplicationContext
-import org.particleframework.http.HttpRequest
-import org.particleframework.http.MediaType
-import org.particleframework.http.client.RxHttpClient
-import org.particleframework.runtime.server.EmbeddedServer
+import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
 import spock.lang.Shared

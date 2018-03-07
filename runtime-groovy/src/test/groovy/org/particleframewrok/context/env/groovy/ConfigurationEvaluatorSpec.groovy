@@ -1,4 +1,4 @@
-package org.particleframework.context.env.groovy
+package io.micronaut.context.env.groovy
 
 import spock.lang.Specification
 

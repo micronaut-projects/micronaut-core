@@ -1,7 +1,7 @@
 dependencies {
-    compile "org.particleframework:http:${projectVersion}"
-    compile "org.particleframework:runtime:${projectVersion}"
-    compile "org.particleframework:validation:${projectVersion}"
+    compile "io.micronaut:http:${projectVersion}"
+    compile "io.micronaut:runtime:${projectVersion}"
+    compile "io.micronaut:validation:${projectVersion}"
 }
 compileJava {
     options.compilerArgs += ["-parameters"]

@@ -66,7 +66,7 @@ cloud:
   serviceDiscovery: Service Discovery
 languageSupport:
   title: Language Support
-  groovy: Particle for Groovy
+  groovy: Micronaut for Groovy
 management:
   title: Management & Monitoring
   buildingEndpoints:

@@ -16,7 +16,7 @@
 package example;
 
 import io.netty.util.ResourceLeakDetector;
-import org.particleframework.runtime.ParticleApplication;
+import io.micronaut.runtime.MicronautApplication;
 
 /**
  * @author Graeme Rocher
@@ -26,6 +26,6 @@ public class Application {
 
     public static void main(String[] args) {
 //        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
-        ParticleApplication.run(Application.class);
+        MicronautApplication.run(Application.class);
     }
 }

@@ -1,12 +1,12 @@
 package example.storefront
 
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Get
-import org.particleframework.openapi.OpenApiDocument
-import org.particleframework.openapi.OpenApiInfo
-import org.particleframework.openapi.OpenApiPath
-import org.particleframework.openapi.OpenApiSecurityScheme
-import org.particleframework.openapi.OpenApiServer
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.openapi.OpenApiDocument
+import io.micronaut.openapi.OpenApiInfo
+import io.micronaut.openapi.OpenApiPath
+import io.micronaut.openapi.OpenApiSecurityScheme
+import io.micronaut.openapi.OpenApiServer
 
 @Controller('/swagger')
 class OpenApiController {

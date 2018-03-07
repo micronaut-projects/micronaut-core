@@ -1,9 +1,9 @@
-package org.particleframework.openapi
+package io.micronaut.openapi
 
 import groovy.transform.CompileStatic
-import org.particleframework.http.annotation.Body
-import org.particleframework.http.annotation.CookieValue
-import org.particleframework.http.annotation.Header
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.CookieValue
+import io.micronaut.http.annotation.Header
 
 import java.lang.annotation.Annotation
 import java.lang.reflect.Parameter
@@ -50,8 +50,8 @@ class OpenApiParameter {
                         return value
                     }
                 }
-                if ( annotation instanceof org.particleframework.http.annotation.Parameter) {
-                    org.particleframework.http.annotation.Parameter parameterAnnotation = (org.particleframework.http.annotation.Parameter) annotation
+                if ( annotation instanceof io.micronaut.http.annotation.Parameter) {
+                    io.micronaut.http.annotation.Parameter parameterAnnotation = (io.micronaut.http.annotation.Parameter) annotation
                     String value = parameterAnnotation.value()
                     if ( value != null ) {
                         return value

@@ -16,9 +16,9 @@
 package example.function.tweet
 
 import groovy.transform.CompileStatic
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Factory
-import org.particleframework.context.exceptions.ConfigurationException
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.exceptions.ConfigurationException
 import twitter4j.Twitter
 import twitter4j.TwitterFactory
 import twitter4j.conf.Configuration

@@ -15,9 +15,9 @@
  */
 package example.api.v1;
 
-import org.particleframework.http.HttpStatus;
-import org.particleframework.http.annotation.Get;
-import org.particleframework.http.annotation.Post;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 
 import javax.validation.constraints.NotBlank;
 import java.util.List;

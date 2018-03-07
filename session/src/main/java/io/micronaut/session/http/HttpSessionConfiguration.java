@@ -1,0 +1,134 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package io.micronaut.session.http;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.session.SessionConfiguration;
+
+import java.time.temporal.TemporalAmount;
+import java.util.Optional;
+
+/**
+ * Allows configuration of the session
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@ConfigurationProperties("http")
+public class HttpSessionConfiguration extends SessionConfiguration {
+
+    public static final String DEFAULT_COOKIE_NAME = "SESSION";
+
+    private boolean rememberMe = false;
+    private boolean base64Encode = true;
+    private TemporalAmount cookieMaxAge;
+    private String cookiePath;
+    private String domainName;
+    private String cookieName = DEFAULT_COOKIE_NAME;
+    private String prefix;
+    private String[] headerNames = new String[] { HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN };
+
+    /**
+     * @return Whether the Base64 encode sessions IDs sent back to clients
+     */
+    public boolean isBase64Encode() {
+        return base64Encode;
+    }
+
+    /**
+     * @return The cookie name to use
+     */
+    public String getCookieName() {
+        return cookieName;
+    }
+
+    /**
+     * @return The prefix to use when serializing session ID
+     */
+    public Optional<String> getPrefix() {
+        return Optional.ofNullable(prefix);
+    }
+
+    /**
+     * @return The header names when using a Header strategy
+     */
+    public String[] getHeaderNames() {
+        return headerNames;
+    }
+
+    /**
+     * @return The cookie path to use
+     */
+    public Optional<String> getCookiePath() {
+        return Optional.ofNullable(cookiePath);
+    }
+
+    /**
+     * @return The domain name to use for the cookie
+     */
+    public Optional<String> getDomainName() {
+        return Optional.ofNullable(domainName);
+    }
+
+    /**
+     * @return The max age to use for the cookie
+     */
+    public Optional<TemporalAmount> getCookieMaxAge() {
+        return Optional.ofNullable(cookieMaxAge);
+    }
+
+    /**
+     * @return Is remember me config
+     */
+    public boolean isRememberMe() {
+        return rememberMe;
+    }
+
+    void setRememberMe(boolean rememberMe) {
+        this.rememberMe = rememberMe;
+    }
+
+    void setBase64Encode(boolean base64Encode) {
+        this.base64Encode = base64Encode;
+    }
+
+    void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+        this.cookieMaxAge = cookieMaxAge;
+    }
+
+    void setCookiePath(String cookiePath) {
+        this.cookiePath = cookiePath;
+    }
+
+    void setDomainName(String domainName) {
+        this.domainName = domainName;
+    }
+
+    void setCookieName(String cookieName) {
+        this.cookieName = cookieName;
+    }
+
+    void setPrefix(String prefix) {
+        this.prefix = prefix;
+    }
+
+   void setHeaderNames(String[] headerNames) {
+        this.headerNames = headerNames;
+    }
+}

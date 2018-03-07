@@ -20,10 +20,10 @@ import example.vendors.client.v1.PetClient
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Post
-import org.particleframework.validation.Validated
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.validation.Validated
 
 import javax.inject.Singleton
 import javax.validation.constraints.NotBlank

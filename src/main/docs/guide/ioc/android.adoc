@@ -1,20 +1,20 @@
-Since Particle dependency injection is based on annotation processors and doesn't rely on reflection, it can be used on Android when using the Android plugin 3.0.0 or above.
+Since Micronaut dependency injection is based on annotation processors and doesn't rely on reflection, it can be used on Android when using the Android plugin 3.0.0 or above.
 
 This allows you to use the same application framework for both your Android client and server implementation.
 
 ### Configuring Your Android Build
 
-To get started you must add the Particle annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
+To get started you must add the Micronaut annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
 
-The Particle `inject-java` dependency should be included in both the `annotationProcessor` and `compileOnly` scopes of your Android build configuration:
+The Micronaut `inject-java` dependency should be included in both the `annotationProcessor` and `compileOnly` scopes of your Android build configuration:
 
 .Example Android build.gradle
 [source,groovy,subs="attributes"]
 ----
 dependencies {
     ...
-    annotationProcessor "org.particleframework:inject-java:{version}"
-    compileOnly "org.particleframework:inject-java:{version}"
+    annotationProcessor "io.micronaut:inject-java:{version}"
+    compileOnly "io.micronaut:inject-java:{version}"
     ...
 }
 ----
@@ -35,7 +35,7 @@ android {
 
 You can find more information on https://developer.android.com/studio/build/gradle-plugin-3-0-0-migration.html#annotationProcessor_config[configuring annotations processors] in the Android documentation.
 
-NOTE: Particle `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
+NOTE: Micronaut `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
 
 ### Enabling Dependency Injection
 
@@ -51,8 +51,8 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.env.Environment;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
 
 public class BaseApplication extends Application { // <1>
 

@@ -17,8 +17,8 @@ package example.comments
 
 import example.api.v1.CommentOperations
 import groovy.transform.CompileStatic
-import org.particleframework.http.HttpStatus
-import org.particleframework.http.annotation.Controller
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
 
 import javax.validation.constraints.NotBlank
 
