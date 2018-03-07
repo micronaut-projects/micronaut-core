@@ -29,5 +29,5 @@ import javax.validation.constraints.NotNull
 interface HelloClient {
 
     @Named("hello-world")
-    Single<Message> hello(@NotNull Person person)
+    Single<Message> hello(String name)
 }

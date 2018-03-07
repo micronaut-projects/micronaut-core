@@ -24,6 +24,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -47,6 +48,10 @@ public class LocalFunctionDefinitionProvider implements FunctionDefinitionProvid
 
     @Override
     public Collection<FunctionDefinition> getFunctionDefinitions() {
+        if(!embeddedServer.isRunning()) {
+            return Collections.emptyList();
+        }
+
         Map<String, URI> availableFunctions = localFunctionRegistry.getAvailableFunctions();
         return availableFunctions.entrySet().stream().map((Function<Map.Entry<String, URI>, FunctionDefinition>) stringURIEntry -> new FunctionDefinition() {
             @Override

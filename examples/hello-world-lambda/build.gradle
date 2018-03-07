@@ -47,7 +47,7 @@ dependencies {
     testCompile "io.micronaut:function-client:${projectVersion}"
     testRuntime "io.micronaut:http-server-netty:${projectVersion}"
     testRuntime "io.micronaut:function-web:${projectVersion}"
-
+    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
     testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
         exclude module:'groovy-all'
