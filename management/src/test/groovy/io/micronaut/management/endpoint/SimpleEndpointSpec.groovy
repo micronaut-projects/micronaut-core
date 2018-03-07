@@ -16,14 +16,12 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.Toggleable
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -38,20 +36,15 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
-        OkHttpClient client = new OkHttpClient()
 
         when:
-        def request = new Request.Builder()
-                .url( new URL(server.URL, "/simple"))
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange("/simple", String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'test foo'
+        response.body() == 'test foo'
 
         cleanup:
         server.close()
@@ -62,21 +55,16 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
-
-        OkHttpClient client = new OkHttpClient()
 
         when:
-        def request = new Request.Builder()
-                .url(new URL(server.URL, "/simple/baz"))
+        def response = rxClient.exchange("/simple/baz", String).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'test baz'
+        response.body() == 'test baz'
 
         cleanup:
         server.close()
@@ -87,32 +75,21 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
-        OkHttpClient client = new OkHttpClient()
 
         when:
-        def request = new Request.Builder()
-                .url(new URL(server.URL, "/simple"))
-                .post(RequestBody.create(MediaType.parse("text/plain"), "bar"))
-        def response = client.newCall(
-                request.build()
-        ).execute()
-
+        def response = rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
 
         when:
-        request = new Request.Builder()
-                .url(new URL(server.URL, "/simple"))
-
-        response = client.newCall(
-                request.build()
-        ).execute()
+        response = rxClient.exchange("/simple", String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'test bar'
+        response.body() == 'test bar'
 
         cleanup:
         server.close()
@@ -123,20 +100,14 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.enabled':false]
         )
-
-
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
-        def request = new Request.Builder()
-                .url(new URL(server.URL, "/simple"))
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        rxClient.exchange("/simple", String).blockingFirst()
 
         then:
-        response.code() == HttpStatus.NOT_FOUND.code
+        HttpClientResponseException ex = thrown()
+        ex.response.code() == HttpStatus.NOT_FOUND.code
 
         cleanup:
         server.close()

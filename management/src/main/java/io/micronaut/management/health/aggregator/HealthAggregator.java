@@ -16,6 +16,7 @@
 package io.micronaut.management.health.aggregator;
 
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.micronaut.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
 /**
@@ -31,4 +32,12 @@ public interface HealthAggregator<T> {
      * @return An aggregated response.
      */
     Publisher<T> aggregate(HealthIndicator[] indicators);
+
+    /**
+     * @param name The name of the new health result
+     * @param results The health results to aggregate.
+     *
+     * @return An aggregated {@link HealthResult}.
+     */
+    Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results);
 }

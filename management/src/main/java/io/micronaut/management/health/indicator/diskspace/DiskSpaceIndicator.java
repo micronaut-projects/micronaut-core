@@ -37,7 +37,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "endpoints.health.disk-space.enabled", notEquals = "false")
+@Requires(property = HealthEndpoint.PREFIX + ".disk-space.enabled", notEquals = "false")
 @Requires(beans = HealthEndpoint.class)
 public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Object>> {
 

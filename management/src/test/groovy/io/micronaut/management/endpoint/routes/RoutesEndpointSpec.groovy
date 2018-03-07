@@ -15,7 +15,6 @@
  */
 package io.micronaut.management.endpoint.routes
 
-import groovy.json.JsonSlurper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
@@ -24,17 +23,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Controller
+import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Put
 import spock.lang.Specification
 
 /**
@@ -46,11 +36,11 @@ class RoutesEndpointSpec extends Specification {
     void "test routes endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName])
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/routes")).build()).execute()
-        def result = new JsonSlurper().parseText(response.body().string())
+        def response = rxClient.exchange("/routes", Map).blockingFirst()
+        def result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
