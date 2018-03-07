@@ -15,45 +15,18 @@
  */
 package example
 
-import grails.gorm.transactions.Transactional
-import io.micronaut.context.annotation.Value
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-
-import javax.annotation.PostConstruct
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller
-@Singleton
-class BookController {
+@Controller("/")
+class HelloController {
 
-    @Inject
-    BookService bookService
-
-    @Value('${galecino.servo.trim:0.0}')
-    Float trim
-
-    @Get('/')
-    List<Book> index() {
-        bookService.list()
-    }
-
-    @Get(uri = '/trim', produces = MediaType.TEXT_PLAIN)
-    String trim() {
-        trim.toString()
-    }
-
-
-
-    @Transactional
-    @PostConstruct
-    void setup() {
-        bookService.save 'The Stand'
+    @Get("/hello/{name}")
+    String hello(String name) {
+        return "Hello $name!"
     }
 }
