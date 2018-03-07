@@ -17,9 +17,9 @@ package example;
 
 import okhttp3.*;
 import org.junit.Test;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.HttpStatus;
-import org.particleframework.runtime.server.EmbeddedServer;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.runtime.server.EmbeddedServer;
 
 import java.io.IOException;
 import java.net.URL;
@@ -51,6 +51,6 @@ public class UpperCaseTitleFunctionTest {
     }
 
     private RequestBody createBody(String data) {
-        return RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), data);
+        return RequestBody.create( MediaType.parse(io.micronaut.http.MediaType.APPLICATION_JSON), data);
     }
 }

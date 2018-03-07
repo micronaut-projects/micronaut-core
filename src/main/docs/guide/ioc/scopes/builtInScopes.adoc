@@ -1,4 +1,4 @@
-.Particle Built-in Scopes
+.Micronaut Built-in Scopes
 |===
 |Type |Description
 

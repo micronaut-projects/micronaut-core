@@ -16,11 +16,11 @@
 package example.offers
 
 import example.api.v1.Offer
-import org.particleframework.http.MediaType
-import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Post
-import org.particleframework.http.client.Client
-import org.particleframework.validation.Validated
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.Client
+import io.micronaut.validation.Validated
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 

@@ -1,4 +1,4 @@
-Handling of file uploads has special treatment in Particle. In order to allow streaming of data and non-blocking file uploads there are a number of approaches depending on your use case.
+Handling of file uploads has special treatment in micronaut. In order to allow streaming of data and non-blocking file uploads there are a number of approaches depending on your use case.
 
 To receive and file and enable easy non-blocking file transfer you can use the api:http.multipart.FileUpload[] interface:
 

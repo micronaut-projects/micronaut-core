@@ -16,7 +16,7 @@
 package example;
 
 
-import org.particleframework.function.FunctionBean;
+import io.micronaut.function.FunctionBean;
 
 import java.util.function.Function;
 

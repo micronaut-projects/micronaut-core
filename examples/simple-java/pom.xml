@@ -14,7 +14,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <particle.version>1.0.0-SNAPSHOT</particle.version>
+        <micronaut.version>1.0.0-SNAPSHOT</micronaut.version>
     </properties>
 
     <build>
@@ -69,22 +69,22 @@
         <dependency>
             <groupId>org.particleframework</groupId>
             <artifactId>http-server-netty</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
         </dependency>
         <dependency>
             <groupId>org.particleframework</groupId>
             <artifactId>management</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
         </dependency>
         <dependency>
             <groupId>org.particleframework</groupId>
             <artifactId>validation</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.particleframework.configuration</groupId>
+            <groupId>io.micronaut.configuration</groupId>
             <artifactId>hibernate-validator</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
         </dependency>
         <dependency>
             <groupId>io.reactivex.rxjava2</groupId>
@@ -102,13 +102,13 @@
         <dependency>
             <groupId>org.particleframework</groupId>
             <artifactId>inject-java</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.particleframework</groupId>
             <artifactId>http-client</artifactId>
-            <version>${particle.version}</version>
+            <version>${micronaut.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

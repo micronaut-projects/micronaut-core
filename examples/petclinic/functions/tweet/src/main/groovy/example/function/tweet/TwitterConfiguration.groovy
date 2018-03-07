@@ -16,7 +16,7 @@
 package example.function.tweet
 
 import groovy.transform.CompileStatic
-import org.particleframework.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.ConfigurationProperties
 import twitter4j.conf.ConfigurationBuilder
 
 /**
@@ -27,6 +27,6 @@ import twitter4j.conf.ConfigurationBuilder
 @CompileStatic
 class TwitterConfiguration {
 
-    @org.particleframework.context.annotation.ConfigurationBuilder
+    @io.micronaut.context.annotation.ConfigurationBuilder
     ConfigurationBuilder builder = new ConfigurationBuilder()
 }

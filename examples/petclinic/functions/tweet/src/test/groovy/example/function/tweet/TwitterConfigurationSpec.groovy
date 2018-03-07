@@ -15,7 +15,7 @@
  */
 package example.function.tweet
 
-import org.particleframework.context.ApplicationContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import twitter4j.conf.Configuration

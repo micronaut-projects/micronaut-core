@@ -2,7 +2,7 @@ The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.
 
 To solve this problem many frameworks produce runtime metadata or perform expensive reflection to analyze the annotations of a class.
 
-Particle instead produces this annotation metadata at compile time, avoiding expensive reflection and saving on memory.
+Micronaut instead produces this annotation metadata at compile time, avoiding expensive reflection and saving on memory.
 
 The link:{api}/org/particleframework/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/org/particleframework/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
 
@@ -23,5 +23,5 @@ for(BeanDefinition definition : definitions) {
 
 The above example will find all link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
 
-Like Spring, Particle also supports an link:{api}/org/particleframework/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
+Like Spring, Micronaut also supports an link:{api}/org/particleframework/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
 

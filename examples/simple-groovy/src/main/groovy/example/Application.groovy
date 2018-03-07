@@ -15,10 +15,10 @@
  */
 package example
 
-import org.particleframework.runtime.ParticleApplication
+import io.micronaut.runtime.MicronautApplication
 
 class Application {
     static void main(String[] args) {
-        ParticleApplication.run(Application)
+        MicronautApplication.run(Application)
     }
 }

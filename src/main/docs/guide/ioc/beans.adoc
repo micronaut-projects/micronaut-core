@@ -1,4 +1,4 @@
-Particle implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Particle you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
+Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
 
 The following is a simply example:
 
@@ -21,14 +21,14 @@ To perform dependency injection simply instantiate an instance of link:{api}/org
 
 [source,groovy]
 ----
-import org.particleframework.context.*
+import io.micronaut.context.*
 ...
 include::{testsdir}/intro/VehicleSpec.groovy[tags=start, indent=0]
 ----
 
-Particle will automatically discover dependency injection metadata on the classpath and wire the beans together according to injection points you define.
+Micronaut will automatically discover dependency injection metadata on the classpath and wire the beans together according to injection points you define.
 
-Particle supports the following types of dependency injection:
+Micronaut supports the following types of dependency injection:
 
 * Constructor injection (must be one public constructor or a single contructor annotated with `@Inject`)
 * Field injection

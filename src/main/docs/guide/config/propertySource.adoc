@@ -8,9 +8,9 @@ include::{testsjava}/env/EnvironmentTest.java[tags=envProps, indent=0]
 
 The link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
 
-Alternatively one can register a link:{api}/org/particleframework/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/org.particleframework.context.env.PropertySourceLoader` containg a reference to the class name of the `PropertySourceLoader`.
+Alternatively one can register a link:{api}/org/particleframework/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containg a reference to the class name of the `PropertySourceLoader`.
 
-Particle by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
+Micronaut by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
 
 * Command line arguments
 * Properties from `SPRING_APPLICATION_JSON` (for Spring compatibility)

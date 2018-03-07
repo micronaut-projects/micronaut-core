@@ -19,7 +19,7 @@ import example.api.v1.Pet
 import example.api.v1.PetOperations
 import io.reactivex.Maybe
 import io.reactivex.Single
-import org.particleframework.http.client.Client
+import io.micronaut.http.client.Client
 
 /**
  * @author graemerocher

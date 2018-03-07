@@ -1,9 +1,9 @@
 package example.api.v1;
 
-import org.particleframework.http.HttpResponse;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Post;
-import org.particleframework.validation.Validated;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.validation.Validated;
 import javax.validation.Valid;
 
 @Validated

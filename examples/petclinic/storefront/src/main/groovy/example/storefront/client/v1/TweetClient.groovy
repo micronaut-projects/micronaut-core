@@ -16,7 +16,7 @@
 package example.storefront.client.v1
 
 import io.reactivex.Single
-import org.particleframework.function.client.FunctionClient
+import io.micronaut.function.client.FunctionClient
 
 /**
  * @author graemerocher

@@ -15,7 +15,8 @@
  */
 package example.pets;
 
-import org.particleframework.runtime.ParticleApplication;
+
+import io.micronaut.runtime.Micronaut;
 
 import javax.inject.Singleton;
 
@@ -27,6 +28,6 @@ import javax.inject.Singleton;
 public class Application {
 
     public static void main(String[] args) {
-        ParticleApplication.run(Application.class);
+        Micronaut.run(Application.class);
     }
 }

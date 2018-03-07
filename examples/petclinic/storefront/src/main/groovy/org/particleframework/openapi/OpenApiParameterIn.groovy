@@ -1,8 +1,8 @@
-package org.particleframework.openapi
+package io.micronaut.openapi
 
 import groovy.transform.CompileStatic
-import org.particleframework.http.annotation.CookieValue
-import org.particleframework.http.annotation.Header
+import io.micronaut.http.annotation.CookieValue
+import io.micronaut.http.annotation.Header
 
 import java.lang.annotation.Annotation
 import java.lang.reflect.Parameter

@@ -31,9 +31,9 @@ subprojects { project ->
         dependencies {
             if(project.name != 'api' && !project.path.contains(':functions') && !project.path.contains(':frontend')) {
 
-                compile "org.particleframework:discovery-client:${projectVersion}"
-                compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
-                runtime "org.particleframework:management:${projectVersion}"
+                compile "io.micronaut:discovery-client:${projectVersion}"
+                compile "io.micronaut.configuration:hibernate-validator:${projectVersion}"
+                runtime "io.micronaut:management:${projectVersion}"
                 runtime "ch.qos.logback:logback-classic:1.2.3"
             }
         }

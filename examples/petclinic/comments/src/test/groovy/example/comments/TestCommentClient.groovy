@@ -16,8 +16,8 @@
 package example.comments
 
 import example.api.v1.CommentOperations
-import org.particleframework.http.HttpStatus
-import org.particleframework.http.client.Client
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.Client
 
 import javax.validation.constraints.NotBlank
 

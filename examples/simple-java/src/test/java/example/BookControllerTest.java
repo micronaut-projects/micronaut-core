@@ -1,10 +1,10 @@
 package example;
 
 import org.junit.Test;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.client.HttpClient;
-import org.particleframework.runtime.server.EmbeddedServer;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.runtime.server.EmbeddedServer;
 
 import static org.junit.Assert.*;
 

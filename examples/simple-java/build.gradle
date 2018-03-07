@@ -15,15 +15,15 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    compileOnly "org.particleframework:inject-java:${projectVersion}"
-    compile "org.particleframework:http-server-netty:${projectVersion}"
-    compile "org.particleframework:management:${projectVersion}"
-    compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+    compileOnly "io.micronaut:inject-java:${projectVersion}"
+    compile "io.micronaut:http-server-netty:${projectVersion}"
+    compile "io.micronaut:management:${projectVersion}"
+    compile "io.micronaut.configuration:hibernate-validator:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
-    compile "org.particleframework:discovery-client:${projectVersion}"
+    compile "io.micronaut:discovery-client:${projectVersion}"
 
     testCompile "junit:junit:4.12"
-    testCompile "org.particleframework:http-client:${projectVersion}"
+    testCompile "io.micronaut:http-client:${projectVersion}"
 }
 shadowJar {
     mergeServiceFiles()

@@ -1,4 +1,4 @@
-package org.particleframework.openapi
+package io.micronaut.openapi
 
 import groovy.transform.CompileStatic
 import groovy.transform.builder.Builder

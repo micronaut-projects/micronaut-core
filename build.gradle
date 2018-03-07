@@ -40,7 +40,7 @@ subprojects { subproject ->
     }
 
     if(isConfiguration) {
-        group "org.particleframework.configuration"
+        group "io.micronaut.configuration"
     }
     else {
         group projectGroupId

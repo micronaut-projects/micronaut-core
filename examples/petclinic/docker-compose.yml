@@ -30,7 +30,7 @@ services:
       - mongodb-server
       - consul-server
     environment:
-      PARTICLE_SERVER_HOST: pets-service
+      MICRONAUT_SERVER_HOST: pets-service
       MONGO_HOST: mongodb-server
       MONGO_PORT: 27017
       CONSUL_HOST: consul-server
@@ -42,7 +42,7 @@ services:
       - pets-service
       - consul-server
     environment:
-      PARTICLE_SERVER_HOST: vendors-service
+      MICRONAUT_SERVER_HOST: vendors-service
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
   offers-service:
@@ -52,7 +52,7 @@ services:
       - pets-service
       - consul-server
     environment:
-      PARTICLE_SERVER_HOST: offers-service
+      MICRONAUT_SERVER_HOST: offers-service
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
       REDIS_HOST: redis-server
@@ -65,7 +65,7 @@ services:
       - neo4j-server
       - consul-server
     environment:
-      PARTICLE_SERVER_HOST: comments-service
+      MICRONAUT_SERVER_HOST: comments-service
       NEO4J_HOST: neo4j-server
       NEO4J_PORT: 7687
       CONSUL_HOST: consul-server
@@ -80,6 +80,6 @@ services:
       - offers-service
       - comments-service
     environment:
-      PARTICLE_SERVER_HOST: storefront
+      MICRONAUT_SERVER_HOST: storefront
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500

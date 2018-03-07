@@ -16,7 +16,7 @@
 package example.pets;
 
 import example.api.v1.PetOperations;
-import org.particleframework.http.client.Client;
+import io.micronaut.http.client.Client;
 
 /**
  * @author graemerocher

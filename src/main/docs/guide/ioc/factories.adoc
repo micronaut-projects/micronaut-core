@@ -6,7 +6,7 @@ The return types of methods annotated with `@Bean` are the bean types. This is b
 
 [source,groovy]
 ----
-import org.particleframework.context.annotation.*
+import io.micronaut.context.annotation.*
 import javax.inject.*
 
 

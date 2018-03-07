@@ -17,12 +17,12 @@ package example.offers
 
 import example.api.v1.Offer
 import example.api.v1.Pet
-import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.socket.SocketUtils
-import org.particleframework.http.HttpRequest
-import org.particleframework.http.client.RxHttpClient
-import org.particleframework.http.client.RxStreamingHttpClient
-import org.particleframework.runtime.server.EmbeddedServer
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup

@@ -17,7 +17,7 @@ include::{testsjava}/aop/around/NotNullInterceptor.java[tags=interceptor, indent
 <3> If a `null` parameter is found an exception is thrown
 <4> Otherwise link:{api}/org/particleframework/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
 
-NOTE: Particle AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
+NOTE: Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
 
 To put the new `MethodInterceptor` to work the next step is to define an annotation that will trigger the `MethodInterceptor`:
 
@@ -32,7 +32,7 @@ include::{testsjava}/aop/around/NotNull.java[tags=annotation, indent=0]
 
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
-<3> The link:{api}/org/particleframework/aop/Around.html[Around] annotation is added to tell Particle that the annotation is Around advice
+<3> The link:{api}/org/particleframework/aop/Around.html[Around] annotation is added to tell Micronaut that the annotation is Around advice
 <4> The link:{api}/org/particleframework/context/annotation/Type.html[@Type] annotation is used to configure which type implements the advice (in this case the previously defined `NotNullInterceptor`)
 
 With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:
@@ -51,7 +51,7 @@ Whenever the type `NotNullExample` is injected into any class a compile time gen
 include::{testsjava}/aop/around/AroundTest.java[tags=test, indent=0]
 ----
 
-NOTE: Since Particle is compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test compiling before the advice itself is compiled.
+NOTE: Since Micronaut is compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test compiling before the advice itself is compiled.
 
 === Customizing Proxy Generation
 
@@ -61,4 +61,4 @@ This behaviour is more efficient as only one instance of the bean is required, h
 
 * `proxyTarget` (defaults to `false`) - If set to `true` instead of a subclass that calls `super`, the proxy will delegate to the original bean instance
 * `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/org/particleframework/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
-* `lazy` (defaults to `false`) - By default Particle will eagerly intialize the proxy target when the proxy is created. If set to `true` the proxy target will instead be resolved lazily for each method call.
+* `lazy` (defaults to `false`) - By default Micronaut will eagerly intialize the proxy target when the proxy is created. If set to `true` the proxy target will instead be resolved lazily for each method call.

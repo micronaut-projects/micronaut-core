@@ -22,12 +22,12 @@ import example.storefront.client.v1.PetClient
 import example.storefront.client.v1.VendorClient
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.micronaut.runtime.Micronaut
 import io.netty.util.ResourceLeakDetector
 import io.reactivex.Flowable
 import io.reactivex.Single
-import org.particleframework.context.event.ApplicationEventListener
-import org.particleframework.runtime.ParticleApplication
-import org.particleframework.runtime.server.event.ServerStartupEvent
+import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.runtime.server.event.ServerStartupEvent
 
 import javax.inject.Singleton
 
@@ -71,7 +71,6 @@ class Application implements ApplicationEventListener<ServerStartupEvent> {
     }
 
     static void main(String...args) {
-        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID)
-        ParticleApplication.run(Application, args)
+        Micronaut.run(Application, args)
     }
 }

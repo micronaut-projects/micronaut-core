@@ -67,7 +67,7 @@ def asmDependencies = [
 
 ]
 Task taskAsmDownload = buildDownloadTask("asm", asmDependencies, asmVersion)
-buildJarJarTask(targetDir, taskAsmDownload, "asm", ["org.objectweb.asm": "org.particleframework.asm"])
+buildJarJarTask(targetDir, taskAsmDownload, "asm", ["org.objectweb.asm": "io.micronaut.asm"])
 
 
 // ##########################
@@ -77,15 +77,15 @@ buildJarJarTask(targetDir, taskAsmDownload, "asm", ["org.objectweb.asm": "org.pa
 //
 //]
 //Task cglibDownload = buildDownloadTask("cglib", cglibDependencies, cglibVersion)
-//buildJarJarTask(targetDir, cglibDownload, "cglib", ["net.sf.cglib": "org.particleframework.cglib"])
+//buildJarJarTask(targetDir, cglibDownload, "cglib", ["net.sf.cglib": "io.micronaut.cglib"])
 
 // ##########################
 // Project JARJAR handling
 def jarjarOutputJar = new File(targetDir, "jarjar-output.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
-    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
-//    classRename "net.sf.cglib.**", "org.particleframework.cglib.@1"
+    classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
+//    classRename "net.sf.cglib.**", "io.micronaut.cglib.@1"
     destinationDir = targetDir
     destinationName = jarjarOutputJar.name
 }

@@ -1,3 +1,3 @@
-#org.particleframework.annotation.processing.DependencyInjectionAnnotationProcessor
-org.particleframework.annotation.processing.PackageConfigurationInjectProcessor
-org.particleframework.annotation.processing.BeanDefinitionInjectProcessor
+#io.micronaut.annotation.processing.DependencyInjectionAnnotationProcessor
+io.micronaut.annotation.processing.PackageConfigurationInjectProcessor
+io.micronaut.annotation.processing.BeanDefinitionInjectProcessor

@@ -1,6 +1,6 @@
 package demo
 
-import org.particleframework.context.ApplicationContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

@@ -15,7 +15,8 @@
  */
 package example.comments
 
-import org.particleframework.runtime.ParticleApplication
+import io.micronaut.runtime.Micronaut
+
 
 /**
  * @author graemerocher
@@ -24,6 +25,6 @@ import org.particleframework.runtime.ParticleApplication
 class Application {
 
     static void main(String...args) {
-        ParticleApplication.run(Application, args)
+        Micronaut.run(Application, args)
     }
 }

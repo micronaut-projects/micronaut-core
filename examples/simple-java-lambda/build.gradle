@@ -22,12 +22,12 @@ plugins {
 
 apply plugin: 'jp.classmethod.aws.lambda'
 
-//mainClassName = "org.particleframework.function.executor.FunctionApplication"
+//mainClassName = "io.micronaut.function.executor.FunctionApplication"
 mainClassName = "example.UpperCaseTitleFunction"
 applicationDefaultJvmArgs = [""]
 jar {
     manifest {
-//        attributes 'Main-Class': "org.particleframework.function.executor.FunctionApplication"
+//        attributes 'Main-Class': "io.micronaut.function.executor.FunctionApplication"
         attributes 'Main-Class': "example.UpperCaseTitleFunction"
     }
 }
@@ -36,14 +36,14 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    compileOnly "org.particleframework:inject-java:${projectVersion}"
-    compile "org.particleframework:function-aws:${projectVersion}"
+    compileOnly "io.micronaut:inject-java:${projectVersion}"
+    compile "io.micronaut:function-aws:${projectVersion}"
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
 
 
-    testRuntime "org.particleframework:http-server-netty:${projectVersion}"
-    testRuntime "org.particleframework:function-web:${projectVersion}"
+    testRuntime "io.micronaut:http-server-netty:${projectVersion}"
+    testRuntime "io.micronaut:function-web:${projectVersion}"
     testCompile 'junit:junit:4.12'
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }
@@ -53,8 +53,8 @@ shadowJar {
 
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "particle-function"
-//  To deploy ParticleRequestStreamHandler uncomment function-aws dependency
-//  handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+//  To deploy MicronautRequestStreamHandler uncomment function-aws dependency
+//  handler = "io.micronaut.function.aws.MicronautRequestStreamHandler"
     handler = "example.UpperCaseTitleFunction::toUpperCase"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8

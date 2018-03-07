@@ -19,12 +19,12 @@ repositories {
 dependencies {
     Properties props = new Properties()
     new File("../../gradle.properties").withReader { props.load(it) }
-    compileOnly "org.particleframework:inject-groovy:${props.projectVersion}"
-    compile "org.particleframework:runtime-groovy:${props.projectVersion}"
+    compileOnly "io.micronaut:inject-groovy:${props.projectVersion}"
+    compile "io.micronaut:runtime-groovy:${props.projectVersion}"
 
     // use one of these servers, not both...
-    compile "org.particleframework:http-server-netty:${props.projectVersion}"
-    compile "org.particleframework.configuration:hibernate-gorm:${props.projectVersion}"
+    compile "io.micronaut:http-server-netty:${props.projectVersion}"
+    compile "io.micronaut.configuration:hibernate-gorm:${props.projectVersion}"
 
     runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     runtime 'com.h2database:h2:1.4.196'

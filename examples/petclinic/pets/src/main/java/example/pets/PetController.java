@@ -22,9 +22,9 @@ import example.api.v1.PetOperations;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
-import org.particleframework.configurations.hystrix.annotation.HystrixCommand;
-import org.particleframework.http.annotation.Controller;
-import org.particleframework.validation.Validated;
+import io.micronaut.configurations.hystrix.annotation.HystrixCommand;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.validation.Validated;
 
 import javax.inject.Singleton;
 import javax.validation.Valid;

@@ -1,6 +1,6 @@
 package demo;
 
-import org.particleframework.context.annotation.Bean;
+import io.micronaut.context.annotation.Bean;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;

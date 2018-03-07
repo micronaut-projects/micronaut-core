@@ -1,16 +1,16 @@
-package org.particleframework.openapi
+package io.micronaut.openapi
 
 import groovy.transform.CompileStatic
-import org.particleframework.core.naming.conventions.TypeConvention
-import org.particleframework.http.HttpMethod
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Delete
-import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Head
-import org.particleframework.http.annotation.Patch
-import org.particleframework.http.annotation.Post
-import org.particleframework.http.annotation.Put
-import org.particleframework.http.annotation.Trace
+import io.micronaut.core.naming.conventions.TypeConvention
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Delete
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Head
+import io.micronaut.http.annotation.Patch
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.Trace
 
 import java.lang.annotation.Annotation
 import java.lang.reflect.Method

@@ -4,12 +4,12 @@ import example.api.v1.HealthStatus
 import example.storefront.client.v1.MailClient
 import groovy.transform.CompileStatic
 import io.reactivex.Single
-import org.particleframework.http.HttpResponse
-import org.particleframework.http.MediaType
-import org.particleframework.http.annotation.Body
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Post
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 
 import javax.inject.Inject
 import javax.inject.Singleton

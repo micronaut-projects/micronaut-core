@@ -15,7 +15,7 @@
  */
 package example.pets;
 
-import org.particleframework.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
  * @author graemerocher

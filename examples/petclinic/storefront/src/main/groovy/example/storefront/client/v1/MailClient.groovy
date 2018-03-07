@@ -4,10 +4,10 @@ import example.api.v1.Email
 import example.api.v1.HealthStatusOperation
 import example.api.v1.MailOperation
 import groovy.transform.CompileStatic
-import org.particleframework.http.HttpResponse
-import org.particleframework.http.annotation.Body
-import org.particleframework.http.annotation.Post
-import org.particleframework.http.client.Client
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.Client
 
 import javax.validation.Valid
 

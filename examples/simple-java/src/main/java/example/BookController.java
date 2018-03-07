@@ -17,9 +17,9 @@ package example;
 
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import org.particleframework.cache.annotation.Cacheable;
-import org.particleframework.http.annotation.*;
-import org.particleframework.validation.Validated;
+import io.micronaut.cache.annotation.Cacheable;
+import io.micronaut.http.annotation.*;
+import io.micronaut.validation.Validated;
 
 import javax.inject.Singleton;
 import javax.validation.constraints.NotBlank;

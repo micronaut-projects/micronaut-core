@@ -1,0 +1,104 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package io.micronaut.http.server.netty.errors
+
+import groovy.json.JsonSlurper
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.hateos.VndError
+import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.annotation.Get
+
+import javax.inject.Singleton
+
+/**
+ * Tests for different kinds of errors and the expected responses
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+class ErrorSpec extends AbstractMicronautSpec {
+
+    void "test 500 server error"() {
+        given:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/serverError')
+
+        ).onErrorReturn({ t -> t.response.getBody(VndError); return t.response } ).blockingFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+        response.getBody(VndError).get().message == 'Internal Server Error: bad'
+
+
+    }
+
+    void "test 404 error"() {
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/blah')
+
+        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.NOT_FOUND.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+
+
+        when:
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
+
+        then:
+        json.message == 'Page Not Found'
+        json._links.self.href == '/errors/blah'
+
+    }
+
+    void "test 405 error"() {
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.POST('/errors/serverError', 'blah')
+
+        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+
+
+        when:
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
+
+        then:
+        json.message == 'Method [POST] not allowed. Allowed methods: [GET]'
+        json._links.self.href == '/errors/serverError'
+
+
+    }
+    @Controller('/errors')
+    @Singleton
+    static class ErrorController {
+
+        @Get
+        String serverError() {
+            throw new RuntimeException("bad")
+        }
+    }
+}

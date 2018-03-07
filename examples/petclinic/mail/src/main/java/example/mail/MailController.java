@@ -1,10 +1,10 @@
 package example.mail;
 
 import example.api.v1.Email;
-import org.particleframework.http.HttpResponse;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Controller;
-import org.particleframework.http.annotation.Post;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

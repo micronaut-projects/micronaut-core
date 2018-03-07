@@ -17,7 +17,7 @@ package example.vendors
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import org.particleframework.runtime.ParticleApplication
+import io.micronaut.runtime.Micronaut
 
 import javax.inject.Singleton
 
@@ -26,7 +26,7 @@ import javax.inject.Singleton
 @Slf4j
 class Application {
     static void main(String...args) {
-        ParticleApplication.run(Application, args)
+        Micronaut.run(Application, args)
     }
 
 }

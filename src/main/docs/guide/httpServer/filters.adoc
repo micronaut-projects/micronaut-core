@@ -1,4 +1,4 @@
-The Particle HTTP server supports the ability to apply filters to request/response processing in a similar, but reactive, way to Servlet filters in traditional Java applications.
+The Micronaut HTTP server supports the ability to apply filters to request/response processing in a similar, but reactive, way to Servlet filters in traditional Java applications.
 
 Filters provide the ability to support the following use cases:
 
@@ -10,7 +10,7 @@ For a server application, the api:http.filter.HttpServerFilter[] interface's `do
 
 The `doFilter` method accepts the api:http.HttpRequest[] and an instance of api:http.filter.ServerFilterChain[].
 
-The `ServerFilterChain` interface contains a resolved chain of filters with the final entry in the chain being the matched route. The api:http.filter.ServerFilterChain.proceed(org.particleframework.http.HttpRequest)[] method can be used to resume processing of the request.
+The `ServerFilterChain` interface contains a resolved chain of filters with the final entry in the chain being the matched route. The api:http.filter.ServerFilterChain.proceed(io.micronaut.http.HttpRequest)[] method can be used to resume processing of the request.
 
 The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response that will be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] object to modify the response prior to returning the response to the client.
 
@@ -19,7 +19,7 @@ To put these concepts into practise lets look at an example.
 
 === Writing a Filter
 
-Consider a hypothetical use case whereby you wish to trace each request to the Particle "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.
+Consider a hypothetical use case whereby you wish to trace each request to the Micronaut "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.
 
 What you don't want to do is block the underlying Netty event loop within your filter, instead you want to the filter to proceed with execution once any I/O is complete.
 

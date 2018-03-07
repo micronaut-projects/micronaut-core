@@ -1,0 +1,193 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package io.micronaut.runtime.executor
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.PropertySource
+import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.scheduling.Schedulers
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.PropertySource
+import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.scheduling.Schedulers
+import io.micronaut.scheduling.executor.ExecutorConfiguration
+import io.micronaut.scheduling.executor.IOExecutorServiceConfig
+import io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig
+import io.micronaut.scheduling.executor.UserExecutorConfiguration
+import spock.lang.Specification
+import spock.lang.Unroll
+
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ThreadPoolExecutor
+
+/**
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+class ExecutorServiceConfigSpec extends Specification {
+
+    @Unroll
+    void "test configure custom executor with invalidate cache: #invalidateCache"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.build("test")
+                          .environment {
+            it.addPropertySource(PropertySource.of(
+                    'micronaut.server.executors.one.type':'FIXED',
+                    'micronaut.server.executors.one.nThreads':'5',
+                    'micronaut.server.executors.two.type':'work_stealing',
+            ))
+        }.start()
+
+        when:
+        def configs = ctx.getBeansOfType(ExecutorConfiguration)
+
+        then:
+        configs.size() == 4
+
+        when:
+        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+
+        then:
+        executorServices.size() == 4
+
+        when:
+        ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
+        ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
+
+        then:
+        executorServices.size() == 4
+        poolExecutor.corePoolSize == 5
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) // the default IO executor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(Schedulers.SCHEDULED)) // the default IO executor
+        forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
+        poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+
+        def secondResolveExecutors = ctx.getBeansOfType(ExecutorService.class)
+        def secondResolveExecutorConfig = ctx.getBeansOfType(ExecutorConfiguration.class)
+
+        then:
+        secondResolveExecutors.size() == executorServices.size()
+        secondResolveExecutorConfig.size() == configs.size()
+        executorServices.containsAll(secondResolveExecutors)
+        configs.containsAll(secondResolveExecutorConfig)
+
+        when:
+        ctx.stop()
+
+        then:
+        poolExecutor.isShutdown()
+        forkJoinPool.isShutdown()
+
+        where:
+        invalidateCache | environment
+        true            | "test"
+//        false           | "test"
+    }
+
+
+    @Unroll
+    void "test configure custom executor - distinct initialization order with invalidate cache: #invalidateCache"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.build(environment)
+                .environment {
+            it.addPropertySource(PropertySource.of(
+                    'micronaut.server.executors.one.type':'FIXED',
+                    'micronaut.server.executors.one.nThreads':'5',
+                    'micronaut.server.executors.two.type':'work_stealing',
+            ))
+        }.start()
+
+
+
+        when:
+        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+        ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
+        ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
+
+        then:
+        executorServices.size() == 4
+        poolExecutor.corePoolSize == 5
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) instanceof ThreadPoolExecutor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(Schedulers.SCHEDULED)) instanceof ScheduledExecutorService
+        forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
+        poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+        def configs = ctx.getBeansOfType(UserExecutorConfiguration)
+        def moreConfigs = ctx.getBeansOfType(ExecutorConfiguration)
+        executorServices = ctx.getBeansOfType(ExecutorService)
+
+        then:
+        executorServices.size() == 4
+        moreConfigs.size() == 4
+        configs.size() == 4
+
+        where:
+        invalidateCache | environment
+        true            | "test"
+        false           | "test"
+    }
+
+    @Unroll
+    void "test configure existing IO executor - distinct initialization order with invalidate cache: #invalidateCache"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.build(environment)
+                .environment {
+            it.addPropertySource(PropertySource.of(
+                    'micronaut.server.executors.io.type':'FIXED',
+                    'micronaut.server.executors.io.nThreads':'5',
+                    'micronaut.server.executors.two.type':'work_stealing',
+            ))
+        }.start()
+
+
+
+        when:
+        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+
+        then:
+        executorServices.size() == 3
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) instanceof ThreadPoolExecutor
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+        def configs = ctx.getBeansOfType(UserExecutorConfiguration)
+        def moreConfigs = ctx.getBeansOfType(ExecutorConfiguration)
+        executorServices = ctx.getBeansOfType(ExecutorService)
+
+        then:
+        executorServices.size() == 3
+        moreConfigs.size() == 3
+        configs.size() == 3
+
+        where:
+        invalidateCache | environment
+        true            | "test"
+        false           | "test"
+    }
+}

@@ -24,22 +24,22 @@ mainClassName = "example.function.tweet.UpdateStatusFunction"
 
 
 dependencies {
-    compileOnly "org.particleframework:inject-java:${projectVersion}"
+    compileOnly "io.micronaut:inject-java:${projectVersion}"
     compile 'org.twitter4j:twitter4j-core:4.0.6'
 
-    compile "org.particleframework:inject-groovy:${projectVersion}"
-    compile "org.particleframework:function-groovy:${projectVersion}"
+    compile "io.micronaut:inject-groovy:${projectVersion}"
+    compile "io.micronaut:function-groovy:${projectVersion}"
 
 
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
-    provided "org.particleframework:discovery-client:${projectVersion}"
-    provided "org.particleframework:function-web:${projectVersion}"
-    provided "org.particleframework:http-server-netty:${projectVersion}"
+    provided "io.micronaut:discovery-client:${projectVersion}"
+    provided "io.micronaut:function-web:${projectVersion}"
+    provided "io.micronaut:http-server-netty:${projectVersion}"
 
-    testCompile "org.particleframework:http-client:${projectVersion}"
-    testRuntime "org.particleframework:function-web:${projectVersion}"
-    testRuntime "org.particleframework:http-server-netty:${projectVersion}"
+    testCompile "io.micronaut:http-client:${projectVersion}"
+    testRuntime "io.micronaut:function-web:${projectVersion}"
+    testRuntime "io.micronaut:http-server-netty:${projectVersion}"
 
     testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
         exclude module:'groovy-all'
