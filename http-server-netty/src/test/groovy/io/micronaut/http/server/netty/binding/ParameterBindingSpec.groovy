@@ -1,12 +1,15 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpParameters
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Parameter
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import spock.lang.Unroll
 
 /**
@@ -17,9 +20,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
     @Unroll
     void "test bind HTTP parameters for URI #uri"() {
+
         given:
-        def response = rxClient.exchange(uri, String)
-                               .onErrorReturn({t -> t.response}).blockingFirst()
+        def req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
+        def exchange = rxClient.exchange(req, String)
+        def response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
         def status = response.status
         def body = null
         if (status == HttpStatus.OK) {
@@ -33,20 +38,25 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
 
         where:
-        uri                                             | result                      | httpStatus
-        '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
-        '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
-        '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
-        '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
-        '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-        '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
-        '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
-        '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
-        '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
+        httpMethod      | uri                                             | result                      | httpStatus
+        HttpMethod.GET  | '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
+        HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
+        // you can't populate post request data from query parameters without explicit @QueryValue
+        HttpMethod.POST | '/parameter/save?max=30'                        | null                        | HttpStatus.BAD_REQUEST
+        HttpMethod.POST | '/parameter/saveAgain?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/overlap/30'                         | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
     }
 
@@ -57,18 +67,33 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: $max"
         }
 
-        @Get
-        String simple(@Parameter Integer max) {
+        @Post
+        String save(Integer max) {
+            "Parameter Value: $max"
+        }
+
+        @Post
+        String saveAgain(@QueryValue Integer max) {
+            "Parameter Value: $max"
+        }
+
+        @Get('/overlap/{max}')
+        String overlap(@QueryValue Integer max) {
             "Parameter Value: $max"
         }
 
         @Get
-        String named(@Parameter('maximum') Integer max) {
+        String simple(@QueryValue Integer max) {
             "Parameter Value: $max"
         }
 
         @Get
-        String optional(@Parameter Optional<Integer> max) {
+        String named(@QueryValue('maximum') Integer max) {
+            "Parameter Value: $max"
+        }
+
+        @Get
+        String optional(@QueryValue Optional<Integer> max) {
             "Parameter Value: ${max.orElse(10)}"
         }
 

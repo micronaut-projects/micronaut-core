@@ -31,4 +31,10 @@ import java.lang.annotation.*;
 @Documented
 @Qualifier
 public @interface Parameter {
+    /**
+     * Specifies the parameter name. Useful as metadata at times for reflection on classes already compiled without -parameters argument to javac
+     *
+     * @return An optional name of the parameter.
+     */
+    String value() default "";
 }

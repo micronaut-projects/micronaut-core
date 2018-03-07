@@ -16,14 +16,12 @@
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Parameter;
 import io.micronaut.http.uri.UriTemplate;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Write;
 
@@ -59,6 +57,6 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     @Override
     protected boolean isPathParameter(Argument argument) {
-        return argument.getAnnotation(Parameter.class) != null;
+        return argument.getAnnotation(QueryValue.class) != null;
     }
 }
