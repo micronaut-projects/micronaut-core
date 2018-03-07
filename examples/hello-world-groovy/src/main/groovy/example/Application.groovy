@@ -15,10 +15,6 @@
  */
 package example
 
-import io.micronaut.runtime.MicronautApplication
+import io.micronaut.runtime.Micronaut
 
-class Application {
-    static void main(String[] args) {
-        MicronautApplication.run(Application)
-    }
-}
+Micronaut.run(getClass())
