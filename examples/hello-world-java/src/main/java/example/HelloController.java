@@ -15,39 +15,25 @@
  */
 package example;
 
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
-import io.micronaut.cache.annotation.Cacheable;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.validation.Validated;
+import io.reactivex.Single;
 
 import javax.inject.Singleton;
 import javax.validation.constraints.NotBlank;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller
+@Controller("/")
 @Singleton
 @Validated
-public class BookController {
+public class HelloController {
 
-    @Get("/")
-    @Cacheable("books")
-    public List<Book> index() {
-        return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
-    }
-
-    @Post("/save")
-    public Book saveBook(@NotBlank String title) {
-        return new Book(title);
-    }
-
-    @Post("/upload")
-    public Flowable<Book> uploadBook(@Body Flowable<Book> bookFlowable) {
-        return bookFlowable.subscribeOn(Schedulers.io());
+    @Get("/hello/{name}")
+    public Single<String> hello(@NotBlank String name) {
+        return Single.just("Hello " + name + "!");
     }
 }

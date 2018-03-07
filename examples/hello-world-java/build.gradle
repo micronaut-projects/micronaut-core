@@ -23,6 +23,7 @@ dependencies {
     compile "io.micronaut:discovery-client:${projectVersion}"
 
     testCompile "junit:junit:4.12"
+    testCompile "io.micronaut:inject-java:${projectVersion}"
     testCompile "io.micronaut:http-client:${projectVersion}"
 }
 shadowJar {

@@ -15,8 +15,7 @@
  */
 package example;
 
-import io.netty.util.ResourceLeakDetector;
-import io.micronaut.runtime.MicronautApplication;
+import io.micronaut.runtime.Micronaut;
 
 /**
  * @author Graeme Rocher
@@ -25,7 +24,6 @@ import io.micronaut.runtime.MicronautApplication;
 public class Application {
 
     public static void main(String[] args) {
-//        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
-        MicronautApplication.run(Application.class);
+        Micronaut.run(Application.class);
     }
 }

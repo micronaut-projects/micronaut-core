@@ -160,6 +160,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     protected List<PathSegment> buildNestedSegments(CharSequence uriTemplate, int len, Object...parserArguments) {
         List<PathSegment> newSegments = new ArrayList<>();
         List<PathSegment> querySegments = new ArrayList<>();
+
         for (PathSegment segment : segments) {
             if(!segment.isQuerySegment()) {
                 newSegments.add(segment);
@@ -171,6 +172,15 @@ public class UriTemplate implements Comparable<UriTemplate> {
         String templateString = uriTemplate.toString();
         if(shouldPrependSlash(templateString, len)) {
             templateString = '/' + templateString;
+        }
+        else if(!segments.isEmpty() && templateString.startsWith("/")) {
+            PathSegment last = segments.get(segments.size() - 1);
+            if(last instanceof UriTemplateParser.RawPathSegment) {
+                String v = ((UriTemplateParser.RawPathSegment) last).value;
+                if(v.endsWith("/")) {
+                    templateString = templateString.substring(1);
+                }
+            }
         }
         createParser(templateString, parserArguments).parse(newSegments);
         newSegments.addAll(querySegments);
