@@ -22,11 +22,11 @@ plugins {
 
 apply plugin: 'jp.classmethod.aws.lambda'
 
-mainClassName = "example.UpperCaseTitleFunction"
+mainClassName = "example.HelloWorldFunction"
 applicationDefaultJvmArgs = [""]
 jar {
     manifest {
-        attributes 'Main-Class': "example.UpperCaseTitleFunction"
+        attributes 'Main-Class': "example.HelloWorldFunction"
     }
 }
 repositories {
@@ -41,7 +41,7 @@ dependencies {
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
 
 
-    testCompile "io.micronaut:http-client:${projectVersion}"
+    testCompile "io.micronaut:function-client:${projectVersion}"
     testRuntime "io.micronaut:http-server-netty:${projectVersion}"
     testRuntime "io.micronaut:function-web:${projectVersion}"
 
@@ -56,13 +56,11 @@ shadowJar {
 }
 
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
-    functionName = "particle-function"
-//  To deploy MicronautRequestStreamHandler uncomment function-aws dependency
-//  handler = "io.micronaut.function.aws.MicronautRequestStreamHandler"
-    handler = "example.UpperCaseTitleFunction::toUpperCase"
+    functionName = "hello-world"
+    handler = "example.HelloWorldFunction::toUpperCase"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
-    memorySize = 512
+    memorySize = 192
     timeout = 60
 }

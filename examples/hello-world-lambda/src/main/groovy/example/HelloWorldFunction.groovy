@@ -15,24 +15,17 @@
  */
 package example
 
-import groovy.transform.CompileStatic
+import groovy.transform.Field
 
-import javax.inject.Singleton
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-@CompileStatic
-class BookService {
 
+@Field @Inject HelloService helloService
 
-    Book toUpperCase(Book book) {
-        String title = book.title
-        if(title != null) {
-            book.title = book.title.toUpperCase()
-        }
-        return book
-    }
+Message hello(Person person) {
+    helloService.hello(person)
 }

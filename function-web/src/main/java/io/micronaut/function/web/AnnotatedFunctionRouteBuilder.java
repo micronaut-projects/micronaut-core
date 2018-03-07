@@ -141,8 +141,9 @@ public class AnnotatedFunctionRouteBuilder
      *
      * @return A map of functions
      */
+    @Override
     public Map<String, URI> getAvailableFunctions() {
-        return availableFunctions;
+        return Collections.unmodifiableMap(availableFunctions);
     }
 
     @Override

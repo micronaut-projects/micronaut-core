@@ -25,25 +25,24 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class UpperCaseTitleFunctionSpec extends Specification {
+class HelloWorldFunctionSpec extends Specification {
 
     void "run function directly"() {
         expect:
-        new UpperCaseTitleFunction()
-                .toUpperCase(new Book(title: "The Stand")) == new Book(title: "THE STAND")
+        new HelloWorldFunction()
+                .hello(new Person(name: "Fred")).text == "Hello Fred!"
     }
 
     void "run function as REST service"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        HttpClient client = server.getApplicationContext().createBean(HttpClient, server.getURL())
+        HelloClient client = server.getApplicationContext().getBean(HelloClient)
 
         when:
-        Book book = client.toBlocking()
-                          .retrieve(HttpRequest.POST("/upper-case-title", new Book(title: "The Stand")), Book)
-
+        Message message = client.hello(new Person(name: "Fred")).blockingGet()
+        
         then:
-        book.title == "THE STAND"
+        message.text == "Hello Fred!"
 
         cleanup:
         if(server != null)
