@@ -15,7 +15,7 @@
  */
 package io.micronaut.configuration.lettuce;
 
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 
 /**
@@ -29,7 +29,7 @@ public class NamedRedisServersConfiguration extends AbstractRedisConfiguration {
 
     private final String serverName;
 
-    public NamedRedisServersConfiguration(@Argument String name) {
+    public NamedRedisServersConfiguration(@Parameter String name) {
         this.serverName = name;
     }
 

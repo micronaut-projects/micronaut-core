@@ -17,13 +17,7 @@ package io.micronaut.inject.factory
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Argument
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Argument
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.exceptions.BeanInstantiationException
@@ -138,7 +132,7 @@ class ParametrizedFactorySpec extends Specification  {
         }
 
         @Bean
-        C buildC(B b, @Argument int count) {
+        C buildC(B b, @Parameter int count) {
             return new C(b, count)
         }
 

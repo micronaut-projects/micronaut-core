@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.netty.http.HttpStreamsClientHandler;
 import com.typesafe.netty.http.StreamedHttpResponse;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
@@ -49,7 +49,6 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -58,33 +57,16 @@ import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.client.exceptions.ContentLengthExceededException;
-import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.filter.ClientFilterChain;
-import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -150,8 +132,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      * @param codecRegistry The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
     @Inject
-    public DefaultHttpClient(@Argument LoadBalancer loadBalancer,
-                             @Argument HttpClientConfiguration configuration,
+    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
+                             @Parameter HttpClientConfiguration configuration,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
@@ -189,7 +171,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
 
-    public DefaultHttpClient(@Argument URL url) {
+    public DefaultHttpClient(@Parameter URL url) {
         this(LoadBalancer.fixed(url));
     }
 

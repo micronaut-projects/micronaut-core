@@ -24,6 +24,7 @@ import io.micronaut.context.BeanContext;
  * @author graemerocher
  * @since 1.0
  */
+@FunctionalInterface
 public interface BeanContextConditional {
 
     /**

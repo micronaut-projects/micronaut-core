@@ -15,11 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.env.Environment;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -52,8 +48,8 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private ConvertibleValues<String> instanceMetadata;
 
     NettyEmbeddedServerInstance(
-            @Argument String id,
-            @Argument NettyHttpServer nettyHttpServer,
+            @Parameter String id,
+            @Parameter NettyHttpServer nettyHttpServer,
             Environment environment,
             @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
             ServiceInstanceMetadataContributor...metadataContributors) {

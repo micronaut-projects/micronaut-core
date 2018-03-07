@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
-
-
 /**
- * A constructor injection point
+ * This package contains the core classes for starting a {@link io.micronaut.context.BeanContext}
  *
- * @author Graeme Rocher
+ * @see io.micronaut.context.BeanContext
+ * @see io.micronaut.context.ApplicationContext
+ * @author graemerocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint {
-
-    /**
-     * Invoke the constructor
-     *
-     * @param args The arguments
-     * @return The new value
-     */
-    T invoke(Object... args);
-}
+package io.micronaut.context;

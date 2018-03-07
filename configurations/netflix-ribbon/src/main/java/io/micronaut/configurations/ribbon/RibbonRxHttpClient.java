@@ -19,11 +19,8 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.reactive.ExecutionListener;
 import com.netflix.loadbalancer.reactive.LoadBalancerCommand;
 import hu.akarnokd.rxjava.interop.RxJavaInterop;
+import io.micronaut.context.annotation.*;
 import io.reactivex.Flowable;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -60,8 +57,8 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
 
     @Inject
     public RibbonRxHttpClient(
-            @io.micronaut.context.annotation.Argument LoadBalancer loadBalancer,
-            @io.micronaut.context.annotation.Argument HttpClientConfiguration configuration,
+            @Parameter LoadBalancer loadBalancer,
+            @Parameter HttpClientConfiguration configuration,
             NettyClientSslBuilder nettyClientSslBuilder,
             MediaTypeCodecRegistry codecRegistry,
             RibbonExecutionListenerAdapter[] executionListeners,

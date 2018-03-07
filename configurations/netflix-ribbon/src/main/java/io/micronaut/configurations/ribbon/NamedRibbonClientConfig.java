@@ -15,10 +15,7 @@
  */
 package io.micronaut.configurations.ribbon;
 
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.Environment;
 
@@ -33,7 +30,7 @@ public class NamedRibbonClientConfig extends AbstractRibbonClientConfig {
     public static final String PREFIX = "ribbon.clients";
     private final String name;
 
-    public NamedRibbonClientConfig(@Argument String name, Environment environment) {
+    public NamedRibbonClientConfig(@Parameter String name, Environment environment) {
         super(environment);
         this.name = name;
     }

@@ -41,7 +41,7 @@ import java.util.stream.Stream;
 public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T> {
 
     /**
-     * @return The scope of the component
+     * @return The scope of the bean
      */
     Optional<Class<? extends Annotation>> getScope();
 
@@ -57,12 +57,12 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     boolean isProvided();
 
     /**
-     * @return Whether the bean declared {@link EachProperty}
+     * @return Whether the bean declared with {@link EachProperty} or {@link io.micronaut.context.annotation.EachBean}
      */
     boolean isIterable();
 
     /**
-     * @return The component type
+     * @return The produced bean type
      */
     @Override
     Class<T> getBeanType();

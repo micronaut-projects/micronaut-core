@@ -19,7 +19,7 @@ import javax.inject.Qualifier;
 import java.lang.annotation.*;
 
 /**
- * <p>Specifies that the the argument is user provided and a {@link io.micronaut.inject.ParametrizedBeanFactory} should be generated</p>
+ * <p>Specifies that an argument to a bean constructor is user provided and a {@link io.micronaut.inject.ParametrizedBeanFactory} should be generated</p>
  *
  * <p>Should be applied only to constructor arguments and {@link Bean} factory methods</p>
  *
@@ -30,5 +30,5 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Qualifier
-public @interface Argument {
+public @interface Parameter {
 }

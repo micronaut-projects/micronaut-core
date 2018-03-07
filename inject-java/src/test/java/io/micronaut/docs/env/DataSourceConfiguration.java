@@ -18,12 +18,10 @@ package io.micronaut.docs.env;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 
 // tag::eachProperty[]
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.*;
 
 @EachProperty("test.datasource")  // <1>
 public class DataSourceConfiguration {
@@ -31,7 +29,7 @@ public class DataSourceConfiguration {
     private final String name;
     private URI url = new URI("localhost");
 
-    public DataSourceConfiguration(@Argument String name) // <2>
+    public DataSourceConfiguration(@Parameter String name) // <2>
             throws URISyntaxException {
         this.name = name;
     }

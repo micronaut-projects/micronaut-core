@@ -16,12 +16,7 @@
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.model.InvokeRequest;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.function.client.FunctionDefinition;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Requires;
@@ -42,7 +37,7 @@ public class AWSInvokeRequestDefinition implements FunctionDefinition {
     @ConfigurationBuilder
     protected InvokeRequest invokeRequest;
 
-    public AWSInvokeRequestDefinition(@Argument String name) {
+    public AWSInvokeRequestDefinition(@Parameter String name) {
         this.invokeRequest = new InvokeRequest();
         this.invokeRequest.setFunctionName(name);
     }

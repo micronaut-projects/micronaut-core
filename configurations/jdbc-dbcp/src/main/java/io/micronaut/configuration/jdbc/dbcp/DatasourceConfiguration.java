@@ -15,15 +15,11 @@
  */
 package io.micronaut.configuration.jdbc.dbcp;
 
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 import org.apache.commons.dbcp2.BasicDataSource;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.jdbc.BasicJdbcConfiguration;
-import io.micronaut.jdbc.CalculatedSettings;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -47,7 +43,7 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     private final CalculatedSettings calculatedSettings;
     private final String name;
 
-    public DatasourceConfiguration(@Argument String name) {
+    public DatasourceConfiguration(@Parameter String name) {
         super();
         this.name = name;
         this.calculatedSettings = new CalculatedSettings(this);

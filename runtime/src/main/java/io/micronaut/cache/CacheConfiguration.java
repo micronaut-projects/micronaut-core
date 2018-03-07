@@ -15,15 +15,11 @@
  */
 package io.micronaut.cache;
 
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -49,7 +45,7 @@ public class CacheConfiguration {
 
     private final String cacheName;
 
-    public CacheConfiguration(@Argument String cacheName, ApplicationConfiguration applicationConfiguration) {
+    public CacheConfiguration(@Parameter String cacheName, ApplicationConfiguration applicationConfiguration) {
         this.cacheName = cacheName;
         this.charset = applicationConfiguration.getDefaultCharset();
     }

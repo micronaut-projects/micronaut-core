@@ -1,10 +1,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.*;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -13,21 +10,13 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.*;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
-import io.micronaut.context.*;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.*;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -43,12 +32,12 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * <p>Responsible for building bean definitions at compile time. Uses ASM build the class definition.</p>
- * <p>
+ * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
+ *
  * <p>Should be used from AST frameworks to build bean definitions from source code data.</p>
- * <p>
+ *
  * <p>For example:</p>
- * <p>
+ *
  * <pre>
  *     {@code
  *
@@ -60,6 +49,7 @@ import java.util.stream.Collectors;
  *     }
  * </pre>
  *
+ * @see BeanDefinition
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -1793,9 +1783,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private boolean isArgumentType(Object qualifierType) {
         if (qualifierType != null) {
             if (qualifierType instanceof Class) {
-                return io.micronaut.context.annotation.Argument.class.getName().equals(((Class) qualifierType).getName());
+                return Parameter.class.getName().equals(((Class) qualifierType).getName());
             } else if (qualifierType instanceof CharSequence) {
-                return io.micronaut.context.annotation.Argument.class.getName().equals(qualifierType.toString());
+                return Parameter.class.getName().equals(qualifierType.toString());
             }
         }
         return false;
