@@ -59,6 +59,16 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
         return result.toFlowable();
     }
 
+    @Override
+    public Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results) {
+        Single<HealthResult> result = Flowable.fromPublisher(results).toList().map((list) -> {
+            HealthStatus overallStatus = calculateOverallStatus(list);
+            Object details = aggregateDetails(list);
+            return HealthResult.builder(name, overallStatus).details(details).build();
+        });
+        return result.toFlowable();
+    }
+
     protected HealthStatus calculateOverallStatus(List<HealthResult> results) {
         return results.stream()
                 .map(HealthResult::getStatus)
@@ -71,8 +81,8 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
     protected Flowable<HealthResult> aggregateResults(HealthIndicator[] indicators) {
         return Flowable.merge(
                 Arrays.stream(indicators)
-                      .map(HealthIndicator::getResult)
-                      .collect(Collectors.toList())
+                        .map(HealthIndicator::getResult)
+                        .collect(Collectors.toList())
         );
     }
 

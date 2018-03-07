@@ -47,18 +47,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
         if(executorService == null) {
             throw new IllegalStateException("I/O ExecutorService is null");
         }
-        return new AsyncSingleResultPublisher<>(executorService, () -> {
-            HealthResult.Builder builder = HealthResult.builder(getName());
-            try {
-                builder.details(getHealthInformation());
-                builder.status(this.healthStatus);
-            } catch (Exception e) {
-                builder.status(HealthStatus.DOWN);
-                builder.exception(e);
-            }
-            return builder.build();
-        });
-
+        return new AsyncSingleResultPublisher<>(executorService, this::getHealthResult);
     }
 
     /**
@@ -69,6 +58,23 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
      * @return Any details to be included in the response.
      */
     protected abstract T getHealthInformation();
+
+    /**
+     * Builds the whole health result.
+     *
+     * @return The health result to provide to the indicator.
+     */
+    protected HealthResult getHealthResult() {
+        HealthResult.Builder builder = HealthResult.builder(getName());
+        try {
+            builder.details(getHealthInformation());
+            builder.status(this.healthStatus);
+        } catch (Exception e) {
+            builder.status(HealthStatus.DOWN);
+            builder.exception(e);
+        }
+        return builder.build();
+    }
 
     /**
      * Used to populate the {@link HealthResult}. Provides a key to go

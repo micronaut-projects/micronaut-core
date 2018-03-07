@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint.health;
 
+import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.endpoint.Endpoint;
@@ -29,8 +30,12 @@ import org.reactivestreams.Publisher;
  * @author James Kleeh
  * @since 1.0
  */
-@Endpoint("health")
+@Endpoint(HealthEndpoint.NAME)
 public class HealthEndpoint {
+
+
+    public static final String NAME = "health";
+    public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     private HealthAggregator healthAggregator;
     private HealthIndicator[] healthIndicators;
