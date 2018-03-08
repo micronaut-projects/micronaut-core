@@ -17,6 +17,7 @@ package io.micronaut.http
 
 import io.micronaut.core.value.OptionalValues
 import spock.lang.Specification
+import spock.lang.Unroll
 
 /**
  * @author Graeme Rocher
@@ -45,6 +46,27 @@ class MediaTypeSpec extends Specification {
         "application/hal+xml"       | null  | null       | "application/hal+xml"  | 'xml'       | [:]                | 1.0     | 'hal+xml'  | "application"
         "application/json"          | null  | null       | "application/json"     | 'json'      | [:]                | 1.0     | 'json'     | "application"
         "text/html;charset=utf-8"   | null  | null       | "text/html"            | 'html'      | [charset: "utf-8"] | 1.0     | 'html'     | "text"
+    }
 
+    @Unroll
+    void "test #contentType is compressible = #expected"() {
+        expect:
+        MediaType.isCompressible(contentType) == expected
+
+        where:
+        contentType                  | expected
+        "application/hal+xml;q=1.1"  | true
+        "application/hal+xml;q=1.1"  | true
+        "application/hal+json"       | true
+        "application/hal+xml"        | true
+        "application/json"           | true
+        "application/xml"            | true
+        "text/html;charset=utf-8"    | true
+        "text/foo"                   | true
+        "application/hal+text"       | true
+        "image/png"                  | false
+        "image/jpg"                  | false
+        "multipart/form-data"        | false
+        "application/x-json-stream"  | false
     }
 }

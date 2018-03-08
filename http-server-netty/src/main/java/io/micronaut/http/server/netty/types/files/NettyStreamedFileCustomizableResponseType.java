@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType;
 import io.netty.channel.ChannelFuture;
@@ -29,8 +27,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.async.DefaultCloseHandler;
-import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType;
 
 import java.io.InputStream;
 import java.net.URL;

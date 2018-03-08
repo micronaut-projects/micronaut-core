@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.server.netty.types;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
 import io.netty.channel.ChannelHandlerContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
