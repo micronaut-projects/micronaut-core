@@ -19,7 +19,6 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.http.annotation.Produces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -48,11 +48,16 @@ public class MediaType implements CharSequence {
     private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
+    private static final List<Pattern> compressiblePatterns = new ArrayList<>(4);
 
     static {
         ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
                 new MediaType(charSequence.toString())
         );
+        compressiblePatterns.add(Pattern.compile("^text/.*$"));
+        compressiblePatterns.add(Pattern.compile("^.*\\+json$"));
+        compressiblePatterns.add(Pattern.compile("^.*\\+text$"));
+        compressiblePatterns.add(Pattern.compile("^.*\\+xml$"));
     }
 
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
@@ -377,6 +382,19 @@ public class MediaType implements CharSequence {
     @Override
     public CharSequence subSequence(int start, int end) {
         return toString().subSequence(start, end);
+    }
+
+    public boolean isCompressible() {
+        boolean matches = compressiblePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
+        if (!matches) {
+            matches = subtype.equals("json") || subtype.equals("xml");
+        }
+        return matches;
+    }
+
+    public static boolean isCompressible(String contentType) {
+        MediaType mediaType = new MediaType(contentType);
+        return mediaType.isCompressible();
     }
 
     public String toString() {

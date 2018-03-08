@@ -183,7 +183,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     (int)serverConfiguration.getWriteIdleTime().getSeconds(),
                                     (int)serverConfiguration.getIdleTime().getSeconds()));
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
-//                            pipeline.addLast(HTTP_COMPRESSOR, new HttpContentCompressor());
+                            pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                             pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration));
                             pipeline.addLast(MICRONAUT_HANDLER, new RoutingInBoundHandler(
