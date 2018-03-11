@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.value.OptionalValues;
 
 import javax.lang.model.element.*;
@@ -56,7 +57,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
-        return element.getAnnotationMirrors();
+        List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
+        annotationMirrors.removeIf(mirror -> getAnnotationTypeName(mirror).equals(AnnotationUtil.KOTLIN_METADATA));
+        return annotationMirrors;
     }
 
     @Override
@@ -354,56 +357,56 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitBoolean(boolean b, Object o) {
-                arrayType = boolean.class;
+                arrayType = Boolean.class;
                 values.add(b);
                 return null;
             }
 
             @Override
             public Object visitByte(byte b, Object o) {
-                arrayType = byte.class;
+                arrayType = Byte.class;
                 values.add(b);
                 return null;
             }
 
             @Override
             public Object visitChar(char c, Object o) {
-                arrayType = char.class;
+                arrayType = Character.class;
                 values.add(c);
                 return null;
             }
 
             @Override
             public Object visitDouble(double d, Object o) {
-                arrayType = double.class;
+                arrayType = Double.class;
                 values.add(d);
                 return null;
             }
 
             @Override
             public Object visitFloat(float f, Object o) {
-                arrayType = float.class;
+                arrayType = Float.class;
                 values.add(f);
                 return null;
             }
 
             @Override
             public Object visitInt(int i, Object o) {
-                arrayType = int.class;
+                arrayType = Integer.class;
                 values.add(i);
                 return null;
             }
 
             @Override
             public Object visitLong(long i, Object o) {
-                arrayType = long.class;
+                arrayType = Long.class;
                 values.add(i);
                 return null;
             }
 
             @Override
             public Object visitShort(short s, Object o) {
-                arrayType = short.class;
+                arrayType = Short.class;
                 values.add(s);
                 return null;
             }

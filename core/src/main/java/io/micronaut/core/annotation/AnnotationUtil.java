@@ -27,6 +27,8 @@ public class AnnotationUtil {
             Target.class.getName()
     );
 
+    public static final String KOTLIN_METADATA = "kotlin.Metadata";
+
     /**
      * Constant indicating an zero annotation
      */

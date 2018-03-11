@@ -18,8 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -28,21 +27,10 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.writer.*;
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
-import io.micronaut.context.annotation.*;
-import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.value.OptionalValues;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
-import io.micronaut.inject.writer.*;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -106,7 +94,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (annotations.isEmpty()) {
             return false;
         }
-        annotations = annotations.stream().filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES)).collect(Collectors.toSet());
+        annotations = annotations.stream()
+                .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
+                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES))
+                .collect(Collectors.toSet());
         if (!annotations.isEmpty()) {
 
             // accumulate all the class elements for all annotated elements
