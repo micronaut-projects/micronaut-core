@@ -1,4 +1,4 @@
-Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
+Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
 
 Unlike the aforementioned frameworks, however, Micronaut uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
 
@@ -26,7 +26,7 @@ Once you have prepared a type safe configuration it can simply be injected into 
 include::{testsdir}/config/properties/EngineImpl.groovy[tags=class, indent=0]
 ----
 
-Configuration values can then be supplied from one of the link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances. For example:
+Configuration values can then be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
 .Supply Configuration
 [source,groovy]
@@ -38,11 +38,11 @@ The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
 
 == Configuration Builder
 
-To support the ability for a builder style class to be populated with configuration values, the link:{api}/org/particleframework/context/annotation/ConfigurationBuilder.html[@ConfigurationBuilder] annotation can be used. link:{api}/org/particleframework/context/annotation/ConfigurationBuilder.html[ConfigurationBuilder] can be added to a field or method in a class annotated with link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[@ConfigurationProperties].
+To support the ability for a builder style class to be populated with configuration values, the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[@ConfigurationBuilder] annotation can be used. link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[ConfigurationBuilder] can be added to a field or method in a class annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties].
 
 One or more method prefixes can be specified in the annotation to support builder methods like "withXxx" or "setXxx". If the builder methods have no prefix, assign an empty string to the parameter.
 
-A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
+A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 
 For example:
 
@@ -72,7 +72,7 @@ include::{testsdir}/config/builder/EngineFactory.groovy[tags=class, indent=0]
 
 The engine that was returned can then be injected anywhere an engine is depended on.
 
-Configuration values can be supplied from one of the link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances. For example:
+Configuration values can be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
 .Supply Configuration
 [source,groovy]

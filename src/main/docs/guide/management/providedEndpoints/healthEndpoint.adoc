@@ -18,11 +18,11 @@ endpoints:
 
 === Customization
 
-The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/org/particleframework/management/health/indicator/HealthIndicator.html[HealthIndicator]. A base class link:{api}/org/particleframework/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
+The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
 
-All of the health indicator beans will be collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements link:{api}/org/particleframework/management/health/aggregator/HealthAggregator.html[HealthAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/org/particleframework/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/org/particleframework/management/health/aggregator/RxJavaHealthAggregator.html[default implementation].
+All of the health indicator beans will be collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements link:{api}/io/micronaut/management/health/aggregator/HealthAggregator.html[HealthAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/health/aggregator/RxJavaHealthAggregator.html[default implementation].
 
-The default health aggregator returns an overall status that is calculated based on the health statuses of the indicators. A link:{api}/org/particleframework/health/HealthStatus.html[health status] consists of several pieces of information.
+The default health aggregator returns an overall status that is calculated based on the health statuses of the indicators. A link:{api}/io/micronaut/health/HealthStatus.html[health status] consists of several pieces of information.
 
 |=======
 |Name |The name of the status
