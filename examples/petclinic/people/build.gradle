@@ -1,6 +1,0 @@
-dependencies {
-  compileOnly "io.micronaut:inject-java:${projectVersion}"
-  compile "io.micronaut:http-server-netty:${projectVersion}"
-
-  testCompile "junit:junit:4.12"
-}
