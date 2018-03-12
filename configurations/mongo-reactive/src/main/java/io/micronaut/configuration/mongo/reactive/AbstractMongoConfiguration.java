@@ -16,35 +16,23 @@
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.ConnectionString;
-import com.mongodb.ServerAddress;
-import com.mongodb.async.client.MongoClientSettings;
-import com.mongodb.connection.*;
-import com.mongodb.reactivestreams.client.MongoClients;
-import io.micronaut.context.env.Environment;
-import org.bson.codecs.pojo.PojoCodecProvider;
+import com.mongodb.MongoClientOptions;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.validation.constraints.NotBlank;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
-import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
-import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
-
 /**
- * Abstract Mongo configuration type
- *
  * @author graemerocher
  * @since 1.0
  */
-abstract class AbstractMongoConfiguration {
+public abstract class AbstractMongoConfiguration {
 
-    protected String uri;
+    private String uri = MongoSettings.DEFAULT_URI;
 
-    protected final ApplicationConfiguration applicationConfiguration;
+    private final ApplicationConfiguration applicationConfiguration;
 
     public AbstractMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
@@ -59,43 +47,6 @@ abstract class AbstractMongoConfiguration {
     }
 
     /**
-     * @return The {@link ClusterSettings#builder()}
-     */
-    public abstract ClusterSettings.Builder getClusterSettings();
-
-    /**
-     * @return The {@link MongoClientSettings#builder()}
-     */
-    public abstract MongoClientSettings.Builder getClientSettings();
-
-    public abstract ServerSettings.Builder getServerSettings();
-
-    public abstract ConnectionPoolSettings.Builder getPoolSettings();
-
-    public abstract SocketSettings.Builder getSocketSettings();
-
-    public abstract SslSettings.Builder getSslSettings();
-
-    /**
-     * Sets the MongoDB URI
-     * @param uri The MongoDB URI
-     */
-    public void setUri(String uri) {
-        this.uri = uri;
-        Optional<ConnectionString> connectionString = getConnectionString();
-        if(connectionString.isPresent()) {
-            ConnectionString cs = connectionString.get();
-
-            getServerSettings().applyConnectionString(cs);
-            getClusterSettings().applyConnectionString(cs);
-            getPoolSettings().applyConnectionString(cs);
-            getSslSettings().applyConnectionString(cs);
-            getSocketSettings().applyConnectionString(cs);
-        }
-    }
-
-
-    /**
      * @return The MongoDB {@link ConnectionString}
      */
     public Optional<ConnectionString> getConnectionString() {
@@ -106,31 +57,19 @@ abstract class AbstractMongoConfiguration {
     }
 
     /**
-     * @return Builds the {@link MongoClientSettings}
+     * Sets the MongoDB URI
+     * @param uri The MongoDB URI
      */
-    public MongoClientSettings buildSettings() {
-        ClusterSettings.Builder clusterSettings = getClusterSettings();
-        SslSettings.Builder sslSettings = getSslSettings();
-        ConnectionPoolSettings.Builder poolSettings = getPoolSettings();
-        SocketSettings.Builder socketSettings = getSocketSettings();
-        ServerSettings.Builder serverSettings = getServerSettings();
-
-
-        MongoClientSettings.Builder clientSettings = getClientSettings();
-        clientSettings.applicationName(getApplicationName());
-        clientSettings.clusterSettings(clusterSettings.build())
-                      .serverSettings(serverSettings.build())
-                      .connectionPoolSettings(poolSettings.build())
-                      .socketSettings(socketSettings.build())
-                      .sslSettings(sslSettings.build())  ;
-
-        clientSettings.codecRegistry(
-                fromRegistries(MongoClients.getDefaultCodecRegistry(),
-                        fromProviders(PojoCodecProvider.builder().automatic(true).build()))
-
-        );
-        return clientSettings.build();
+    public void setUri(String uri) {
+        if(StringUtils.isNotEmpty(uri)) {
+            this.uri = uri;
+        }
     }
+
+    /**
+     * @return Builds the options
+     */
+    public abstract MongoClientOptions buildOptions();
 
     protected String getApplicationName() {
         return applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);

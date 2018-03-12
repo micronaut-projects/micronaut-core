@@ -24,15 +24,6 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.Resource;
 import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.Resource;
-import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
 
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;

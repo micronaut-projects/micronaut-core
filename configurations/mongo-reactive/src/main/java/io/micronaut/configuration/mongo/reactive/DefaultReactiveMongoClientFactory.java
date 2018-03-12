@@ -15,7 +15,8 @@
  */
 package io.micronaut.configuration.mongo.reactive;
 
-import com.mongodb.MongoClient;
+import com.mongodb.reactivestreams.client.MongoClient;
+import com.mongodb.reactivestreams.client.MongoClients;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -23,19 +24,19 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
 
 /**
- * Builds the primary MongoClient
+ * Factory for the default {@link MongoClient}. Creates the injectable {@link Primary} bean
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(classes = MongoClient.class)
-@Requires(beans = DefaultMongoConfiguration.class)
+@Requires(beans = ReactiveMongoConfiguration.class)
 @Factory
-public class DefaultMongoClientFactory {
+public class DefaultReactiveMongoClientFactory {
+
     @Bean(preDestroy = "close")
     @Refreshable(MongoSettings.PREFIX)
     @Primary
-    MongoClient mongoClient(DefaultMongoConfiguration configuration) {
-        return new MongoClient(configuration.buildURI());
+    MongoClient mongoClient(ReactiveMongoConfiguration mongoConfiguration) {
+        return MongoClients.create(mongoConfiguration.buildSettings());
     }
 }

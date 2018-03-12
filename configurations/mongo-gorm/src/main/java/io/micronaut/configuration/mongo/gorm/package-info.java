@@ -13,29 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configuration.mongo.reactive;
-
 /**
- * Common constants to for MongoDB settings
- *
  * @author graemerocher
  * @since 1.0
  */
-public interface MongoSettings {
-    /**
-     * The prefix to use for all MongoDB settings
-     */
-    String PREFIX = "mongodb";
-    /**
-     * The MongoDB URI setting
-     */
-    String MONGODB_URI = PREFIX + ".uri";
-    /**
-     * The MongoDB servers settings
-     */
-    String MONGODB_SERVERS = PREFIX + ".servers";
-    /**
-     * The default URI
-     */
-    String DEFAULT_URI = "mongodb://localhost";
-}
+@Configuration
+@RequiresMongo
+@Requires(beans = MongoClient.class)
+package io.micronaut.configuration.mongo.gorm;
+
+import com.mongodb.MongoClient;
+import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;

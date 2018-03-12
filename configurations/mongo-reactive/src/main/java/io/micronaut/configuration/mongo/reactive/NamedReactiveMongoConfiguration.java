@@ -30,7 +30,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
  * @since 1.0
  */
 @EachProperty(value = MongoSettings.MONGODB_SERVERS)
-public class NamedMongoConfiguration extends AbstractMongoConfiguration {
+public class NamedReactiveMongoConfiguration extends AbstractReactiveMongoConfiguration {
 
     private final String serverName;
     @ConfigurationBuilder(prefixes = "")
@@ -52,7 +52,7 @@ public class NamedMongoConfiguration extends AbstractMongoConfiguration {
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
 
-    public NamedMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
+    public NamedReactiveMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.serverName = serverName;
     }
@@ -96,6 +96,7 @@ public class NamedMongoConfiguration extends AbstractMongoConfiguration {
 
     @Override
     protected String getApplicationName() {
-        return applicationConfiguration.getName().map(n -> n + "-" +  serverName).orElse(Environment.DEFAULT_NAME + "-" + serverName);
+        String applicationName = super.getApplicationName();
+        return applicationName + "-" + serverName;
     }
 }

@@ -94,7 +94,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
 
     @Override
     public boolean isContextScope() {
-        return getClass().getAnnotation(Context.class) != null;
+        return getAnnotationMetadata().hasDeclaredStereotype(Context.class);
     }
 
     @Override

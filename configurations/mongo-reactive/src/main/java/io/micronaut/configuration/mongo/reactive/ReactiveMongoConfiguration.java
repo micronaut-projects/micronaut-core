@@ -20,9 +20,6 @@ import com.mongodb.connection.*;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
@@ -34,7 +31,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 @Requires(property = MongoSettings.PREFIX)
 @Requires(missingProperty = MongoSettings.MONGODB_SERVERS)
 @ConfigurationProperties(MongoSettings.PREFIX)
-public class MongoConfiguration extends AbstractMongoConfiguration {
+public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfiguration {
 
     @ConfigurationBuilder(prefixes = "")
     protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();
@@ -55,7 +52,7 @@ public class MongoConfiguration extends AbstractMongoConfiguration {
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
 
-    public MongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public ReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }
 
@@ -103,7 +100,7 @@ public class MongoConfiguration extends AbstractMongoConfiguration {
 
     @Override
     public String toString() {
-        return "MongoConfiguration{" +
+        return "ReactiveMongoConfiguration{" +
                 "uri='" + getUri() + '\'' +
                 ", clientSettings=" + clientSettings +
                 ", clusterSettings=" + clusterSettings +

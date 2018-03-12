@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configuration.neo4j.gorm.event;
+package io.micronaut.configuration.gorm.event;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.grails.datastore.gorm.events.ConfigurableApplicationEventPublisher;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.spring.core.event.ApplicationEventPublisherAdapter;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
@@ -43,6 +43,7 @@ public class ConfigurableEventPublisherAdapter extends ApplicationEventPublisher
     public void addApplicationListener(ApplicationListener<?> listener) {
         if(listener instanceof SmartApplicationListener) {
             SmartApplicationListener smartApplicationListener = (SmartApplicationListener) listener;
+            Qualifier<ApplicationEventListener> qualifier = resolveQualifier(smartApplicationListener);
             this.applicationContext.registerSingleton(
                     ApplicationEventListener.class,
                     new ApplicationEventListener() {
@@ -64,9 +65,19 @@ public class ConfigurableEventPublisherAdapter extends ApplicationEventPublisher
                             }
                             return false;
                         }
-                    }
+
+                        @Override
+                        public String toString() {
+                            return "Adapted: " + smartApplicationListener;
+                        }
+                    },
+                    qualifier
             );
 
         }
+    }
+
+    private Qualifier<ApplicationEventListener> resolveQualifier(SmartApplicationListener smartApplicationListener) {
+        return Qualifiers.byName(smartApplicationListener.getClass().getSimpleName());
     }
 }
