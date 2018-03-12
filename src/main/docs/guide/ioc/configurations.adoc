@@ -1,4 +1,4 @@
-A bean link:{api}/org/particleframework/context/annotation/Configuration.html[@Configuration] is a grouping of multiple bean definitions within a package.
+A bean link:{api}/io/micronaut/context/annotation/Configuration.html[@Configuration] is a grouping of multiple bean definitions within a package.
 
 The `@Configuration` annotation is applied at the package level and informs Micronaut that the beans defined with the package form a logical grouping.
 
@@ -27,7 +27,7 @@ In the above example, all bean definitions within the annotated package will onl
 
 === Configuration Requirements
 
-The link:{api}/org/particleframework/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
+The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
 
 
 .Using @Requires
