@@ -1,4 +1,4 @@
-The link:{api}/org/particleframework/context/annotation/EachProperty.html[@EachProperty] is a great way to drive dynamic configuration, but typically you want to inject that configuration into another bean that depends on it. Injecting a single instance with a hard coded qualifier is not a great solution, hence `@EachProperty` is typically used in combination with link:{api}/org/particleframework/context/annotation/EachBean.html[@EachBean]:
+The link:{api}/io/micronaut/context/annotation/EachProperty.html[@EachProperty] is a great way to drive dynamic configuration, but typically you want to inject that configuration into another bean that depends on it. Injecting a single instance with a hard coded qualifier is not a great solution, hence `@EachProperty` is typically used in combination with link:{api}/io/micronaut/context/annotation/EachBean.html[@EachBean]:
 
 .Using @EachBean
 [source,java]
@@ -7,8 +7,8 @@ include::{testsjava}/env/DataSourceFactory.java[tags=eachBean, indent=0]
 }
 ----
 
-<1> The above example defines a bean link:{api}/org/particleframework/context/annotation/Factory.html[Factory] that will create instances of `javax.sql.DataSource`.
-<2> The link:{api}/org/particleframework/context/annotation/EachBean.html[@EachBean] annotation is used to indicate that a new `DataSource` bean should be created for each `DataSourceConfiguration` defined in the previous section.
+<1> The above example defines a bean link:{api}/io/micronaut/context/annotation/Factory.html[Factory] that will create instances of `javax.sql.DataSource`.
+<2> The link:{api}/io/micronaut/context/annotation/EachBean.html[@EachBean] annotation is used to indicate that a new `DataSource` bean should be created for each `DataSourceConfiguration` defined in the previous section.
 <3> The `DataSourceConfiguration` instance is injected as a method argument and used to drive the configuration of each `javax.sql.DataSource`
 
 

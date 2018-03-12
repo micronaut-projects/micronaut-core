@@ -8,7 +8,7 @@ include::{testsuite}/server/intro/Application.java[tags=imports, indent=0]
 include::{testsuite}/server/intro/Application.java[tags=class, indent=0]
 ----
 
-To run the application from a unit test you can use the link:{api}/org/particleframework/runtime/server/EmbeddedServer.html[EmbeddedServer] interface. The following test is written in Groovy with http://spockframework.org[Spock]:
+To run the application from a unit test you can use the link:{api}/io/micronaut/runtime/server/EmbeddedServer.html[EmbeddedServer] interface. The following test is written in Groovy with http://spockframework.org[Spock]:
 
 
 .Micronaut Spock Test
