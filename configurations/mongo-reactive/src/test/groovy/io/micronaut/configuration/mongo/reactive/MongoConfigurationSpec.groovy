@@ -16,6 +16,7 @@
 package io.micronaut.configuration.mongo.reactive
 
 import com.mongodb.MongoClient
+import com.mongodb.MongoClientOptions
 import com.mongodb.client.MongoCollection
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
@@ -47,5 +48,23 @@ class MongoConfigurationSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+    }
+
+    void "test build mongo client options"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}",
+            "mongodb.options.maxConnectionIdleTime":'10000'
+        )
+
+        DefaultMongoConfiguration configuration = applicationContext.getBean(DefaultMongoConfiguration)
+        MongoClientOptions clientOptions = configuration.buildOptions()
+
+
+        expect:
+        clientOptions.getMaxConnectionIdleTime() == 10000
+
+        cleanup:
+        applicationContext?.close()
+
     }
 }

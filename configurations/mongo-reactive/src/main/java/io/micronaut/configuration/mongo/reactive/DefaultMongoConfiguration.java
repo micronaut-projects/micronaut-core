@@ -31,13 +31,16 @@ import io.micronaut.runtime.ApplicationConfiguration;
 @ConfigurationProperties(MongoSettings.PREFIX)
 public class DefaultMongoConfiguration extends AbstractMongoConfiguration {
 
-    @ConfigurationBuilder(prefixes = "options")
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "options")
     protected MongoClientOptions.Builder clientOptions = MongoClientOptions.builder();
 
     public DefaultMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }
 
+    /**
+     * @return Builds the {@link MongoClientOptions}
+     */
     @Override
     public MongoClientOptions buildOptions() {
         clientOptions.applicationName(getApplicationName());
