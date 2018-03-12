@@ -1,9 +1,9 @@
 You can hook into the creation of beans using one of the following interfaces:
 
-* link:{api}/org/particleframework/context/event/BeanInitializedEventListener.html[BeanInitializedEventListener] - allows modifying or replacing of a bean after the properties have been set but prior to `@PostConstruct` event hooks.
-* link:{api}/org/particleframework/context/event/BeanCreatedEventListener.html[BeanCreatedEventListener] - allows modifying or replacing of a bean after the bean is fully initialized and all `@PostConstruct` hooks called.
+* link:{api}/io/micronaut/context/event/BeanInitializedEventListener.html[BeanInitializedEventListener] - allows modifying or replacing of a bean after the properties have been set but prior to `@PostConstruct` event hooks.
+* link:{api}/io/micronaut/context/event/BeanCreatedEventListener.html[BeanCreatedEventListener] - allows modifying or replacing of a bean after the bean is fully initialized and all `@PostConstruct` hooks called.
 
-The `BeanInitializedEventListener` interface is commonly used in combination with link:{api}/org/particleframework/context/annotation/Factory.html[Factory] beans. Consider the following example:
+The `BeanInitializedEventListener` interface is commonly used in combination with link:{api}/io/micronaut/context/annotation/Factory.html[Factory] beans. Consider the following example:
 
 [source,groovy]
 ----
@@ -18,8 +18,8 @@ include::{testsdir}/events/factory/EngineInitializer.groovy[tags=class, indent=0
 
 <1> The `V8Engine` class defines a `rodLength` property
 <2> The `EngineFactory` initializes the value of `rodLength` and creates the instance
-<3> The created instance is returned as a link:{api}/org/particleframework/context/annotation/Bean.html[Bean]
+<3> The created instance is returned as a link:{api}/io/micronaut/context/annotation/Bean.html[Bean]
 <4> The `BeanInitializedEventListener` interface is implemented to listen for the initialization of the factory
 <5> Within the `onInitialized` method the `rodLength` is overridden prior to the engine being created by the factory bean.
 
-The link:{api}/org/particleframework/context/event/BeanCreatedEventListener.html[BeanCreatedEventListener] interface is more typically used to decorate or enhance a fully initialized bean by creating a proxy for example.
+The link:{api}/io/micronaut/context/event/BeanCreatedEventListener.html[BeanCreatedEventListener] interface is more typically used to decorate or enhance a fully initialized bean by creating a proxy for example.

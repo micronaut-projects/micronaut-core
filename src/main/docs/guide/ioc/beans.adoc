@@ -17,7 +17,7 @@ include::{testsdir}/intro/Vehicle.groovy[tags=class, indent=0]
 <2> A `V8Engine` implementation is defined and marked with `Singleton` scope
 <3> The `Engine` is injected via constructor injection
 
-To perform dependency injection simply instantiate an instance of link:{api}/org/particleframework/context/BeanContext.html[BeanContext] and call the `run()` method as per the following example:
+To perform dependency injection simply instantiate an instance of link:{api}/io/micronaut/context/BeanContext.html[BeanContext] and call the `run()` method as per the following example:
 
 [source,groovy]
 ----

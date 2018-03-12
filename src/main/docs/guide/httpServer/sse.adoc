@@ -9,8 +9,6 @@ Imagine for an example a event stream of news headlines, you may define a data c
 .Headline.java
 [source,java]
 ----
-include::{testsuite}/server/sse/Headline.java[tags=imports, indent=0]
-
 include::{testsuite}/server/sse/Headline.java[tags=class, indent=0]
 ----
 

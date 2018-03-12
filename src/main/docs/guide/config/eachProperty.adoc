@@ -1,7 +1,7 @@
-The link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation is great for a single configuration class, but sometimes you want multiple instances each with their own distinct configuration. That is where link:{api}/org/particleframework/context/annotation/EachProperty.html[EachProperty] comes in.
+The link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation is great for a single configuration class, but sometimes you want multiple instances each with their own distinct configuration. That is where link:{api}/io/micronaut/context/annotation/EachProperty.html[EachProperty] comes in.
 
 
-The link:{api}/org/particleframework/context/annotation/EachProperty.html[@EachProperty] annotation will create a `ConfigurationProperties` bean for each sub-property within the given property. As an example consider the following class:
+The link:{api}/io/micronaut/context/annotation/EachProperty.html[@EachProperty] annotation will create a `ConfigurationProperties` bean for each sub-property within the given property. As an example consider the following class:
 
 .Using @EachProperty
 [source,java]
@@ -13,7 +13,7 @@ include::{testsjava}/env/DataSourceConfiguration.java[tags=eachProperty, indent=
 <2> The `@Argument` annotation can be used to inject the name of the sub-property that defines the name of the bean (and the bean qualifier)
 <3> Each property of the bean is bound to configuration.
 
-The above `DataSourceConfiguration` defines a `url` property to configure one or many hypothetical data sources of some sort. The URLs themselves can be configured using any of the link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances evaluated to Micronaut:
+The above `DataSourceConfiguration` defines a `url` property to configure one or many hypothetical data sources of some sort. The URLs themselves can be configured using any of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances evaluated to Micronaut:
 
 .Providing Configuration to @EachProperty
 [source,java]

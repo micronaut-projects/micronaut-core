@@ -7,9 +7,9 @@ The next example, illustrates the `@Refreshable` scope behavior.
 
 [source,groovy]
 ----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=wheatherController, indent=0]
+include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=weatherController, indent=0]
 
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=wheatherService, indent=0]
+include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=weatherService, indent=0]
 ----
 
 <1> `WeatherService` is annotated with `@Refresable` scope. The publication of a `RefreshEvent` causes its destruction.
