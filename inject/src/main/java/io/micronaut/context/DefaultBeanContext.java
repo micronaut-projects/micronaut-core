@@ -831,7 +831,15 @@ public class DefaultBeanContext implements BeanContext {
                         Class<?> candidateType = reference.getBeanType();
                         return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
-                    .map(ref -> (BeanDefinition<T>) ref.load(this));
+                    .map(ref -> {
+                        BeanDefinition<T> loadedBean;
+                        try {
+                            loadedBean = ref.load(this);
+                        } catch (Throwable e) {
+                            throw new BeanContextException("Error loading bean ["+ref.getName()+"]: " + e.getMessage(), e);
+                        }
+                        return loadedBean;
+                    });
 
             if (filter != null) {
                 candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
@@ -1538,18 +1546,8 @@ public class DefaultBeanContext implements BeanContext {
                         beansOfTypeList.add((T) instance);
                         processedDefinitions.add(reg.beanDefinition);
                     } else {
-                        Qualifier registeredQualifier = entry.getKey().qualifier;
-                        if (registeredQualifier == null) {
-                            Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
-                            if (result.isPresent()) {
-                                if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
-                                }
-
-                                beansOfTypeList.add((T) instance);
-                                processedDefinitions.add(reg.beanDefinition);
-                            }
-                        } else if (qualifier.equals(registeredQualifier)) {
+                        Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
+                        if (result.isPresent()) {
                             if (LOG.isTraceEnabled()) {
                                 LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
                             }

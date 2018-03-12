@@ -25,7 +25,7 @@ import de.flapdoodle.embed.mongo.config.MongodConfigBuilder;
 import de.flapdoodle.embed.mongo.config.Net;
 import de.flapdoodle.embed.mongo.distribution.Version;
 import de.flapdoodle.embed.process.runtime.Network;
-import io.micronaut.configuration.mongo.reactive.DefaultMongoConfiguration;
+import io.micronaut.configuration.mongo.reactive.ReactiveMongoConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -40,19 +40,22 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
+ * This class will configure a {@link MongodProcess} if the class is on the classpath and the server is not configured
+ *
  * @author graemerocher
  * @since 1.0
  */
 @Requires(classes = MongodProcess.class)
-@Requires(beans = DefaultMongoConfiguration.class)
+@Requires(beans = ReactiveMongoConfiguration.class)
 @Requires(env = Environment.TEST)
 @Singleton
-public class MongoProcessFactory implements BeanCreatedEventListener<DefaultMongoConfiguration>, Closeable {
+public class ReactiveMongoProcessFactory implements BeanCreatedEventListener<ReactiveMongoConfiguration>, Closeable {
+
     private MongodProcess process;
 
     @Override
-    public DefaultMongoConfiguration onCreated(BeanCreatedEvent<DefaultMongoConfiguration> event) {
-        DefaultMongoConfiguration configuration = event.getBean();
+    public ReactiveMongoConfiguration onCreated(BeanCreatedEvent<ReactiveMongoConfiguration> event) {
+        ReactiveMongoConfiguration configuration = event.getBean();
         try {
             Optional<ConnectionString> connectionString = configuration.getConnectionString();
             if(connectionString.isPresent()) {
@@ -75,6 +78,7 @@ public class MongoProcessFactory implements BeanCreatedEventListener<DefaultMong
         }
         return configuration;
     }
+
 
     @Override
     @PreDestroy

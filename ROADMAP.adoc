@@ -40,7 +40,7 @@ At compile time we know the types but at runtime the lambda loses type informati
 
 We need to implement AOP annotations for:
 
-- Hystrix
+- Spring @Transactional
 
 ### Configuration Sharing
 
@@ -59,7 +59,6 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 
 We still need auto-configurations for the following:
 
-* GORM for MongoDB
 * Apache Kafka
 * Cassandra
 
@@ -104,7 +103,7 @@ Some view technology support and port GSON views to micronaut.
 
 #### Distributed Tracing
 
-Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.)
+Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.).
 
 ### HTTP Gateway
 

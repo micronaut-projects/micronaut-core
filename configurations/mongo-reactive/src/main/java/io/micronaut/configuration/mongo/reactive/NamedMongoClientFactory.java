@@ -21,10 +21,6 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.runtime.context.scope.Refreshable;
 
 /**
@@ -37,9 +33,9 @@ import io.micronaut.runtime.context.scope.Refreshable;
 public class NamedMongoClientFactory {
 
     @Bean(preDestroy = "close")
-    @EachBean(NamedMongoConfiguration.class)
+    @EachBean(NamedReactiveMongoConfiguration.class)
     @Refreshable(MongoSettings.PREFIX)
-    MongoClient mongoClient(NamedMongoConfiguration configuration) {
+    MongoClient mongoClient(NamedReactiveMongoConfiguration configuration) {
         return MongoClients.create(configuration.buildSettings());
     }
 }

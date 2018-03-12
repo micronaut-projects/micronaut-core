@@ -18,26 +18,18 @@ package io.micronaut.configuration.neo4j.gorm
 import grails.gorm.annotation.Entity
 import grails.neo4j.Neo4jEntity
 import groovy.transform.CompileStatic
-import io.micronaut.configuration.neo4j.gorm.event.ConfigurableEventPublisherAdapter
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.env.Environment
 import org.grails.datastore.gorm.neo4j.Neo4jDatastore
 import org.grails.datastore.gorm.neo4j.Neo4jDatastoreTransactionManager
 import org.neo4j.driver.v1.Driver
 import io.micronaut.configuration.neo4j.bolt.condition.RequiresNeo4j
 import io.micronaut.configuration.neo4j.gorm.configuration.GormPropertyResolverAdapter
-import io.micronaut.configuration.neo4j.gorm.event.ConfigurableEventPublisherAdapter
+import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
-import io.micronaut.spring.core.env.PropertyResolverAdapter
 
 import javax.inject.Singleton
 import java.util.stream.Stream
