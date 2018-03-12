@@ -50,8 +50,8 @@ class OpenApiParameter {
                         return value
                     }
                 }
-                if ( annotation instanceof io.micronaut.http.annotation.Parameter) {
-                    io.micronaut.http.annotation.Parameter parameterAnnotation = (io.micronaut.http.annotation.Parameter) annotation
+                if ( annotation instanceof io.micronaut.context.annotation.Parameter) {
+                    io.micronaut.context.annotation.Parameter parameterAnnotation = (io.micronaut.context.annotation.Parameter) annotation
                     String value = parameterAnnotation.value()
                     if ( value != null ) {
                         return value
