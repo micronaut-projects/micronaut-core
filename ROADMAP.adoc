@@ -61,6 +61,7 @@ We still need auto-configurations for the following:
 
 * Apache Kafka
 * Cassandra
+* RabbitMQ
 
 ### Security / JWT Token Solution
 
@@ -93,6 +94,16 @@ WebSocket Support must be implemented
 Some view technology support and port GSON views to micronaut.
 
 ### HTTP Client
+
+
+* Connection Pooling
+* multi part requests / file uploads
+* Server Sent Events
+* HTTP Redirect Handling
+* CONTINUE request handling
+* Cookie Support
+* Publisher has body to allow streaming requests
+* @Parameter support f
 
 #### Distributed Tracing
 
