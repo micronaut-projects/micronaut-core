@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
@@ -54,6 +55,7 @@ import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -78,17 +80,24 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Argument[] requiredArguments = executableMethod.getArguments();
         this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
         for (Argument requiredArgument : requiredArguments) {
-            Optional<Annotation> ann = requiredArgument.findAnnotationWithStereoType(Bindable.class);
-            if(ann.isPresent()) {
-                Optional<String> value = AnnotationUtil.findValueOfType(ann.get(), String.class);
-                requiredInputs.put(value.orElse(requiredArgument.getName()), requiredArgument);
-            }
-            else {
-                requiredInputs.put(requiredArgument.getName(), requiredArgument);
-            }
+            String inputName = resolveInputName(requiredArgument);
+            requiredInputs.put(inputName, requiredArgument);
         }
 
         this.acceptedMediaTypes = abstractRoute.getConsumes();
+    }
+
+    private String resolveInputName(Argument requiredArgument) {
+        Optional<Annotation> ann = requiredArgument.findAnnotationWithStereoType(Bindable.class);
+        return ann.map(annotation -> {
+            Optional<String> value = AnnotationUtil.findValueOfType(annotation, String.class);
+            return value.map(s -> {
+                if(StringUtils.isEmpty(s)) {
+                    return requiredArgument.getName();
+                }
+                return s;
+            }).orElse(requiredArgument.getName());
+        }).orElse(requiredArgument.getName());
     }
 
     @Override
@@ -138,10 +147,11 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     @Override
     public boolean isExecutable() {
         Map<String, Object> variables = getVariables();
-        for (Argument argument : requiredInputs.values()) {
-            Object value = variables.get(argument.getName());
+        for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
+            Object value = variables.get(entry.getKey());
             if( value == null || value instanceof UnresolvedArgument)
                 return false;
+
         }
 
         Optional<Argument<?>> bodyArgument = getBodyArgument();
@@ -230,14 +240,17 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             ConversionService conversionService = this.conversionService;
             Map<String, Object> uriVariables = getVariables();
             List argumentList = new ArrayList();
-            for (Argument argument : targetArguments) {
-                String name = argument.getName();
+
+            for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
+                Argument argument = entry.getValue();
+                String name = entry.getKey();
                 Object value = DefaultRouteBuilder.NO_VALUE;
                 if (uriVariables.containsKey(name)) {
                     value = uriVariables.get(name);
                 } else if (argumentValues.containsKey(name)) {
                     value = argumentValues.get(name);
                 }
+
                 if(value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
@@ -292,9 +305,9 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             if (!lastError.isPresent() && argument.getDeclaredAnnotation(Nullable.class) != null) {
                 return null;
             }
-            throw lastError.map(conversionError -> {
-                return (RuntimeException) new ConversionErrorException(argument, conversionError);
-            }).orElseGet(() -> new UnsatisfiedRouteException(argument));
+            throw lastError.map(conversionError ->
+                    (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+            );
         } else {
             return result.get();
         }
@@ -314,14 +327,14 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             Object value = argumentValues.get(name);
             if(value != null) {
                 if(value instanceof UnresolvedArgument) {
-                    newVariables.put(name, value);
+                    newVariables.put(resolveInputName(requiredArgument), value);
                 }
                 else {
                     ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
                     Optional converted = conversionService.convert(value, conversionContext);
                     Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
                     if(result != null) {
-                        newVariables.put(name, result);
+                        newVariables.put(resolveInputName(requiredArgument), result);
                     }
                 }
             }
