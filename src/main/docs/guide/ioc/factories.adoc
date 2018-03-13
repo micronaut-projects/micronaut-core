@@ -1,6 +1,6 @@
-In many cases, you may want to make available as a bean a class that is not part of your codebase. In this case, you cannot annotate the already compiled class. Instead, you should implement a link:{api}/org/particleframework/context/annotation/Factory.html[Factory].
+In many cases, you may want to make available as a bean a class that is not part of your codebase. In this case, you cannot annotate the already compiled class. Instead, you should implement a link:{api}/io/micronaut/context/annotation/Factory.html[Factory].
 
-A factory is a class annotated with the link:{api}/org/particleframework/context/annotation/Factory.html[Factory] annotation that provides 1 or more methods annotated with the link:{api}/org/particleframework/context/annotation/Bean.html[Bean] annotation.
+A factory is a class annotated with the link:{api}/io/micronaut/context/annotation/Factory.html[Factory] annotation that provides 1 or more methods annotated with the link:{api}/io/micronaut/context/annotation/Bean.html[Bean] annotation.
 
 The return types of methods annotated with `@Bean` are the bean types. This is best illustrated by an example:
 
@@ -19,7 +19,7 @@ include::{testsdir}/factories/EngineFactory.groovy[tags=class, indent=0]
 
 In this case, the `V8Engine` is built by the `EngineFactory` class' `v8Engine` method. Note that you can inject parameters into the method and these parameters will be resolved as beans.
 
-A factory can also have multiple methods annotated with link:{api}/org/particleframework/context/annotation/Bean.html[@Bean] each one returning a distinct bean type.
+A factory can also have multiple methods annotated with link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] each one returning a distinct bean type.
 
 NOTE: If you take this approach, then you should not invoke other methods annotated with `@Bean` internally within the class. Instead, inject the types via parameters.
 

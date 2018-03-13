@@ -1,4 +1,4 @@
-Like Spring Boot and Grails, you can inject configuration values into beans with Micronaut using the link:{api}/org/particleframework/context/annotation/Value.html[Value] annotation.
+Like Spring Boot and Grails, you can inject configuration values into beans with Micronaut using the link:{api}/io/micronaut/context/annotation/Value.html[Value] annotation.
 
 For example:
 

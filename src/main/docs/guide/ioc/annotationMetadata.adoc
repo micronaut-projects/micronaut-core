@@ -4,7 +4,7 @@ To solve this problem many frameworks produce runtime metadata or perform expens
 
 Micronaut instead produces this annotation metadata at compile time, avoiding expensive reflection and saving on memory.
 
-The link:{api}/org/particleframework/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/org/particleframework/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
+The link:{api}/io/micronaut/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/io/micronaut/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
 
 For example the following code will obtain all bean definitions annotated with a particular stereotype:
 
@@ -21,7 +21,7 @@ for(BeanDefinition definition : definitions) {
 }
 ----
 
-The above example will find all link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+The above example will find all link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
 
-Like Spring, Micronaut also supports an link:{api}/org/particleframework/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
+Like Spring, Micronaut also supports an link:{api}/io/micronaut/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
 
