@@ -96,7 +96,9 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
         healthStatus.put("status", status.getName());
         status.getDescription().ifPresent(description -> healthStatus.put("description", description));
-        healthStatus.put("details", details);
+        if(details != null) {
+            healthStatus.put("details", details);
+        }
         return healthStatus;
     }
 }

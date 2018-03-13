@@ -15,7 +15,6 @@
  */
 package io.micronaut.configuration.lettuce;
 
-import io.lettuce.core.RedisURI;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;

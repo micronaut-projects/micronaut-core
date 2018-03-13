@@ -27,6 +27,9 @@ import java.util.Optional;
 
 /**
  * Abstract version of the a factory class for creating Redis clients
+ *
+ * @author Graeme Rocher
+ * @since 1.0
  */
 public abstract class AbstractRedisClientFactory {
     /**
