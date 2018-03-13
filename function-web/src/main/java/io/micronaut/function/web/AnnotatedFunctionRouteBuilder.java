@@ -26,6 +26,8 @@ import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.function.DefaultLocalFunctionRegistry;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.context.ExecutionHandleLocator;
@@ -67,7 +69,7 @@ import java.util.stream.Stream;
 @Replaces(DefaultLocalFunctionRegistry.class)
 public class AnnotatedFunctionRouteBuilder
         extends DefaultRouteBuilder
-        implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, ServiceInstanceMetadataContributor {
+        implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, ServiceInstanceMetadataContributor, MediaTypeCodecRegistry {
 
 
     private final LocalFunctionRegistry localFunctionRegistry;
@@ -78,9 +80,10 @@ public class AnnotatedFunctionRouteBuilder
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
             ConversionService<?> conversionService,
+            MediaTypeCodecRegistry codecRegistry,
             @Value("${function.contextPath:/}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.localFunctionRegistry = new DefaultLocalFunctionRegistry();
+        this.localFunctionRegistry = new DefaultLocalFunctionRegistry(codecRegistry);
         this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';
     }
 
@@ -182,5 +185,29 @@ public class AnnotatedFunctionRouteBuilder
             String functionName = entry.getKey();
             metadata.put(FUNCTION_PREFIX + functionName, entry.getValue().toString());
         }
+    }
+
+    @Override
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+        if(localFunctionRegistry instanceof MediaTypeCodecRegistry) {
+            return ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(mediaType);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+        if(localFunctionRegistry instanceof MediaTypeCodecRegistry) {
+            return ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(mediaType, type);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Collection<MediaTypeCodec> getCodecs() {
+        if(localFunctionRegistry instanceof MediaTypeCodecRegistry) {
+            return ((MediaTypeCodecRegistry) localFunctionRegistry).getCodecs();
+        }
+        return Collections.emptyList();
     }
 }
