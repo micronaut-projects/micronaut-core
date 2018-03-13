@@ -71,12 +71,12 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
 
             @Override
             public void info(String message, Object... params) {
-                logger.info(message, params);
+                logger.info(String.format(message, params));
             }
 
             @Override
             public void warn(String message, Object... params) {
-                logger.warn(message,params);
+                logger.warn(String.format(message, params));
             }
 
             @Override
@@ -86,12 +86,12 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
 
             @Override
             public void debug(String message, Object... params) {
-                logger.debug(message, params);
+                logger.debug(String.format(message, params));
             }
 
             @Override
             public void trace(String message, Object... params) {
-                logger.trace(message, params);
+                logger.trace(String.format(message, params));
             }
 
             @Override

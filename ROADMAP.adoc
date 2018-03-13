@@ -55,7 +55,7 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 * Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
 * Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
 
-### Auto Configurations
+### Auto Configurations and Health Checks
 
 We still need auto-configurations for the following:
 
@@ -76,13 +76,6 @@ We need endpoints for managing and/or exposing information about:
 - info
 
 These should be built on the `Endpoint` API.
-
-#### Health Checks
-
-Health checks still to be implemented:
-
-* Neo4j Driver
-
 
 ### HTTP Server
 

@@ -8,4 +8,5 @@ dependencies {
     compileOnly "org.neo4j.test:neo4j-harness:$neo4jVersion"
 
     testCompile "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    testCompile project(":management")
 }
