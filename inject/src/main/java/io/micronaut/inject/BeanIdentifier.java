@@ -16,6 +16,7 @@
 package io.micronaut.inject;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.naming.Named;
 
 import java.io.Serializable;
 
@@ -25,5 +26,5 @@ import java.io.Serializable;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanIdentifier extends CharSequence, Serializable {
+public interface BeanIdentifier extends CharSequence, Serializable, Named {
 }

@@ -16,6 +16,7 @@
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisURI;
+import io.micronaut.context.env.Environment;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     private List<RedisURI> uris = Collections.emptyList();
 
     protected AbstractRedisConfiguration() {
+        setClientName(Environment.DEFAULT_NAME);
         setPort(RedisURI.DEFAULT_REDIS_PORT);
         setHost("localhost"); // localhost by default
     }
@@ -58,6 +60,9 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     }
 
     public Optional<RedisURI> getUri() {
+        if(uri != null) {
+            uri.setClientName(getClientName());
+        }
         return Optional.ofNullable(uri);
     }
 }

@@ -162,6 +162,9 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public BeanContext stop() {
         if (running.compareAndSet(true, false)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Stopping BeanContext");
+            }
             publishEvent(new ShutdownEvent(this));
             // need to sort registered singletons so that beans with that require other beans appear first
             ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
@@ -223,6 +226,23 @@ public class DefaultBeanContext implements BeanContext {
                 })
                 .collect(Collectors.toList());
         return (Collection<BeanRegistration<?>>) result;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
+        if (beanType == null) {
+            return Collections.emptyList();
+        }
+        List result = singletonObjects
+                .values()
+                .stream()
+                .filter(registration -> {
+                    BeanDefinition beanDefinition = registration.beanDefinition;
+                    return beanType.isAssignableFrom(beanDefinition.getBeanType());
+                })
+                .collect(Collectors.toList());
+        return (Collection<BeanRegistration<T>>) result;
     }
 
     @SuppressWarnings("unchecked")
@@ -1800,6 +1820,14 @@ public class DefaultBeanContext implements BeanContext {
             int result = beanType.hashCode();
             result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
             return result;
+        }
+
+        @Override
+        public String getName() {
+            if(qualifier instanceof Named) {
+                return ((Named) qualifier).getName();
+            }
+            return Primary.class.getSimpleName();
         }
     }
 
