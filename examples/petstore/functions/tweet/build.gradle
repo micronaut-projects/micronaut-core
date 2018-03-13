@@ -61,10 +61,10 @@ task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     timeout = 60
 }
 
-task invokeFunction(type: AWSLambdaInvokeTask) {
+task invoke(type: AWSLambdaInvokeTask) {
     functionName = "twitter-update-status"
     invocationType = InvocationType.RequestResponse
-    payload = '{"text:"Time is '+System.currentTimeMillis()+'"}'
+    payload = '{"text":"Time is '+System.currentTimeMillis()+'"}'
     doLast {
         println "Lambda function result: " + new String(invokeResult.payload.array(), "UTF-8")
     }
