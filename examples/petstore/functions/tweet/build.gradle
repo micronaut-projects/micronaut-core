@@ -33,11 +33,9 @@ dependencies {
 
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
-    provided "io.micronaut:discovery-client:${projectVersion}"
-    provided "io.micronaut:function-web:${projectVersion}"
-    provided "io.micronaut:http-server-netty:${projectVersion}"
 
     testCompile "io.micronaut:http-client:${projectVersion}"
+    testRuntime "io.micronaut:discovery-client:${projectVersion}"
     testRuntime "io.micronaut:function-web:${projectVersion}"
     testRuntime "io.micronaut:http-server-netty:${projectVersion}"
 
