@@ -1,6 +1,6 @@
 Static resource resolution is disabled by default.
 
-The following configuration options are available through link:{api}/org/particleframework/web/router/resource/StaticResourceConfiguration.html[StaticResourceConfiguration]:
+The following configuration options are available through link:{api}/io/micronaut/web/router/resource/StaticResourceConfiguration.html[StaticResourceConfiguration]:
 |=======
 |enabled |boolean |Whether static resources will be resolved at all
 |mapping |String |The path resources should be served from. Uses ant path matching. Options might be `/\****` or `/static/****`

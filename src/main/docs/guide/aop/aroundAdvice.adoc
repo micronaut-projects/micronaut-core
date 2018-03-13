@@ -2,7 +2,7 @@ The most common type of advice you may want to apply is "Around" advice, which e
 
 === Writing Around Advice
 
-The first step to defining Around advice is to implement a link:{api}/org/particleframework/aop/MethodInterceptor.html[MethodInterceptor]. For example the following interceptor disallows parameters with `null` values:
+The first step to defining Around advice is to implement a link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor]. For example the following interceptor disallows parameters with `null` values:
 
 .MethodInterceptor Example
 [source,java]
@@ -12,10 +12,10 @@ include::{testsjava}/aop/around/NotNullInterceptor.java[tags=imports, indent=0]
 include::{testsjava}/aop/around/NotNullInterceptor.java[tags=interceptor, indent=0]
 ----
 
-<1> An interceptor implements the link:{api}/org/particleframework/aop/MethodInterceptor.html[MethodInterceptor] interface
-<2> The passed link:{api}/org/particleframework/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
+<1> An interceptor implements the link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor] interface
+<2> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
 <3> If a `null` parameter is found an exception is thrown
-<4> Otherwise link:{api}/org/particleframework/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
+<4> Otherwise link:{api}/io/micronaut/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
 
 NOTE: Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
 
@@ -32,8 +32,8 @@ include::{testsjava}/aop/around/NotNull.java[tags=annotation, indent=0]
 
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
-<3> The link:{api}/org/particleframework/aop/Around.html[Around] annotation is added to tell Micronaut that the annotation is Around advice
-<4> The link:{api}/org/particleframework/context/annotation/Type.html[@Type] annotation is used to configure which type implements the advice (in this case the previously defined `NotNullInterceptor`)
+<3> The link:{api}/io/micronaut/aop/Around.html[Around] annotation is added to tell Micronaut that the annotation is Around advice
+<4> The link:{api}/io/micronaut/context/annotation/Type.html[@Type] annotation is used to configure which type implements the advice (in this case the previously defined `NotNullInterceptor`)
 
 With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:
 
@@ -55,10 +55,10 @@ NOTE: Since Micronaut is compile time, generally the advice should be packaged i
 
 === Customizing Proxy Generation
 
-The default behaviour of the link:{api}/org/particleframework/aop/Around.html[Around] annotation is generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
+The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
 
 This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviur and the `@Around` annotation supports various attributes that allow you to alter this behaviour including:
 
 * `proxyTarget` (defaults to `false`) - If set to `true` instead of a subclass that calls `super`, the proxy will delegate to the original bean instance
-* `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/org/particleframework/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
+* `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
 * `lazy` (defaults to `false`) - By default Micronaut will eagerly intialize the proxy target when the proxy is created. If set to `true` the proxy target will instead be resolved lazily for each method call.

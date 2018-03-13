@@ -1,4 +1,4 @@
-Additional link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances can be added to the environment prior to initializing the link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+Additional link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances can be added to the environment prior to initializing the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
 
 .Initializing the Environment
 [source,java]
@@ -6,9 +6,9 @@ Additional link:{api}/org/particleframework/context/env/PropertySource.html[Prop
 include::{testsjava}/env/EnvironmentTest.java[tags=envProps, indent=0]
 ----
 
-The link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
+The link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
 
-Alternatively one can register a link:{api}/org/particleframework/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containg a reference to the class name of the `PropertySourceLoader`.
+Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containg a reference to the class name of the `PropertySourceLoader`.
 
 Micronaut by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
 
