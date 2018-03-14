@@ -7,7 +7,7 @@ const VendorsTable = ({vendors}) => <div>
 </div>
 
 VendorsTable.propTypes = {
-  vendors: array.required
+  vendors: array.isRequired
 }
 
 export default VendorsTable;

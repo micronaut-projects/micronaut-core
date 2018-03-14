@@ -8,8 +8,8 @@ const Alert = ({message, level}) => message ? <div className={`alert alert-${lev
 </div> : null
 
 Alert.propTypes = {
-  message: string.required,
-  level: string.required
+  message: string,
+  level: string.isRequired
 }
 
 export default Alert;
