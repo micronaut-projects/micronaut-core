@@ -1,0 +1,50 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+    }
+}
+
+apply plugin: "application"
+apply plugin: "kotlin"
+apply plugin: 'kotlin-kapt'
+
+mainClassName = "example.Application"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
+    kapt "io.micronaut:inject-java:$projectVersion"
+    compile "io.micronaut:http-server-netty:$projectVersion"
+    compile "io.micronaut:runtime:$projectVersion"
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+
+    kaptTest "io.micronaut:inject-java:$projectVersion"
+    testCompile "io.micronaut:http-client:$projectVersion"
+
+    testCompile "org.jetbrains.spek:spek-api:$spekVersion"
+    testRuntime "org.jetbrains.spek:spek-junit-platform-engine:$spekVersion"
+    testCompile "org.junit.jupiter:junit-jupiter-api:$junitVersion"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+

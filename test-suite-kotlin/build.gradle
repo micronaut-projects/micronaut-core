@@ -1,0 +1,19 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm" version "1.2.30"
+    id "org.jetbrains.kotlin.kapt" version "1.2.30"
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
+    compile project(':aop')
+    compile project(':http-server-netty:')
+    compile project(':runtime')
+
+    testCompileOnly project(':inject-java')
+    kaptTest project(':inject-java')
+    testCompile "junit:junit:4.7"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}

@@ -3,6 +3,8 @@ package io.micronaut.jackson;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.DeserializerFactory;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.annotation.Bean;
@@ -42,6 +44,9 @@ public class ObjectMapperFactory {
 
     @Inject
     protected BeanSerializerModifier[] beanSerializerModifiers = new BeanSerializerModifier[0];
+
+    @Inject
+    protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
 
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}

@@ -34,6 +34,8 @@ public interface Link {
     CharSequence HELP = "help";
     CharSequence SELF = "self";
     CharSequence ABOUT = "about";
+    CharSequence HREF = "href";
+
     /**
      * @return The URI to template to
      */
@@ -95,6 +97,15 @@ public interface Link {
      */
     static Link of(URI uri) {
         return new DefaultLink(uri);
+    }
+
+    /**
+     * Create a link from the given URI
+     * @param uri The URI
+     * @return The link
+     */
+    static Link of(String uri) {
+        return new DefaultLink(URI.create(uri));
     }
 
     /**
