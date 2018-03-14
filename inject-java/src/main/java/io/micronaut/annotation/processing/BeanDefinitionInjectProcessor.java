@@ -38,10 +38,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Scope;
-import javax.inject.Singleton;
+import javax.inject.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -406,11 +403,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            boolean injected = methodAnnotationMetadata.hasStereotype(Inject.class);
-            boolean postConstruct = methodAnnotationMetadata.hasStereotype(PostConstruct.class);
-            boolean preDestroy = methodAnnotationMetadata.hasStereotype(PreDestroy.class);
+            boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
+            boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(PostConstruct.class);
+            boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(PreDestroy.class);
             if (injected || postConstruct || preDestroy) {
-
                 visitAnnotatedMethod(method, o);
                 return null;
             }
@@ -726,12 +722,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
 
+
             PackageElement packageOfOverridingClass = elementUtils.getPackageOf(overridingMethod);
             PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
             boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
                     !packageOfOverridingClass.getQualifiedName().equals(packageOfDeclaringClass.getQualifiedName());
             boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer;
-            boolean overriddenInjected = overridden && annotationUtils.hasStereotype(overridingMethod, Inject.class);
+            boolean overriddenInjected = overridden && annotationUtils.getAnnotationMetadata(overridingMethod).hasDeclaredStereotype(Inject.class);
 
             if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
                 // bail out if the method has been overridden by another method annotated with @Inject
@@ -746,7 +743,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 requiresReflection = true;
             }
 
-            if (annotationUtils.hasStereotype(method, PostConstruct.class)) {
+            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+
+            if (annotationMetadata.hasDeclaredStereotype(PostConstruct.class)) {
                 writer.visitPostConstructMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -756,7 +755,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getQualifierTypes(),
                         params.getGenericTypes()
                 );
-            } else if (annotationUtils.hasStereotype(method, PreDestroy.class)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(PreDestroy.class)) {
                 writer.visitPreDestroyMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -766,7 +765,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getQualifierTypes(),
                         params.getGenericTypes()
                 );
-            } else if (annotationUtils.hasStereotype(method, Inject.class)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(Inject.class)) {
                 writer.visitMethodInjectionPoint(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -795,6 +794,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     (annotationUtils.hasStereotype(variable, Value.class)); // || isConfigurationPropertiesType);
 
             if (isInjected || isValue) {
+                Name fieldName = variable.getSimpleName();
                 BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
 
                 TypeElement declaringClass = modelUtils.classElementFor(variable);
@@ -809,7 +809,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     writer.setValidated(true);
                 }
 
-                Name fieldName = variable.getSimpleName();
+
                 TypeMirror type = variable.asType();
                 Object fieldType = modelUtils.resolveTypeReference(type);
 
@@ -1154,8 +1154,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
     }
-
-
 
     private String getPropertyMetadataTypeReference(TypeMirror valueType) {
         return modelUtils.isOptional(valueType) ? genericUtils.getFirstTypeArgument(valueType).map(TypeMirror::toString).orElse(valueType.toString()) : valueType.toString();
