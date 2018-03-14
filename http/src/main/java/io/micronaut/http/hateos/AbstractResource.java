@@ -15,14 +15,17 @@
  */
 package io.micronaut.http.hateos;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Produces;
 
 import javax.annotation.Nullable;
+import java.net.URI;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * An abstract implementation of {@link Resource}
@@ -32,8 +35,8 @@ import java.util.*;
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {
-    private final Map<CharSequence, List<Link>> links = new LinkedHashMap<>(1);
-    private final Map<CharSequence, List<Resource>> embedded = new LinkedHashMap<>(1);
+    private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
+    private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
 
     /**
      * Add a link with the given reference
@@ -44,8 +47,23 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      */
     public Impl link(@Nullable CharSequence ref, @Nullable Link link) {
         if(StringUtils.isNotEmpty(ref) && link != null) {
-            List<Link> links = this.links.computeIfAbsent(ref, charSequence -> new ArrayList<>());
+            List<Link> links = this.linkMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             links.add(link);
+        }
+        return (Impl) this;
+    }
+
+    /**
+     * Add a link with the given reference
+     *
+     * @param ref The reference
+     * @param link The link
+     * @return This VndError
+     */
+    public Impl link(@Nullable CharSequence ref, @Nullable String link) {
+        if(StringUtils.isNotEmpty(ref) && link != null) {
+            List<Link> links = this.linkMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
+            links.add(Link.of(link));
         }
         return (Impl) this;
     }
@@ -59,7 +77,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      */
     public Impl embedded(CharSequence ref, Resource resource) {
         if(StringUtils.isNotEmpty(ref) && resource != null) {
-            List<Resource> resources = this.embedded.computeIfAbsent(ref, charSequence -> new ArrayList<>());
+            List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.add(resource);
         }
         return (Impl) this;
@@ -75,7 +93,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      */
     public Impl embedded(CharSequence ref, Resource... resource) {
         if(StringUtils.isNotEmpty(ref) && resource != null) {
-            List<Resource> resources = this.embedded.computeIfAbsent(ref, charSequence -> new ArrayList<>());
+            List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.addAll(Arrays.asList(resource));
         }
         return (Impl) this;
@@ -90,7 +108,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      */
     public Impl embedded(CharSequence ref, List<Resource> resourceList) {
         if(StringUtils.isNotEmpty(ref) && resourceList != null) {
-            List<Resource> resources = this.embedded.computeIfAbsent(ref, charSequence -> new ArrayList<>());
+            List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.addAll(resourceList);
         }
         return (Impl) this;
@@ -98,11 +116,38 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
 
     @Override
     public OptionalMultiValues<Link> getLinks() {
-        return OptionalMultiValues.of( links);
+        return OptionalMultiValues.of(linkMap);
     }
 
     @Override
     public OptionalMultiValues<Resource> getEmbedded() {
-        return OptionalMultiValues.of(embedded);
+        return OptionalMultiValues.of(embeddedMap);
+    }
+
+    /**
+     * Allows de-serializing of links with Jackson
+     */
+    @SuppressWarnings("unchecked")
+    @Internal
+    protected final void setLinks(Map<String, Object> links) {
+        for (Map.Entry<String, Object> entry : links.entrySet()) {
+            String name = entry.getKey();
+            Object value = entry.getValue();
+            if(value instanceof Map) {
+                Map<String, Object> linkMap = (Map<String, Object>) value;
+                link(name, linkMap);
+            }
+        }
+    }
+
+    private void link(String name, Map<String, Object> linkMap) {
+        ConvertibleValues<Object> values = ConvertibleValues.of(linkMap);
+        Optional<URI> uri = values.get(Link.HREF, URI.class);
+        uri.ifPresent(uri1 -> {
+            Link.Builder link = Link.build(uri1);
+
+            // TODO: build remaining properties
+            link(name, link.build());
+        });
     }
 }

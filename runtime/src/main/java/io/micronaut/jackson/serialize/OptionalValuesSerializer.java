@@ -20,8 +20,6 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.core.value.OptionalMultiValues;
-import io.micronaut.core.value.OptionalValues;
 
 import javax.inject.Singleton;
 import java.io.IOException;
