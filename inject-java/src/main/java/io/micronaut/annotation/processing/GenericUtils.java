@@ -29,6 +29,11 @@ import java.util.*;
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
 
+/**
+ * Utility methods for dealing with generic type signatures
+ *
+ * @author Graeme Rocher
+ */
 class GenericUtils {
 
     private final Elements elementUtils;
