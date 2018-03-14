@@ -59,12 +59,12 @@ WebSocket Support must be implemented
 ### HTTP Client
 
 * Connection Pooling
-* multi part requests / file uploads
+* multi part requests / file uploads - Zak/Puneet
 * Server Sent Events
 * CONTINUE request handling
-* Cookie Support
+* Cookie Support - Zak/Puneet
 * Reactive Streams Publisher as request body to allow streaming
-* @Parameter support
+* @Parameter support - Zak/Puneet
 
 #### Distributed Tracing
 
