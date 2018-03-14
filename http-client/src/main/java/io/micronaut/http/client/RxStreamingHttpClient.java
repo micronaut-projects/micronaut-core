@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
+import java.net.URL;
 import java.util.Map;
 
 /**
@@ -47,5 +48,16 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
     @Override
     default <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Class<O> type) {
         return (Flowable<O>)StreamingHttpClient.super.jsonStream(request, type);
+    }
+
+    /**
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within particle use
+     * {@link javax.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static RxStreamingHttpClient create(URL url) {
+        return new DefaultHttpClient(url);
     }
 }

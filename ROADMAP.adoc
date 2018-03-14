@@ -61,7 +61,6 @@ WebSocket Support must be implemented
 * Connection Pooling
 * multi part requests / file uploads
 * Server Sent Events
-* HTTP Redirect Handling
 * CONTINUE request handling
 * Cookie Support
 * Reactive Streams Publisher as request body to allow streaming
