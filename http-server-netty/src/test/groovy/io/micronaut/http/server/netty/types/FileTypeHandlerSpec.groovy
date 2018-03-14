@@ -13,6 +13,7 @@ import io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.AttachedFile
+import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 
 import java.time.Instant
@@ -113,6 +114,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         NettySystemFileCustomizableResponseType   | true
         NettyStreamedFileCustomizableResponseType | true
         SystemFileCustomizableResponseType        | true
+        StreamedFileCustomizableResponseType      | true
         File                                      | true
         AttachedFile                              | true
     }

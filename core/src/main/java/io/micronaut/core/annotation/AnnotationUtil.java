@@ -17,17 +17,21 @@ import java.util.*;
  */
 public class AnnotationUtil {
 
+    public static final String KOTLIN_METADATA = "kotlin.Metadata";
+
     public static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
             Retention.class.getName(),
+            "kotlin.annotation.Retention",
             Inherited.class.getName(),
             SuppressWarnings.class.getName(),
             Override.class.getName(),
             Repeatable.class.getName(),
             Documented.class.getName(),
-            Target.class.getName()
+            "kotlin.annotation.MustBeDocumented",
+            Target.class.getName(),
+            "kotlin.annotation.Target",
+            KOTLIN_METADATA
     );
-
-    public static final String KOTLIN_METADATA = "kotlin.Metadata";
 
     /**
      * Constant indicating an zero annotation
