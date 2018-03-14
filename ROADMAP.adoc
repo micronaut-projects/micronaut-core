@@ -30,12 +30,6 @@ class TypeConverterFactory {
 At compile time we know the types but at runtime the lambda loses type information. We need to add an API to obtain type information for a bean from the factory.
 
 
-#### AOP API
-
-- We need to allow `Introduction` advise to specify additional interfaces that should be be implemented by the interceptor.
-- Allow adding interfaces to non-abstract classes via introduction advise
-
-
 #### Aspect Implementations
 
 We need to implement AOP annotations for:
