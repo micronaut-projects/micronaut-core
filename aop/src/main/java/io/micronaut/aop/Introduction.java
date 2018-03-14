@@ -53,4 +53,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Executable
 public @interface Introduction {
+
+    /**
+     * Additional interfaces that the introduction advice should implement. Note that if introduction advise is applied
+     * to a concrete class at least 1 interface must be specified
+     *
+     * @return The additional interfaces to implement
+     */
+    Class[] interfaces() default {};
 }

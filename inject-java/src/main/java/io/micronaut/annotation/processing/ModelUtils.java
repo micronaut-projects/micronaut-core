@@ -123,8 +123,7 @@ class ModelUtils {
     // e.g. see InjectTransform requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
     boolean requiresReflection(Element element) {
         Set<Modifier> modifiers = element.getModifiers();
-        boolean requiresReflection = isPrivate(element);
-        return requiresReflection;
+        return isPrivate(element);
     }
 
     // for cases where Element.getKind() == FIELD
