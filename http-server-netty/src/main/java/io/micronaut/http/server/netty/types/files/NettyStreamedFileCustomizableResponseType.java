@@ -40,12 +40,17 @@ import java.util.Optional;
  */
 public class NettyStreamedFileCustomizableResponseType extends StreamedFileCustomizableResponseType implements NettyFileCustomizableResponseType {
 
+
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
         super(inputStream, name);
     }
 
     public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
+    }
+
+    public NettyStreamedFileCustomizableResponseType(StreamedFileCustomizableResponseType delegate) {
+        super(delegate.getInputStream(), delegate.getName(), delegate.getLastModified(), delegate.getLength());
     }
 
     @Override
