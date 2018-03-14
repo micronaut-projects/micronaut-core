@@ -1,0 +1,20 @@
+dependencies {
+    compile project(":configurations:mongo-reactive")
+    compile project(":configurations:hibernate-validator")
+    compile project(":configurations:gorm")
+
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compileOnly project(":inject-groovy")
+    compileOnly project(":inject-java")
+    compileOnly project(":http-server")
+    compile project(":runtime-groovy")
+    compile project(":inject")
+    compile project(":spring")
+    testCompile project(":inject-groovy")
+    compile "org.grails:grails-datastore-gorm-mongodb:6.1.4.RELEASE"
+    compile "org.mongodb:mongo-java-driver:$mongoVersion"
+
+    testCompile project(":http-server")
+    testCompile project(":http-client")
+    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+}

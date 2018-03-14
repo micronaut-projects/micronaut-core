@@ -31,6 +31,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
@@ -53,8 +54,12 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     private final Map<String, ExecutableMethod<?,?>> suppliers = new LinkedHashMap<>(1);
     private final MediaTypeCodecRegistry decoderRegistry;
 
-    public DefaultLocalFunctionRegistry(MediaTypeCodec...decoders) {
+    @Inject public DefaultLocalFunctionRegistry(MediaTypeCodec...decoders) {
         this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
+    }
+
+    public DefaultLocalFunctionRegistry(MediaTypeCodecRegistry codecRegistry) {
+        this.decoderRegistry = codecRegistry;
     }
 
     @SuppressWarnings("unchecked")

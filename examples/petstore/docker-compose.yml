@@ -1,0 +1,95 @@
+version: '3'
+services:
+  neo4j:
+    image: neo4j
+    environment:
+      NEO4J_AUTH: none
+    ports:
+      - 7687:7687
+      - 7474:7474
+  mongodb:
+    image: mongo
+    ports:
+      - 27017:27017
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+  consul:
+      image: consul
+      ports:
+        - 8500:8500
+  pets:
+    build: ./pets
+    depends_on:
+      - mongodb
+      - consul
+    environment:
+      MICRONAUT_SERVER_HOST: pets
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  vendors:
+    build: ./vendors
+    depends_on:
+      - consul
+    environment:
+      MICRONAUT_SERVER_HOST: vendors
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  offers:
+    build: ./offers
+    depends_on:
+      - redis
+      - pets
+      - consul
+    environment:
+      MICRONAUT_SERVER_HOST: offers
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+  comments:
+    build: ./comments
+    links:
+      - neo4j
+    depends_on:
+      - neo4j
+      - consul
+    environment:
+      MICRONAUT_SERVER_HOST: comments
+      NEO4J_HOST: neo4j
+      NEO4J_PORT: 7687
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  mail:
+    build: ./mail
+    depends_on:
+      - consul
+    environment:
+      MICRONAUT_SERVER_HOST: mail
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  storefront:
+    build: ./storefront
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pets
+      - vendors
+      - offers
+      - comments
+    environment:
+      MICRONAUT_SERVER_HOST: storefront
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  frontend:
+    build: ./frontend/react
+    depends_on:
+      - storefront
+    ports:
+      - 3000:3000
+    volumes:
+      - ./frontend/react/src:/usr/src/app/src
+      - ./frontend/react/public:/usr/src/app/public

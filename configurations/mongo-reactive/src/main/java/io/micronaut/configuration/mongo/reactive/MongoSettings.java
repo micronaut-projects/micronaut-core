@@ -34,4 +34,8 @@ public interface MongoSettings {
      * The MongoDB servers settings
      */
     String MONGODB_SERVERS = PREFIX + ".servers";
+    /**
+     * The default URI
+     */
+    String DEFAULT_URI = "mongodb://localhost";
 }

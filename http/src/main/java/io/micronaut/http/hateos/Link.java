@@ -94,7 +94,7 @@ public interface Link {
      * @return The link
      */
     static Link of(URI uri) {
-        return () -> uri;
+        return new DefaultLink(uri);
     }
 
     /**

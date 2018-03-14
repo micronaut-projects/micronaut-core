@@ -85,6 +85,7 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     @Override
     protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, conversionService) {
+
             @Override
             public List<Argument> getRequiredArguments() {
                 return Collections.unmodifiableList(requiredArguments);

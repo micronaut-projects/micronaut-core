@@ -38,6 +38,9 @@ import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.ExecutableMethodWriter
 import org.codehaus.groovy.ast.*
+import org.codehaus.groovy.ast.expr.ClassExpression
+import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -251,19 +254,30 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                 Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
+                String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
 
-                boolean isSingleton = annotationMetadata.hasDeclaredStereotype(Singleton)
                 boolean isInterface = node.isInterface()
                 AopProxyWriter aopProxyWriter = new AopProxyWriter(
                         packageName,
                         beanClassName,
                         isInterface,
-                        isSingleton,
                         annotationMetadata,
+                        interfaceTypes,
                         interceptorTypes)
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
+                if(ArrayUtils.isNotEmpty(interfaceTypes)) {
+                    List<AnnotationNode> annotationNodes = node.annotations
+                    Set<ClassNode> interfacesToVisit = []
+                    populateIntroducedInterfaces(annotationNodes, interfacesToVisit)
+
+                    if(!interfacesToVisit.isEmpty()) {
+                        for(itce in interfacesToVisit) {
+                            visitIntroductionTypePublicMethods(aopProxyWriter, itce)
+                        }
+                    }
+                }
             } else {
 
                 ClassNode superClass = node.getSuperClass()
@@ -279,6 +293,27 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
                 super.visitClass(node)
+            }
+        }
+
+        private void populateIntroducedInterfaces(List<AnnotationNode> annotationNodes, Set<ClassNode> interfacesToVisit) {
+            for (ann in annotationNodes) {
+                if (ann.classNode.name == Introduction.class.getName()) {
+                    Expression expression = ann.getMember("interfaces")
+                    if (expression instanceof ClassExpression) {
+                        interfacesToVisit.add(((ClassExpression) expression).type)
+                    }
+                    else if(expression instanceof ListExpression) {
+                        ListExpression list = (ListExpression)expression
+                        for(expr in list.expressions) {
+                            if (expr instanceof ClassExpression) {
+                                interfacesToVisit.add(((ClassExpression) expr).type)
+                            }
+                        }
+                    }
+                } else if (AstAnnotationUtils.hasStereotype(ann.classNode, Introduction)) {
+                    populateIntroducedInterfaces(ann.classNode.annotations, interfacesToVisit)
+                }
             }
         }
 

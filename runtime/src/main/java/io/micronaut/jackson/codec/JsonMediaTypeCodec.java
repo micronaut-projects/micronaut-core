@@ -94,8 +94,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
 
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
-            T result = objectMapper.treeToValue(node, type.getType());
-            return result;
+            return objectMapper.treeToValue(node, type.getType());
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
         }

@@ -6,62 +6,30 @@ The following features are a TODO list of things to do on Micronaut before launc
 
 ### Core Features
 
-
 #### Generate ConfigurationProperties documentation
 
 We should generate asciidoc documentation for @ConfigurationProperties
-
-#### Generic Type Abstraction for Factory Beans
-
-This is currently not possible due to type erasure:
-
-```
-@Factory
-class TypeConverterFactory {
-
-    TypeConverter<String, Integer> typeConverter() {
-        (string, integer, context) -> {
-           // do conversion
-        }
-    }
-}
-```
-
-At compile time we know the types but at runtime the lambda loses type information. We need to add an API to obtain type information for a bean from the factory.
-
-
-#### AOP API
-
-- We need to allow `Introduction` advise to specify additional interfaces that should be be implemented by the interceptor.
-- Allow adding interfaces to non-abstract classes via introduction advise
-
 
 #### Aspect Implementations
 
 We need to implement AOP annotations for:
 
-- Hystrix
+- Spring @Transactional
 
 ### Configuration Sharing
 
 Need a mechanism for configuration discovery and sharing across the federation. Configuration sharing should initially support:
 
 * Consul
-* Google Cloud (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
 * AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
 
-### Service Discovery
-
-* Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
-* Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
-
-### Auto Configurations
+### Auto Configurations and Health Checks
 
 We still need auto-configurations for the following:
 
-* GORM for MongoDB
 * Apache Kafka
 * Cassandra
+* RabbitMQ
 
 ### Security / JWT Token Solution
 
@@ -78,15 +46,7 @@ We need endpoints for managing and/or exposing information about:
 
 These should be built on the `Endpoint` API.
 
-#### Health Checks
-
-Health checks still to be implemented:
-
-* Neo4j Driver
-
-
 ### HTTP Server
-
 
 #### Content Negotiation
 
@@ -96,15 +56,41 @@ Content negotiation must be supported
 
 WebSocket Support must be implemented
 
-#### Support for Views
-
-Some view technology support and port GSON views to micronaut.
-
 ### HTTP Client
+
+* Connection Pooling
+* multi part requests / file uploads - Zak/Puneet
+* Server Sent Events
+* CONTINUE request handling
+* Cookie Support - Zak/Puneet
+* Reactive Streams Publisher as request body to allow streaming
+* @Parameter support - Zak/Puneet
 
 #### Distributed Tracing
 
-Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.)
+Built in distributed tracing should be activated by default and allow integration with third-party tools (zipkin etc.).
+
+#### Metrics
+
+Built in metrics support on-top of Micro Meter
+
+## POST 1.0 Items
+
+The following items are postponed until after 1.0
+
+### HTTP/2 Support
+
+* The HTTP server should support HTTP/2
+
+### Configuration Sharing
+
+* Google Cloud Runtime Configurator (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
+
+
+### Service Discovery
+
+* Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
+* Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
 
 ### HTTP Gateway
 

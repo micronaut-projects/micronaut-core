@@ -16,7 +16,6 @@
 package io.micronaut.function.groovy
 
 import io.micronaut.function.executor.FunctionExitHandler
-import io.micronaut.function.executor.FunctionExitHandler
 
 import javax.inject.Singleton
 

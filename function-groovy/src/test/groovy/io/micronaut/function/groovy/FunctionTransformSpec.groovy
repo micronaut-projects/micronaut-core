@@ -56,6 +56,29 @@ int round(float value) {
         TestFunctionExitHandler.lastError == null
     }
 
+    void 'test parse JSON marshalling function'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['micronaut.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+        gcl.parseClass('''
+package test
+
+class Test { String name }
+''')
+        Class functionClass = gcl.parseClass('''
+import test.*
+
+Test test(Test test) {
+    test 
+}
+''')
+
+        expect:
+        functionClass.main(['-d','{"name":"Fred"}'] as String[])
+        TestFunctionExitHandler.lastError == null
+    }
+
     void "run function main method"() {
 
         expect:

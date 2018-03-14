@@ -162,6 +162,9 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public BeanContext stop() {
         if (running.compareAndSet(true, false)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Stopping BeanContext");
+            }
             publishEvent(new ShutdownEvent(this));
             // need to sort registered singletons so that beans with that require other beans appear first
             ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
@@ -223,6 +226,23 @@ public class DefaultBeanContext implements BeanContext {
                 })
                 .collect(Collectors.toList());
         return (Collection<BeanRegistration<?>>) result;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
+        if (beanType == null) {
+            return Collections.emptyList();
+        }
+        List result = singletonObjects
+                .values()
+                .stream()
+                .filter(registration -> {
+                    BeanDefinition beanDefinition = registration.beanDefinition;
+                    return beanType.isAssignableFrom(beanDefinition.getBeanType());
+                })
+                .collect(Collectors.toList());
+        return (Collection<BeanRegistration<T>>) result;
     }
 
     @SuppressWarnings("unchecked")
@@ -831,7 +851,15 @@ public class DefaultBeanContext implements BeanContext {
                         Class<?> candidateType = reference.getBeanType();
                         return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
-                    .map(ref -> (BeanDefinition<T>) ref.load(this));
+                    .map(ref -> {
+                        BeanDefinition<T> loadedBean;
+                        try {
+                            loadedBean = ref.load(this);
+                        } catch (Throwable e) {
+                            throw new BeanContextException("Error loading bean ["+ref.getName()+"]: " + e.getMessage(), e);
+                        }
+                        return loadedBean;
+                    });
 
             if (filter != null) {
                 candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
@@ -1538,18 +1566,8 @@ public class DefaultBeanContext implements BeanContext {
                         beansOfTypeList.add((T) instance);
                         processedDefinitions.add(reg.beanDefinition);
                     } else {
-                        Qualifier registeredQualifier = entry.getKey().qualifier;
-                        if (registeredQualifier == null) {
-                            Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
-                            if (result.isPresent()) {
-                                if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
-                                }
-
-                                beansOfTypeList.add((T) instance);
-                                processedDefinitions.add(reg.beanDefinition);
-                            }
-                        } else if (qualifier.equals(registeredQualifier)) {
+                        Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
+                        if (result.isPresent()) {
                             if (LOG.isTraceEnabled()) {
                                 LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
                             }
@@ -1802,6 +1820,14 @@ public class DefaultBeanContext implements BeanContext {
             int result = beanType.hashCode();
             result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
             return result;
+        }
+
+        @Override
+        public String getName() {
+            if(qualifier instanceof Named) {
+                return ((Named) qualifier).getName();
+            }
+            return Primary.class.getSimpleName();
         }
     }
 

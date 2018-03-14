@@ -2,9 +2,9 @@ The examples in the previous section demonstrates how Micronaut allows you to bi
 
 === Binding Annotations
 
-You can customize the name of the variable bound with the link:{api}/org/particleframework/http/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
+You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
-In addition, there are other annotations within the link:{api}/org/particleframework/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
+In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
 The following table summarizes the annotations, their purpose and provides an example:
 
@@ -13,19 +13,19 @@ The following table summarizes the annotations, their purpose and provides an ex
 |===
 |Annotation|Description |Example
 
-|link:{api}/org/particleframework/http/annotation/Body.html[@Body]
+|link:{api}/io/micronaut/http/annotation/Body.html[@Body]
 |Allows to specify the parameter the body of the request should bind to
 |`@Body String body`
 
-|link:{api}/org/particleframework/http/annotation/CookieValue.html[@CookieValue]
+|link:{api}/io/micronaut/http/annotation/CookieValue.html[@CookieValue]
 |Binds a parameter from a Cookie
 |`@CookieValue String myCookie`
 
-|link:{api}/org/particleframework/http/annotation/Header.html[@Header]
+|link:{api}/io/micronaut/http/annotation/Header.html[@Header]
 |Binds a parameter from an HTTP header
 |`@Header String contentType`
 
-|link:{api}/org/particleframework/http/annotation/Parameter.html[@Parameter]
+|link:{api}/io/micronaut/http/annotation/Parameter.html[@Parameter]
 |Bindings from a request URI variable or request parameter
 |`@Parameter String myParam`
 |===
@@ -61,9 +61,9 @@ public String hello(@Header String contentType) {
 
 === Bindable Types
 
-Generally any type that can be converted from a String representation to a Java type via the link:{api}/org/particleframework/core/convert/ConversionService.html[ConversionService] API can be bound to.
+Generally any type that can be converted from a String representation to a Java type via the link:{api}/io/micronaut/core/convert/ConversionService.html[ConversionService] API can be bound to.
 
-This includes most common Java types, however additional link:{api}/org/particleframework/core/convert/TypeConverter.html[TypeConverter] instances can be registered simply be creating `@Singleton` beans of type `TypeConverter`.
+This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered simply be creating `@Singleton` beans of type `TypeConverter`.
 
 The handling of link:{jdkapi}/java/util/Optional.html[Optional] deserves special mention. Consider for example the following example:
 
@@ -87,7 +87,7 @@ public String hello(@Header Optional<String> contentType) {
 
 An empty `Optional` will be passed if the header is absent from the request.
 
-Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/org/particleframework/core/convert/format/Format.html[Format] annotation:
+Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
 
 [source,java]
 ----
