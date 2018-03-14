@@ -13,6 +13,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import spock.lang.Unroll
 
+import javax.annotation.Nullable
+
 /**
  * Created by graemerocher on 25/08/2017.
  */
@@ -40,6 +42,9 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         where:
         httpMethod      | uri                                             | result                      | httpStatus
+        HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.POST | '/parameter/saveAgain?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
@@ -94,6 +99,16 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         @Get('/path/{max}')
         String path(@Parameter("max") Integer maximum) {
             "Parameter Value: $maximum"
+        }
+
+        @Get('/path/{id}/foo/{fooId}')
+        String path2(@Parameter("id") Long someId, Long fooId) {
+            "Parameter Values: $someId $fooId"
+        }
+
+        @Get('/path/{id}/bar{/barId}')
+        String optionalPath(@Parameter("id") Long someId, @Nullable Long barId) {
+            "Parameter Values: $someId ${barId ?: ''}"
         }
 
         @Get
