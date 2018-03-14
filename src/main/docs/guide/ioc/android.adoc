@@ -39,7 +39,7 @@ NOTE: Micronaut `inject-java` dependency uses https://developer.android.com/stud
 
 ### Enabling Dependency Injection
 
-Once you have configured the classpath correctly, the next step is start the link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+Once you have configured the classpath correctly, the next step is start the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
 
 
 The following example demonstrates creating a subclass of https://developer.android.com/reference/android/app/Application.html[android.app.Application] for that purpose:

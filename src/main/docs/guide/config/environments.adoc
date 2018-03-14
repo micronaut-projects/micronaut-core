@@ -1,4 +1,4 @@
-The application environment is modelled by the link:{api}/org/particleframework/context/env/Environment.html[Environment] interface, which allows specifying one or many unique environment names when creating an link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+The application environment is modelled by the link:{api}/io/micronaut/context/env/Environment.html[Environment] interface, which allows specifying one or many unique environment names when creating an link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
 
 
 .Initializing the Environment
@@ -7,4 +7,4 @@ The application environment is modelled by the link:{api}/org/particleframework/
 include::{testsjava}/env/EnvironmentTest.java[tags=env, indent=0]
 ----
 
-The active environment names serve the purpose of allowing loading different configuration files depending on the environment and also using the link:{api}/org/particleframework/context/annotation/Requires.html[@Requires] annotation to conditionally load beans or bean link:{api}/org/particleframework/context/annotation/Configuration.html[@Configuration] packages.
+The active environment names serve the purpose of allowing loading different configuration files depending on the environment and also using the link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation to conditionally load beans or bean link:{api}/io/micronaut/context/annotation/Configuration.html[@Configuration] packages.

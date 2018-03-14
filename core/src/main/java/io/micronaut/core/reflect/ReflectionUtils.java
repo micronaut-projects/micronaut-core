@@ -355,7 +355,7 @@ public class ReflectionUtils {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
-        return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName() + ". This could indicate a classpath issue, an incompatible JVM or out-of-date class metadata. Check your classpath and recompile classes as necessary.");
+        return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName() + ". Most likely cause of this error is that an unsupported or older version of a dependency is present on the classpath. Check your classpath, and ensure the incompatible classes are not present and/or recompile classes as necessary.");
     }
 
     private static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {

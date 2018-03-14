@@ -29,6 +29,14 @@ import java.util.Iterator;
  */
 @Singleton
 public class StubIntroducer implements MethodInterceptor<Object,Object> {
+
+    public static final int POSITION = 0;
+
+    @Override
+    public int getOrder() {
+        return POSITION;
+    }
+
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator();

@@ -117,6 +117,13 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      */
     Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
+
+    /**
+     * Find active {@link javax.inject.Singleton} beans for the given bean type
+     * @param beanType The bean type
+     * @return The beans
+     */
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType);
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}
      *

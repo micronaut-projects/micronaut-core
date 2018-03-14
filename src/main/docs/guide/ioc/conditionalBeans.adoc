@@ -1,6 +1,6 @@
 At times you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans etc.
 
-The link:{api}/org/particleframework/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
+The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
 
 Consider the following example:
 

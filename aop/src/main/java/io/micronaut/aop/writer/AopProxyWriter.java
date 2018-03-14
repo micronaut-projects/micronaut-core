@@ -25,6 +25,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -102,6 +103,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final BeanDefinitionWriter proxyBeanDefinitionWriter;
     private final String proxyInternalName;
     private final Set<Object> interceptorTypes;
+    private final Set<Object> interfaceTypes;
     private final Type proxyType;
     private final boolean hotswap;
     private final boolean lazy;
@@ -164,6 +166,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
+        this.interfaceTypes = Collections.emptySet();
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
@@ -177,14 +180,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param packageName The package name
      * @param className The class name
      * @param isInterface Is the target of the advise an interface
-     * @param isSingleton Is the target of the advise singleton
+     * @param annotationMetadata The annotation metadata
+     * @param interfaceTypes The additional interfaces to implement
      * @param interceptorTypes The interceptor types
      */
     public AopProxyWriter(String packageName,
                           String className,
                           boolean isInterface,
-                          boolean isSingleton,
                           AnnotationMetadata annotationMetadata,
+                          Object[] interfaceTypes,
                           Object... interceptorTypes) {
         this.isIntroduction = true;
         this.packageName = packageName;
@@ -198,6 +202,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
+        this.interfaceTypes = interfaceTypes != null ? new HashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
@@ -207,12 +212,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
-    @Override
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
-        super.startClass(classWriter, className, superType);
+        String[] interfaces = getImplementedInterfaceInternalNames();
+        classWriter.visit(V1_8, ACC_PUBLIC, className, null, superType.getInternalName(), interfaces);
 
         classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS.getDescriptor(), null, null);
         classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS.getDescriptor(), null, null);
+    }
+
+    private String[] getImplementedInterfaceInternalNames() {
+        return interfaceTypes.stream().map(o -> getTypeReference(o).getInternalName()).toArray(String[]::new);
     }
 
     @Override
@@ -646,15 +655,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             }
         }
 
-        String[] interfaces;
+        String[] interfaces = getImplementedInterfaceInternalNames();
         if(isInterface) {
-            interfaces = new String[]{
+            String[] adviceInterfaces = {
                     getInternalName(targetClassFullName),
                     Type.getInternalName(interceptedInterface)
             };
+            interfaces = ArrayUtils.concat( interfaces, adviceInterfaces);
         }
         else {
-            interfaces = new String[]{Type.getInternalName(interceptedInterface)};
+            String[] adviceInterfaces = {Type.getInternalName(interceptedInterface)};
+            interfaces = ArrayUtils.concat( interfaces, adviceInterfaces);
         }
         proxyClassWriter.visit(V1_8, ACC_PUBLIC,
                 proxyInternalName,

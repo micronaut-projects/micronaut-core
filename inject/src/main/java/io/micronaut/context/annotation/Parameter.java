@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.bind.annotation.Bindable;
+
 import javax.inject.Qualifier;
 import java.lang.annotation.*;
 
@@ -30,6 +32,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Qualifier
+@Bindable
 public @interface Parameter {
     /**
      * Specifies the parameter name. Useful as metadata at times for reflection on classes already compiled without -parameters argument to javac

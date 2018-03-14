@@ -27,16 +27,7 @@ import io.micronaut.context.annotation.EachProperty;
 @EachProperty(value = RedisSetting.REDIS_SERVERS)
 public class NamedRedisServersConfiguration extends AbstractRedisConfiguration {
 
-    private final String serverName;
-
     public NamedRedisServersConfiguration(@Parameter String name) {
-        this.serverName = name;
-    }
-
-    /**
-     * @return The name of the server
-     */
-    public String getServerName() {
-        return serverName;
+        setClientName(name);
     }
 }

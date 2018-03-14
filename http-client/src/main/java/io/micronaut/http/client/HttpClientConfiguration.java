@@ -68,6 +68,8 @@ public abstract class HttpClientConfiguration {
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
+    private boolean followRedirects = true;
+
 
     public HttpClientConfiguration() {
     }
@@ -75,6 +77,21 @@ public abstract class HttpClientConfiguration {
     public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         if(applicationConfiguration != null)
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
+    }
+
+    /**
+     * @return Whether redirects should be followed
+     */
+    public boolean isFollowRedirects() {
+        return followRedirects;
+    }
+
+    /**
+     * Sets whether redirects should be followed (defaults to true)
+     * @param followRedirects Whether redirects should be followed
+     */
+    public void setFollowRedirects(boolean followRedirects) {
+        this.followRedirects = followRedirects;
     }
 
     /**

@@ -4,4 +4,4 @@ Configuration can by default be provided in either Java properties, YAML, JSON o
 
 In addition, Micronaut will search for the system properties and environment variables for configuration allow the ability to conveniently override settings at the system property or environment variable level.
 
-Each source of configuration is modeled with the link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] interface and the mechanism is extensible allowing the implementation of additional link:{api}/org/particleframework/context/env/PropertySourceLoader.html[PropertySourceLoader] implementations.
+Each source of configuration is modeled with the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] interface and the mechanism is extensible allowing the implementation of additional link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] implementations.
