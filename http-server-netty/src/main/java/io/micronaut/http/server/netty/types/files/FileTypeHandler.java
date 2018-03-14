@@ -18,14 +18,12 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.*;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.micronaut.http.*;
 import io.micronaut.http.server.netty.NettyHttpResponse;
 import io.micronaut.http.server.netty.async.DefaultCloseHandler;
-import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 
@@ -34,6 +32,7 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -45,8 +44,8 @@ import java.util.Optional;
 @Singleton
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
-
     private final FileTypeHandlerConfiguration configuration;
+    private static final Class<?>[] supportedTypes = new Class[] {File.class, SystemFileCustomizableResponseType.class, StreamedFileCustomizableResponseType.class, NettyFileCustomizableResponseType.class};
 
     public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
@@ -62,6 +61,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             type = (NettyFileCustomizableResponseType) obj;
         } else if (obj instanceof SystemFileCustomizableResponseType) {
             type = new NettySystemFileCustomizableResponseType((SystemFileCustomizableResponseType) obj);
+        } else if (obj instanceof StreamedFileCustomizableResponseType) {
+            type = new NettyStreamedFileCustomizableResponseType((StreamedFileCustomizableResponseType) obj);
         } else {
             throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
         }
@@ -97,9 +98,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @Override
     public boolean supports(Class<?> type) {
-        return File.class.isAssignableFrom(type) ||
-                SystemFileCustomizableResponseType.class.isAssignableFrom(type) ||
-                NettyFileCustomizableResponseType.class.isAssignableFrom(type);
+        return Arrays.stream(supportedTypes)
+                .anyMatch((aClass -> aClass.isAssignableFrom(type)));
     }
 
     protected MediaType getMediaType(String filename) {

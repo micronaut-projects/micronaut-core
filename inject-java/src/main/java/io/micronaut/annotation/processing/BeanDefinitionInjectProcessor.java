@@ -722,7 +722,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
 
-
             PackageElement packageOfOverridingClass = elementUtils.getPackageOf(overridingMethod);
             PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
             boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
