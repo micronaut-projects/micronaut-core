@@ -406,13 +406,56 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                         protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
                                             if(received.compareAndSet(false, true)) {
                                                 NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                                                HttpHeaders headers = msg.headers();
                                                 if(LOG.isTraceEnabled()) {
                                                     LOG.trace("HTTP Client Streaming Response Received: {}", msg.status() );
-                                                    traceHeaders(msg.headers());
+                                                    traceHeaders(headers);
                                                 }
 
-                                                emitter.onNext(response);
-                                                emitter.onComplete();
+                                                int statusCode = response.getStatus().getCode();
+                                                if(statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
+                                                    String location = headers.get(HttpHeaderNames.LOCATION);
+                                                    Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
+                                                    try {
+                                                        MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                                                        redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
+                                                                .flatMap(uri -> buildStreamExchange(redirectRequest, uri));
+
+                                                        redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {
+                                                            Subscription sub;
+
+                                                            @Override
+                                                            public void onSubscribe(Subscription s) {
+                                                                s.request(1);
+                                                                this.sub = s;
+                                                            }
+
+                                                            @Override
+                                                            public void onNext(io.micronaut.http.HttpResponse<Object> objectHttpResponse) {
+                                                                emitter.onNext(objectHttpResponse);
+                                                                sub.cancel();
+                                                            }
+
+                                                            @Override
+                                                            public void onError(Throwable t) {
+                                                                emitter.onError(t);
+                                                                sub.cancel();
+                                                            }
+
+                                                            @Override
+                                                            public void onComplete() {
+                                                                emitter.onComplete();
+                                                            }
+                                                        });
+                                                    } catch (Exception e) {
+                                                        emitter.onError(e);
+                                                    }
+                                                }
+                                                else {
+                                                    emitter.onNext(response);
+                                                    emitter.onComplete();
+                                                }
+
                                             }
                                         }
                                     });
@@ -779,16 +822,53 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 if(!completableFuture.isDone()) {
 
                     HttpResponseStatus status = fullResponse.status();
+                    HttpHeaders headers = fullResponse.headers();
                     if(LOG.isTraceEnabled()) {
                         LOG.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri() );
                         LOG.trace("Status Code: {}", status );
-                        traceHeaders(fullResponse.headers());
+                        traceHeaders(headers);
                         traceBody(fullResponse.content());
                     }
                     int statusCode = status.code();
+                    // it is a redirect
+                    if(statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
+                        String location = headers.get(HttpHeaderNames.LOCATION);
+                        Flowable<io.micronaut.http.HttpResponse<O>> redirectedRequest = exchange(io.micronaut.http.HttpRequest.GET(location), bodyType);
+                        redirectedRequest.subscribe(new Subscriber<io.micronaut.http.HttpResponse<O>>() {
+                            Subscription sub;
+
+                            @Override
+                            public void onSubscribe(Subscription s) {
+                                this.sub = s;
+                                s.request(1);
+                            }
+
+                            @Override
+                            public void onNext(io.micronaut.http.HttpResponse<O> oHttpResponse) {
+                                if(!completableFuture.isDone()) {
+                                    completableFuture.complete(oHttpResponse);
+                                    sub.cancel();
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                                if(!completableFuture.isDone()) {
+                                    completableFuture.completeExceptionally(t);
+                                    sub.cancel();
+                                }
+                            }
+
+                            @Override
+                            public void onComplete() {
+
+                            }
+                        });
+                        return;
+                    }
                     if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                         // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                        fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                        headers.remove(HttpHeaderNames.CONTENT_LENGTH);
                     }
                     boolean errorStatus = statusCode >= 400;
                     FullNettyClientHttpResponse<O> response
