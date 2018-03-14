@@ -18,6 +18,8 @@ package io.micronaut.core.value;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * An {@link OptionalValues} that for each key features an {@link java.util.Optional} {@link List} of values
@@ -30,6 +32,22 @@ public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
      * Constant for empty values
      */
     OptionalMultiValues EMPTY_VALUES = of(Collections.emptyMap());
+
+    /**
+     * Retrieve a value if it is present
+     *
+     * @param name The name of the value
+     * @return An {@link Optional} of the value
+     */
+    default Optional<V> getFirst(CharSequence name) {
+        Optional<List<V>> list = get(name);
+        return list.flatMap(v -> {
+            if(!v.isEmpty()) {
+                return Optional.ofNullable(v.get(0));
+            }
+            return Optional.empty();
+        });
+    }
     /**
      * An empty {@link OptionalValues}
      *
