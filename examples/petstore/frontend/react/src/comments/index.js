@@ -152,7 +152,7 @@ class Comments extends Component {
 }
 
 Comments.propTypes = {
-  topic: string.required
+  topic: string.isRequired
 }
 
 export default Comments
