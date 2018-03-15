@@ -1,5 +1,5 @@
 Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or
-other particle micro-service. To simplify this, Micronaut includes a feature named `HttpClientFilter`.
+other Micronaut microservice. To simplify this, Micronaut includes a feature named `HttpClientFilter`.
 
 The next example illustrates a Micronaut's bean which interacts with https://bintray.com/docs/api/[Bintray REST Api].
 
