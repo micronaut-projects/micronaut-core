@@ -17,20 +17,23 @@
 
 package io.micronaut.core.beans;
 
+import java.util.List;
 
+/**
+ * An interface that provides basic bean information. Designed as a simpler replacement for
+ * {@link java.beans.BeanInfo}
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 public interface BeanInfo {
-
-    public PropertyDescriptor[] getPropertyDescriptors();
-
-    public MethodDescriptor[] getMethodDescriptors();
-
-    public EventSetDescriptor[] getEventSetDescriptors();
-
-    public BeanInfo[] getAdditionalBeanInfo();
-
-    public BeanDescriptor getBeanDescriptor();
-
-    public int getDefaultPropertyIndex();
-
-    public int getDefaultEventIndex();
+    /**
+     * @return The bean class
+     */
+    Class<?> getBeanClass();
+    /**
+     * The properties of the bean
+     * @return The properties of the bean
+     */
+    List<PropertyDescriptor> getPropertyDescriptors();
 }
