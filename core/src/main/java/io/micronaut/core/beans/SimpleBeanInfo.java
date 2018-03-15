@@ -127,6 +127,7 @@ class SimpleBeanInfo implements BeanInfo {
         return Collections.unmodifiableList(propertyList);
     }
 
+    @SuppressWarnings("unchecked")
     private static void introspectGet(Method theMethod,
                                       HashMap<String, HashMap> propertyTable) {
 
@@ -157,7 +158,7 @@ class SimpleBeanInfo implements BeanInfo {
         propertyName = decapitalize(methodName.substring(prefixLength));
 
         // validate property name
-        if (!isValidProperty(propertyName)) {
+        if (isInvalidProperty(propertyName)) {
             return;
         }
 
@@ -218,7 +219,7 @@ class SimpleBeanInfo implements BeanInfo {
         propertyName = decapitalize(methodName.substring(PREFIX_SET.length()));
 
         // validate property name
-        if (!isValidProperty(propertyName)) {
+        if (isInvalidProperty(propertyName)) {
             return;
         }
 
@@ -240,11 +241,11 @@ class SimpleBeanInfo implements BeanInfo {
     }
 
     /**
-     * Checks and fixs all cases when several incompatible checkers / getters
+     * Checks and fixes all cases when several incompatible checkers / getters
      * were specified for single property.
      *
-     * @param propertyTable
      */
+    @SuppressWarnings("unchecked")
     private void fixGetSet(HashMap<String, HashMap> propertyTable){
 
         if (propertyTable == null) {
@@ -352,8 +353,8 @@ class SimpleBeanInfo implements BeanInfo {
         }
 
     }
-    private static boolean isValidProperty(String propertyName) {
-        return (propertyName != null) && (propertyName.length() != 0) && !EXCLUDED_PROPERTIES.contains(propertyName);
+    private static boolean isInvalidProperty(String propertyName) {
+        return (propertyName == null) || (propertyName.length() == 0) || EXCLUDED_PROPERTIES.contains(propertyName);
     }
 
 }
