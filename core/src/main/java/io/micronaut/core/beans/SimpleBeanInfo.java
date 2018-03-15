@@ -16,9 +16,11 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 import static io.micronaut.core.naming.NameUtils.decapitalize;
@@ -50,7 +52,7 @@ class SimpleBeanInfo implements BeanInfo {
 
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
-        List<PropertyDescriptor> propertyList = introspectProperties(beanClass.getMethods());
+        List<PropertyDescriptor> propertyList = introspectProperties(introspectMethods(beanClass));
         if(propertyList.isEmpty()) {
             this.properties = Collections.emptyMap();
         }
@@ -63,11 +65,11 @@ class SimpleBeanInfo implements BeanInfo {
         }
     }
 
+
     @Override
     public Class<?> getBeanClass() {
         return beanClass;
     }
-
     @Override
     public Map<String, PropertyDescriptor> getPropertyDescriptors() {
         return properties;
@@ -194,6 +196,7 @@ class SimpleBeanInfo implements BeanInfo {
         // add current method as a valid getter
         getters.add(theMethod);
     }
+
     @SuppressWarnings("unchecked")
     private static void introspectSet(Method theMethod,
                                       HashMap<String, HashMap> propertyTable) {
@@ -238,6 +241,37 @@ class SimpleBeanInfo implements BeanInfo {
 
         // add new setter
         setters.add(theMethod);
+    }
+
+    private static Method[] introspectMethods(Class<?> beanClass) {
+
+        // Get the list of methods belonging to this class
+        Method[] basicMethods = beanClass.getMethods();
+
+        if (ArrayUtils.isEmpty(basicMethods))
+            return null;
+
+        ArrayList<Method> methodList = new ArrayList<>(
+                basicMethods.length);
+
+        // Loop over the methods found, looking for public non-static methods
+        for (Method basicMethod : basicMethods) {
+            if(basicMethod.getDeclaringClass() == Object.class) break;
+            int modifiers = basicMethod.getModifiers();
+            if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers) && !basicMethod.isBridge() && !basicMethod.isSynthetic() && basicMethod.getName().indexOf('$') == -1) {
+                methodList.add(basicMethod);
+            }
+        }
+
+        // Get the list of public methods into the returned array
+        int methodCount = methodList.size();
+        Method[] theMethods = null;
+        if (methodCount > 0) {
+            theMethods = new Method[methodCount];
+            theMethods = methodList.toArray(theMethods);
+        }
+
+        return theMethods;
     }
 
     /**

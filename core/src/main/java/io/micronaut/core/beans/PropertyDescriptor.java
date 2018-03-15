@@ -19,6 +19,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.naming.Named;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 
 /**
@@ -45,11 +46,17 @@ public class PropertyDescriptor implements Named {
         }
     }
 
+    /**
+     * @return The property name
+     */
     @Override
     public String getName() {
         return propertyName;
     }
 
+    /**
+     * @return The bean type
+     */
     public Class<?> getBeanClass() {
         if(getter != null) {
             return getter.getDeclaringClass();
@@ -59,6 +66,9 @@ public class PropertyDescriptor implements Named {
         }
     }
 
+    /**
+     * @return The property type
+     */
     public Class<?> getType() {
         if(getter != null) {
             return getter.getReturnType();
@@ -68,11 +78,17 @@ public class PropertyDescriptor implements Named {
         }
     }
 
-    public Method getReadMethod() {
+    /**
+     * @return The read method
+     */
+    public @Nullable Method getReadMethod() {
         return getter;
     }
 
-    public Method getWriteMethod() {
+    /**
+     * @return The write method
+     */
+    public @Nullable Method getWriteMethod() {
         return setter;
     }
 }
