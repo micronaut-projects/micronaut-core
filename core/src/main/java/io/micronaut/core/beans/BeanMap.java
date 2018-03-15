@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Simple class that provides a map interface over a bean

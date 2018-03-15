@@ -18,10 +18,8 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 
 /**
  * An interface that provides basic bean information. Designed as a simpler replacement for

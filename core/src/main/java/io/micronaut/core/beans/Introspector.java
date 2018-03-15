@@ -20,10 +20,6 @@ package io.micronaut.core.beans;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * An interface that provides basic bean introspection. Designed as a simpler replacement for
  * {@link java.beans.Introspector}
