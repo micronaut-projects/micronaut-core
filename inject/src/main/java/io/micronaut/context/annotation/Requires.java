@@ -56,7 +56,7 @@ public @interface Requires {
      *
      * @return The SDK required
      */
-    Sdk sdk() default Sdk.PARTICLE;
+    Sdk sdk() default Sdk.MICRONAUT;
     /**
      * Expresses the configurations that should be present for the bean or configuration to load
      *
@@ -139,7 +139,7 @@ public @interface Requires {
     enum Sdk {
         JAVA,
         GROOVY,
-        PARTICLE
+        MICRONAUT
     }
 
 }

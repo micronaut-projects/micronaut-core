@@ -26,10 +26,10 @@ class BeansEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[0] == "org.particleframework.context.BeanContext"
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[1] == "org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector"
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "singleton"
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].type == "org.particleframework.management.endpoint.beans.BeansEndpoint"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[0] == "io.micronaut.context.BeanContext"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[1] == "io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "singleton"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
         cleanup:
         embeddedServer.close()
