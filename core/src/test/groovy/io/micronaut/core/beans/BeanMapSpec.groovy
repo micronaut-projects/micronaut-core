@@ -41,6 +41,9 @@ class BeanMapSpec extends Specification {
         beanMap.get("foo") == 'bar'
         beanMap.get("sup") == 'parent'
         beanMap.get("readOnly") == "test"
+        beanMap.size() == 6
+        !beanMap.containsKey('metaClass')
+        !beanMap.containsKey('class')
     }
 
     static class SuperClass {
