@@ -31,7 +31,6 @@ import java.util.Set;
  * @since 1.0
  */
 class ReflectionBeanMap<T> extends BeanMap<T> {
-    private static final Set<String> EXCLUDED_PROPERTIES = CollectionUtils.setOf("class", "metaClass");
 
     @SuppressWarnings("unchecked")
     ReflectionBeanMap(T bean) {
@@ -40,16 +39,12 @@ class ReflectionBeanMap<T> extends BeanMap<T> {
 
     private static <T> PropertyAccess[] buildPropertyReaders(T bean) {
         BeanInfo beanInfo = Introspector.getBeanInfo(bean.getClass());
-        PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
-        List<PropertyAccess> propertyAccesses = new ArrayList<>(propertyDescriptors.length);
-        for (int i = 0; i < propertyDescriptors.length; i++) {
-            final PropertyDescriptor propertyDescriptor = propertyDescriptors[i];
-            String name = propertyDescriptor.getName();
-            if(EXCLUDED_PROPERTIES.contains(name)) continue;
-
+        List<PropertyDescriptor> propertyDescriptors = beanInfo.getPropertyDescriptors();
+        List<PropertyAccess> propertyAccesses = new ArrayList<>(propertyDescriptors.size());
+        for (final PropertyDescriptor propertyDescriptor : propertyDescriptors) {
             final Method readMethod = propertyDescriptor.getReadMethod();
             final Method writeMethod = propertyDescriptor.getWriteMethod();
-            propertyAccesses.add( new PropertyAccess() {
+            propertyAccesses.add(new PropertyAccess() {
                 @Override
                 public String getName() {
                     return propertyDescriptor.getName();
@@ -57,7 +52,7 @@ class ReflectionBeanMap<T> extends BeanMap<T> {
 
                 @Override
                 public Object read() {
-                    if(readMethod != null) {
+                    if (readMethod != null) {
                         return ReflectionUtils.invokeMethod(bean, readMethod);
                     }
                     return null;
@@ -65,7 +60,7 @@ class ReflectionBeanMap<T> extends BeanMap<T> {
 
                 @Override
                 public void write(Object object) {
-                    if(writeMethod != null) {
+                    if (writeMethod != null) {
                         ReflectionUtils.invokeMethod(bean, writeMethod, object);
                     }
                 }
