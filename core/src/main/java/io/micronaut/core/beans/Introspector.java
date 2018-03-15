@@ -82,7 +82,8 @@ public class Introspector {
      *            the specified bean class.
      * @return the <code>BeanInfo</code> of the bean class.
      */
-    public static BeanInfo getBeanInfo(Class<?> beanClass) {
+    @SuppressWarnings("unchecked")
+    public static <T> BeanInfo<T> getBeanInfo(Class<T> beanClass) {
         return theCache.get(beanClass, aClass -> new SimpleBeanInfo(beanClass));
     }
 

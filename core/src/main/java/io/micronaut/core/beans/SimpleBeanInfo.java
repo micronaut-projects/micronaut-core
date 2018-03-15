@@ -46,11 +46,21 @@ class SimpleBeanInfo implements BeanInfo {
     private static final String STR_INVALID = "invalid"; //$NON-NLS-1$
 
     private final Class<?> beanClass;
-    private final List<PropertyDescriptor> properties;
+    private final Map<String, PropertyDescriptor> properties;
 
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
-        this.properties = introspectProperties(beanClass.getMethods());
+        List<PropertyDescriptor> propertyList = introspectProperties(beanClass.getMethods());
+        if(propertyList.isEmpty()) {
+            this.properties = Collections.emptyMap();
+        }
+        else {
+            HashMap<String, PropertyDescriptor> propertyMap = new HashMap<>(propertyList.size());
+            for (PropertyDescriptor propertyDescriptor : propertyList) {
+                propertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
+            }
+            this.properties = Collections.unmodifiableMap(propertyMap);
+        }
     }
 
     @Override
@@ -59,7 +69,7 @@ class SimpleBeanInfo implements BeanInfo {
     }
 
     @Override
-    public List<PropertyDescriptor> getPropertyDescriptors() {
+    public Map<String, PropertyDescriptor> getPropertyDescriptors() {
         return properties;
     }
 
