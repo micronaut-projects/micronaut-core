@@ -17,240 +17,78 @@
 
 package io.micronaut.core.beans;
 
+import io.micronaut.core.naming.Named;
+
+import javax.annotation.Nullable;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 
+/**
+ * An interface that provides basic bean information. Designed as a simpler replacement for
+ * {@link java.beans.PropertyDescriptor}
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+public class PropertyDescriptor implements Named {
+    private final String propertyName;
+    private final Method getter;
+    private final Method setter;
 
-public class PropertyDescriptor extends FeatureDescriptor {
-    private Method getter;
-
-    private Method setter;
-
-    boolean constrained;
-
-    boolean bound;
-
-    public PropertyDescriptor(String propertyName, Class<?> beanClass,
-                              String getterName, String setterName) throws IntrospectionException {
-        super();
-        if (beanClass == null) {
-            throw new IntrospectionException(Messages.getString("beans.03")); //$NON-NLS-1$
-        }
-        if (propertyName == null || propertyName.length() == 0) {
-            throw new IntrospectionException(Messages.getString("beans.04")); //$NON-NLS-1$
-        }
-        this.setName(propertyName);
-        if (getterName != null) {
-            if (getterName.length() == 0) {
-                throw new IntrospectionException(
-                        "read or write method cannot be empty."); //$NON-NLS-1$
-            }
-            try {
-                setReadMethod(beanClass, getterName);
-            } catch (IntrospectionException e) {
-                setReadMethod(beanClass, createDefaultMethodName(propertyName,
-                        "get")); //$NON-NLS-1$
-            }
-        }
-        if (setterName != null) {
-            if (setterName.length() == 0) {
-                throw new IntrospectionException(
-                        "read or write method cannot be empty."); //$NON-NLS-1$
-            }
-            setWriteMethod(beanClass, setterName);
-        }
-    }
-
-    public PropertyDescriptor(String propertyName, Method getter, Method setter)
-            throws IntrospectionException {
-        super();
-        if (propertyName == null || propertyName.length() == 0) {
-            throw new IntrospectionException(Messages.getString("beans.04")); //$NON-NLS-1$
-        }
-        this.setName(propertyName);
-        setReadMethod(getter);
-        setWriteMethod(setter);
-    }
-
-    public PropertyDescriptor(String propertyName, Class<?> beanClass)
-            throws IntrospectionException {
-        if (beanClass == null) {
-            throw new IntrospectionException(Messages.getString("beans.03")); //$NON-NLS-1$
-        }
-        if (propertyName == null || propertyName.length() == 0) {
-            throw new IntrospectionException(Messages.getString("beans.04")); //$NON-NLS-1$
-        }
-        this.setName(propertyName);
-        try {
-            setReadMethod(beanClass,
-                    createDefaultMethodName(propertyName, "is")); //$NON-NLS-1$
-        } catch (Exception e) {
-            setReadMethod(beanClass, createDefaultMethodName(propertyName,
-                    "get")); //$NON-NLS-1$
-        }
-
-        setWriteMethod(beanClass, createDefaultMethodName(propertyName, "set")); //$NON-NLS-1$
-    }
-
-    public void setWriteMethod(Method setter) throws IntrospectionException {
-        if (setter != null) {
-            int modifiers = setter.getModifiers();
-            if (!Modifier.isPublic(modifiers)) {
-                throw new IntrospectionException(Messages.getString("beans.05")); //$NON-NLS-1$
-            }
-            Class<?>[] parameterTypes = setter.getParameterTypes();
-            if (parameterTypes.length != 1) {
-                throw new IntrospectionException(Messages.getString("beans.06")); //$NON-NLS-1$
-            }
-            Class<?> parameterType = parameterTypes[0];
-            Class<?> propertyType = getPropertyType();
-            if (propertyType != null && !propertyType.equals(parameterType)) {
-                throw new IntrospectionException(Messages.getString("beans.07")); //$NON-NLS-1$
-            }
-        }
-        this.setter = setter;
-    }
-
-    public void setReadMethod(Method getter) throws IntrospectionException {
-        if (getter != null) {
-            int modifiers = getter.getModifiers();
-            if (!Modifier.isPublic(modifiers)) {
-                throw new IntrospectionException(Messages.getString("beans.0A")); //$NON-NLS-1$
-            }
-            Class<?>[] parameterTypes = getter.getParameterTypes();
-            if (parameterTypes.length != 0) {
-                throw new IntrospectionException(Messages.getString("beans.08")); //$NON-NLS-1$
-            }
-            Class<?> returnType = getter.getReturnType();
-            if (returnType.equals(Void.TYPE)) {
-                throw new IntrospectionException(Messages.getString("beans.33")); //$NON-NLS-1$
-            }
-            Class<?> propertyType = getPropertyType();
-            if ((propertyType != null) && !returnType.equals(propertyType)) {
-                throw new IntrospectionException(Messages.getString("beans.09")); //$NON-NLS-1$
-            }
-        }
+    PropertyDescriptor(String propertyName, Method getter, Method setter) {
+        this.propertyName = propertyName;
         this.getter = getter;
+        this.setter = setter;
+        if(this.getter != null) {
+            this.getter.setAccessible(true);
+        }
+        if(this.setter != null) {
+            this.setter.setAccessible(true);
+        }
     }
 
-    public Method getWriteMethod() {
-        return setter;
+    /**
+     * @return The property name
+     */
+    @Override
+    public String getName() {
+        return propertyName;
     }
 
-    public Method getReadMethod() {
+    /**
+     * @return The bean type
+     */
+    public Class<?> getBeanClass() {
+        if(getter != null) {
+            return getter.getDeclaringClass();
+        }
+        else {
+            return setter.getDeclaringClass();
+        }
+    }
+
+    /**
+     * @return The property type
+     */
+    public Class<?> getType() {
+        if(getter != null) {
+            return getter.getReturnType();
+        }
+        else {
+            return setter.getParameterTypes()[0];
+        }
+    }
+
+    /**
+     * @return The read method
+     */
+    public @Nullable Method getReadMethod() {
         return getter;
     }
 
-    @Override
-    public boolean equals(Object object) {
-        boolean result = object instanceof PropertyDescriptor;
-        if (result) {
-            PropertyDescriptor pd = (PropertyDescriptor) object;
-            boolean gettersAreEqual = (this.getter == null)
-                    && (pd.getReadMethod() == null) || (this.getter != null)
-                    && (this.getter.equals(pd.getReadMethod()));
-            boolean settersAreEqual = (this.setter == null)
-                    && (pd.getWriteMethod() == null) || (this.setter != null)
-                    && (this.setter.equals(pd.getWriteMethod()));
-            boolean propertyTypesAreEqual = this.getPropertyType() == pd
-                    .getPropertyType();
-            boolean boundPropertyAreEqual = this.isBound() == pd.isBound();
-            boolean constrainedPropertyAreEqual = this.isConstrained() == pd
-                    .isConstrained();
-            result = gettersAreEqual && settersAreEqual
-                    && propertyTypesAreEqual
-                    && boundPropertyAreEqual && constrainedPropertyAreEqual;
-        }
-        return result;
+    /**
+     * @return The write method
+     */
+    public @Nullable Method getWriteMethod() {
+        return setter;
     }
-
-    @Override
-    public int hashCode() {
-        return BeansUtils.getHashCode(getter) + BeansUtils.getHashCode(setter)
-                + BeansUtils.getHashCode(getPropertyType())
-                + BeansUtils.getHashCode(isBound())
-                + BeansUtils.getHashCode(isConstrained());
-    }
-
-
-    public Class<?> getPropertyType() {
-        Class<?> result = null;
-        if (getter != null) {
-            result = getter.getReturnType();
-        } else if (setter != null) {
-            Class<?>[] parameterTypes = setter.getParameterTypes();
-            result = parameterTypes[0];
-        }
-        return result;
-    }
-
-    public void setConstrained(boolean constrained) {
-        this.constrained = constrained;
-    }
-
-    public void setBound(boolean bound) {
-        this.bound = bound;
-    }
-
-    public boolean isConstrained() {
-        return constrained;
-    }
-
-    public boolean isBound() {
-        return bound;
-    }
-
-    String createDefaultMethodName(String propertyName, String prefix) {
-        String result = null;
-        if (propertyName != null) {
-            String bos = BeansUtils.toASCIIUpperCase(propertyName.substring(0, 1));
-            String eos = propertyName.substring(1, propertyName.length());
-            result = prefix + bos + eos;
-        }
-        return result;
-    }
-
-    void setReadMethod(Class<?> beanClass, String getterName)
-            throws IntrospectionException {
-        try {
-            Method readMethod = beanClass.getMethod(getterName, new Class[] {});
-            setReadMethod(readMethod);
-        } catch (Exception e) {
-            throw new IntrospectionException(e.getLocalizedMessage());
-        }
-    }
-
-    void setWriteMethod(Class<?> beanClass, String setterName)
-            throws IntrospectionException {
-        Method writeMethod = null;
-        try {
-            if (getter != null) {
-                writeMethod = beanClass.getMethod(setterName,
-                        new Class[] { getter.getReturnType() });
-            } else {
-                Class<?> clazz = beanClass;
-                Method[] methods = null;
-                while (clazz != null && writeMethod == null) {
-                    methods = clazz.getDeclaredMethods();
-                    for (Method method : methods) {
-                        if (setterName.equals(method.getName())) {
-                            if (method.getParameterTypes().length == 1) {
-                                writeMethod = method;
-                                break;
-                            }
-                        }
-                    }
-                    clazz = clazz.getSuperclass();
-                }
-            }
-        } catch (Exception e) {
-            throw new IntrospectionException(e.getLocalizedMessage());
-        }
-        if (writeMethod == null) {
-            throw new IntrospectionException(Messages.getString(
-                    "beans.64", setterName)); //$NON-NLS-1$
-        }
-        setWriteMethod(writeMethod);
-    }
-
 }
