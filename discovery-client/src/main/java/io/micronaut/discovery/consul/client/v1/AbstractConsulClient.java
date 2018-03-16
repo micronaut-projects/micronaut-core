@@ -15,23 +15,22 @@
  */
 package io.micronaut.discovery.consul.client.v1;
 
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.http.client.Client;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
-import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.Client;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.validation.constraints.NotNull;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -41,9 +40,16 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
+@Requires(beans = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient {
 
-    @Inject protected ConsulConfiguration consulConfiguration = new ConsulConfiguration();
+    private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
+
+    @Inject
+    public void setConsulConfiguration(ConsulConfiguration consulConfiguration) {
+        if(consulConfiguration != null)
+            this.consulConfiguration = consulConfiguration;
+    }
 
     @Override
     public String getDescription() {
