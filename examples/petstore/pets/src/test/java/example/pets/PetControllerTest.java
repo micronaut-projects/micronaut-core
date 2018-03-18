@@ -19,10 +19,7 @@ import com.mongodb.reactivestreams.client.MongoClient;
 import example.api.v1.Pet;
 import example.api.v1.PetType;
 import io.reactivex.Flowable;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import io.micronaut.configuration.mongo.reactive.MongoSettings;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.io.socket.SocketUtils;
@@ -30,6 +27,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.junit.runners.MethodSorters;
 
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +37,7 @@ import static org.junit.Assert.*;
  * @author graemerocher
  * @since 1.0
  */
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class PetControllerTest {
 
 
@@ -107,7 +106,7 @@ public class PetControllerTest {
     }
 
     @Test
-    public void testFindByVendor() {
+    public void testNextFindByVendor() {
         PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
 
         PetEntity entity = new PetEntity("Fred", "Ron", "photo-1442605527737-ed62b867591f.jpeg")
