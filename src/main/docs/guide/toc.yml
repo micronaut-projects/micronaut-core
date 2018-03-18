@@ -67,6 +67,7 @@ cloud:
 languageSupport:
   title: Language Support
   groovy: Micronaut for Groovy
+  kotlin: Micronaut for Kotlin
 management:
   title: Management & Monitoring
   buildingEndpoints:
