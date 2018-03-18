@@ -17,20 +17,23 @@
 
 package io.micronaut.core.beans;
 
+import java.util.Map;
 
-public interface BeanInfo {
-
-    public PropertyDescriptor[] getPropertyDescriptors();
-
-    public MethodDescriptor[] getMethodDescriptors();
-
-    public EventSetDescriptor[] getEventSetDescriptors();
-
-    public BeanInfo[] getAdditionalBeanInfo();
-
-    public BeanDescriptor getBeanDescriptor();
-
-    public int getDefaultPropertyIndex();
-
-    public int getDefaultEventIndex();
+/**
+ * An interface that provides basic bean information. Designed as a simpler replacement for
+ * {@link java.beans.BeanInfo}
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+public interface BeanInfo<T> {
+    /**
+     * @return The bean class
+     */
+    Class<T> getBeanClass();
+    /**
+     * The properties of the bean
+     * @return The properties of the bean as a map where the key is the property name
+     */
+    Map<String, PropertyDescriptor> getPropertyDescriptors();
 }

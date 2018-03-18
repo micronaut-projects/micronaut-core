@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.naming;
 
-import io.micronaut.core.beans.Introspector;
-
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -29,15 +27,7 @@ import java.util.stream.Collectors;
  */
 public class NameUtils {
 
-    /**
-     * Converts class name to property name using JavaBean decapitalization
-     *
-     * @param name The class name
-     * @return The decapitalized name
-     */
-    public static String decapitalize(String name) {
-        return Introspector.decapitalize(name);
-    }
+
 
     /**
      * Converts class name to property name using JavaBean decapitalization
@@ -47,7 +37,7 @@ public class NameUtils {
      * @return The decapitalized name
      */
     public static String decapitalizeWithoutSuffix(String name, String... suffixes) {
-        String decapitalized = Introspector.decapitalize(name);
+        String decapitalized = decapitalize(name);
         return trimSuffix(decapitalized, suffixes);
     }
 
@@ -226,5 +216,33 @@ public class NameUtils {
             return decapitalize(setterName.substring(3));
         }
         return setterName;
+    }
+
+    /**
+     * Decapitalizes a given string according to the rule:
+     * <ul>
+     * <li>If the first or only character is Upper Case, it is made Lower Case
+     * <li>UNLESS the second character is also Upper Case, when the String is
+     * returned unchanged <eul>
+     *
+     * @param name -
+     *            the String to decapitalize
+     * @return the decapitalized version of the String
+     */
+    public static String decapitalize(String name) {
+
+        if (name == null)
+            return null;
+        // The rule for decapitalize is that:
+        // If the first letter of the string is Upper Case, make it lower case
+        // UNLESS the second letter of the string is also Upper Case, in which case no
+        // changes are made.
+        if (name.length() == 0 || (name.length() > 1 && Character.isUpperCase(name.charAt(1)))) {
+            return name;
+        }
+
+        char[] chars = name.toCharArray();
+        chars[0] = Character.toLowerCase(chars[0]);
+        return new String(chars);
     }
 }
