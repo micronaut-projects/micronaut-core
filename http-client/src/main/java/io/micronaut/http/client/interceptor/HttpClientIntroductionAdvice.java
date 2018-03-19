@@ -22,12 +22,10 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -57,6 +55,7 @@ import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -158,6 +157,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     String finalHeaderName = headerName;
                     ConversionService.SHARED.convert(value.getValue(), String.class)
                             .ifPresent(o -> headers.put(finalHeaderName, o));
+                }
+                else if (argument.isAnnotationPresent(CookieValue.class)) {
+                    Object cookieValue = parameters.get(argumentName).getValue();
+
+                    ConversionService.SHARED.convert(cookieValue, String.class)
+                            .ifPresent(o -> headers.put(HttpHeaderNames.COOKIE.toString(), o));
+
                 }
                 else if (argument.isAnnotationPresent(Parameter.class)) {
 
