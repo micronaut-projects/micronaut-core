@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
@@ -157,6 +158,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     String finalHeaderName = headerName;
                     ConversionService.SHARED.convert(value.getValue(), String.class)
                             .ifPresent(o -> headers.put(finalHeaderName, o));
+                }
+                else if (argument.isAnnotationPresent(Parameter.class)) {
+
+                    String parameterName = argument.getAnnotation(Parameter.class).value();
+                    MutableArgumentValue<?> value = parameters.get(argumentName);
+                    ConversionService.SHARED.convert(value.getValue(), String.class)
+                            .ifPresent(o -> paramMap.put(parameterName, o));
                 }
                 else if(!uriVariables.contains(argumentName)){
                     bodyArguments.add(argument);
