@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.*;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -45,7 +45,7 @@ import java.util.Optional;
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
     private final FileTypeHandlerConfiguration configuration;
-    private static final Class<?>[] supportedTypes = new Class[] {File.class, SystemFileCustomizableResponseType.class, StreamedFileCustomizableResponseType.class, NettyFileCustomizableResponseType.class};
+    private static final Class<?>[] supportedTypes = new Class[] {File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class};
 
     public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
@@ -61,8 +61,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             type = (NettyFileCustomizableResponseType) obj;
         } else if (obj instanceof SystemFileCustomizableResponseType) {
             type = new NettySystemFileCustomizableResponseType((SystemFileCustomizableResponseType) obj);
-        } else if (obj instanceof StreamedFileCustomizableResponseType) {
-            type = new NettyStreamedFileCustomizableResponseType((StreamedFileCustomizableResponseType) obj);
+        } else if (obj instanceof StreamedFile) {
+            type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj);
         } else {
             throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
         }

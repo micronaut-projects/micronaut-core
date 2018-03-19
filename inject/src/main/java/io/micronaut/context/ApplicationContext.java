@@ -19,8 +19,8 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
-import io.micronaut.context.env.*;
-import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.convert.ConversionService;
@@ -220,7 +220,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(ClassLoader classLoader, String... environments) {
-        return new DefaultApplicationContext(ResourceLoader.of(classLoader), environments);
+        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), environments);
     }
 
     /**
@@ -231,7 +231,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(Class mainClass, String... environments) {
-        DefaultApplicationContext applicationContext = new DefaultApplicationContext(ResourceLoader.of(mainClass.getClassLoader()), environments);
+        DefaultApplicationContext applicationContext = new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(mainClass.getClassLoader()), environments);
         applicationContext.getEnvironment().addPackage(mainClass.getPackage());
         return applicationContext;
     }

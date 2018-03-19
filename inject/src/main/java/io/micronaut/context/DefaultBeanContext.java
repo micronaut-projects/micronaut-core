@@ -37,6 +37,8 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -108,7 +110,7 @@ public class DefaultBeanContext implements BeanContext {
      * @param classLoader The class loader
      */
     public DefaultBeanContext(ClassLoader classLoader) {
-        this(ResourceLoader.of(classLoader));
+        this(ClassPathResourceLoader.defaultLoader(classLoader));
     }
 
     /**
@@ -116,7 +118,7 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(ResourceLoader resourceLoader) {
+    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
     }

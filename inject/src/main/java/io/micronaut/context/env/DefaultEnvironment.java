@@ -27,6 +27,8 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
@@ -66,7 +68,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ResourceLoader resourceLoader;
+    protected final ClassPathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
@@ -84,10 +86,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
-        this(ResourceLoader.of(classLoader), conversionService, names);
+        this(ClassPathResourceLoader.defaultLoader(classLoader), conversionService, names);
     }
 
-    public DefaultEnvironment(ResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
@@ -447,6 +449,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return resourceLoader.getResources(path);
     }
 
+    @Override
+    public boolean supportsPrefix(String path) {
+        return resourceLoader.supportsPrefix(path);
+    }
+
+    @Override
+    public ResourceLoader forBase(String basePath) {
+        return resourceLoader.forBase(basePath);
+    }
 
     private static ComputePlatform determineCloudProvider() {
 
