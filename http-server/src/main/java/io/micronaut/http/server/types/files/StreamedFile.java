@@ -26,33 +26,40 @@ import java.time.Instant;
 
 /**
  * A special type for streaming an {@link InputStream} representing
- * a file or resource.
+ * a file or resource. The
  *
  * @author James Kleeh
+ * @since 1.0
  */
-public class StreamedFileCustomizableResponseType implements FileCustomizableResponseType {
+public class StreamedFile implements FileCustomizableResponseType {
 
     private final String name;
     private final long lastModified;
     private final InputStream inputStream;
     private final long length;
 
-    public StreamedFileCustomizableResponseType(InputStream inputStream, String name) {
+    public StreamedFile(InputStream inputStream, String name) {
         this(inputStream, name, Instant.now().toEpochMilli());
     }
 
-    public StreamedFileCustomizableResponseType(InputStream inputStream, String name, long lastModified) {
+    public StreamedFile(InputStream inputStream, String name, long lastModified) {
         this(inputStream, name, lastModified, -1);
     }
 
-    public StreamedFileCustomizableResponseType(InputStream inputStream, String name, long lastModified, long contentLength) {
+    public StreamedFile(InputStream inputStream, String name, long lastModified, long contentLength) {
         this.name = name;
         this.lastModified = lastModified;
         this.inputStream = inputStream;
         this.length = contentLength;
     }
 
-    public StreamedFileCustomizableResponseType(URL url) {
+    /**
+     * Immediately opens a connection to the given URL to retrieve
+     * data about the connection, including the input stream.
+     *
+     * @param url The URL to resource
+     */
+    public StreamedFile(URL url) {
         String path = url.getPath();
         int idx = path.lastIndexOf(File.separatorChar);
         if (idx > -1) {
@@ -85,6 +92,9 @@ public class StreamedFileCustomizableResponseType implements FileCustomizableRes
         return name;
     }
 
+    /**
+     * @return The stream used to retrieve data for the file
+     */
     public InputStream getInputStream() {
         return inputStream;
     }
