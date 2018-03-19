@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.StreamedFileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
@@ -38,7 +38,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public class NettyStreamedFileCustomizableResponseType extends StreamedFileCustomizableResponseType implements NettyFileCustomizableResponseType {
+public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
 
 
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
@@ -49,7 +49,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFileCusto
         super(url);
     }
 
-    public NettyStreamedFileCustomizableResponseType(StreamedFileCustomizableResponseType delegate) {
+    public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
         super(delegate.getInputStream(), delegate.getName(), delegate.getLastModified(), delegate.getLength());
     }
 

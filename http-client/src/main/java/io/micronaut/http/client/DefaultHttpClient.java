@@ -22,6 +22,8 @@ import com.typesafe.netty.http.StreamedHttpResponse;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.http.HttpStatus;
@@ -167,7 +169,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     public DefaultHttpClient(LoadBalancer loadBalancer) {
-        this(loadBalancer, new DefaultHttpClientConfiguration(), new NettyClientSslBuilder(new SslConfiguration()), createDefaultMediaTypeRegistry());
+        this(loadBalancer,
+                new DefaultHttpClientConfiguration(),
+                new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
+                createDefaultMediaTypeRegistry());
     }
 
 

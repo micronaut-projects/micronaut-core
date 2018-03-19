@@ -19,6 +19,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
@@ -39,7 +41,7 @@ import java.util.*;
 public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
 
     private final ConversionService conversionService;
-    private final ResourceLoader resourceLoader;
+    private final ClassPathResourceLoader resourceLoader;
     private Environment environment;
 
     private Iterable<BeanConfiguration> resolvedConfigurations;
@@ -52,7 +54,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(String... environmentNames) {
-        this(ResourceLoader.of(DefaultBeanContext.class.getClassLoader()), environmentNames);
+        this(ClassPathResourceLoader.defaultLoader(DefaultBeanContext.class.getClassLoader()), environmentNames);
     }
 
     /**
@@ -61,7 +63,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      * @param resourceLoader  The class loader
      */
-    public DefaultApplicationContext(ResourceLoader resourceLoader, String... environmentNames) {
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;

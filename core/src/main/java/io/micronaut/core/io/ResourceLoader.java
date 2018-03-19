@@ -1,15 +1,7 @@
 package io.micronaut.core.io;
 
-import io.micronaut.core.io.file.FileSystemResourceLoader;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.file.FileSystemResourceLoader;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
-
-import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Enumeration;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -30,59 +22,36 @@ public interface ResourceLoader {
     Optional<InputStream> getResourceAsStream(String path);
 
     /**
-     * @return The class loader for this resource loader
+     * Obtains the URL to a given resource
+     *
+     * @param path The path
+     * @return An optional resource
      */
-    ClassLoader getClassLoader();
-
-    default Optional<URL> getResource(String path) {
-        URL resource = getClassLoader().getResource(path);
-        if(resource != null) {
-            return Optional.of(resource);
-        }
-        return Optional.empty();
-    }
-
-    default Stream<URL> getResources(String fileName) {
-        Enumeration<URL> all;
-        try {
-            all = getClassLoader().getResources(fileName);
-        } catch (IOException e) {
-            return Stream.empty();
-        }
-        Stream.Builder<URL> builder = Stream.builder();
-        while (all.hasMoreElements()) {
-            URL url = all.nextElement();
-            builder.accept(url);
-        }
-        return builder.build();
-    }
+    Optional<URL> getResource(String path);
 
     /**
-     * Create a resource loader for the given classloader
-     * @param classLoader The class loader
-     * @return The resource loader
+     * Obtains all resources with the given name
+     *
+     * @param name The name of the resource
+     * @return A stream of URLs
      */
-    static ClassPathResourceLoader of(ClassLoader classLoader) {
-        return new ClassPathResourceLoader(classLoader);
-    }
+    Stream<URL> getResources(String name);
 
-    static Optional<ResourceLoader> forPath(String path, ClassLoader classLoader) {
-        if (path.startsWith("classpath:")) {
-            return Optional.of(new ClassPathResourceLoader(classLoader, path.substring(10)));
-        } else if (path.startsWith("file:")) {
-            return Optional.of(new FileSystemResourceLoader(new File(path.substring(5))));
-        } else {
-            return Optional.empty();
-        }
-    }
+    /**
+     * @param path The path to a resource including a prefix
+     *             appended by a colon. Ex (classpath:, file:)
+     * @return Whether the given resource loader supports the prefix
+     */
+    boolean supportsPrefix(String path);
 
-    static Optional<ResourceLoader> forResource(String path, ClassLoader classLoader) {
-        if (path.startsWith("classpath:")) {
-            return Optional.of(new ClassPathResourceLoader(classLoader, ""));
-        } else if (path.startsWith("file:")) {
-            return Optional.of(new FileSystemResourceLoader(new File(String.valueOf(path.charAt(5)))));
-        } else {
-            return Optional.empty();
-        }
-    }
+    /**
+     * Constructs a new resource loader designed to load
+     * resources from the given path. Requested resources
+     * will be loaded within the context of the given path.
+     *
+     * @param basePath The path to load resources
+     * @return The new {@link ResourceLoader}
+     */
+    ResourceLoader forBase(String basePath);
+
 }
