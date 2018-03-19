@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.ssl;
 
-import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.ResourceResolver;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.URL;
@@ -35,11 +35,13 @@ import java.util.Optional;
 abstract public class SslBuilder<T> {
 
     protected final SslConfiguration ssl;
+    private final ResourceResolver resourceResolver;
     private KeyStore keyStoreCache = null;
     private KeyStore trustStoreCache = null;
 
-    public SslBuilder(SslConfiguration ssl) {
+    public SslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         this.ssl = ssl;
+        this.resourceResolver = resourceResolver;
     }
 
     abstract public Optional<T> build();
@@ -105,17 +107,13 @@ abstract public class SslBuilder<T> {
         String type = optionalType.orElse("JKS");
         String password = optionalPassword.orElse(null);
         KeyStore store = KeyStore.getInstance(type);
-        Optional<ResourceLoader> resourceLoader = ResourceLoader.forResource(resource, this.getClass().getClassLoader());
-        if (resourceLoader.isPresent()) {
-            Optional<URL> url = resourceLoader.get().getResource(resource);
-            if (url.isPresent()) {
-                store.load(url.get().openStream(), password == null ? null : password.toCharArray());
-                return store;
-            } else {
-                throw new SslConfigurationException("The resource " + resource + " could not be found");
-            }
+
+        Optional<URL> url = resourceResolver.getResource(resource);
+        if (url.isPresent()) {
+            store.load(url.get().openStream(), password == null ? null : password.toCharArray());
+            return store;
         } else {
-            throw new SslConfigurationException("No resource loader could be found for the path: " + resource);
+            throw new SslConfigurationException("The resource " + resource + " could not be found");
         }
     }
 

@@ -71,7 +71,10 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test resources with configured mapping"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent], 'router.static.resources.enabled': true, 'router.static.resources.mapping': '/static/**'], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'router.static.resources.enabled': true,
+                'router.static.resources.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 

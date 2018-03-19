@@ -29,9 +29,11 @@ import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceLocator
 import io.micronaut.core.io.ResourceLoader
+import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.util.stream.Stream
 
 /**
  * @author graemerocher
@@ -43,7 +45,12 @@ class CustomPropertySourceLocatorSpec extends Specification {
     void "test that a PropertySource from a PropertySourceLocator overrides application config"() {
         given:
         def cl = getClass().getClassLoader()
-        ResourceLoader resourceLoader = new ResourceLoader() {
+        ResourceLoader resourceLoader = new ClassPathResourceLoader() {
+            @Override
+            ClassLoader getClassLoader() {
+                return cl
+            }
+
             @Override
             Optional<InputStream> getResourceAsStream(String path) {
                 if(path == "bootstrap.properties") {
@@ -56,8 +63,18 @@ some.bootstrap.config=true
             }
 
             @Override
-            ClassLoader getClassLoader() {
-                return cl
+            Optional<URL> getResource(String path) {
+                return null
+            }
+
+            @Override
+            Stream<URL> getResources(String name) {
+                return null
+            }
+
+            @Override
+            ResourceLoader forBase(String basePath) {
+                return null
             }
         }
 

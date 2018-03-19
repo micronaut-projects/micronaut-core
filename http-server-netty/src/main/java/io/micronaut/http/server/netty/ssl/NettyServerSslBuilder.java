@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.ssl;
 
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
@@ -44,8 +45,8 @@ import java.util.Optional;
 @Singleton
 public class NettyServerSslBuilder extends SslBuilder<SslContext> {
 
-    public NettyServerSslBuilder(SslConfiguration ssl) {
-        super(ssl);
+    public NettyServerSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
+        super(ssl, resourceResolver);
     }
 
     public SslConfiguration getSslConfiguration() {
