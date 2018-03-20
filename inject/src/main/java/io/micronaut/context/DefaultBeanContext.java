@@ -399,7 +399,16 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> boolean containsBean(Class<T> beanType, Qualifier<T> qualifier) {
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-        return this.containsBeanCache.computeIfAbsent(beanKey, beanKey1 -> singletonObjects.containsKey(beanKey1) || findConcreteCandidateNoCache(beanType, qualifier, false, false, false).isPresent());
+        if(containsBeanCache.containsKey(beanKey)) {
+            return containsBeanCache.get(beanKey);
+        }
+        else {
+            boolean result = singletonObjects.containsKey(beanKey) ||
+                    findConcreteCandidateNoCache(beanType, qualifier, false, false, false).isPresent();
+
+            containsBeanCache.put(beanKey, result);
+            return result;
+        }
     }
 
     @Override

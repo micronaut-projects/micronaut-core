@@ -220,4 +220,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     boolean isActive(BeanConfiguration configuration);
 
 
+    /**
+     * Obtains the {@link PropertySourceLoader} instances
+     * @return A collection of {@link PropertySourceLoader}
+     */
+    Collection<PropertySourceLoader> getPropertySourceLoaders();
 }

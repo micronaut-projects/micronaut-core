@@ -37,6 +37,12 @@ Need to implement support for JWT token based authorization
 
 ### Management Features
 
+Tasks to complete:
+
+- Endpoints shouldn't be exposed to the web by default
+- Integrate Endpoints with Security solution above such that @Endpoint.defaultSensitive is honoured
+
+
 #### Endpoints
 
 We need endpoints for managing and/or exposing information about:

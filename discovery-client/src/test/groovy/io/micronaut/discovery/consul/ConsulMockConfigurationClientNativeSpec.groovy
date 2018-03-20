@@ -17,6 +17,7 @@ package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.consul.client.v1.ConsulClient
@@ -33,7 +34,7 @@ import spock.lang.Stepwise
  * @since 1.0
  */
 @Stepwise
-class ConsulMockConfigurationClientSpec extends Specification {
+class ConsulMockConfigurationClientNativeSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
 
@@ -48,7 +49,8 @@ class ConsulMockConfigurationClientSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['consul.client.host'                     : 'localhost',
+            [
+             'consul.client.host'                     : 'localhost',
              'consul.client.port'                     : serverPort]
     )
 
@@ -72,15 +74,31 @@ class ConsulMockConfigurationClientSpec extends Specification {
         keyValues.size() == 2
     }
 
-    void "test discovery property sources from Consul"() {
+    void "test discovery property sources from Consul with native property handling"() {
 
+        given:
+        writeValue("application,test", "foo", "bar")
+        writeValue("application,other", "foo", "baz")
+        writeValue("application,other", "more", "stuff")
 
         when:
         def env = Mock(Environment)
         env.getActiveNames() >> (['test'] as Set)
         List<PropertySource> propertySources = Flowable.fromPublisher(client.getPropertySources(env)).toList().blockingGet()
 
-        then:"TODO: WIP"
-        propertySources.size() == 0
+        then:"verify property source characteristics"
+        propertySources.size() == 2
+        propertySources[0].order > EnvironmentPropertySource.POSITION
+        propertySources[0].name == 'consul-application'
+        propertySources[0].get('datasource.url') == "mysql://blah"
+        propertySources[0].get('datasource.driver') == "java.SomeDriver"
+        propertySources[0].toList().size() == 2
+        propertySources[1].name == 'consul-application[test]'
+        propertySources[1].order > propertySources[0].order
+        propertySources[1].toList().size() == 1
+    }
+
+    private void writeValue(String env, String name, String value) {
+        Flowable.fromPublisher(client.putValue("/config/$env/$name", value)).blockingFirst()
     }
 }

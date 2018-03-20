@@ -17,25 +17,37 @@ package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.context.env.PropertySourceLoader;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.client.Client;
-import io.reactivex.Emitter;
-import io.reactivex.Flowable;
-import io.reactivex.functions.Consumer;
-import io.reactivex.functions.Function;
+import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.jackson.env.JsonPropertySourceLoader;
+import io.reactivex.*;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -47,12 +59,14 @@ import java.util.*;
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 @Requires(beans = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient, ConfigurationClient {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractConsulClient.class);
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
+    private final Map<ConfigDiscoveryConfiguration.Format, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
 
     @Inject
     public void setConsulConfiguration(ConsulConfiguration consulConfiguration) {
-        if(consulConfiguration != null)
+        if (consulConfiguration != null)
             this.consulConfiguration = consulConfiguration;
     }
 
@@ -69,53 +83,188 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
 
         ConfigDiscoveryConfiguration.Format format = configDiscoveryConfiguration.getFormat();
         String path = configDiscoveryConfiguration.getPath().orElse(ConfigDiscoveryConfiguration.DEFAULT_PATH);
-        if(!path.endsWith("/")) {
+        if (!path.endsWith("/")) {
             path += "/";
         }
 
         String commonConfigPath = path + Environment.DEFAULT_NAME;
-        String applicationSpecificPath = null;
-        if(serviceId.isPresent()) {
-            applicationSpecificPath = path + serviceId.get();
-        }
+        final boolean hasApplicationSpecificConfig = serviceId.isPresent();
+        String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
-        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(readValues(path, dc, null, null));
-        String finalApplicationSpecificPath = applicationSpecificPath;
+        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(readValues(commonConfigPath, dc, null, null));
+        if (hasApplicationSpecificConfig) {
+            configurationValues = Flowable.merge(
+                    configurationValues,
+                    Flowable.fromPublisher(readValues(applicationSpecificPath, dc, null, null))
+            );
+        }
         String finalPath = path;
-        return configurationValues.flatMap(keyValues -> Flowable.generate(emitter -> {
-            if(CollectionUtils.isEmpty(keyValues)) {
+        return configurationValues.flatMap(keyValues -> Flowable.create(emitter -> {
+            if (CollectionUtils.isEmpty(keyValues)) {
                 emitter.onComplete();
-            }
-            else {
-                Map<String, PropertySource> propertySources = new HashMap();
+            } else {
+                Map<String, Map<String, Object>> propertySources = new HashMap();
+                Base64.Decoder base64Decoder = Base64.getDecoder();
 
                 for (KeyValue keyValue : keyValues) {
                     String key = keyValue.getKey();
                     String value = keyValue.getValue();
+                    boolean isFolder = key.endsWith("/") && value == null;
+                    boolean isCommonConfigKey = key.startsWith(commonConfigPath);
+                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationSpecificPath);
+                    boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
+                    if (!isFolder && validKey) {
 
-                    if(key.startsWith(finalPath)) {
-                        key = key.substring(finalPath.length());
+
+                        MediaType mediaType = null;
+                        byte[] decoded = base64Decoder.decode(value);
+                        switch (format) {
+                            case NATIVE:
+                                String property = null;
+                                Set<String> propertySourceNames = null;
+                                if (key.startsWith(commonConfigPath)) {
+                                    property = resolvePropertyName(commonConfigPath, key);
+                                    propertySourceNames = resolvePropertySourceNames(finalPath, key, activeNames);
+
+                                } else if (isApplicationSpecificConfigKey) {
+                                    property = resolvePropertyName(applicationSpecificPath, key);
+                                    propertySourceNames = resolvePropertySourceNames(finalPath, key, activeNames);
+                                }
+                                if (property != null && propertySourceNames != null) {
+                                    for (String propertySourceName : propertySourceNames) {
+                                        Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
+                                        values.put(property, new String(decoded));
+                                    }
+                                }
+                                break;
+                            case JSON:
+                                String fullName = key.substring(finalPath.length());
+                                if(!fullName.contains("/")) {
+                                    propertySourceNames = calcPropertySourceNames(fullName, activeNames);
+
+
+                                    PropertySourceLoader propertySourceLoader = loaderByFormatMap.computeIfAbsent(format, f -> new JsonPropertySourceLoader());
+                                    if (propertySourceLoader == null) {
+                                        emitter.onError(new ConfigurationException("No PropertySourceLoader found for format [" + format + "]. Ensure ConfigurationClient is running within Micronaut container."));
+                                        return;
+                                    } else {
+                                        Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
+                                        for (String propertySourceName : propertySourceNames) {
+
+                                            Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
+                                            values.putAll(properties);
+                                        }
+                                    }
+                                }
+
+                            break;
+                            case PROPERTIES:
+                                String javaPropertySourceName = null;
+                                if(javaPropertySourceName != null) {
+
+                                    Properties properties = new Properties();
+                                    try (InputStream input = new ByteArrayInputStream(decoded)) {
+                                        properties.load(input);
+                                    } catch (IOException e) {
+                                        ConfigurationException error = new ConfigurationException("Error reading properties for key [" + key + "] from Consul: " + e.getMessage(), e);
+                                        emitter.onError(error);
+                                        return;
+                                    }
+                                    Map<String, Object> values = propertySources.computeIfAbsent(javaPropertySourceName, s -> new LinkedHashMap<>());
+                                    values.putAll((Map) properties);
+                                }
+                                break;
+                        }
 
                     }
+
                 }
 
-                for (PropertySource propertySource : propertySources.values()) {
-                    emitter.onNext(propertySource);
+                for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
+                    String name = entry.getKey();
+                    int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? 150 : 100);
+                    emitter.onNext(PropertySource.of(ConsulClient.SERVICE_ID + '-' + name, entry.getValue(), priority));
                 }
                 emitter.onComplete();
             }
-        }));
+        }, BackpressureStrategy.ERROR));
+    }
+
+    @Inject
+    void setEnvironment(@Nullable Environment environment) {
+        if (environment != null) {
+            Collection<PropertySourceLoader> loaders = environment.getPropertySourceLoaders();
+            for (PropertySourceLoader loader : loaders) {
+                Set<String> extensions = loader.getExtensions();
+                if (extensions.contains(ConfigDiscoveryConfiguration.Format.JSON.name().toLowerCase(Locale.ENGLISH))) {
+                    loaderByFormatMap.put(ConfigDiscoveryConfiguration.Format.JSON, loader);
+                } else if (extensions.contains(ConfigDiscoveryConfiguration.Format.YAML.name().toLowerCase(Locale.ENGLISH))) {
+                    loaderByFormatMap.put(ConfigDiscoveryConfiguration.Format.YAML, loader);
+                }
+            }
+        }
+    }
+
+    private Set<String> resolvePropertySourceNames(String finalPath, String key, Set<String> activeNames) {
+        Set<String> propertySourceNames = null;
+        String prefix = key.substring(finalPath.length());
+        int i = prefix.indexOf('/');
+        if (i > -1) {
+            prefix = prefix.substring(0, i);
+            propertySourceNames = calcPropertySourceNames(prefix, activeNames);
+            if (propertySourceNames == null) return null;
+        }
+        return propertySourceNames;
+    }
+
+    private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
+        Set<String> propertySourceNames;
+        if (prefix.indexOf(',') > -1) {
+
+            String[] tokens = prefix.split(",");
+            if (tokens.length == 1) {
+                propertySourceNames = Collections.singleton(tokens[0]);
+            } else {
+                String name = tokens[0];
+                Set<String> newSet = new HashSet<>(tokens.length - 1);
+                for (int j = 1; j < tokens.length; j++) {
+                    String envName = tokens[j];
+                    if (!activeNames.contains(envName)) {
+                        return Collections.emptySet();
+                    }
+                    newSet.add(name + '[' + envName + ']');
+                }
+                propertySourceNames = newSet;
+            }
+        } else {
+            propertySourceNames = Collections.singleton(prefix);
+        }
+        return propertySourceNames;
+    }
+
+    private String resolvePropertyName(String commonConfigPath, String key) {
+        String property = key.substring(commonConfigPath.length());
+
+        if (StringUtils.isNotEmpty(property)) {
+            if (property.charAt(0) == '/') {
+                property = property.substring(1);
+            } else if (property.lastIndexOf('/') > -1) {
+                property = property.substring(property.lastIndexOf('/') + 1);
+            }
+        }
+        if (property.indexOf('/') == -1)
+            return property;
+        return null;
     }
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        if(SERVICE_ID.equals(serviceId)) {
+        if (SERVICE_ID.equals(serviceId)) {
             return Publishers.just(
                     Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))
             );
-        }
-        else {
+        } else {
             ConsulConfiguration.ConsulDiscoveryConfiguration discovery = consulConfiguration.getDiscovery();
             boolean passing = discovery.isPassing();
             Optional<String> datacenter = Optional.ofNullable(discovery.getDatacenters().get(serviceId));
