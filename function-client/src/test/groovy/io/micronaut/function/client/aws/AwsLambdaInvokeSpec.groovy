@@ -28,6 +28,7 @@ import io.micronaut.function.client.FunctionDefinition
 import io.micronaut.function.client.FunctionInvoker
 import io.micronaut.function.client.FunctionInvokerChooser
 import io.micronaut.http.annotation.Body
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
@@ -37,9 +38,10 @@ import javax.inject.Named
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({
-    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
-})
+//@IgnoreIf({
+//    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
+//})
+@Ignore
 class AwsLambdaInvokeSpec extends Specification {
 
 

@@ -1328,7 +1328,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     private boolean isInnerConfiguration(Class argumentType) {
-        return isConfigurationProperties() &&
+        return !argumentType.isEnum() && isConfigurationProperties() &&
                 argumentType.getName().indexOf('$') > -1 &&
                 Arrays.asList(getBeanType().getClasses()).contains(argumentType) &&
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());

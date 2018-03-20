@@ -73,7 +73,7 @@ class MockConsulServer implements ConsulOperations {
                 folder = key.substring(0, i)
             }
             List<KeyValue> list = keyvalues.computeIfAbsent(folder, { String k -> []})
-            list.add(new KeyValue(key, value))
+            list.add(new KeyValue(key, Base64.getEncoder().encodeToString(value.bytes)))
         }
         return Flowable.just(true)
     }
@@ -86,6 +86,17 @@ class MockConsulServer implements ConsulOperations {
         if(found) {
             return Flowable.just(found.values().stream().flatMap({ values -> values.stream() })
                                    .collect(Collectors.toList()))
+        }
+        else {
+            int i = key.lastIndexOf('/')
+            if(i > -1) {
+                String prefix = key.substring(0,i)
+
+                List<KeyValue> values = keyvalues.get(prefix)
+                if(values) {
+                    return Publishers.just(values.findAll({it.key.startsWith(key)}))
+                }
+            }
         }
         return Flowable.just(Collections.emptyList())
     }

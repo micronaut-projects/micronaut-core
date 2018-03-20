@@ -77,6 +77,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         return configuration;
     }
 
+    @Inject
     public void setConfiguration(ConsulConfigDiscoveryConfiguration configuration) {
         if(configuration != null)
             this.configuration = configuration;
@@ -105,6 +106,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         return discovery;
     }
 
+    @Inject
     public void setDiscovery(ConsulDiscoveryConfiguration discovery) {
         if(discovery != null)
             this.discovery = discovery;
@@ -119,6 +121,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         return ConsulClient.SERVICE_ID;
     }
 
+    @Inject
     public void setRegistration(ConsulRegistrationConfiguration registration) {
         if(registration != null)
             this.registration = registration;
