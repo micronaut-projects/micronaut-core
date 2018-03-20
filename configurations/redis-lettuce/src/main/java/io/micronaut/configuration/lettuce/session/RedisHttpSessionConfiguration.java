@@ -48,7 +48,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
 
     private WriteMode writeMode = WriteMode.BATCH;
     private boolean enableKeyspaceEvents = true;
-    private String namespace = "particle:session:";
+    private String namespace = "micronaut:session:";
     private String activeSessionsKey = namespace + "active-sessions";
     private String sessionCreatedTopic = namespace + "event:session-created";
     private Class<ObjectSerializer> valueSerializer;
