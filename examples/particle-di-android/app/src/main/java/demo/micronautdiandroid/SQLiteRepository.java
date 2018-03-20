@@ -1,4 +1,4 @@
-package demo.particlediandroid;
+package demo.micronautdiandroid;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;

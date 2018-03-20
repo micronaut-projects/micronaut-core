@@ -27,7 +27,7 @@ import javax.inject.Singleton
  */
 class MicronautRequestHandlerSpec extends Specification {
 
-    void "test particle request handler"() {
+    void "test micronaut request handler"() {
         expect:
         new RoundHandler().handleRequest(1.6f, Mock(Context)) == 2
     }

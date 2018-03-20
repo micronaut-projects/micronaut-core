@@ -31,7 +31,7 @@ import java.util.*;
 public class ObjectMapperFactory {
 
 
-    public static final String PARTICLE_MODULE = "particle";
+    public static final String MICRONAUT_MODULE = "micronaut";
 
     @Inject
     protected Module[] jacksonModules = new Module[0];
@@ -65,7 +65,7 @@ public class ObjectMapperFactory {
 
         objectMapper.findAndRegisterModules();
         objectMapper.registerModules(jacksonModules);
-        SimpleModule module = new SimpleModule(PARTICLE_MODULE);
+        SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
         for (JsonSerializer serializer : serializers) {
             Class<? extends JsonSerializer> type = serializer.getClass();
             Type annotation = type.getAnnotation(Type.class);

@@ -1,4 +1,4 @@
-package demo.particlediandroid;
+package demo.micronautdiandroid;
 
 import java.util.List;
 

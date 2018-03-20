@@ -27,7 +27,7 @@ By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache def
 .Cache Configuration Example
 [source,yaml]
 ----
-particle:
+micronaut:
     caches:
         myCache:
             maximumSize: 20
@@ -54,7 +54,7 @@ Then within your application configuration configure the Redis URL and Redis cac
 .Cache Configuration Example
 [source,yaml]
 ----
-particle:
+micronaut:
     redis:
         uri: redis://localhost
         caches:
