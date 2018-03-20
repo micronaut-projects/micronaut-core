@@ -28,24 +28,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.aop.InterceptPhase;
-import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.cache.*;
 import io.micronaut.cache.annotation.*;
 import io.micronaut.cache.exceptions.CacheSystemException;
-import io.micronaut.context.BeanContext;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.publisher.SingleSubscriberPublisher;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.InstantiationUtils;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.MutableArgumentValue;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.scheduling.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -83,7 +69,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     public CacheInterceptor(CacheManager cacheManager,
                             CacheErrorHandler errorHandler,
                             AsyncCacheErrorHandler asyncCacheErrorHandler,
-                            @Named(Schedulers.IO) ExecutorService ioExecutor,
+                            @Named(TaskExecutors.IO) ExecutorService ioExecutor,
                             BeanContext beanContext) {
         this.cacheManager = cacheManager;
         this.errorHandler = errorHandler;

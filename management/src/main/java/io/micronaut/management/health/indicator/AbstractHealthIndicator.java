@@ -17,7 +17,7 @@ package io.micronaut.management.health.indicator;
 
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.health.HealthStatus;
-import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskExecutors;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;
@@ -38,7 +38,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
     protected HealthStatus healthStatus;
 
     @Inject
-    public void setExecutorService(@Named(Schedulers.IO) ExecutorService executorService) {
+    public void setExecutorService(@Named(TaskExecutors.IO) ExecutorService executorService) {
         this.executorService = executorService;
     }
 

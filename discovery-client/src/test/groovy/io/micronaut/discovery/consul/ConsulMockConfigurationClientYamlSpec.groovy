@@ -1,18 +1,3 @@
-/*
- * Copyright 2018 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
@@ -22,18 +7,13 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.consul.client.v1.ConsulClient
-import io.micronaut.discovery.consul.client.v1.KeyValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-/**
- * @author graemerocher
- * @since 1.0
- */
-class ConsulMockConfigurationClientJsonSpec extends Specification {
+class ConsulMockConfigurationClientYamlSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
 
@@ -49,7 +29,7 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'consul.client.config.format': 'json',
+                    'consul.client.config.format': 'yaml',
                     'consul.client.host'         : 'localhost',
                     'consul.client.port'         : serverPort]
     )
@@ -60,20 +40,22 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
 
     def setup() {
         consulServer.applicationContext.getBean(MockConsulServer)
-                                        .keyvalues.clear()
+                .keyvalues.clear()
     }
 
-    void "test discovery property sources from Consul with JSON handling"() {
+    void "test discovery property sources from Consul with YAML handling"() {
 
         given:
         writeValue("application", """
-{ "datasource": { "url":"mysql://blah", "driver":"java.SomeDriver"} } 
+datasource:
+    url: "mysql://blah"
+    driver: "java.SomeDriver"
 """)
         writeValue("application,test", """
-{ "foo":"bar"} } 
+foo: bar
 """)
         writeValue("application,other", """
-{ "foo":"baz"} } 
+foo: baz 
 """)
         when:
         def env = Mock(Environment)
@@ -93,11 +75,13 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
         propertySources[1].toList().size() == 1
     }
 
-    void "test discovery property sources from Consul with invalid JSON"() {
+    void "test discovery property sources from Consul with invalid YAML"() {
 
         given:
         writeValue("application", """
-{ "datasource": { "url":"mysql://blah", "driver":"java.SomeDriver} }
+datasource:
+    url: "mysql://blah
+    driver: "java.SomeDriver"
 """)
         when:
         def env = Mock(Environment)

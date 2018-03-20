@@ -35,8 +35,7 @@ import io.micronaut.core.serialize.JdkSerializer;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.session.*;
 import io.micronaut.session.event.SessionCreatedEvent;
 import io.micronaut.session.event.SessionDeletedEvent;
@@ -107,7 +106,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             RedisHttpSessionConfiguration sessionConfiguration,
             BeanLocator beanLocator,
             ConversionService<?> conversionService,
-            @Named(Schedulers.SCHEDULED) ExecutorService scheduledExecutorService,
+            @Named(TaskExecutors.SCHEDULED) ExecutorService scheduledExecutorService,
             ApplicationEventPublisher eventPublisher) {
         this.writeMode = sessionConfiguration.getWriteMode();
         this.sessionIdGenerator = sessionIdGenerator;

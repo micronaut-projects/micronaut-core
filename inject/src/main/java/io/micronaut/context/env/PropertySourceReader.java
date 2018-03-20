@@ -57,7 +57,7 @@ public interface PropertySourceReader {
         try(InputStream input = new ByteArrayInputStream(bytes)) {
             return read(name, input);
         }
-        catch (IOException e) {
+        catch (Throwable e) {
             throw new ConfigurationException("Error reading property source ["+name+"]: " + e.getMessage(),e);
         }
     }

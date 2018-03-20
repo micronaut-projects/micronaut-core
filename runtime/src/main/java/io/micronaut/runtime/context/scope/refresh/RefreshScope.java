@@ -28,22 +28,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.LifeCycle;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.scope.CustomScope;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.DisposableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.runtime.context.scope.Refreshable;
-import io.micronaut.scheduling.Schedulers;
 
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -71,7 +57,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final BeanContext beanContext;
     private final Executor executorService;
 
-    public RefreshScope(BeanContext beanContext, @Named(Schedulers.IO) Executor executorService) {
+    public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
         this.beanContext = beanContext;
         this.executorService = executorService;
     }
