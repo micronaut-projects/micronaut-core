@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -140,6 +141,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
             Map<String,String> headers = new LinkedHashMap<>(3);
+            List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
@@ -160,9 +162,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
                 else if (argument.isAnnotationPresent(CookieValue.class)) {
                     Object cookieValue = parameters.get(argumentName).getValue();
+                    String cookieName = argument.getAnnotation(CookieValue.class).value();
+                    if(StringUtils.isEmpty(cookieName)) {
+                        cookieName = NameUtils.hyphenate(argumentName);
+                    }
+                    String finalCookieName = cookieName;
 
                     ConversionService.SHARED.convert(cookieValue, String.class)
-                            .ifPresent(o -> headers.put(HttpHeaderNames.COOKIE.toString(), o));
+                            .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
 
                 }
                 else if (argument.isAnnotationPresent(Parameter.class)) {
@@ -221,6 +228,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     uri = uriTemplate.expand(paramMap);
                     request = HttpRequest.create(httpMethod, uri);
                 }
+
+                cookies.forEach(request::cookie);
+
             }
             else {
                 uri = uriTemplate.expand(paramMap);
