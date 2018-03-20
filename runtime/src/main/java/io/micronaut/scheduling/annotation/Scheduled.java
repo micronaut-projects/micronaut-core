@@ -16,10 +16,7 @@
 package io.micronaut.scheduling.annotation;
 
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig;
+import io.micronaut.scheduling.TaskExecutors;
 
 import java.lang.annotation.*;
 
@@ -66,5 +63,5 @@ public @interface Scheduled {
     /**
      * @return The name of a {@link javax.inject.Named} bean that is a {@link java.util.concurrent.ScheduledExecutorService} to use to schedule the task
      */
-    String scheduler() default Schedulers.SCHEDULED;
+    String scheduler() default TaskExecutors.SCHEDULED;
 }

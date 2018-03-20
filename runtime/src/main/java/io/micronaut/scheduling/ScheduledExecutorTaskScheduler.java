@@ -16,7 +16,6 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
 
@@ -38,7 +37,7 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     private final ScheduledExecutorService executorService;
 
-    public ScheduledExecutorTaskScheduler(@Named(Schedulers.SCHEDULED) ExecutorService executorService) {
+    public ScheduledExecutorTaskScheduler(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         if(!(executorService instanceof ScheduledExecutorService)) {
             throw new IllegalStateException("Cannot schedule tasks on ExecutorService that is not a ScheduledExecutorService: " + executorService);
         }

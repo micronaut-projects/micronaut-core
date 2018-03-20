@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.value.ValueException;
 import io.micronaut.core.util.Toggleable;
@@ -79,7 +80,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 return read(qualifiedName, input);
             }
             catch (IOException e){
-                throw new ValueException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
+                throw new ConfigurationException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
             }
         }
         return Collections.emptyMap();

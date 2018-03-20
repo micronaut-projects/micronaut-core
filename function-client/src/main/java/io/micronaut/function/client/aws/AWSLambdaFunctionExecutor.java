@@ -25,18 +25,12 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.micronaut.core.type.Argument;
-import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionExecutionException;
-import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -64,7 +58,7 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
             AWSLambdaAsync asyncClient,
             ByteBufferFactory byteBufferFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
-            @Named(io.micronaut.scheduling.Schedulers.IO) ExecutorService ioExecutor) {
+            @Named(TaskExecutors.IO) ExecutorService ioExecutor) {
         this.asyncClient = asyncClient;
         this.byteBufferFactory = byteBufferFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;

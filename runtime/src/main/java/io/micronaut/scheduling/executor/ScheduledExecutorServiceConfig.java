@@ -18,11 +18,7 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskExecutors;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -39,7 +35,7 @@ public class ScheduledExecutorServiceConfig {
 
     @Singleton
     @Bean
-    @Named(Schedulers.SCHEDULED)
+    @Named(TaskExecutors.SCHEDULED)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
     }

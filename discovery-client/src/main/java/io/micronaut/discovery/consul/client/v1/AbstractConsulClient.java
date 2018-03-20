@@ -16,12 +16,11 @@
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.EnvironmentPropertySource;
-import io.micronaut.context.env.PropertySource;
-import io.micronaut.context.env.PropertySourceLoader;
+import io.micronaut.context.env.*;
+import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
@@ -30,11 +29,9 @@ import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.client.Client;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.jackson.env.JsonPropertySourceLoader;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.*;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -42,12 +39,13 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -63,6 +61,7 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
     private final Map<ConfigDiscoveryConfiguration.Format, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
+    private ExecutorService executionService;
 
     @Inject
     public void setConsulConfiguration(ConsulConfiguration consulConfiguration) {
@@ -100,11 +99,11 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
             );
         }
         String finalPath = path;
-        return configurationValues.flatMap(keyValues -> Flowable.create(emitter -> {
+        Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(keyValues -> Flowable.create(emitter -> {
             if (CollectionUtils.isEmpty(keyValues)) {
                 emitter.onComplete();
             } else {
-                Map<String, Map<String, Object>> propertySources = new HashMap();
+                Map<String, Map<String, Object>> propertySources = new HashMap<>();
                 Base64.Decoder base64Decoder = Base64.getDecoder();
 
                 for (KeyValue keyValue : keyValues) {
@@ -115,9 +114,6 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
                     boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationSpecificPath);
                     boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
                     if (!isFolder && validKey) {
-
-
-                        MediaType mediaType = null;
                         byte[] decoded = base64Decoder.decode(value);
                         switch (format) {
                             case NATIVE:
@@ -139,41 +135,30 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
                                 }
                                 break;
                             case JSON:
+                            case YAML:
+                            case PROPERTIES:
                                 String fullName = key.substring(finalPath.length());
-                                if(!fullName.contains("/")) {
+                                if (!fullName.contains("/")) {
                                     propertySourceNames = calcPropertySourceNames(fullName, activeNames);
+                                    PropertySourceLoader propertySourceLoader = loaderByFormatMap.computeIfAbsent(format, f -> defaultLoader(format));
 
 
-                                    PropertySourceLoader propertySourceLoader = loaderByFormatMap.computeIfAbsent(format, f -> new JsonPropertySourceLoader());
                                     if (propertySourceLoader == null) {
                                         emitter.onError(new ConfigurationException("No PropertySourceLoader found for format [" + format + "]. Ensure ConfigurationClient is running within Micronaut container."));
                                         return;
                                     } else {
-                                        Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
-                                        for (String propertySourceName : propertySourceNames) {
+                                        if(propertySourceLoader.isEnabled()) {
 
-                                            Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
-                                            values.putAll(properties);
+                                            Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
+                                            for (String propertySourceName : propertySourceNames) {
+
+                                                Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
+                                                values.putAll(properties);
+                                            }
                                         }
                                     }
                                 }
 
-                            break;
-                            case PROPERTIES:
-                                String javaPropertySourceName = null;
-                                if(javaPropertySourceName != null) {
-
-                                    Properties properties = new Properties();
-                                    try (InputStream input = new ByteArrayInputStream(decoded)) {
-                                        properties.load(input);
-                                    } catch (IOException e) {
-                                        ConfigurationException error = new ConfigurationException("Error reading properties for key [" + key + "] from Consul: " + e.getMessage(), e);
-                                        emitter.onError(error);
-                                        return;
-                                    }
-                                    Map<String, Object> values = propertySources.computeIfAbsent(javaPropertySourceName, s -> new LinkedHashMap<>());
-                                    values.putAll((Map) properties);
-                                }
                                 break;
                         }
 
@@ -189,6 +174,40 @@ public abstract class AbstractConsulClient implements ConsulClient, Configuratio
                 emitter.onComplete();
             }
         }, BackpressureStrategy.ERROR));
+
+        if(executionService != null) {
+            return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
+                    executionService
+            ));
+        }
+        else {
+            return propertySourceFlowable;
+        }
+    }
+
+    private PropertySourceLoader defaultLoader(ConfigDiscoveryConfiguration.Format format) {
+        try {
+            switch (format) {
+                case JSON:
+                    return new JsonPropertySourceLoader();
+                case PROPERTIES:
+                    return new PropertiesPropertySourceLoader();
+                case YAML:
+                    if(ClassUtils.isPresent("org.yaml.snakeyaml.Yaml", YamlPropertySourceLoader.class.getClassLoader())) {
+                        return new YamlPropertySourceLoader();
+                    }
+            }
+        } catch (Exception e) {
+            // ignore, fallback to exception
+        }
+        throw new ConfigurationException("Unsupported properties file format: " + format);
+    }
+
+    @Inject
+    void setExecutionService(@Named(TaskExecutors.IO) @Nullable ExecutorService executionService) {
+        if(executionService != null) {
+            this.executionService = executionService;
+        }
     }
 
     @Inject

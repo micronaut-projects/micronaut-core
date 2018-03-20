@@ -21,7 +21,7 @@ package io.micronaut.scheduling;
  * @author graemerocher
  * @since 1.0
  */
-public interface Schedulers {
+public interface TaskExecutors {
     /**
      * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks
      */
