@@ -1,28 +1,19 @@
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.CookieValue
 import io.micronaut.http.client.Client
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Ignore
-import spock.lang.Shared
-import spock.lang.Specification
+
 import spock.lang.Unroll
 
 /**
  * Created by graemerocher on 25/07/2017.
  */
 class CookieBindingSpec extends AbstractMicronautSpec {
-
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
 
     @Unroll
     void "test bind HTTP cookies for URI #uri"() {
@@ -44,28 +35,42 @@ class CookieBindingSpec extends AbstractMicronautSpec {
 
     }
 
-    void "test setting HTTP cookies for client"() {
+    void "test set HTTP cookies for client"() {
         setup:
-        context.getBean(EmbeddedServer).start()
-        CookieClient client = context.createBean(CookieClient, server)
-        def result
+        CookieClient client = embeddedServer.applicationContext.getBean(CookieClient)
 
         when:
-        result = client.simple("foo")
+        def result = client.simple("foo")
 
         then:
-        result
+        result == "Cookie Value: foo"
+    }
+
+    void "test set HTTP cookies with custom names"() {
+        setup:
+        CookieClient client = embeddedServer.applicationContext.getBean(CookieClient)
+
+        when:
+        def result = client.custom("foo")
+
+        then:
+        result == "Cookie Value: foo"
     }
 
     @Client('/cookie')
     static interface CookieClient extends CookieApi {
     }
 
-    @Controller('/cookie')
+    @Controller
     static class CookieController implements CookieApi {
 
         @Override
         String simple(@CookieValue String myVar) {
+            "Cookie Value: $myVar"
+        }
+
+        @Override
+        String custom(@CookieValue('custom') String myVar) {
             "Cookie Value: $myVar"
         }
 
@@ -86,10 +91,13 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         @Get('/simple')
         String simple(@CookieValue String myVar)
 
-        @Get
+        @Get('/custom')
+        String custom(@CookieValue('custom') String myVar)
+
+        @Get('/optional')
         String optional(@CookieValue Optional<Integer> myVar)
 
-        @Get
+        @Get('/all')
         String all(Cookies cookies)
     }
 
