@@ -15,17 +15,21 @@
  */
 package io.micronaut.configurations.ribbon
 
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.discovery.consul.client.v1.CatalogEntry
 import io.micronaut.discovery.consul.client.v1.ConsulOperations
 import io.micronaut.discovery.consul.client.v1.HealthEntry
+import io.micronaut.discovery.consul.client.v1.KeyValue
 import io.micronaut.discovery.consul.client.v1.NewServiceEntry
 import io.micronaut.discovery.consul.client.v1.ServiceEntry
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.*
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 
+import javax.annotation.Nullable
 import javax.inject.Singleton
 import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
@@ -53,18 +57,35 @@ class MockConsulServer implements ConsulOperations {
     }
 
     @Override
-    Publisher<HttpStatus> pass(String checkId, Optional<String> note) {
+    Publisher<Boolean> putValue(String key, @Body String value) {
+        return Flowable.just(true)
+    }
+
+    @Override
+    Publisher<List<KeyValue>> readValues(String key) {
+        return Flowable.just(Collections.emptyList())
+    }
+
+    @Override
+    Publisher<List<KeyValue>> readValues(String key,
+                                         @Nullable @Parameter("dc") String datacenter,
+                                         @Nullable Boolean raw, @Nullable String seperator) {
+        return Flowable.just(Collections.emptyList())
+    }
+
+    @Override
+    Publisher<HttpStatus> pass(String checkId, @Nullable String note) {
         passingReports.add(checkId)
         return Publishers.just(HttpStatus.OK)
     }
 
     @Override
-    Publisher<HttpStatus> warn(String checkId, Optional<String> note) {
+    Publisher<HttpStatus> warn(String checkId, @Nullable String note) {
         return Publishers.just(HttpStatus.OK)
     }
 
     @Override
-    Publisher<HttpStatus> fail(String checkId, Optional<String> note) {
+    Publisher<HttpStatus> fail(String checkId, @Nullable String note) {
         return Publishers.just(HttpStatus.OK)
     }
 

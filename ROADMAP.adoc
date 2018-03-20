@@ -48,6 +48,10 @@ These should be built on the `Endpoint` API.
 
 ### HTTP Server
 
+#### Misc TODO Items
+
+* URI variable values passed to Controller methods should be URI decoded
+
 #### Content Negotiation
 
 Content negotiation must be supported

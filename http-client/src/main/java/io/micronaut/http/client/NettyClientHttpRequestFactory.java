@@ -86,6 +86,6 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
             }
         }
         return new NettyClientHttpRequest<T>(method, uri)
-                .body(body);
+                        .body(body);
     }
 }

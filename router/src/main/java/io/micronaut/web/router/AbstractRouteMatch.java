@@ -268,19 +268,23 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
                     }
-                    else if (bindingResult.isSatisfied() && argument.getDeclaredAnnotation(Nullable.class) != null) {
-                        argumentList.add(null);
-                    }
                     else {
-                        List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
-                        if(!conversionErrors.isEmpty()) {
-                            // should support multiple errors
-                            ConversionError conversionError = conversionErrors.iterator().next();
-                            throw new ConversionErrorException(argument, conversionError);
+                        if(argument.getDeclaredAnnotation(Nullable.class) != null) {
+                            argumentList.add(null); continue;
                         }
                         else {
-                            throw new UnsatisfiedRouteException(argument);
+
+                            List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
+                            if(!conversionErrors.isEmpty()) {
+                                // should support multiple errors
+                                ConversionError conversionError = conversionErrors.iterator().next();
+                                throw new ConversionErrorException(argument, conversionError);
+                            }
+                            else {
+                                throw new UnsatisfiedRouteException(argument);
+                            }
                         }
+
                     }
                 }
                 else if(value instanceof ConversionError) {

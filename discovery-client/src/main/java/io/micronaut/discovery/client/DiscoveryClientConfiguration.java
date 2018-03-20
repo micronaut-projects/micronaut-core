@@ -31,10 +31,7 @@ import javax.annotation.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,6 +45,7 @@ import java.util.stream.Stream;
 public abstract class DiscoveryClientConfiguration extends HttpClientConfiguration {
 
 
+    private final ApplicationConfiguration applicationConfiguration;
     private List<ServiceInstance> defaultZone = Collections.emptyList();
     private List<ServiceInstance> otherZones = Collections.emptyList();
 
@@ -56,12 +54,23 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     private boolean secure;
 
     public DiscoveryClientConfiguration() {
+        this.applicationConfiguration = null;
     }
 
     public DiscoveryClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+        this.applicationConfiguration = applicationConfiguration;
     }
 
+    /**
+     * @return Resolves the service ID to use
+     */
+    public Optional<String> getServiceId() {
+        if(applicationConfiguration != null) {
+            return applicationConfiguration.getName();
+        }
+        return Optional.empty();
+    }
     /**
      * @return The Discovery servers within the default zone
      */

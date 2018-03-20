@@ -13,22 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.env;
-
-import java.util.Optional;
+package io.micronaut.discovery.consul.config;
 
 /**
- * An interface for beans that are capable of locating a {@link PropertySource} instance
- *
  * @author graemerocher
  * @since 1.0
  */
-public interface PropertySourceLocator {
-    /**
-     * Locate a {@link PropertySource} for the given environment
-     *
-     * @param environment The environment
-     * @return The located property source
-     */
-    Optional<PropertySource> load(Environment environment);
+public class ConsulConfigDiscoveryConfiguration {
 }

@@ -18,6 +18,7 @@ package io.micronaut.discovery.consul.client.v1;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
@@ -35,7 +36,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConsulClient extends ConsulOperations, DiscoveryClient {
+public interface ConsulClient extends ConsulOperations, DiscoveryClient, ConfigurationClient {
     /**
      * The default ID of the consul service
      */
