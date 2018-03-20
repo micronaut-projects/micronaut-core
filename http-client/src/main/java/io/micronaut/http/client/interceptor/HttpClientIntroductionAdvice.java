@@ -164,7 +164,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     Object cookieValue = parameters.get(argumentName).getValue();
                     String cookieName = argument.getAnnotation(CookieValue.class).value();
                     if(StringUtils.isEmpty(cookieName)) {
-                        cookieName = NameUtils.hyphenate(argumentName);
+                        cookieName = argumentName;
                     }
                     String finalCookieName = cookieName;
 
@@ -228,9 +228,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     uri = uriTemplate.expand(paramMap);
                     request = HttpRequest.create(httpMethod, uri);
                 }
-
-                cookies.forEach(request::cookie);
-
             }
             else {
                 uri = uriTemplate.expand(paramMap);
@@ -242,6 +239,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     request.header(entry.getKey(), entry.getValue());
                 }
             }
+
+            cookies.forEach(request::cookie);
+
             HttpClient httpClient = reg.httpClient;
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
