@@ -160,7 +160,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     private String decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return queryStringDecoder.path();
+        return queryStringDecoder.rawPath();
     }
 
     protected abstract Charset initCharset(Charset characterEncoding);

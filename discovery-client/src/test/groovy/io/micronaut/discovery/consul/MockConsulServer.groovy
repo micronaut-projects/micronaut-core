@@ -15,37 +15,24 @@
  */
 package io.micronaut.discovery.consul
 
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.consul.client.v1.CatalogEntry
-import io.micronaut.discovery.consul.client.v1.Check
-import io.micronaut.discovery.consul.client.v1.ConsulOperations
-import io.micronaut.discovery.consul.client.v1.HealthEntry
-import io.micronaut.discovery.consul.client.v1.MockCheckEntry
-import io.micronaut.discovery.consul.client.v1.MockHealthEntry
-import io.micronaut.discovery.consul.client.v1.NewServiceEntry
-import io.micronaut.discovery.consul.client.v1.ServiceEntry
+import io.micronaut.core.util.StringUtils
+import io.micronaut.discovery.consul.client.v1.*
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.consul.client.v1.CatalogEntry
-import io.micronaut.discovery.consul.client.v1.Check
-import io.micronaut.discovery.consul.client.v1.ConsulOperations
-import io.micronaut.discovery.consul.client.v1.HealthEntry
-import io.micronaut.discovery.consul.client.v1.MockCheckEntry
-import io.micronaut.discovery.consul.client.v1.MockHealthEntry
-import io.micronaut.discovery.consul.client.v1.NewServiceEntry
-import io.micronaut.discovery.consul.client.v1.ServiceEntry
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 
+import javax.annotation.Nullable
 import javax.inject.Singleton
 import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.stream.Collectors
 
 /**
  * A simple server that mocks the Consul API
@@ -61,6 +48,9 @@ class MockConsulServer implements ConsulOperations {
 
     Map<String, ServiceEntry> services = new ConcurrentHashMap<>()
     Map<String, MockCheckEntry> checks = new ConcurrentHashMap<>()
+
+    Map<String, List<KeyValue>> keyvalues = new ConcurrentHashMap<>()
+
     final CatalogEntry nodeEntry
 
     static NewServiceEntry lastNewEntry
@@ -73,7 +63,42 @@ class MockConsulServer implements ConsulOperations {
     }
 
     @Override
-    Publisher<HttpStatus> pass(String checkId, Optional<String> note) {
+    Publisher<Boolean> putValue(String key, @Body String value) {
+        // make sure it isn't a folder
+        key = URLDecoder.decode(key, "UTF-8")
+        if(!key.endsWith("/") && StringUtils.hasText(value)) {
+            int i = key.lastIndexOf('/')
+            String folder = key
+            if(i > -1) {
+                folder = key.substring(0, i)
+            }
+            List<KeyValue> list = keyvalues.computeIfAbsent(folder, { String k -> []})
+            list.add(new KeyValue(key, value))
+        }
+        return Flowable.just(true)
+    }
+
+    @Override
+    @Get("/kv/{key}")
+    Publisher<List<KeyValue>> readValues(String key) {
+        key = URLDecoder.decode(key, "UTF-8")
+        Map<String, List<KeyValue>> found = keyvalues.findAll { entry -> entry.key.startsWith(key)}
+        if(found) {
+            return Flowable.just(found.values().stream().flatMap({ values -> values.stream() })
+                                   .collect(Collectors.toList()))
+        }
+        return Flowable.just(Collections.emptyList())
+    }
+
+    @Override
+    Publisher<List<KeyValue>> readValues(String key,
+                                         @Nullable @Parameter("dc") String datacenter,
+                                         @Nullable Boolean raw, @Nullable String seperator) {
+        return readValues(key)
+    }
+
+    @Override
+    Publisher<HttpStatus> pass(String checkId, @Nullable String note) {
         passingReports.add(checkId)
         String service = nameFromCheck(checkId)
         checks.get(service)?.setStatus(Check.Status.PASSING.name().toLowerCase())
@@ -82,12 +107,12 @@ class MockConsulServer implements ConsulOperations {
     }
 
     @Override
-    Publisher<HttpStatus> warn(String checkId, Optional<String> note) {
+    Publisher<HttpStatus> warn(String checkId, @Nullable String  note) {
         return Publishers.just(HttpStatus.OK)
     }
 
     @Override
-    Publisher<HttpStatus> fail(String checkId, Optional<String> note) {
+    Publisher<HttpStatus> fail(String checkId, @Nullable String  note) {
         String service = nameFromCheck(checkId)
         checks.get(service)?.setStatus(Check.Status.CRITICAL.name().toLowerCase())
         return Publishers.just(HttpStatus.OK)

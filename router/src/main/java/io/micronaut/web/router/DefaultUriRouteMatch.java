@@ -20,14 +20,10 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.uri.UriMatchInfo;
 
-import java.lang.reflect.AnnotatedElement;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Function;
 
@@ -43,15 +39,17 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
     private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
+    private final Charset defaultCharset;
 
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          DefaultRouteBuilder.DefaultUriRoute uriRoute,
-                         ConversionService<?> conversionService
+                         Charset defaultCharset, ConversionService<?> conversionService
     ) {
         super(uriRoute, conversionService);
         this.uriRoute = uriRoute;
         this.matchInfo = matchInfo;
         this.httpMethod = uriRoute.httpMethod;
+        this.defaultCharset = defaultCharset;
     }
 
     @Override
@@ -59,7 +57,7 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
         Map<String, Object> variables = getVariables();
         List<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, conversionService) {
+        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, defaultCharset, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
                 return Collections.unmodifiableList(arguments);
@@ -84,7 +82,7 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
 
     @Override
     protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, conversionService) {
+        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, defaultCharset, conversionService) {
 
             @Override
             public List<Argument> getRequiredArguments() {
@@ -110,7 +108,21 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
 
     @Override
     public Map<String, Object> getVariables() {
-        return matchInfo.getVariables();
+        Map<String, Object> variables = matchInfo.getVariables();
+        Map<String,Object> decoded = new LinkedHashMap<>(variables.size());
+        for (Map.Entry<String, Object> entry : variables.entrySet()) {
+            String k = entry.getKey();
+            Object v = entry.getValue();
+            if(v instanceof CharSequence) {
+                try {
+                    v = URLDecoder.decode(v.toString(), defaultCharset.toString());
+                } catch (UnsupportedEncodingException e) {
+                    // ignore
+                }
+            }
+            decoded.put(k,v);
+        }
+        return decoded;
     }
 
     @Override

@@ -29,6 +29,7 @@ import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -48,6 +49,10 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     public NettyClientSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
+    }
+
+    @Inject public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
+        super(ssl, new ResourceResolver());
     }
 
     public SslConfiguration getSslConfiguration() {

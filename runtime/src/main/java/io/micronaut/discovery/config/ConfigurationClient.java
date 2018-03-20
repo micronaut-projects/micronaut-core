@@ -13,31 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery;
+package io.micronaut.discovery.config;
 
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
 
-import java.io.Closeable;
-import java.util.List;
-
 /**
- * Main client abstraction used for service discovery
+ * A Configuration client is responsible for reading configuration for configuration servers
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface DiscoveryClient extends Closeable, AutoCloseable, Described{
+public interface ConfigurationClient extends Described{
 
     /**
-     * Obtain a list of {@link ServiceInstance} for the given service id
-     * @param serviceId The service id
-     * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
+     * Retrieves all of the {@link PropertySource} registrations for the given environment
+     *
+     * @param environment The environment
+     * @return A {@link Publisher} that emits zero or many {@link PropertySource} instances discovered for the given environment
      */
-    Publisher<List<ServiceInstance>> getInstances(String serviceId);
-
-    /**
-     * @return The known service IDs
-     */
-    Publisher<List<String>> getServiceIds();
+    Publisher<PropertySource> getPropertySources(Environment environment);
 }

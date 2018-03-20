@@ -16,21 +16,26 @@
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
+import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
 import io.micronaut.http.client.Client;
+import io.reactivex.Emitter;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -41,7 +46,7 @@ import java.util.Optional;
 @SuppressWarnings("unused")
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 @Requires(beans = ConsulConfiguration.class)
-public abstract class AbstractConsulClient implements ConsulClient {
+public abstract class AbstractConsulClient implements ConsulClient, ConfigurationClient {
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 
@@ -54,6 +59,53 @@ public abstract class AbstractConsulClient implements ConsulClient {
     @Override
     public String getDescription() {
         return ConsulClient.SERVICE_ID;
+    }
+
+    @Override
+    public Publisher<PropertySource> getPropertySources(Environment environment) {
+        Set<String> activeNames = environment.getActiveNames();
+        Optional<String> serviceId = consulConfiguration.getServiceId();
+        ConsulConfiguration.ConsulConfigDiscoveryConfiguration configDiscoveryConfiguration = consulConfiguration.getConfiguration();
+
+        ConfigDiscoveryConfiguration.Format format = configDiscoveryConfiguration.getFormat();
+        String path = configDiscoveryConfiguration.getPath().orElse(ConfigDiscoveryConfiguration.DEFAULT_PATH);
+        if(!path.endsWith("/")) {
+            path += "/";
+        }
+
+        String commonConfigPath = path + Environment.DEFAULT_NAME;
+        String applicationSpecificPath = null;
+        if(serviceId.isPresent()) {
+            applicationSpecificPath = path + serviceId.get();
+        }
+
+        String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
+        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(readValues(path, dc, null, null));
+        String finalApplicationSpecificPath = applicationSpecificPath;
+        String finalPath = path;
+        return configurationValues.flatMap(keyValues -> Flowable.generate(emitter -> {
+            if(CollectionUtils.isEmpty(keyValues)) {
+                emitter.onComplete();
+            }
+            else {
+                Map<String, PropertySource> propertySources = new HashMap();
+
+                for (KeyValue keyValue : keyValues) {
+                    String key = keyValue.getKey();
+                    String value = keyValue.getValue();
+
+                    if(key.startsWith(finalPath)) {
+                        key = key.substring(finalPath.length());
+
+                    }
+                }
+
+                for (PropertySource propertySource : propertySources.values()) {
+                    emitter.onNext(propertySource);
+                }
+                emitter.onComplete();
+            }
+        }));
     }
 
     @Override
@@ -81,8 +133,4 @@ public abstract class AbstractConsulClient implements ConsulClient {
         }
     }
 
-    @Override
-    public void close() throws IOException {
-        // no-op.. will be closed by @Client
-    }
 }

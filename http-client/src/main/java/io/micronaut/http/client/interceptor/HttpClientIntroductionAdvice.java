@@ -21,10 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -83,7 +80,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
-    public static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
+    public static final MediaType[] DEFAULT_ACCEPT_TYPES = { MediaType.APPLICATION_JSON_TYPE };
     private final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
@@ -226,8 +223,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 Class<?> argumentType = publisherArgument.getType();
                 Publisher<?> publisher;
+
+                MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                if(ArrayUtils.isNotEmpty(contentTypes)) {
+                    request.contentType(contentTypes[0]);
+                }
+
                 if(HttpResponse.class.isAssignableFrom(argumentType)) {
-                    request.accept( context.getValue(Consumes.class,MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
+                    request.accept( context.getValue(Produces.class,MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                     publisher = httpClient.exchange(
                             request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
                     );
@@ -238,7 +241,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     );
                 }
                 else {
-                    MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                    MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                     request.accept(acceptTypes);
                     publisher = httpClient.retrieve(
                             request, publisherArgument

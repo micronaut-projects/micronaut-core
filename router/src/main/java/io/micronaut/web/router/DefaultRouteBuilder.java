@@ -16,7 +16,9 @@
 package io.micronaut.web.router;
 
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
@@ -50,6 +52,8 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -93,6 +97,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService<?> conversionService;
+    protected final Charset defaultCharset;
 
     private DefaultUriRoute currentParentRoute = null;
     private List<UriRoute> uriRoutes = new ArrayList<>();
@@ -112,6 +117,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
+        if(executionHandleLocator instanceof ApplicationContext) {
+            ApplicationContext applicationContext = (ApplicationContext) executionHandleLocator;
+            Environment environment = applicationContext.getEnvironment();
+            defaultCharset = environment.get("micronaut.application.defaultCharset", Charset.class, StandardCharsets.UTF_8);
+        }
+        else {
+            defaultCharset = StandardCharsets.UTF_8;
+        }
     }
 
     @Override
@@ -646,7 +659,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, conversionService));
+            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
         }
 
         @Override

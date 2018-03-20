@@ -17,6 +17,7 @@ package io.micronaut.discovery.consul;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
 import io.micronaut.http.HttpMethod;
@@ -57,6 +58,8 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
 
+    private ConsulConfigDiscoveryConfiguration configuration = new ConsulConfigDiscoveryConfiguration();
+
     public ConsulConfiguration() {
         setPort(8500);
     }
@@ -65,6 +68,18 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     public ConsulConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         setPort(8500);
+    }
+
+    /**
+     * @return The configuration discovery configuration
+     */
+    public ConsulConfigDiscoveryConfiguration getConfiguration() {
+        return configuration;
+    }
+
+    public void setConfiguration(ConsulConfigDiscoveryConfiguration configuration) {
+        if(configuration != null)
+            this.configuration = configuration;
     }
 
     /**
@@ -91,7 +106,8 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     }
 
     public void setDiscovery(ConsulDiscoveryConfiguration discovery) {
-        this.discovery = discovery;
+        if(discovery != null)
+            this.discovery = discovery;
     }
 
     public void setAslToken(String aslToken) {
@@ -104,7 +120,26 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     }
 
     public void setRegistration(ConsulRegistrationConfiguration registration) {
-        this.registration = registration;
+        if(registration != null)
+            this.registration = registration;
+    }
+
+    @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
+    public static class ConsulConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
+
+        private String datacenter;
+
+        /**
+         * The data center to use to read configuration
+         * @return The data center name
+         */
+        public Optional<String> getDatacenter() {
+            return Optional.ofNullable(datacenter);
+        }
+
+        public void setDatacenter(String datacenter) {
+            this.datacenter = datacenter;
+        }
     }
 
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
