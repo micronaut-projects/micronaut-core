@@ -1,4 +1,4 @@
-rootProject.name = 'particle'
+rootProject.name = 'micronaut'
 
 include "aop"
 include "runtime"

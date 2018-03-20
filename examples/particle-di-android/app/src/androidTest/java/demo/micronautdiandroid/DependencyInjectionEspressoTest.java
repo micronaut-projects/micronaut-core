@@ -1,4 +1,4 @@
-package demo.particlediandroid;
+package demo.micronautdiandroid;
 
 import android.support.test.filters.LargeTest;
 import android.support.test.rule.ActivityTestRule;

@@ -26,7 +26,7 @@ import spock.lang.Specification
  */
 class MicronautSpec extends Specification {
 
-    void "test particle application"() {
+    void "test micronaut application"() {
         when:
         ApplicationContext applicationContext = Micronaut.run(Application)
 
