@@ -88,16 +88,16 @@ class CookieBindingSpec extends AbstractMicronautSpec {
 
     static interface CookieApi {
 
-        @Get('/simple')
+        @Get
         String simple(@CookieValue String myVar)
 
-        @Get('/custom')
+        @Get
         String custom(@CookieValue('custom') String myVar)
 
-        @Get('/optional')
+        @Get
         String optional(@CookieValue Optional<Integer> myVar)
 
-        @Get('/all')
+        @Get
         String all(Cookies cookies)
     }
 
