@@ -24,7 +24,7 @@ const Price = ({price, currency}) => {
 }
 
 Price.propTypes = {
-  price: number.required,
+  price: number.isRequired,
   currency: string
 }
 

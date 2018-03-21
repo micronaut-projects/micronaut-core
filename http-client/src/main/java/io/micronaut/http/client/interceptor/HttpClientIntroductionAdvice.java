@@ -25,6 +25,8 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -54,6 +56,7 @@ import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -114,7 +117,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         ClientRegistration reg = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if(httpMethodMapping.isPresent()) {
-            String uri = context.getValue(HttpMethodMapping.class, String.class).orElse( "");
+            String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
+            if(StringUtils.isEmpty(uri)) {
+                uri = "/" + context.getMethodName();
+            }
+
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
             HttpMethod httpMethod = HttpMethod.valueOf(annotationType.getSimpleName().toUpperCase());
@@ -138,6 +145,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
             Map<String,String> headers = new LinkedHashMap<>(3);
+            List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
@@ -155,6 +163,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     String finalHeaderName = headerName;
                     ConversionService.SHARED.convert(value.getValue(), String.class)
                             .ifPresent(o -> headers.put(finalHeaderName, o));
+                }
+                else if (argument.isAnnotationPresent(CookieValue.class)) {
+                    Object cookieValue = parameters.get(argumentName).getValue();
+                    String cookieName = argument.getAnnotation(CookieValue.class).value();
+                    if(StringUtils.isEmpty(cookieName)) {
+                        cookieName = argumentName;
+                    }
+                    String finalCookieName = cookieName;
+
+                    ConversionService.SHARED.convert(cookieValue, String.class)
+                            .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
+
                 }
                 else if (argument.isAnnotationPresent(Parameter.class)) {
                     String parameterName = argument.getAnnotation(Parameter.class).value();
@@ -224,6 +244,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     request.header(entry.getKey(), entry.getValue());
                 }
             }
+
+            cookies.forEach(request::cookie);
+
             HttpClient httpClient = reg.httpClient;
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);

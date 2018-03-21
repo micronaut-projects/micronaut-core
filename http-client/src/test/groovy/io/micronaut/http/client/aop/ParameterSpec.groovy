@@ -65,7 +65,7 @@ class ParameterSpec extends Specification {
         }
 
         @Override
-        User findByAge(@Parameter Integer age) {
+        User findByAge(@Parameter('userAge') Integer age) {
             return new User(username:"John", age: 18)
         }
     }
@@ -75,8 +75,8 @@ class ParameterSpec extends Specification {
         @Get('/user/{X-username}')
         User get(@Parameter('X-username') String username)
 
-        @Get('/user/age/{age}')
-        User findByAge(@Parameter Integer age)
+        @Get('/user/age/{userAge}')
+        User findByAge(@Parameter('userAge') Integer age)
     }
 
     static class User {
