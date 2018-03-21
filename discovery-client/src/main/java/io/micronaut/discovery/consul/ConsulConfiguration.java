@@ -129,6 +129,10 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
     public static class ConsulConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
+        /**
+         * The full prefix for this configuration
+         */
+        public static final String PREFIX = ConsulConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
 
         private String datacenter;
 
@@ -147,6 +151,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
+
         private Map<String, String> tags = Collections.emptyMap();
         private Map<String, String> schemes = Collections.emptyMap();
         private Map<String, String> datacenters = Collections.emptyMap();
