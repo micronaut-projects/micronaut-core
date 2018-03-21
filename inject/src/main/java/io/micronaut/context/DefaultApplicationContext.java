@@ -204,26 +204,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
-        Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
-        for (TypeConverter typeConverter : typeConverters) {
-            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
-            if (genericTypes.length == 2) {
-                Class source = genericTypes[0];
-                Class target = genericTypes[1];
-                if (source != null && target != null) {
-                    if (!(source == Object.class && target == Object.class)) {
-                        getConversionService().addConverter(source, target, typeConverter);
-                    }
-                }
-            }
-        }
-        Collection<TypeConverterRegistrar> registrars = getBeansOfType(TypeConverterRegistrar.class);
-        for (TypeConverterRegistrar registrar : registrars) {
-            registrar.register(conversionService);
-        }
-
         super.initializeContext(contextScopeBeans, processedBeans);
     }
+
+
 
     @Override
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
@@ -442,6 +426,26 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
+            initializeTypeConverters();
+        }
+        private void initializeTypeConverters() {
+            Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
+            for (TypeConverter typeConverter : typeConverters) {
+                Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
+                if (genericTypes.length == 2) {
+                    Class source = genericTypes[0];
+                    Class target = genericTypes[1];
+                    if (source != null && target != null) {
+                        if (!(source == Object.class && target == Object.class)) {
+                            getConversionService().addConverter(source, target, typeConverter);
+                        }
+                    }
+                }
+            }
+            Collection<TypeConverterRegistrar> registrars = getBeansOfType(TypeConverterRegistrar.class);
+            for (TypeConverterRegistrar registrar : registrars) {
+                registrar.register(conversionService);
+            }
         }
     }
 }

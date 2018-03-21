@@ -4,7 +4,13 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A type converter for converting from one type to another. Implementations should be stateless and thread safe.
+ * <p>A type converter for converting from one type to another.</p>
+ *
+ * <p>Implementations should be stateless, simple and thread safe. Type converters are often best defined as Java lambdas.
+ * You should NOT perform any overly complex, blocking or slow conversions in implementations of this interface.
+ * </p>
+ *
+ * <p>If dependency injection is required, carefully consider what you inject. Databases and I/O bound interfaces are not good candidates.</p>
  *
  * @param <S> The source type
  * @param <T> The target type

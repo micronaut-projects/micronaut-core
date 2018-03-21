@@ -87,19 +87,22 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             path += "/";
         }
 
+        String pathPrefix = path.substring(1);
         String commonConfigPath = path + Environment.DEFAULT_NAME;
+        String commonPrefix = commonConfigPath.substring(1);
         final boolean hasApplicationSpecificConfig = serviceId.isPresent();
         String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
+        String applicationPrefix = hasApplicationSpecificConfig ? applicationSpecificPath.substring(1) : null;
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
         Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(consulClient.readValues(commonConfigPath, dc, null, null));
         if (hasApplicationSpecificConfig) {
-            configurationValues = Flowable.merge(
+            configurationValues = Flowable.concat(
                     configurationValues,
                     Flowable.fromPublisher(consulClient.readValues(applicationSpecificPath, dc, null, null))
             );
         }
-        String finalPath = path;
+
         Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(keyValues -> Flowable.create(emitter -> {
             if (CollectionUtils.isEmpty(keyValues)) {
                 emitter.onComplete();
@@ -111,8 +114,8 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     String key = keyValue.getKey();
                     String value = keyValue.getValue();
                     boolean isFolder = key.endsWith("/") && value == null;
-                    boolean isCommonConfigKey = key.startsWith(commonConfigPath);
-                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationSpecificPath);
+                    boolean isCommonConfigKey = key.startsWith(commonPrefix);
+                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationPrefix);
                     boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
                     if (!isFolder && validKey) {
                         byte[] decoded = base64Decoder.decode(value);
@@ -120,13 +123,13 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                             case NATIVE:
                                 String property = null;
                                 Set<String> propertySourceNames = null;
-                                if (key.startsWith(commonConfigPath)) {
-                                    property = resolvePropertyName(commonConfigPath, key);
-                                    propertySourceNames = resolvePropertySourceNames(finalPath, key, activeNames);
+                                if (isCommonConfigKey) {
+                                    property = resolvePropertyName(commonPrefix, key);
+                                    propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames);
 
                                 } else if (isApplicationSpecificConfigKey) {
-                                    property = resolvePropertyName(applicationSpecificPath, key);
-                                    propertySourceNames = resolvePropertySourceNames(finalPath, key, activeNames);
+                                    property = resolvePropertyName(applicationPrefix, key);
+                                    propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames);
                                 }
                                 if (property != null && propertySourceNames != null) {
                                     for (String propertySourceName : propertySourceNames) {
@@ -138,7 +141,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                             case JSON:
                             case YAML:
                             case PROPERTIES:
-                                String fullName = key.substring(finalPath.length());
+                                String fullName = key.substring(pathPrefix.length());
                                 if (!fullName.contains("/")) {
                                     propertySourceNames = calcPropertySourceNames(fullName, activeNames);
                                     PropertySourceLoader propertySourceLoader = loaderByFormatMap.computeIfAbsent(format, f -> defaultLoader(format));
@@ -170,6 +173,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                 for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
                     String name = entry.getKey();
                     int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? 150 : 100);
+                    if(hasApplicationSpecificConfig && name.startsWith(serviceId.get())) {
+                        priority += 10;
+                    }
                     emitter.onNext(PropertySource.of(ConsulClient.SERVICE_ID + '-' + name, entry.getValue(), priority));
                 }
                 emitter.onComplete();
