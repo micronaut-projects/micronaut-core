@@ -27,7 +27,14 @@ import java.util.Optional;
  */
 public abstract class ConfigDiscoveryConfiguration implements Toggleable {
 
+    /**
+     * The prefix to use for all Consul client config settings
+     */
     public static final String PREFIX = "config";
+
+    /**
+     * The default path
+     */
     public static final String DEFAULT_PATH = "/" + PREFIX + "/";
 
     private boolean enabled = true;
@@ -42,6 +49,9 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
         return enabled;
     }
 
+    /**
+     * @param enabled Enable the distributed configuration
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
@@ -53,19 +63,25 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
         return Optional.ofNullable(path);
     }
 
+    /**
+     * @param path The path to store the configuration
+     */
     public void setPath(String path) {
         this.path = path;
     }
 
     /**
-      * @return The configuration format
+     * @return The configuration format
      */
     public Format getFormat() {
         return format;
     }
 
+    /**
+     * @param format The configuration format
+     */
     public void setFormat(Format format) {
-        if(format != null) {
+        if (format != null) {
             this.format = format;
         }
     }
