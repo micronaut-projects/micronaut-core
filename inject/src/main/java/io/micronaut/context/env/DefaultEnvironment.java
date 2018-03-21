@@ -74,6 +74,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private Collection<PropertySourceLoader> propertySourceLoaderList;
 
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
@@ -267,17 +268,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     protected List<PropertySource> readPropertySourceList(String name) {
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
-        SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = readPropertySourceLoaders();
-        boolean hasLoaders = false;
-        for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
-            hasLoaders = true;
-            if(loader.isPresent()) {
-                PropertySourceLoader propertySourceLoader = loader.load();
+        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
+        if(propertySourceLoaders.isEmpty()) {
+            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
+        }
+        else {
+            for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
             }
-        }
-        if(!hasLoaders) {
-            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
         }
         if(!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
@@ -288,6 +286,40 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return propertySources;
     }
 
+    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+        return SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
+    }
+
+    /**
+     * Obtains the {@link PropertySourceLoader} instances
+     * @return A collection of {@link PropertySourceLoader}
+     */
+    @Override
+    public Collection<PropertySourceLoader> getPropertySourceLoaders() {
+        Collection<PropertySourceLoader> propertySourceLoaderList = this.propertySourceLoaderList;
+        if (propertySourceLoaderList == null) {
+            synchronized (this) { // double check
+                propertySourceLoaderList = this.propertySourceLoaderList;
+                if (propertySourceLoaderList == null) {
+                    this.propertySourceLoaderList = propertySourceLoaderList = evaluatePropertySourceLoaders();
+                }
+            }
+        }
+        return propertySourceLoaderList;
+    }
+
+    private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
+        SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
+        Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
+        for (ServiceDefinition<PropertySourceLoader> definition : definitions) {
+            if(definition.isPresent()) {
+                PropertySourceLoader loader = definition.load();
+                allLoaders.add(loader);
+            }
+        }
+        return allLoaders;
+    }
+
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
         Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
         defaultPropertySource.ifPresent(propertySources::add);
@@ -296,10 +328,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
             propertySource.ifPresent(propertySources::add);
         }
-    }
-
-    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
-        return SoftServiceLoader.load(PropertySourceLoader.class);
     }
 
     private static EnvironmentsAndPackage getEnvironmentsAndPackage() {

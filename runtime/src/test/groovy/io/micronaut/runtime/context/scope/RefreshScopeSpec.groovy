@@ -20,15 +20,8 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.scheduling.Schedulers
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.ConfigurationProperties
-import io.micronaut.context.annotation.Value
-import io.micronaut.context.env.Environment
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
-import io.micronaut.scheduling.Schedulers
-import io.micronaut.scheduling.executor.IOExecutorServiceConfig
+import io.micronaut.scheduling.TaskExecutors
 import spock.lang.Specification
 
 import java.util.concurrent.Executor
@@ -50,7 +43,7 @@ class RefreshScopeSpec extends Specification {
             void execute(Runnable command) {
                 command.run()
             }
-        }, Qualifiers.byName(Schedulers.IO))
+        }, Qualifiers.byName(TaskExecutors.IO))
 
         when:
         RefreshBean bean = beanContext.getBean(RefreshBean)
@@ -85,7 +78,7 @@ class RefreshScopeSpec extends Specification {
             void execute(Runnable command) {
                 command.run()
             }
-        }, Qualifiers.byName(Schedulers.IO))
+        }, Qualifiers.byName(TaskExecutors.IO))
 
         when:
         RefreshBean bean = beanContext.getBean(RefreshBean)

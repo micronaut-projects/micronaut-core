@@ -21,12 +21,13 @@ import com.fasterxml.jackson.databind.type.MapType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.context.env.PropertySourceLoader;
-import io.micronaut.context.env.AbstractPropertySourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>A {@link PropertySourceLoader} that reads <tt>application.json</tt> files if they exist</p>
@@ -39,12 +40,13 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
     public static final String FILE_EXTENSION = "json";
 
     @Override
-    protected String getFileExtension() {
-        return FILE_EXTENSION;
+    public Set<String> getExtensions() {
+        return Collections.singleton(FILE_EXTENSION);
     }
 
+
     @Override
-    protected void processInput(InputStream input, Map<String, Object> finalMap) throws IOException {
+    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper(new JsonFactory());
         TypeFactory factory = TypeFactory.defaultInstance();
         MapType mapType = factory.constructMapType(LinkedHashMap.class, String.class, Object.class);

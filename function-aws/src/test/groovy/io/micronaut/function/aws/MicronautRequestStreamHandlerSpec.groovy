@@ -29,7 +29,7 @@ import java.util.function.Function
  */
 class MicronautRequestStreamHandlerSpec extends Specification{
 
-    void "test particle stream handler with POJO"() {
+    void "test micronaut stream handler with POJO"() {
         given:
         MicronautRequestStreamHandler requestStreamHandler = new MicronautRequestStreamHandler() {
             @Override
@@ -54,7 +54,7 @@ class MicronautRequestStreamHandlerSpec extends Specification{
         output.toString() == '{"title":"THE STAND"}'
     }
 
-    void "test particle stream handler with integer"() {
+    void "test micronaut stream handler with integer"() {
         given:
         MicronautRequestStreamHandler requestStreamHandler = new MicronautRequestStreamHandler() {
             @Override

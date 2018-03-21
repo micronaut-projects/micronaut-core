@@ -163,7 +163,7 @@ public class DefaultRouter implements Router {
                 .map(Optional::get)
                 .findFirst();
         UriRouteMatch match = result.orElse(null);
-        return match != null ? Optional.of(match) : Optional.empty();
+        return Optional.ofNullable(match);
     }
 
     @Override

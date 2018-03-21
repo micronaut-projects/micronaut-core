@@ -34,7 +34,6 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.ssl.SslContext;
@@ -46,7 +45,7 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.server.netty.ssl.NettyServerSslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
@@ -113,7 +112,7 @@ public class NettyHttpServer implements EmbeddedServer {
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(Schedulers.IO) ExecutorService ioExecutor,
+            @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             NettyServerSslBuilder nettyServerSslBuilder,
             ChannelOutboundHandler... outboundHandlers

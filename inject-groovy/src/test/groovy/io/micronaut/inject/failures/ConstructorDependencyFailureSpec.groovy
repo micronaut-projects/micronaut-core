@@ -26,10 +26,11 @@ class ConstructorDependencyFailureSpec extends Specification {
 
         then:"The correct error is thrown"
         def e = thrown(DependencyInjectionException)
+        println e.message
         e.message == '''\
 Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.ConstructorDependencyFailureSpec$B
 
-Message: No bean of type [io.micronaut.inject.failures.ConstructorDependencyFailureSpec$A] exists
+Message: No bean of type [io.micronaut.inject.failures.ConstructorDependencyFailureSpec$A] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.
 Path Taken: new B([A a])'''
     }
 

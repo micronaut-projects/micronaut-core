@@ -15,7 +15,10 @@
  */
 package io.micronaut.discovery.consul.client.v1;
 
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Put;
@@ -28,6 +31,7 @@ import io.micronaut.http.annotation.Put;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +46,47 @@ import java.util.Optional;
 public interface ConsulOperations {
 
     /**
+     * Writes a value for the given key to Consul
+     *
+     * @param key The key
+     * @param value The value as a String
+     * @return A {@link Publisher} that emits a boolean if the operation succeeded
+     */
+    @Put(uri = "/kv/{key}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+    Publisher<Boolean> putValue(String key, @Body String value);
+
+    /**
+     * Reads a Key from Consul. See https://www.consul.io/api/kv.html
+     *
+     * @return A {@link Publisher} that emits a list of {@link KeyValue}
+     */
+
+    @Get("/kv/{key}?recurse")
+    Publisher<List<KeyValue>> readValues(String key);
+
+    /**
+     * Reads a Key from Consul. See https://www.consul.io/api/kv.html
+     *
+     * @param key The key
+     * @param datacenter The data center
+     * @param raw Whether the value should be raw without encoding or metadata
+     * @param seperator The separator to use
+     * @return A {@link Publisher} that emits a list of {@link KeyValue}
+     */
+    @Get("/kv/{key}?recurse=true{&dc}{&raw}{&seperator}")
+    Publisher<List<KeyValue>> readValues(
+            String key,
+            @Nullable @Parameter("dc") String datacenter,
+            @Nullable Boolean raw,
+            @Nullable String seperator);
+    /**
      * Pass the TTL check. See https://www.consul.io/api/agent/check.html
      * @param checkId The check ID
      * @param note An optional note
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/pass/{checkId}{?note}")
-    Publisher<HttpStatus> pass(String checkId, Optional<String> note);
+    Publisher<HttpStatus> pass(String checkId, @Nullable String note);
 
     /**
      * Warn the TTL check. See https://www.consul.io/api/agent/check.html
@@ -57,7 +95,7 @@ public interface ConsulOperations {
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/warn/{checkId}{?note}")
-    Publisher<HttpStatus> warn(String checkId, Optional<String> note);
+    Publisher<HttpStatus> warn(String checkId, @Nullable String note);
 
     /**
      * Fail the TTL check. See https://www.consul.io/api/agent/check.html
@@ -66,7 +104,7 @@ public interface ConsulOperations {
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/fail/{checkId}{?note}")
-    Publisher<HttpStatus> fail(String checkId, Optional<String> note);
+    Publisher<HttpStatus> fail(String checkId, @Nullable String note);
     /**
      * @return The current leader address
      */
@@ -169,7 +207,7 @@ public interface ConsulOperations {
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> pass(String checkId) {
-        return pass(checkId, Optional.empty());
+        return pass(checkId, null);
     }
 
     /**
@@ -178,7 +216,7 @@ public interface ConsulOperations {
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> warn(String checkId) {
-        return warn(checkId, Optional.empty());
+        return warn(checkId, null);
     }
 
     /**
@@ -187,7 +225,7 @@ public interface ConsulOperations {
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> fail(String checkId) {
-        return fail(checkId, Optional.empty());
+        return fail(checkId, null);
     }
 
     /**

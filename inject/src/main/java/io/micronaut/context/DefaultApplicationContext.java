@@ -2,25 +2,13 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.env.DefaultEnvironment;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySource;
-import io.micronaut.context.env.PropertySourceLocator;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.env.DefaultEnvironment;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySource;
-import io.micronaut.context.env.PropertySourceLocator;
+import io.micronaut.context.env.*;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
@@ -109,14 +97,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     protected DefaultEnvironment createEnvironment(String... environmentNames) {
         return new DefaultEnvironment(resourceLoader, conversionService, environmentNames) {
-            private DefaultApplicationContext bootstrapContext;
 
             @Override
             public Environment stop() {
-                if(bootstrapContext != null) {
-                    bootstrapContext.stop();
-                }
-
                 return super.stop();
             }
 
@@ -124,73 +107,35 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             protected List<PropertySource> readPropertySourceList(String name) {
                 Set<String> activeNames = getActiveNames();
                 String[] activeNamesArray = activeNames.toArray(new String[activeNames.size()]);
-                DefaultEnvironment bootstrapEnvironment = new DefaultEnvironment(resourceLoader, conversionService, activeNamesArray) {
-                    @Override
-                    protected String getPropertySourceRootName() {
-                        String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
-                        return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName  : BOOTSTRAP_NAME;
-                    }
-                };
+                BootstrapEnvironment bootstrapEnvironment = new BootstrapEnvironment(
+                        resourceLoader,
+                        conversionService,
+                        activeNamesArray);
+
                 for (PropertySource source: propertySources.values()) {
                     bootstrapEnvironment.addPropertySource(source);
                 }
                 bootstrapEnvironment.start();
 
-                this.bootstrapContext = new DefaultApplicationContext(resourceLoader, activeNamesArray) {
-                    @Override
-                    protected DefaultEnvironment createEnvironment(String... environmentNames) {
-                        return bootstrapEnvironment;
-                    }
-
-                    @Override
-                    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                        List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
-                        // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
-                        // once for the bootstrap context and again for the main context
-                        resolvedBeanReferences = refs;
-                        return refs;
-                    }
-
-                    @Override
-                    protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
-                        Iterable<BeanConfiguration> beanConfigurations = super.resolveBeanConfigurations();
-                        // we cache the resolved configurations in a local field to avoid the I/O cost of resolving them twice
-                        // once for the bootstrap context and again for the main context
-                        resolvedConfigurations = beanConfigurations;
-                        return beanConfigurations;
-                    }
-
-                    @Override
-                    protected void startEnvironment() {
-                        registerSingleton(Environment.class, bootstrapEnvironment);
-                    }
-
-                    @Override
-                    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
-                        // no-op .. @Context scope beans are not started for bootstrap
-                    }
-                };
+                BootstrapApplicationContext bootstrapContext = new BootstrapApplicationContext(bootstrapEnvironment, activeNamesArray);
 
                 bootstrapContext.start();
+                if(bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
+                    BootstrapPropertySourceLocator locator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
 
-                Collection<PropertySourceLocator> locators = bootstrapContext.getBeansOfType(PropertySourceLocator.class);
-                for (PropertySourceLocator locator : locators) {
-                    Optional<PropertySource> propertySource = locator.load(bootstrapEnvironment);
-                    propertySource.ifPresent(ps ->{
-                        BootstrapPropertySource delegate = new BootstrapPropertySource(ps) {
-                            @Override
-                            public int getOrder() {
-                                return super.getOrder() + 10; // higher priority that application config
-                            }
-                        };
-                        addPropertySource(delegate);
-                    });
-                }
+                    for (PropertySource propertySource : locator.findPropertySources(bootstrapEnvironment)) {
+                        addPropertySource(propertySource);
+                    }
 
-                singletonObjects.putAll(bootstrapContext.singletonObjects);
-                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
-                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
-                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                    // share resolved singleton objects between the Bootstrap and the main context
+                    // for performance reasons no need to support hierarchy of contexts in Microservice
+                    // environment
+                    Map<BeanKey, BeanRegistration> bootstrapSingletons = bootstrapContext.singletonObjects;
+                    DefaultApplicationContext.this.singletonObjects.putAll(bootstrapSingletons);
+                    Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+                    for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                        addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                    }
                 }
                 return super.readPropertySourceList(name);
             }
@@ -439,6 +384,65 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         public int getOrder() {
             // lower priority than application property sources
             return delegate.getOrder() - 10;
+        }
+    }
+
+    private static class BootstrapEnvironment extends DefaultEnvironment {
+        BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
+            super(resourceLoader, conversionService, activeEnvironments);
+        }
+
+        @Override
+        protected String getPropertySourceRootName() {
+            String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
+            return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName  : BOOTSTRAP_NAME;
+        }
+    }
+
+    private class BootstrapApplicationContext extends DefaultApplicationContext {
+        private final BootstrapEnvironment bootstrapEnvironment;
+
+        BootstrapApplicationContext(BootstrapEnvironment bootstrapEnvironment, String... activeEnvironments) {
+            super(resourceLoader, activeEnvironments);
+            this.bootstrapEnvironment = bootstrapEnvironment;
+        }
+
+        @Override
+        public Environment getEnvironment() {
+            return bootstrapEnvironment;
+        }
+
+        @Override
+        protected BootstrapEnvironment createEnvironment(String... environmentNames) {
+            return bootstrapEnvironment;
+        }
+
+        @Override
+        protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
+            // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
+            // once for the bootstrap context and again for the main context
+            resolvedBeanReferences = refs;
+            return refs;
+        }
+
+        @Override
+        protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
+            Iterable<BeanConfiguration> beanConfigurations = super.resolveBeanConfigurations();
+            // we cache the resolved configurations in a local field to avoid the I/O cost of resolving them twice
+            // once for the bootstrap context and again for the main context
+            resolvedConfigurations = beanConfigurations;
+            return beanConfigurations;
+        }
+
+        @Override
+        protected void startEnvironment() {
+            registerSingleton(Environment.class, bootstrapEnvironment);
+        }
+
+        @Override
+        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+            // no-op .. @Context scope beans are not started for bootstrap
         }
     }
 }

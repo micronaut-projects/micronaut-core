@@ -9,4 +9,5 @@ dependencies {
     testCompile project(":management")
     testCompile project(":http-server-netty")
     testCompile project(":inject-groovy")
+    testRuntime "org.yaml:snakeyaml:$yamlVersion"
 }

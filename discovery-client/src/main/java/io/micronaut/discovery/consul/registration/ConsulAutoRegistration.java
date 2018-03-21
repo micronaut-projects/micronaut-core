@@ -118,7 +118,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                 });
             } else {
                 // send a request to /agent/check/fail/:check_id
-                consulClient.fail(checkId, status.getDescription()).subscribe(new Subscriber<HttpStatus>() {
+                consulClient.fail(checkId, status.getDescription().orElse(null)).subscribe(new Subscriber<HttpStatus>() {
                     @Override
                     public void onSubscribe(Subscription subscription) {
                         subscription.request(1);

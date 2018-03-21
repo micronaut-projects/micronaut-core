@@ -125,6 +125,15 @@ public class MediaType implements CharSequence {
      * JSON: application/json
      */
     public static final MediaType APPLICATION_JSON_TYPE = new MediaType(MediaType.APPLICATION_JSON);
+
+    /**
+     * YAML: application/x-yaml
+     */
+    public static final String APPLICATION_YAML = "application/x-yaml";
+    /**
+     * YAML: application/x-yaml
+     */
+    public static final MediaType APPLICATION_YAML_TYPE = new MediaType(MediaType.APPLICATION_YAML);
     /**
      * XML: text/xml
      */
@@ -143,13 +152,14 @@ public class MediaType implements CharSequence {
     public static final MediaType TEXT_JSON_TYPE = new MediaType(TEXT_JSON);
 
     /**
-     * JSON: text/plain
+     * Plain Text: text/plain
      */
     public static final String TEXT_PLAIN = "text/plain";
     /**
-     * JSON: text/plain
+     * Plain Text: text/plain
      */
     public static final MediaType TEXT_PLAIN_TYPE = new MediaType(TEXT_PLAIN);
+
     /**
      * HAL JSON: application/hal+json
      */

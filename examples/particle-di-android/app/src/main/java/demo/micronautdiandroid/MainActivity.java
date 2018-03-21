@@ -1,4 +1,4 @@
-package demo.particlediandroid;
+package demo.micronautdiandroid;
 
 import android.app.Activity;
 import android.os.Bundle;

@@ -18,7 +18,6 @@ package example.storefront
 import example.api.v1.Offer
 import example.api.v1.Pet
 import example.api.v1.Vendor
-import example.storefront.client.v1.Comment
 import example.storefront.client.v1.CommentClient
 import example.storefront.client.v1.PetClient
 import example.storefront.client.v1.TweetClient
@@ -29,9 +28,7 @@ import io.reactivex.Maybe
 import io.reactivex.Single
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
@@ -39,7 +36,6 @@ import io.micronaut.http.client.Client
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.http.sse.Event
 
-import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
@@ -50,19 +46,19 @@ import javax.inject.Singleton
 @Controller("/")
 class StoreController {
 
-    private final RxStreamingHttpClient httpClient
+    private final RxStreamingHttpClient offersClient
     private final VendorClient vendorClient
     private final PetClient petClient
     private final CommentClient commentClient
     private final TweetClient tweetClient
 
     StoreController(
-            @Client(id = 'offers') RxStreamingHttpClient httpClient,
+            @Client(id = 'offers') RxStreamingHttpClient offersClient,
             VendorClient vendorClient,
             PetClient petClient,
             CommentClient commentClient,
             TweetClient tweetClient) {
-        this.httpClient = httpClient
+        this.offersClient = offersClient
         this.vendorClient = vendorClient
         this.petClient = petClient
         this.commentClient = commentClient
@@ -77,7 +73,7 @@ class StoreController {
 
     @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
     Flowable<Event<Offer>> offers() {
-        httpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
+        offersClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
             Event.of(offer)
         })
     }

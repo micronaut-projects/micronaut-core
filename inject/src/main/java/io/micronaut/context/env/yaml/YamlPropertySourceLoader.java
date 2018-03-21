@@ -2,11 +2,13 @@ package io.micronaut.context.env.yaml;
 
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Loads properties from a YML file
@@ -24,12 +26,12 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
     }
 
     @Override
-    protected String getFileExtension() {
-        return "yml";
+    public Set<String> getExtensions() {
+        return CollectionUtils.setOf("yml", "yaml");
     }
 
     @Override
-    protected void processInput(InputStream input, Map<String, Object> finalMap) throws IOException {
+    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
         Yaml yaml = new Yaml();
         Iterable<Object> objects = yaml.loadAll(input);
         for (Object object : objects) {

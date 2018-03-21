@@ -17,8 +17,10 @@ package io.micronaut.context.env;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Default load that handles Java properties files
@@ -32,12 +34,12 @@ public class PropertiesPropertySourceLoader extends AbstractPropertySourceLoader
 
 
     @Override
-    protected String getFileExtension() {
-        return PROPERTIES_EXTENSION;
+    public Set<String> getExtensions() {
+        return Collections.singleton(PROPERTIES_EXTENSION);
     }
 
     @Override
-    protected void processInput(InputStream input, Map<String, Object> finalMap) throws IOException {
+    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
         Properties props = new Properties();
         props.load(input);
         for (Map.Entry<Object, Object> entry : props.entrySet()) {

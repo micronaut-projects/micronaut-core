@@ -14,7 +14,7 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 * Command line arguments
 * Properties from `SPRING_APPLICATION_JSON` (for Spring compatibility)
-* Properties from `PARTICLE_APPLICATION_JSON`
+* Properties from `MICRONAUT_APPLICATION_JSON`
 * Java System Properties
 * OS environment variables
 * Enviroment-specific properties from `application-{environment}.{extension}` (Either `.properties`, `.json`, `.yml` or `.groovy` property formats supported)

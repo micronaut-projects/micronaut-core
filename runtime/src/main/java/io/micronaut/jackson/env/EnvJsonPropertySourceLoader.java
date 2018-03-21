@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * <p>Reads properties from JSON stored in the environment variables <tt>SPRING_APPLICATION_JSON</tt> or <tt>PARTICLE_APPLICATION_JSON</tt></p>
+ * <p>Reads properties from JSON stored in the environment variables <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt></p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +35,7 @@ import java.util.Optional;
 public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     public static final int POSITION = SystemPropertiesPropertySource.POSITION + 50;
     private static final String SPRING_APPLICATION_JSON = "SPRING_APPLICATION_JSON";
-    private static final String PARTICLE_APPLICATION_JSON = "PARTICLE_APPLICATION_JSON";
+    private static final String MICRONAUT_APPLICATION_JSON = "MICRONAUT_APPLICATION_JSON";
 
     @Override
     public int getOrder() {
@@ -58,7 +58,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     protected String getEnvValue() {
         String v = System.getenv(SPRING_APPLICATION_JSON);
         if(v == null) {
-            v = System.getenv(PARTICLE_APPLICATION_JSON);
+            v = System.getenv(MICRONAUT_APPLICATION_JSON);
         }
         return v;
     }

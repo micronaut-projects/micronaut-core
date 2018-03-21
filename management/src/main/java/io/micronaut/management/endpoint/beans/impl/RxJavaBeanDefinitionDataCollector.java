@@ -17,11 +17,10 @@ package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
@@ -50,7 +49,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
     private ExecutorService executorService;
 
     RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData,
-                                      @Named(io.micronaut.scheduling.Schedulers.IO) ExecutorService executorService) {
+                                      @Named(TaskExecutors.IO) ExecutorService executorService) {
         this.beanDefinitionData = beanDefinitionData;
         this.executorService = executorService;
     }
