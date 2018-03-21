@@ -99,3 +99,15 @@ public String hello(@Format('dd/MM/yyy') @Header ZonedDateTime date) {
     ...
 }
 ----
+
+=== Variables resolution
+
+Micronaut will try to populate method arguments in the following order:
+
+1. URI variables like `/{id}`.
+2. If the request is a `GET` request from query parameters (ie. `?foo=bar`).
+3. If there is a `@Body` and request allows the body, bind the body to it.
+4. if the request can have a body and no `@Body` is defined then try parse the body (either JSON or form data) and
+bind the method arguments from the body.
+5. Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.
+
