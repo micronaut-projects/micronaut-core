@@ -1,19 +1,19 @@
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.CookieValue
+import io.micronaut.http.client.Client
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+
 import spock.lang.Unroll
 
 /**
  * Created by graemerocher on 25/07/2017.
  */
 class CookieBindingSpec extends AbstractMicronautSpec {
-
 
     @Unroll
     void "test bind HTTP cookies for URI #uri"() {
@@ -35,25 +35,70 @@ class CookieBindingSpec extends AbstractMicronautSpec {
 
     }
 
-    @Controller
-    @Requires(property = 'spec.name', value = 'CookieBindingSpec')
-    static class CookieController {
+    void "test set HTTP cookies for client"() {
+        setup:
+        CookieClient client = embeddedServer.applicationContext.getBean(CookieClient)
 
-        @Get
+        when:
+        def result = client.simple("foo")
+
+        then:
+        result == "Cookie Value: foo"
+    }
+
+    void "test set HTTP cookies with custom names"() {
+        setup:
+        CookieClient client = embeddedServer.applicationContext.getBean(CookieClient)
+
+        when:
+        def result = client.custom("foo")
+
+        then:
+        result == "Cookie Value: foo"
+    }
+
+    @Client('/cookie')
+    static interface CookieClient extends CookieApi {
+    }
+
+    @Controller
+    static class CookieController implements CookieApi {
+
+        @Override
         String simple(@CookieValue String myVar) {
             "Cookie Value: $myVar"
         }
 
+        @Override
+        String custom(@CookieValue('custom') String myVar) {
+            "Cookie Value: $myVar"
+        }
 
-        @Get
+        @Override
         String optional(@CookieValue Optional<Integer> myVar) {
             "Cookie Value: ${myVar.orElse(-1)}"
         }
 
-
-        @Get
+        @Override
         String all(Cookies cookies) {
             "Cookie Value: ${cookies.get('myVar')?.value}"
         }
     }
+
+
+    static interface CookieApi {
+
+        @Get
+        String simple(@CookieValue String myVar)
+
+        @Get
+        String custom(@CookieValue('custom') String myVar)
+
+        @Get
+        String optional(@CookieValue Optional<Integer> myVar)
+
+        @Get
+        String all(Cookies cookies)
+    }
+
 }
