@@ -255,7 +255,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public EmbeddedServer stop() {
-        if (isRunning()) {
+        if (isRunning() && workerGroup != null) {
             try {
                 workerGroup.shutdownGracefully()
                            .addListener(this::logShutdownErrorIfNecessary);

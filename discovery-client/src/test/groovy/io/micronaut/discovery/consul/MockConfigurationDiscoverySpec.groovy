@@ -2,6 +2,7 @@ package io.micronaut.discovery.consul
 
 import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -39,18 +40,28 @@ class MockConfigurationDiscoverySpec extends Specification {
         writeValue("application", "some.consul.value", "test") // should not use default
         writeValue("application,test", "some.consul.value", "foobar")
         writeValue("application,other", "some.consul.value", "other") // should not use test env
+        writeValue("application", "must.override1", "test")
+        writeValue("test-app", "must.override1", "overridden")
+        writeValue("test-app", "must.override2", "test")
+        writeValue("test-app,test", "must.override2", "overridden")
+
+
         ApplicationContext applicationContext = ApplicationContext.run(
                 [
                         'consul.client.config.enabled': true,
+                        'micronaut.application.name':'test-app',
                         'consul.client.host': 'localhost',
                         'consul.client.port': serverPort]
         )
 
-        def result = applicationContext.environment.getProperty("some.consul.value", String)
+        def environment = applicationContext.environment
+        def result = environment.getProperty("some.consul.value", String)
 
         expect:
         result.isPresent()
         result.get() == 'foobar'
+        environment.getProperty('must.override1', String).get() == 'overridden'
+        environment.getProperty('must.override2', String).get() == 'overridden'
 
         cleanup:
         System.setProperty('some.consul.value','')
