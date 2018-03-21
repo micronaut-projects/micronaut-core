@@ -16,7 +16,6 @@
 package io.micronaut.discovery;
 
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.core.util.Toggleable;
 
 /**
  * Base class for common discovery configuration options
@@ -26,6 +25,9 @@ import io.micronaut.core.util.Toggleable;
  */
 public abstract class DiscoveryConfiguration implements Toggleable {
 
+    /**
+     * The prefix to use for all client discovery settings
+     */
     public static final String PREFIX = "discovery";
 
     private boolean enabled = true;
@@ -38,6 +40,9 @@ public abstract class DiscoveryConfiguration implements Toggleable {
         return enabled;
     }
 
+    /**
+     * @param enabled Whether discovery is enabled
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }

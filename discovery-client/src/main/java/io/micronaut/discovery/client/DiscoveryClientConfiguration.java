@@ -17,9 +17,6 @@ package io.micronaut.discovery.client;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
@@ -31,7 +28,11 @@ import javax.annotation.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,7 +44,6 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public abstract class DiscoveryClientConfiguration extends HttpClientConfiguration {
-
 
     private final ApplicationConfiguration applicationConfiguration;
     private List<ServiceInstance> defaultZone = Collections.emptyList();
@@ -71,11 +71,22 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
         }
         return Optional.empty();
     }
+
     /**
      * @return The Discovery servers within the default zone
      */
     public List<ServiceInstance> getDefaultZone() {
         return defaultZone;
+    }
+
+    /**
+     * Sets the Discovery servers to use for the default zone
+     *
+     * @param defaultZone The default zone
+     */
+    public void setDefaultZone(List<URL> defaultZone) {
+        this.defaultZone = defaultZone.stream().map(uriMapper()).map(uri-> ServiceInstance.builder(getServiceID(), uri).build())
+            .collect(Collectors.toList());
     }
 
     /**
@@ -86,25 +97,6 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
         allZones.addAll(defaultZone);
         allZones.addAll(otherZones);
         return allZones;
-    }
-    /**
-     * Sets the Discovery servers to use for the default zone
-     *
-     * @param defaultZone The default zone
-     */
-    public void setDefaultZone(List<URL> defaultZone) {
-        this.defaultZone = defaultZone.stream().map(uriMapper()).map(uri-> ServiceInstance.builder(getServiceID(), uri).build())
-          .collect(Collectors.toList());
-    }
-
-    private Function<URL, URI> uriMapper() {
-        return url -> {
-            try {
-                return url.toURI();
-            } catch (URISyntaxException e) {
-                throw new ConfigurationException("Invalid Eureka server URL: " + url);
-            }
-        };
     }
 
     /**
@@ -127,6 +119,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
                     .collect(Collectors.toList());
         }
     }
+
     /**
      * @return Is the discovery server exposed over HTTPS (defaults to false)
      */
@@ -134,24 +127,12 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
         return secure;
     }
 
+    /**
+     * @param secure Set if the discovery server is exposed over HTTPS
+     */
     public void setSecure(boolean secure) {
         this.secure = secure;
     }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public void setHost(String host) {
-        if(StringUtils.isNotEmpty(host)) {
-            this.host = host;
-        }
-    }
-
-    /**
-     * @return The ID of the {@link io.micronaut.discovery.DiscoveryClient}
-     */
-    protected abstract String getServiceID();
 
     /**
      * @return The Discovery server instance host name. Defaults to 'localhost'.
@@ -161,10 +142,26 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     }
 
     /**
+     * @param host The Discovery server host name
+     */
+    public void setHost(String host) {
+        if(StringUtils.isNotEmpty(host)) {
+            this.host = host;
+        }
+    }
+
+    /**
      * @return The default Discovery server port
      */
     public int getPort() {
         return port;
+    }
+
+    /**
+     * @param port The port for the Discovery server
+     */
+    public void setPort(int port) {
+        this.port = port;
     }
 
     /**
@@ -179,7 +176,6 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     @Nullable
     public abstract RegistrationConfiguration getRegistration();
 
-
     @Override
     public String toString() {
         return "DiscoveryClientConfiguration{" +
@@ -188,5 +184,20 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
                 ", port=" + port +
                 ", secure=" + secure +
                 "} ";
+    }
+
+    /**
+     * @return The ID of the {@link io.micronaut.discovery.DiscoveryClient}
+     */
+    protected abstract String getServiceID();
+
+    private Function<URL, URI> uriMapper() {
+        return url -> {
+            try {
+                return url.toURI();
+            } catch (URISyntaxException e) {
+                throw new ConfigurationException("Invalid Eureka server URL: " + url);
+            }
+        };
     }
 }
