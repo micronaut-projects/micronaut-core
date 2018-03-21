@@ -54,10 +54,6 @@ These should be built on the `Endpoint` API.
 
 ### HTTP Server
 
-#### Misc TODO Items
-
-* URI variable values passed to Controller methods should be URI decoded
-
 #### Content Negotiation
 
 Content negotiation must be supported
@@ -72,9 +68,7 @@ WebSocket Support must be implemented
 * multi part requests / file uploads - Zak/Puneet
 * Server Sent Events
 * CONTINUE request handling
-* Cookie Support - Zak/Puneet
 * Reactive Streams Publisher as request body to allow streaming
-* @Parameter support - Zak/Puneet
 
 #### Distributed Tracing
 

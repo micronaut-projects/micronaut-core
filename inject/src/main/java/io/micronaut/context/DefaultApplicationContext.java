@@ -127,15 +127,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         addPropertySource(propertySource);
                     }
 
-                    // share resolved singleton objects between the Bootstrap and the main context
-                    // for performance reasons no need to support hierarchy of contexts in Microservice
-                    // environment
-                    Map<BeanKey, BeanRegistration> bootstrapSingletons = bootstrapContext.singletonObjects;
-                    DefaultApplicationContext.this.singletonObjects.putAll(bootstrapSingletons);
-                    Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
-                    for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
-                        addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
-                    }
+                }
+                // share resolved singleton objects between the Bootstrap and the main context
+                // for performance reasons no need to support hierarchy of contexts in Microservice
+                // environment
+                DefaultApplicationContext.this.singletonObjects.putAll(bootstrapContext.singletonObjects);
+                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
                 }
                 return super.readPropertySourceList(name);
             }
@@ -383,7 +382,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         public int getOrder() {
             // lower priority than application property sources
-            return delegate.getOrder() - 10;
+            return delegate.getOrder() + 10;
         }
     }
 

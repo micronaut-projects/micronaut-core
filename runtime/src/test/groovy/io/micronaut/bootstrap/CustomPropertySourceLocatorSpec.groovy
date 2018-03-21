@@ -56,7 +56,12 @@ class CustomPropertySourceLocatorSpec extends Specification {
                 if(path == "bootstrap.properties") {
                     return Optional.of(new ByteArrayInputStream('''\
 some.bootstrap.value=bar
-some.bootstrap.config=true
+some.bootstrap.config=xxx
+'''.bytes))
+                }
+                if(path == "application.properties") {
+                    return Optional.of(new ByteArrayInputStream('''\
+some.bootstrap.config=yyy
 '''.bytes))
                 }
                 return Optional.empty()
@@ -85,9 +90,13 @@ some.bootstrap.config=true
         ))
         applicationContext.start()
 
+
         expect:
-        applicationContext.environment.getProperty('custom.prop.a', String).get() == 'AAA'
+        // config passed directly to context higher priority
         applicationContext.environment.getProperty('some.bootstrap.value', String).get() == 'overridden'
+        applicationContext.environment.getProperty('custom.prop.a', String).get() == 'BBB'
+        // bootstrap.properties config higher priority than application.properties config
+        applicationContext.environment.getProperty('some.bootstrap.config', String).get() == 'xxx'
     }
 
     void "test that a PropertySource from a PropertySourceLocator doesn't override application config when not enabled"() {
@@ -102,18 +111,4 @@ some.bootstrap.config=true
         applicationContext.environment.getProperty('custom.prop.a', String).get() == 'BBB'
     }
 
-    @Singleton
-    @Requires(property = 'some.bootstrap.config')
-    static class MyLocator implements PropertySourceLocator {
-
-        @Override
-        Optional<PropertySource> load(Environment environment) {
-            return Optional.of(
-                    PropertySource.of(
-                            'custom',
-                            ['custom.prop.a': 'AAA']
-                    )
-            )
-        }
-    }
 }
