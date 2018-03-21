@@ -74,6 +74,10 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
     @Get("/kv/{key}?recurse=true{&dc}{&raw}{&seperator}")
+    @Retryable(
+            attempts = "${"+ ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
+            delay = "${"+ ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
+    )
     Publisher<List<KeyValue>> readValues(
             String key,
             @Nullable @Parameter("dc") String datacenter,
