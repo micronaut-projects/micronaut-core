@@ -41,7 +41,7 @@ import java.util.List;
 @ChannelHandler.Sharable
 public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    public static final String ID = "particle-http-decoder";
+    public static final String ID = "micronaut-http-decoder";
 
     private final EmbeddedServer embeddedServer;
     private final ConversionService<?> conversionService;

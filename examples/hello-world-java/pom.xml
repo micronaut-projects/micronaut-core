@@ -67,17 +67,17 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.particleframework</groupId>
+            <groupId>io.micronaut</groupId>
             <artifactId>http-server-netty</artifactId>
             <version>${micronaut.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.particleframework</groupId>
+            <groupId>io.micronaut</groupId>
             <artifactId>management</artifactId>
             <version>${micronaut.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.particleframework</groupId>
+            <groupId>io.micronaut</groupId>
             <artifactId>validation</artifactId>
             <version>${micronaut.version}</version>
         </dependency>
@@ -100,13 +100,13 @@
         </dependency>
 
         <dependency>
-            <groupId>org.particleframework</groupId>
+            <groupId>io.micronaut</groupId>
             <artifactId>inject-java</artifactId>
             <version>${micronaut.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.particleframework</groupId>
+            <groupId>io.micronaut</groupId>
             <artifactId>http-client</artifactId>
             <version>${micronaut.version}</version>
             <scope>test</scope>

@@ -21,7 +21,7 @@ class NestedDependencyFailureSpec extends Specification {
         e.message == '''\
 Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.nesteddependency.C
 
-Message: No bean of type [io.micronaut.inject.failures.nesteddependency.D] exists
+Message: No bean of type [io.micronaut.inject.failures.nesteddependency.D] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.
 Path Taken: B.a --> new A([C c]) --> new C([D d])'''
     }
 }

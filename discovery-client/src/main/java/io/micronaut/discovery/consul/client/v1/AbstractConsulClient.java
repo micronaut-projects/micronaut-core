@@ -16,21 +16,36 @@
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.*;
+import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
+import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
 import io.micronaut.http.client.Client;
+import io.micronaut.jackson.env.JsonPropertySourceLoader;
+import io.micronaut.scheduling.TaskExecutors;
+import io.reactivex.*;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.io.InputStream;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -42,12 +57,13 @@ import java.util.Optional;
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 @Requires(beans = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractConsulClient.class);
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 
     @Inject
     public void setConsulConfiguration(ConsulConfiguration consulConfiguration) {
-        if(consulConfiguration != null)
+        if (consulConfiguration != null)
             this.consulConfiguration = consulConfiguration;
     }
 
@@ -56,14 +72,15 @@ public abstract class AbstractConsulClient implements ConsulClient {
         return ConsulClient.SERVICE_ID;
     }
 
+
+
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        if(SERVICE_ID.equals(serviceId)) {
+        if (SERVICE_ID.equals(serviceId)) {
             return Publishers.just(
                     Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))
             );
-        }
-        else {
+        } else {
             ConsulConfiguration.ConsulDiscoveryConfiguration discovery = consulConfiguration.getDiscovery();
             boolean passing = discovery.isPassing();
             Optional<String> datacenter = Optional.ofNullable(discovery.getDatacenters().get(serviceId));
@@ -81,8 +98,4 @@ public abstract class AbstractConsulClient implements ConsulClient {
         }
     }
 
-    @Override
-    public void close() throws IOException {
-        // no-op.. will be closed by @Client
-    }
 }

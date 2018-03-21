@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
-    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.#&;\\+]";
+    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#&;\\+]";
     protected StringBuilder pattern;
     protected List<String> variableList;
     private final Pattern matchPattern;
@@ -235,7 +235,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             boolean hasModifier = modifierChar == ':' && modLen > 0;
             String operatorPrefix = "";
             String operatorQuantifier = "";
-            String variableQuantifier = "+)";
+            String variableQuantifier = "+?)";
             String variablePattern = getVariablePattern(variable, operator);
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);

@@ -77,7 +77,7 @@ class ApiMacro extends InlineMacroProcessor {
 
         String defaultPackage = getDefaultPackagePrefix()
         if(defaultPackage != null && !target.startsWith(defaultPackage)) {
-            target = "${defaultPackage}${target}" // allow excluding org.particleframework
+            target = "${defaultPackage}${target}" // allow excluding io.micronaut
         }
         String baseUri = getBaseUri(parent.document.attributes)
         final Map options = [

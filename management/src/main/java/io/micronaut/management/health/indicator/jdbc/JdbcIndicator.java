@@ -22,7 +22,7 @@ import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
-import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -49,7 +49,7 @@ public class JdbcIndicator implements HealthIndicator {
     private final HealthAggregator healthAggregator;
 
     @Inject
-    public JdbcIndicator(@Named(Schedulers.IO) ExecutorService executorService,
+    public JdbcIndicator(@Named(TaskExecutors.IO) ExecutorService executorService,
                          DataSource[] dataSources,
                          HealthAggregator healthAggregator) {
         this.executorService = executorService;

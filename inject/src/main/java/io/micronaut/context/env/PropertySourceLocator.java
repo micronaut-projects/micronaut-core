@@ -18,7 +18,7 @@ package io.micronaut.context.env;
 import java.util.Optional;
 
 /**
- *
+ * An interface for beans that are capable of locating a {@link PropertySource} instance
  *
  * @author graemerocher
  * @since 1.0

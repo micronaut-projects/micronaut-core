@@ -18,11 +18,7 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.MethodReference;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.core.annotation.NonBlocking;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.inject.MethodReference;
-import io.micronaut.scheduling.Schedulers;
+import io.micronaut.scheduling.TaskExecutors;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -42,7 +38,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     private final ExecutorService ioExecutor;
 
-    protected DefaultExecutorSelector(@Named(Schedulers.IO) ExecutorService ioExecutor) {
+    protected DefaultExecutorSelector(@Named(TaskExecutors.IO) ExecutorService ioExecutor) {
         this.ioExecutor = ioExecutor;
     }
 

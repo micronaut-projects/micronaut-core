@@ -1,14 +1,13 @@
 package io.micronaut.management.endpoint.routes.impl;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.management.endpoint.routes.RouteData;
 import io.micronaut.management.endpoint.routes.RouteDataCollector;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
-import io.micronaut.scheduling.executor.IOExecutorServiceConfig;
 import io.micronaut.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 
@@ -30,7 +29,7 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
     private final ExecutorService executorService;
 
     public RxJavaRouteDataCollector(RouteData routeData,
-                                    @Named(io.micronaut.scheduling.Schedulers.IO) ExecutorService executorService) {
+                                    @Named(TaskExecutors.IO) ExecutorService executorService) {
         this.routeData = routeData;
         this.executorService = executorService;
     }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
@@ -26,12 +27,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface DiscoveryClient extends Closeable, AutoCloseable{
-
-    /**
-     * @return Description of the client
-     */
-    String getDescription();
+public interface DiscoveryClient extends Closeable, AutoCloseable, Described{
 
     /**
      * Obtain a list of {@link ServiceInstance} for the given service id

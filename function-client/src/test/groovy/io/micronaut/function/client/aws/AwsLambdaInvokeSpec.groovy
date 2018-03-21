@@ -28,6 +28,7 @@ import io.micronaut.function.client.FunctionDefinition
 import io.micronaut.function.client.FunctionInvoker
 import io.micronaut.function.client.FunctionInvokerChooser
 import io.micronaut.http.annotation.Body
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
@@ -37,16 +38,17 @@ import javax.inject.Named
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({
-    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
-})
+//@IgnoreIf({
+//    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
+//})
+@Ignore
 class AwsLambdaInvokeSpec extends Specification {
 
 
     void "test setup function definitions"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'aws.lambda.functions.test.functionName':'particle-function',
+                'aws.lambda.functions.test.functionName':'micronaut-function',
                 'aws.lambda.functions.test.qualifier':'something'
         )
         
@@ -55,7 +57,7 @@ class AwsLambdaInvokeSpec extends Specification {
         expect:
         definitions.size() == 1
         definitions.first() instanceof AWSInvokeRequestDefinition
-        definitions.first().invokeRequest.functionName == 'particle-function'
+        definitions.first().invokeRequest.functionName == 'micronaut-function'
         definitions.first().invokeRequest.qualifier == 'something'
 
     }
@@ -63,7 +65,7 @@ class AwsLambdaInvokeSpec extends Specification {
     void "test setup lambda config"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'aws.lambda.functions.test.functionName':'particle-function',
+                'aws.lambda.functions.test.functionName':'micronaut-function',
                 'aws.lambda.functions.test.qualifier':'something',
                 'aws.lambda.region':'us-east-1'
         )
@@ -76,7 +78,7 @@ class AwsLambdaInvokeSpec extends Specification {
     void "test invoke function"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'aws.lambda.functions.test.functionName':'particle-function',
+                'aws.lambda.functions.test.functionName':'micronaut-function',
                 'aws.lambda.region':'us-east-1'
         )
 
@@ -102,13 +104,13 @@ class AwsLambdaInvokeSpec extends Specification {
     void "test invoke client with @FunctionClient"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'aws.lambda.functions.test.functionName':'particle-function',
+                'aws.lambda.functions.test.functionName':'micronaut-function',
                 'aws.lambda.region':'us-east-1'
         )
 
         when:
         MyClient myClient = applicationContext.getBean(MyClient)
-        Book book = myClient.particleFunction( new Book(title: "The Stand") )
+        Book book = myClient.micronautFunction( new Book(title: "The Stand") )
 
         then:
         book != null
@@ -135,12 +137,12 @@ class AwsLambdaInvokeSpec extends Specification {
 
     @FunctionClient
     static interface MyClient {
-        Book particleFunction(@Body Book book)
+        Book micronautFunction(@Body Book book)
 
-        @Named('particle-function')
+        @Named('micronaut-function')
         Book someOtherName(String title)
 
-        @Named('particle-function')
+        @Named('micronaut-function')
         Single<Book> reactiveInvoke(String title)
     }
 }

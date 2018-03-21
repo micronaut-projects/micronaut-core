@@ -18,6 +18,7 @@ package io.micronaut.discovery.consul.client.v1;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;

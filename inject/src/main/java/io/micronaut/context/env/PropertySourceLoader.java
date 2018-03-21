@@ -11,7 +11,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface PropertySourceLoader extends Toggleable, PropertySourceLocator {
+public interface PropertySourceLoader extends Toggleable, PropertySourceLocator, PropertySourceReader {
 
     /**
      * Load a {@link PropertySource} for the given {@link Environment}

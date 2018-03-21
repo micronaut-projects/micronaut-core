@@ -35,8 +35,7 @@ import io.micronaut.core.serialize.JdkSerializer;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.Schedulers;
-import io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.session.*;
 import io.micronaut.session.event.SessionCreatedEvent;
 import io.micronaut.session.event.SessionDeletedEvent;
@@ -70,10 +69,10 @@ import static io.micronaut.configuration.lettuce.session.RedisSessionStore.Redis
  *
  * <h2>Storage Details</h2>
  *
- * <p>Sessions are stored within Redis hashes by default prefixed with {@code particle:session:sessions:[SESSION_ID]}. The expiry of the hash is set to 5 minutes after the actual expiry and
+ * <p>Sessions are stored within Redis hashes by default prefixed with {@code micronaut:session:sessions:[SESSION_ID]}. The expiry of the hash is set to 5 minutes after the actual expiry and
  * expired sessions are simply not returned by {@link #findSession(String)}</p>
  *
- * <p>More exact session expiry entries are stored with keys {@code particle:session:expiry:[SESSION_ID]} and current active sessions are tracked within sorted set at the key {@code particle:session:active-sessions}.
+ * <p>More exact session expiry entries are stored with keys {@code micronaut:session:expiry:[SESSION_ID]} and current active sessions are tracked within sorted set at the key {@code micronaut:session:active-sessions}.
  * The entries within the set are sorted by expiry time and a scheduled job that runs every minute periodically touches the keys within the set that match the last minute thus ensuring Redis propagates expiry events in a timely manner.</p>
  *
  * <h2>Redis Pub/Sub</h2>
@@ -107,7 +106,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             RedisHttpSessionConfiguration sessionConfiguration,
             BeanLocator beanLocator,
             ConversionService<?> conversionService,
-            @Named(Schedulers.SCHEDULED) ExecutorService scheduledExecutorService,
+            @Named(TaskExecutors.SCHEDULED) ExecutorService scheduledExecutorService,
             ApplicationEventPublisher eventPublisher) {
         this.writeMode = sessionConfiguration.getWriteMode();
         this.sessionIdGenerator = sessionIdGenerator;

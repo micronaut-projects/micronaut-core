@@ -47,6 +47,7 @@ class ParameterSpec extends Specification {
 
         then:
         user.username == "John"
+        user.age == 18
 
     }
 
