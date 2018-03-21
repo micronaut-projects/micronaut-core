@@ -23,6 +23,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
+ * The default MongoDB configuration class
+ *
  * @author graemerocher
  * @since 1.0
  */
