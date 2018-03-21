@@ -35,7 +35,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class FileUploadToByteArrayConverter implements TypeConverter<ChunkedFileUpload, byte[]> {
+public class ChunkedFileUploadToByteArrayConverter implements TypeConverter<ChunkedFileUpload, byte[]> {
     @Override
     public Optional<byte[]> convert(ChunkedFileUpload upload, Class<byte[]> targetType, ConversionContext context) {
         try {
