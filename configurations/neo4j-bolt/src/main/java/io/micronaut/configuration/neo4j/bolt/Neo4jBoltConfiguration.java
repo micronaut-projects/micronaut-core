@@ -23,11 +23,6 @@ import org.neo4j.driver.v1.AuthToken;
 import org.neo4j.driver.v1.AuthTokens;
 import org.neo4j.driver.v1.Config;
 import org.neo4j.driver.v1.Logger;
-import io.micronaut.configuration.neo4j.bolt.condition.RequiresNeo4j;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
@@ -64,6 +59,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     public Neo4jBoltConfiguration() {
         config.withLogging(name -> new Logger() {
             org.slf4j.Logger logger = LoggerFactory.getLogger(name);
+
             @Override
             public void error(String message, Throwable cause) {
                 logger.error(message, cause);
@@ -81,7 +77,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
 
             @Override
             public void warn(String message, Throwable cause) {
-                logger.warn(message,cause);
+                logger.warn(message, cause);
             }
 
             @Override
@@ -106,14 +102,24 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         });
     }
 
+    /**
+     * Set a {@link List} of Neo4J {@link URI}
+     *
+     * @param uris The list of URIs
+     */
     public void setUris(List<URI> uris) {
-        if(uris != null) {
+        if (uris != null) {
             this.uris = uris;
         }
     }
 
+    /**
+     * Set a single {@link URI}
+     *
+     * @param uri A single Neo4j URI
+     */
     public void setUri(URI uri) {
-        if(uri != null) {
+        if (uri != null) {
             this.uris = Collections.singletonList(uri);
         }
     }
@@ -139,8 +145,11 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         return retryDelay;
     }
 
+    /**
+     * @param retryDelay The delay between retry attempts
+     */
     public void setRetryDelay(Duration retryDelay) {
-        if(retryDelay != null)
+        if (retryDelay != null)
             this.retryDelay = retryDelay;
     }
 
@@ -170,105 +179,142 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
      * @see org.neo4j.driver.v1.AuthTokens
      */
     public Optional<AuthToken> getAuthToken() {
-        if(authToken != null) {
+        if (authToken != null) {
             return Optional.of(authToken);
-        }
-        else if(StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
+        } else if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             return Optional.of(AuthTokens.basic(username, password));
         }
         return Optional.empty();
     }
 
+    /**
+     * @param username The username
+     */
     public void setUsername(String username) {
         this.username = username;
     }
 
+    /**
+     * @param password The password
+     */
     public void setPassword(String password) {
         this.password = password;
     }
 
+    /**
+     * @param trustStrategy The {@link org.neo4j.driver.v1.Config.TrustStrategy}
+     */
     @Inject
     public void setTrustStrategy(@Nullable Config.TrustStrategy trustStrategy) {
-        if(trustStrategy != null) {
+        if (trustStrategy != null) {
             this.config.withTrustStrategy(trustStrategy);
         }
     }
 
+    /**
+     * @param authToken The {@link AuthToken}
+     */
     @Inject
     public void setAuthToken(@Nullable AuthToken authToken) {
         this.authToken = authToken;
     }
 
+    /**
+     * @param embeddedSettings The {@link Neo4jEmbeddedSettings}
+     */
     @Inject
     public void setEmbeddedSettings(Neo4jEmbeddedSettings embeddedSettings) {
         this.embeddedSettings = embeddedSettings;
     }
 
+    /**
+     * @return The settings for the embedded Neo4j server
+     */
     public Neo4jEmbeddedSettings getEmbeddedSettings() {
         return embeddedSettings;
     }
 
+    /**
+     * The configuration settings for the embedded Neo4j
+     */
     @ConfigurationProperties("embedded")
     public static class Neo4jEmbeddedSettings implements Toggleable {
-        /**
-         * Options to pass to the embedded server
-         */
-        private Map<String,Object> options = Collections.emptyMap();
-        /**
-         * The directory to store embedded data
-         */
+
+        private Map<String, Object> options = Collections.emptyMap();
         private String directory;
-        /**
-         * Whether to drop existing data
-         */
         private boolean dropData = false;
-
-        /**
-         * Whether to
-         */
         private boolean ephemeral = false;
-
         private boolean enabled = true;
 
+        /**
+         * @return Whether the embedded sever is enabled
+         */
         @Override
         public boolean isEnabled() {
             return enabled;
         }
 
+        /**
+         * @param enabled enable the server
+         */
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
         }
 
+        /**
+         * @return Options to pass to the embedded server
+         */
         public Map<String, Object> getOptions() {
             return options;
         }
 
+        /**
+         * @param options The options to pass to the embedded server
+         */
         public void setOptions(Map<String, Object> options) {
-            if(options != null) {
+            if (options != null) {
                 this.options = options;
             }
         }
 
+        /**
+         * @return The directory to store embedded data
+         */
         public Optional<String> getDirectory() {
             return Optional.ofNullable(directory);
         }
 
+        /**
+         * @param directory The directory
+         */
         public void setDirectory(String directory) {
             this.directory = directory;
         }
 
+        /**
+         * @return Whether to drop existing data
+         */
         public boolean isDropData() {
             return dropData;
         }
 
+        /**
+         * @param dropData drop the existing data
+         */
         public void setDropData(boolean dropData) {
             this.dropData = dropData;
         }
 
+        /**
+         * @return Whether to create the database in a temp directory and deleted on shutdown
+         */
         public boolean isEphemeral() {
             return ephemeral;
         }
 
+        /**
+         * @param ephemeral define the embedded ser as ephemeral
+         */
         public void setEphemeral(boolean ephemeral) {
             this.ephemeral = ephemeral;
         }
