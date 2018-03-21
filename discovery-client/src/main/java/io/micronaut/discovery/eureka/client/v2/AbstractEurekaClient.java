@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.Client;
@@ -61,6 +62,7 @@ import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_SINGLE_E
     enabledDeserializationFeatures = {UNWRAP_ROOT_VALUE, ACCEPT_SINGLE_VALUE_AS_ARRAY}
 )
 @Validated
+@RequiresEureka
 abstract class AbstractEurekaClient implements EurekaClient {
 
     @Override
