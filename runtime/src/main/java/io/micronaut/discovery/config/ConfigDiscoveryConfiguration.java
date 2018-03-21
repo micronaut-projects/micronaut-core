@@ -15,6 +15,8 @@
  */
 package io.micronaut.discovery.config;
 
+import io.micronaut.core.util.Toggleable;
+
 import java.util.Optional;
 
 /**
@@ -23,13 +25,26 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-public abstract class ConfigDiscoveryConfiguration {
+public abstract class ConfigDiscoveryConfiguration implements Toggleable {
 
     public static final String PREFIX = "config";
     public static final String DEFAULT_PATH = "/" + PREFIX + "/";
 
+    private boolean enabled = true;
     private String path;
     private Format format = Format.NATIVE;
+
+    /**
+     * @return Is distributed configuration enabled. True if it is.
+     */
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
 
     /**
      * @return The path where the configuration is stored
