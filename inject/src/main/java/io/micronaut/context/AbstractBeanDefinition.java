@@ -25,7 +25,9 @@ import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -629,16 +631,17 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, argument, valAnn, valString);
+                    ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+                    Optional value = resolveValue(applicationContext, conversionContext, valAnn, valString);
                     if (argumentType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
                         if (value.isPresent()) {
                             return value.get();
                         } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
-                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
+                            throw new DependencyInjectionException(resolutionContext, injectionPoint, conversionContext, valString);
                         } else {
-                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Unable to convert value to required type.");
+                            throw new DependencyInjectionException(resolutionContext, injectionPoint, conversionContext, valString);
                         }
 
                     }
@@ -888,12 +891,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
 
                 String prop = valAnn.value();
-                Optional<?> value = resolveValue(propertyResolver, argument, valAnn, prop);
+                ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
+                Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn, prop);
                 if (argument.getType() == Optional.class) {
                     return resolveOptionalObject(value);
                 } else {
                     // can't use orElseThrow here due to compiler bug
-                    result = value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + prop + "]. Property doesn't exist"));
+                    result = value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, conversionContext, prop));
                 }
             } else {
                 throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
@@ -1020,7 +1024,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                             valueAnn
                     );
                     Argument fieldArgument = injectionPoint.asArgument();
-                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, valueAnn, valString);
+                    ArgumentConversionContext conversionContext = ConversionContext.of(fieldArgument);
+                    Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnn, valString);
                     if (fieldType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
@@ -1276,7 +1281,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private Optional resolveValue(
             ApplicationContext context,
-            Argument<?> argument,
+            ArgumentConversionContext<?> argument,
             Value val,
             String valString) {
 
@@ -1289,7 +1294,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         else {
             Optional<?> value = context.getProperty(valString, argument);
             if (!value.isPresent() && isConfigurationProperties()) {
-                String cliOption = resolveCliOption(argument.getName());
+                String cliOption = resolveCliOption(argument.getArgument().getName());
                 if (cliOption != null) {
                     return context.getProperty(cliOption, argument);
                 }
