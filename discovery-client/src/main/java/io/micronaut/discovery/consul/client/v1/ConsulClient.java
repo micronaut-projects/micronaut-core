@@ -36,7 +36,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConsulClient extends ConsulOperations, DiscoveryClient, ConfigurationClient {
+public interface ConsulClient extends ConsulOperations, DiscoveryClient {
     /**
      * The default ID of the consul service
      */

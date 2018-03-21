@@ -50,22 +50,18 @@ import java.util.Optional;
  */
 @Singleton
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
-    private final Optional<EmbeddedServer> embeddedServer;
     private final Map<String, ServiceInstanceList> serviceInstanceLists;
     private final BeanContext beanContext;
 
     /**
      * The default server loadbalance resolver
      *
-     * @param embeddedServer An optional reference to the {@link EmbeddedServer}
      * @param beanContext The bean context
      * @param serviceInstanceLists Any other providers
      */
     public DefaultLoadBalancerResolver(
-            Optional<EmbeddedServer> embeddedServer,
             BeanContext beanContext,
             ServiceInstanceList...serviceInstanceLists) {
-        this.embeddedServer = embeddedServer;
         this.beanContext = beanContext;
         if(ArrayUtils.isNotEmpty(serviceInstanceLists)) {
             this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.length);
@@ -88,8 +84,9 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
 
         if(reference.startsWith("/")) {
             // current server reference
-            if(embeddedServer.isPresent()) {
-                URL url = embeddedServer.get().getURL();
+            if(beanContext.containsBean(EmbeddedServer.class)) {
+                EmbeddedServer embeddedServer = beanContext.getBean(EmbeddedServer.class);
+                URL url = embeddedServer.getURL();
                 return Optional.of(LoadBalancer.fixed(url));
             }
             else {

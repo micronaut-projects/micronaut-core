@@ -7,6 +7,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.consul.client.v1.ConsulClient
+import io.micronaut.discovery.consul.client.v1.ConsulConfigurationClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
@@ -29,6 +30,7 @@ class ConsulMockConfigurationClientYamlSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
+                    'consul.client.config.enabled': true,
                     'consul.client.config.format': 'yaml',
                     'consul.client.host'         : 'localhost',
                     'consul.client.port'         : serverPort]
@@ -36,6 +38,10 @@ class ConsulMockConfigurationClientYamlSpec extends Specification {
 
     @Shared
     ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+
+    @Shared
+    ConsulConfigurationClient configClient = embeddedServer.applicationContext.getBean(ConsulConfigurationClient)
+
 
 
     def setup() {
@@ -60,7 +66,7 @@ foo: baz
         when:
         def env = Mock(Environment)
         env.getActiveNames() >> (['test'] as Set)
-        List<PropertySource> propertySources = Flowable.fromPublisher(client.getPropertySources(env)).toList().blockingGet()
+        List<PropertySource> propertySources = Flowable.fromPublisher(configClient.getPropertySources(env)).toList().blockingGet()
 
         then: "verify property source characteristics"
         propertySources.size() == 2
@@ -86,7 +92,7 @@ datasource:
         when:
         def env = Mock(Environment)
         env.getActiveNames() >> (['test'] as Set)
-        List<PropertySource> propertySources = Flowable.fromPublisher(client.getPropertySources(env)).toList().blockingGet()
+        List<PropertySource> propertySources = Flowable.fromPublisher(configClient.getPropertySources(env)).toList().blockingGet()
 
         then: "verify property source characteristics"
         def e = thrown(ConfigurationException)
