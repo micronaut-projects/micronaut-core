@@ -21,7 +21,7 @@ import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.consul.client.v1.ConsulClient
-import io.micronaut.discovery.consul.client.v1.ConsulConfigurationClient
+import io.micronaut.discovery.consul.config.ConsulConfigurationClient
 import io.micronaut.discovery.consul.client.v1.KeyValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable

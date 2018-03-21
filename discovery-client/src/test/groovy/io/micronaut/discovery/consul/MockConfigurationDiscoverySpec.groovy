@@ -54,14 +54,22 @@ class MockConfigurationDiscoverySpec extends Specification {
                         'consul.client.port': serverPort]
         )
 
+        when:"A configuration value is read"
         def environment = applicationContext.environment
         def result = environment.getProperty("some.consul.value", String)
 
-        expect:
+        then:"the value is the correct one from Consul"
         result.isPresent()
         result.get() == 'foobar'
         environment.getProperty('must.override1', String).get() == 'overridden'
         environment.getProperty('must.override2', String).get() == 'overridden'
+
+        when:"a value is changed and the environment is refreshed"
+        writeValue("test-app", "must.override1", "changed")
+        environment.refresh()
+
+        then:"The value is retrieved again"
+        environment.getProperty('must.override1', String).get() == 'changed'
 
         cleanup:
         System.setProperty('some.consul.value','')

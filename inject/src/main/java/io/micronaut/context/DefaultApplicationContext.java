@@ -96,49 +96,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @return The environment instance
      */
     protected DefaultEnvironment createEnvironment(String... environmentNames) {
-        return new DefaultEnvironment(resourceLoader, conversionService, environmentNames) {
-
-            @Override
-            public Environment stop() {
-                return super.stop();
-            }
-
-            @Override
-            protected List<PropertySource> readPropertySourceList(String name) {
-                Set<String> activeNames = getActiveNames();
-                String[] activeNamesArray = activeNames.toArray(new String[activeNames.size()]);
-                BootstrapEnvironment bootstrapEnvironment = new BootstrapEnvironment(
-                        resourceLoader,
-                        conversionService,
-                        activeNamesArray);
-
-                for (PropertySource source: propertySources.values()) {
-                    bootstrapEnvironment.addPropertySource(source);
-                }
-                bootstrapEnvironment.start();
-
-                BootstrapApplicationContext bootstrapContext = new BootstrapApplicationContext(bootstrapEnvironment, activeNamesArray);
-
-                bootstrapContext.start();
-                if(bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
-                    BootstrapPropertySourceLocator locator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
-
-                    for (PropertySource propertySource : locator.findPropertySources(bootstrapEnvironment)) {
-                        addPropertySource(propertySource);
-                    }
-
-                }
-                // share resolved singleton objects between the Bootstrap and the main context
-                // for performance reasons no need to support hierarchy of contexts in Microservice
-                // environment
-                DefaultApplicationContext.this.singletonObjects.putAll(bootstrapContext.singletonObjects);
-                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
-                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
-                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
-                }
-                return super.readPropertySourceList(name);
-            }
-        };
+        return new RuntimeConfiguredEnvironment(environmentNames);
     }
 
     /**
@@ -446,6 +404,75 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (TypeConverterRegistrar registrar : registrars) {
                 registrar.register(conversionService);
             }
+        }
+    }
+
+    private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
+
+        private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
+        private BootstrapEnvironment bootstrapEnvironment;
+
+        RuntimeConfiguredEnvironment(String... environmentNames) {
+            super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+        }
+
+        @Override
+        public Environment stop() {
+            return super.stop();
+        }
+
+        @Override
+        protected synchronized List<PropertySource> readPropertySourceList(String name) {
+            Set<String> activeNames = getActiveNames();
+            String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
+            if(this.bootstrapEnvironment == null) {
+                this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
+            }
+            BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
+
+            for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
+                addPropertySource(propertySource);
+            }
+
+            Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+            for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+            }
+            return super.readPropertySourceList(name);
+        }
+
+        private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(String...environmentNames) {
+            if(this.bootstrapPropertySourceLocator == null) {
+
+                BootstrapApplicationContext bootstrapContext = new BootstrapApplicationContext(bootstrapEnvironment, environmentNames);
+                bootstrapContext.start();
+                if(bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
+                    bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
+                }
+                else {
+                    bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+                }
+                // share resolved singleton objects between the Bootstrap and the main context
+                // for performance reasons no need to support hierarchy of contexts in Microservice
+                // environment
+                if(!DefaultApplicationContext.this.isRunning()) {
+                    DefaultApplicationContext.this.singletonObjects.putAll(bootstrapContext.singletonObjects);
+                }
+            }
+            return this.bootstrapPropertySourceLocator;
+        }
+
+        private BootstrapEnvironment createBootstrapEnvironment(String... environmentNames) {
+            BootstrapEnvironment bootstrapEnvironment = new BootstrapEnvironment(
+                    resourceLoader,
+                    conversionService,
+                    environmentNames);
+
+            for (PropertySource source: propertySources.values()) {
+                bootstrapEnvironment.addPropertySource(source);
+            }
+            bootstrapEnvironment.start();
+            return bootstrapEnvironment;
         }
     }
 }
