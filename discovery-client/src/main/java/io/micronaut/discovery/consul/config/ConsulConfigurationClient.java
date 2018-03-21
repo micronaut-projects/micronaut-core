@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.consul.client.v1;
+package io.micronaut.discovery.consul.config;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.*;
@@ -25,6 +25,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
+import io.micronaut.discovery.consul.client.v1.ConsulClient;
+import io.micronaut.discovery.consul.client.v1.KeyValue;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
