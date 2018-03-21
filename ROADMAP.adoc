@@ -78,6 +78,13 @@ Built in distributed tracing should be activated by default and allow integratio
 
 Built in metrics support on-top of Micro Meter
 
+#### File Upload Features
+
+* Add a CompletedFileUpload class that waits until the upload is finished and has similar methods to FileUpload.
+* Rename FileUpload to StreamingFileUpload to denote it is designed to be streamed
+* Add support for @Size on blocking types that receive multipart data. Should override the global setting
+
+
 ## POST 1.0 Items
 
 The following items are postponed until after 1.0
