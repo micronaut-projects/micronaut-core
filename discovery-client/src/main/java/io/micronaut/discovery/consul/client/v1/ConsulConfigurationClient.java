@@ -26,10 +26,13 @@ import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.jackson.env.JsonPropertySourceLoader;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -95,11 +98,22 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         String applicationPrefix = hasApplicationSpecificConfig ? applicationSpecificPath.substring(1) : null;
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
-        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(consulClient.readValues(commonConfigPath, dc, null, null));
+        Function<Throwable, Publisher<? extends List<KeyValue>>> errorHandler = throwable -> {
+            if (throwable instanceof HttpClientResponseException) {
+                HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
+                if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND) {
+                    return Flowable.empty();
+                }
+            }
+            return Flowable.error(throwable);
+        };
+        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(consulClient.readValues(commonConfigPath, dc, null, null))
+                                                               .onErrorResumeNext(errorHandler);
         if (hasApplicationSpecificConfig) {
             configurationValues = Flowable.concat(
                     configurationValues,
                     Flowable.fromPublisher(consulClient.readValues(applicationSpecificPath, dc, null, null))
+                            .onErrorResumeNext(errorHandler)
             );
         }
 
@@ -182,6 +196,14 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             }
         }, BackpressureStrategy.ERROR));
 
+        propertySourceFlowable = propertySourceFlowable.onErrorResumeNext(throwable -> {
+            if(throwable instanceof ConfigurationException) {
+                return Flowable.error(throwable);
+            }
+            else {
+                return Flowable.error(new ConfigurationException("Error reading distributed configuration from Consul: " + throwable.getMessage(), throwable));
+            }
+        });
         if(executionService != null) {
             return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
                     executionService
