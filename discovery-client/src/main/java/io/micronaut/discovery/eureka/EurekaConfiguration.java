@@ -36,6 +36,7 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.*;
+import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -61,6 +62,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @ConfigurationProperties(EurekaConfiguration.PREFIX)
+@RequiresEureka
 public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     public static final String PREFIX = "eureka.client";

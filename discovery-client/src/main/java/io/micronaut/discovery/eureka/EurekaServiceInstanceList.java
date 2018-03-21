@@ -22,6 +22,7 @@ import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
+import io.micronaut.discovery.eureka.condition.RequiresEureka;
 
 import javax.inject.Singleton;
 import java.net.URI;
@@ -38,6 +39,7 @@ import java.util.List;
  * @since 1.0
  */
 @Singleton
+@RequiresEureka
 public class EurekaServiceInstanceList extends DiscoveryServerInstanceList {
 
     public EurekaServiceInstanceList(EurekaConfiguration configuration) {
