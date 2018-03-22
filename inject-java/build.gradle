@@ -52,7 +52,7 @@ dependencies {
 
 
     compileOnly project(":aop")
-    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+//    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:2.0.0.Final'
 
     testCompile project(":aop")
@@ -67,7 +67,6 @@ dependencies {
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-
 }
 
 // This logic handles rewriting the dependencies on org.objectweb.asm.** to io.micronaut.asm.**

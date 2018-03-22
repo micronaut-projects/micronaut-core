@@ -29,10 +29,9 @@ import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
+import io.micronaut.inject.processing.ProcessedTypes;
 import io.micronaut.inject.writer.*;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -56,8 +55,8 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
-            "javax.annotation.PostConstruct",
-            "javax.annotation.PreDestroy",
+            ProcessedTypes.POST_CONSTRUCT,
+            ProcessedTypes.PRE_DESTROY,
             "javax.inject.Inject",
             "javax.inject.Qualifier",
             "javax.inject.Singleton",
@@ -408,8 +407,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
-            boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(PostConstruct.class);
-            boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(PreDestroy.class);
+            boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
+            boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
             if (injected || postConstruct || preDestroy) {
                 visitAnnotatedMethod(method, o);
                 return null;
@@ -748,7 +747,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
-            if (annotationMetadata.hasDeclaredStereotype(PostConstruct.class)) {
+            if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)) {
                 writer.visitPostConstructMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -758,7 +757,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getQualifierTypes(),
                         params.getGenericTypes()
                 );
-            } else if (annotationMetadata.hasDeclaredStereotype(PreDestroy.class)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)) {
                 writer.visitPreDestroyMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
