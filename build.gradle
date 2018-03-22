@@ -104,6 +104,8 @@ subprojects { subproject ->
 
     dependencies {
         compile "org.slf4j:slf4j-api:$slf4jVersion"
+        compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
+        testCompile([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
         testCompile "org.codehaus.groovy:groovy:$groovyVersion"
         testCompile("org.spockframework:spock-core:${spockVersion}") {
             exclude module:'groovy-all'

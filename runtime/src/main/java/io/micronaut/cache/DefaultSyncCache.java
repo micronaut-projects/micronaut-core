@@ -15,14 +15,8 @@
  */
 package io.micronaut.cache;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -41,10 +35,10 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @EachBean(CacheConfiguration.class)
-public class DefaultSyncCache implements SyncCache<Cache> {
+public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
-    private final Cache cache;
+    private final com.github.benmanes.caffeine.cache.Cache cache;
     private final ConversionService<?> conversionService;
 
     public DefaultSyncCache(CacheConfiguration cacheConfiguration, ConversionService<?> conversionService) {
@@ -59,7 +53,7 @@ public class DefaultSyncCache implements SyncCache<Cache> {
     }
 
     @Override
-    public Cache getNativeCache() {
+    public com.github.benmanes.caffeine.cache.Cache getNativeCache() {
         return cache;
     }
 
@@ -117,7 +111,7 @@ public class DefaultSyncCache implements SyncCache<Cache> {
         return existing;
     }
 
-    protected Cache buildCache(CacheConfiguration cacheConfiguration) {
+    protected com.github.benmanes.caffeine.cache.Cache buildCache(CacheConfiguration cacheConfiguration) {
         Caffeine<Object, Object> builder = Caffeine.newBuilder();
         cacheConfiguration.getExpireAfterAccess().ifPresent(duration ->
                 builder.expireAfterAccess(duration.toMillis(), TimeUnit.MILLISECONDS)

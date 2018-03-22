@@ -54,6 +54,7 @@ dependencies {
     compileOnly "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly "org.ow2.asm:asm:$asmVersion"
     compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+    compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
     ['javax.validation:validation-api:1.1.0.Final',
      'org.yaml:snakeyaml:1.18'].each { String dep ->
         compileOnly dep
@@ -69,6 +70,7 @@ def targetFile = new File(targetDir, "jarjar.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
     classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
+    classRename "com.github.benmanes.caffeine.**", "io.micronaut.caffeine.@1"
     destinationDir = targetDir
     destinationName = targetFile.name
 }

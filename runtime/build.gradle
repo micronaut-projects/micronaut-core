@@ -1,18 +1,69 @@
-dependencies {
-    compile project(":inject")
-    compile project(":http")
-    compile project(":aop")
-    compile "javax.validation:validation-api:$validationVersion"
-    compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-    runtime "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
-    runtime "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+import org.anarres.gradle.plugin.jarjar.JarjarTask
 
-    compile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+// this is a hack because of how we replace jarjar'ed JAR need to manually supply dependencies to POM
+// Declare all dependencies in this map and not with the dependencies block!
+
+def deps = [
+        compile: [
+                project(":inject"),
+                project(":http"),
+                project(":aop"),
+                [group:"javax.validation", name:"validation-api", version:validationVersion],
+                [group:"com.fasterxml.jackson.core", name:"jackson-databind", version:jacksonVersion],
+                [group:"io.reactivex.rxjava2", name:"rxjava", version:rxJava2Version]
+        ],
+
+        runtime:[
+                [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jdk8", version:jacksonVersion],
+                [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jsr310", version:jacksonVersion]
+        ]
+]
+ext.extraPomInfo = {
+    delegate.dependencies {
+        for(entry in deps) {
+            def scope = entry.key
+            def values = entry.value
+            for(dep in values) {
+                delegate.dependency {
+                    def groupId
+                    def artifactId
+                    def artifactVersion
+
+                    if(dep instanceof Project) {
+                        groupId = projectGroupId
+                        artifactId = dep.name
+                        artifactVersion = version
+                    }
+                    else {
+
+                        groupId = dep.group
+                        artifactId = dep.name
+                        artifactVersion = dep.version
+                    }
+
+                    delegate.groupId groupId
+                    delegate.artifactId artifactId
+                    delegate.version artifactVersion
+                    delegate.scope scope
+                }
+            }
+        }
+    }
+
+}
+
+dependencies {
+    for(entry in deps) {
+        def scope = entry.key
+        for(dep in entry.value) {
+            "$scope"(dep)
+        }
+    }
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly "io.projectreactor:reactor-core:$reactorVersion"
     compileOnly "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
-
+    compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
     compileOnly project(":inject-java")
     testCompile "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
     testCompile "io.projectreactor:reactor-core:$reactorVersion"
@@ -20,5 +71,33 @@ dependencies {
     testCompile project(":inject-groovy")
 
     testCompile "org.grails:grails-datastore-gorm:$gormVersion"
+
 }
+
+// This logic handles rewriting the dependencies on org.objectweb.asm.** to io.micronaut.asm.**
+
+def targetDir = new File(project.buildDir, "jarjar")
+def targetFile = new File(targetDir, "jarjar.jar")
+def jarjarTask = task("jarjarTask", type: JarjarTask) {
+    from(project.files(jar.archivePath))
+    classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
+    classRename "com.github.benmanes.caffeine.**", "io.micronaut.caffeine.@1"
+    destinationDir = targetDir
+    destinationName = targetFile.name
+}
+jarjarTask.dependsOn(jar)
+
+def jarjarOutputs = task("jarjarOutputs").doLast {
+    copy {
+        from zipTree(jarjarTask.destinationPath)
+        into(targetDir)
+    }
+    delete(jarjarTask.destinationPath)
+}
+jarjarOutputs.dependsOn(jarjarTask)
+task("rejar", type:Jar, dependsOn: jarjarOutputs) {
+    from(targetDir)
+    archiveName = "rejar.jar"
+}
+
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
