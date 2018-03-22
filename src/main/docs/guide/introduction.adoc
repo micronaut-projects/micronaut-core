@@ -1,8 +1,8 @@
-Micronaut is a modern, JVM-based, full stack Micro Services framework designed for building modular, easily testable Micro Service applications.
+Micronaut is a modern, JVM-based, full stack microservices framework designed for building modular, easily testable microservice applications.
 
-Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to Micro Services using Spring, Spring Boot and Grails.
+Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
 
-Micronaut aims to provide all the tools necessary to build Micro Service applications including:
+Micronaut aims to provide all the tools necessary to build microservice applications including:
 
 * Dependency Injection and Inversion of Control (IoC)
 * Sensible Defaults and Auto-Configuration
@@ -19,9 +19,9 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 * Minimal use of proxies
 * Easy Unit Testing
 
-Whilst frameworks like Spring and Grails were never designed to run in scenarios such as as functions on a Server-less platform, or on Android or as a low memory footprint Micro Service; Micronaut on the other hand is designed to be suitable for all of these scenarios.
+Whilst frameworks like Spring and Grails were never designed to run in scenarios such as as functions on a Server-less platform, or on Android or as a low memory footprint microservice; Micronaut on the other hand is designed to be suitable for all of these scenarios.
 
 The way this is achieved is through a series of Java annotation processors, that are usable on any JVM language that supports them, and an HTTP Server and Client built on Netty.
 
-The purpose of the annotation processors is to provide a similar programming model to Spring and Grails, but by pre-compiling all the information necessary to perform DI, define AOP proxies and configure your application to run in a Micro Services environment.
+The purpose of the annotation processors is to provide a similar programming model to Spring and Grails, but by pre-compiling all the information necessary to perform DI, define AOP proxies and configure your application to run in a microservices environment.
 
