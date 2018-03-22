@@ -35,8 +35,6 @@ import javax.validation.constraints.NotBlank
 class MongoDatastoreFactorySpec extends Specification {
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run('mongodb.uri': MongoSettings.DEFAULT_URI)
 
-
-
     @Rollback
     void "test configure GORM for MongoDB"() {
         when:
@@ -65,6 +63,7 @@ class MongoDatastoreFactorySpec extends Specification {
         applicationContext.getBean(MongoDatastore)
     }
 }
+
 @Entity
 class Team {
     @NotBlank

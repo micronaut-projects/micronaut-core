@@ -32,6 +32,7 @@ import io.micronaut.runtime.context.scope.Refreshable;
 @Requires(beans = DefaultMongoConfiguration.class)
 @Factory
 public class DefaultMongoClientFactory {
+
     @Bean(preDestroy = "close")
     @Refreshable(MongoSettings.PREFIX)
     @Primary
