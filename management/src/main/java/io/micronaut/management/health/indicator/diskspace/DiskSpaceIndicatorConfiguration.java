@@ -16,7 +16,6 @@
 package io.micronaut.management.health.indicator.diskspace;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.Toggleable;
 
@@ -35,27 +34,45 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     private File path = new File(".");
     private long threshold = 1024 * 1024 * 10; // 10MB
 
+    /**
+     * @return Whether the health indicator is enabled
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
     }
 
-    public File getPath() {
-        return path;
-    }
-
-    public long getThreshold() {
-        return threshold;
-    }
-
+    /**
+     * @param enabled Enable the health indication endpoint
+     */
     void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
+    /**
+     * @return The file path to monitor for disk space
+     */
+    public File getPath() {
+        return path;
+    }
+
+    /**
+     * @param path The file path
+     */
     void setPath(File path) {
         this.path = path;
     }
 
+    /**
+     * @return The threshold
+     */
+    public long getThreshold() {
+        return threshold;
+    }
+
+    /**
+     * @param threshold Set the threshold
+     */
     void setThreshold(@ReadableBytes long threshold) {
         this.threshold = threshold;
     }
