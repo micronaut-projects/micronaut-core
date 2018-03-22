@@ -16,13 +16,18 @@
 package io.micronaut.function.client.aws;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
+ * Configuration options for AWS
+ *
  * @author graemerocher
  * @since 1.0
  */
 @ConfigurationProperties(AWSConfiguration.PREFIX)
 public class AWSConfiguration {
+
+    /**
+     * Prefix for all AWS settings
+     */
     public static final String PREFIX = "aws";
 }
