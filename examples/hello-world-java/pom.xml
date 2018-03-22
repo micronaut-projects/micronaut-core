@@ -86,11 +86,6 @@
             <artifactId>hibernate-validator</artifactId>
             <version>${micronaut.version}</version>
         </dependency>
-        <dependency>
-            <groupId>io.reactivex.rxjava2</groupId>
-            <artifactId>rxjava</artifactId>
-            <version>2.1.5</version>
-        </dependency>
 
         <dependency>
             <groupId>ch.qos.logback</groupId>

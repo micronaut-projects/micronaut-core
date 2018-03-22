@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;

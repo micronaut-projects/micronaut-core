@@ -5,7 +5,6 @@ import org.anarres.gradle.plugin.jarjar.JarjarTask
 def deps = [
         compile: [
                 [group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'],
-                [group:'com.github.ben-manes.caffeine',name:'caffeine', version:'2.5.0'],
                 [group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2']
         ]
 ]
@@ -71,13 +70,13 @@ buildJarJarTask(targetDir, taskAsmDownload, "asm", ["org.objectweb.asm": "io.mic
 
 
 // ##########################
-// Cglib JARJAR handling
-//def cglibDependencies = [
-//        [group:'cglib', name: 'cglib', version:cglibVersion]
-//
-//]
-//Task cglibDownload = buildDownloadTask("cglib", cglibDependencies, cglibVersion)
-//buildJarJarTask(targetDir, cglibDownload, "cglib", ["net.sf.cglib": "io.micronaut.cglib"])
+// Caffeine JARJAR handling
+def caffeineDependencies = [
+        [group:'com.github.ben-manes.caffeine',name:'caffeine', version: caffeineVersion],
+
+]
+Task caffeineDownloadTask = buildDownloadTask("caffeine", caffeineDependencies, caffeineVersion)
+buildJarJarTask(targetDir, caffeineDownloadTask, "caffeine", ["com.github.benmanes.caffeine": "io.micronaut.caffeine"])
 
 // ##########################
 // Project JARJAR handling
@@ -85,7 +84,7 @@ def jarjarOutputJar = new File(targetDir, "jarjar-output.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
     classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
-//    classRename "net.sf.cglib.**", "io.micronaut.cglib.@1"
+    classRename "com.github.benmanes.caffeine.**", "io.micronaut.caffeine.@1"
     destinationDir = targetDir
     destinationName = jarjarOutputJar.name
 }

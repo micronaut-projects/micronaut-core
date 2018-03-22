@@ -26,13 +26,6 @@ import io.micronaut.session.event.SessionCreatedEvent;
 import io.micronaut.session.event.SessionDeletedEvent;
 import io.micronaut.session.event.SessionDestroyedEvent;
 import io.micronaut.session.event.SessionExpiredEvent;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.session.event.SessionCreatedEvent;
-import io.micronaut.session.event.SessionDeletedEvent;
-import io.micronaut.session.event.SessionDestroyedEvent;
-import io.micronaut.session.event.SessionExpiredEvent;
 
 import javax.inject.Singleton;
 import java.time.Instant;

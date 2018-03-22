@@ -17,24 +17,20 @@ package io.micronaut.http.server.binding;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.server.binding.binders.*;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.server.binding.binders.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.core.type.Argument;
+import io.micronaut.http.server.binding.binders.*;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -42,7 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface
