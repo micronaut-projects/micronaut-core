@@ -20,10 +20,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.core.util.Toggleable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,26 +35,36 @@ import java.util.Optional;
 @ConfigurationProperties(StaticResourceConfiguration.PREFIX)
 public class StaticResourceConfiguration implements Toggleable {
 
+    /**
+     * The prefix for static resources configuration
+     */
     public static final String PREFIX = "router.static.resources";
-    private final ResourceResolver resourceResolver;
 
     protected boolean enabled = false;
     protected List<String> paths = Collections.emptyList();
     protected String mapping = "/**";
 
+    private final ResourceResolver resourceResolver;
+
     public StaticResourceConfiguration(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
     }
 
+    /**
+     * @return Enable the static resources router
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * @return The list of {@link ResourceLoader} available for the path
+     */
     public List<ResourceLoader> getResourceLoaders() {
         List<ResourceLoader> loaders = new ArrayList<>(paths.size());
         if (enabled) {
-            for(String path: paths) {
+            for (String path : paths) {
                 Optional<ResourceLoader> loader = resourceResolver.getLoaderForBasePath(path);
                 if (loader.isPresent()) {
                     loaders.add(loader.get());
