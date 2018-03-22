@@ -10,11 +10,11 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 @Singleton
-public class FileUplaodToByteArrayConverter implements TypeConverter<FileUpload, byte[]> {
+public class FileUploadToByteArrayConverter implements TypeConverter<FileUpload, byte[]> {
 
     private final ConversionService conversionService;
 
-    protected FileUplaodToByteArrayConverter(ConversionService conversionService) {
+    protected FileUploadToByteArrayConverter(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 
@@ -29,7 +29,6 @@ public class FileUplaodToByteArrayConverter implements TypeConverter<FileUpload,
         } catch (Exception e) {
             context.reject(e);
             return Optional.empty();
-
         }
     }
 }

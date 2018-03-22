@@ -80,8 +80,8 @@ Built in metrics support on-top of Micro Meter
 
 #### File Upload Features
 
-* Add a CompletedFileUpload class that waits until the upload is finished and has similar methods to FileUpload.
-* Rename FileUpload to StreamingFileUpload to denote it is designed to be streamed
+* Add a CompletedFileUpload class that waits until the upload is finished and has similar methods to FileUpload. (zak)
+* Rename FileUpload to StreamFileUpload to denote it is designed to be streamed (zak)
 * Add support for @Size on blocking types that receive multipart data. Should override the global setting
 
 

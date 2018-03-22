@@ -19,8 +19,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.TypeConverter;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -33,6 +31,7 @@ import java.util.Optional;
  */
 @Singleton
 public class ByteBufToArrayConverter implements TypeConverter<ByteBuf, byte[]> {
+
     @Override
     public Optional<byte[]> convert(ByteBuf object, Class<byte[]> targetType, ConversionContext context) {
         return Optional.of(ByteBufUtil.getBytes(object));
