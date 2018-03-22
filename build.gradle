@@ -60,6 +60,8 @@ subprojects { subproject ->
         apply plugin:"java"
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
+        compileJava.options.compilerArgs.add '-parameters'
+        compileTestJava.options.compilerArgs.add '-parameters'
         if(!subproject.name.contains('test-suite')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
