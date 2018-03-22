@@ -17,6 +17,7 @@ package io.micronaut.core.io.scan;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 
 import java.io.Serializable;
 import java.util.List;

@@ -6,9 +6,10 @@ The following features are a TODO list of things to do on Micronaut before launc
 
 ### Core Features
 
-#### Generate ConfigurationProperties documentation
+#### Documentation Generation
 
-We should generate asciidoc documentation for @ConfigurationProperties
+- We should generate asciidoc documentation for @ConfigurationProperties
+- Add generic annotated type visitor API to allow generating OpenAPI doc
 
 #### Aspect Implementations
 
@@ -20,7 +21,6 @@ We need to implement AOP annotations for:
 
 Need a mechanism for configuration discovery and sharing across the federation. Configuration sharing should initially support:
 
-* Consul
 * AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
 
 ### Auto Configurations and Health Checks
@@ -41,7 +41,7 @@ Tasks to complete:
 
 - Endpoints shouldn't be exposed to the web by default
 - Integrate Endpoints with Security solution above such that @Endpoint.defaultSensitive is honoured
-
+- Add support for JMX
 
 #### Endpoints
 
@@ -72,7 +72,7 @@ WebSocket Support must be implemented
 
 #### Distributed Tracing
 
-Built in distributed tracing should be activated by default and allow integration with third-party tools (zipkin etc.).
+Built in distributed tracing should be activated by default and allow integration with third-party tools (zipkin, opentracing etc.).
 
 #### Metrics
 
