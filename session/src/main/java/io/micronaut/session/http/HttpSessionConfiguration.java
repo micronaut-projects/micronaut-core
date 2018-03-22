@@ -1,22 +1,20 @@
 /*
  * Copyright 2017 original authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.session.http;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.session.SessionConfiguration;
@@ -33,6 +31,9 @@ import java.util.Optional;
 @ConfigurationProperties("http")
 public class HttpSessionConfiguration extends SessionConfiguration {
 
+    /**
+     * Cookie name
+     */
     public static final String DEFAULT_COOKIE_NAME = "SESSION";
 
     private boolean rememberMe = false;
@@ -42,13 +43,20 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private String domainName;
     private String cookieName = DEFAULT_COOKIE_NAME;
     private String prefix;
-    private String[] headerNames = new String[] { HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN };
+    private String[] headerNames = new String[]{HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN};
 
     /**
      * @return Whether the Base64 encode sessions IDs sent back to clients
      */
     public boolean isBase64Encode() {
         return base64Encode;
+    }
+
+    /**
+     * @param base64Encode Enable the Base64 encode for sessions IDs sent back to clients
+     */
+    void setBase64Encode(boolean base64Encode) {
+        this.base64Encode = base64Encode;
     }
 
     /**
@@ -59,10 +67,24 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * @param cookieName Set the cookie name to use
+     */
+    void setCookieName(String cookieName) {
+        this.cookieName = cookieName;
+    }
+
+    /**
      * @return The prefix to use when serializing session ID
      */
     public Optional<String> getPrefix() {
         return Optional.ofNullable(prefix);
+    }
+
+    /**
+     * @param prefix Set the prefix to use when serializing session ID
+     */
+    void setPrefix(String prefix) {
+        this.prefix = prefix;
     }
 
     /**
@@ -73,10 +95,24 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * @param headerNames Set the header names when using a Header strategy
+     */
+    void setHeaderNames(String[] headerNames) {
+        this.headerNames = headerNames;
+    }
+
+    /**
      * @return The cookie path to use
      */
     public Optional<String> getCookiePath() {
         return Optional.ofNullable(cookiePath);
+    }
+
+    /**
+     * @param cookiePath Set the cookie path to use
+     */
+    void setCookiePath(String cookiePath) {
+        this.cookiePath = cookiePath;
     }
 
     /**
@@ -87,10 +123,24 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * @param domainName Set the domain name to use for the cookie
+     */
+    void setDomainName(String domainName) {
+        this.domainName = domainName;
+    }
+
+    /**
      * @return The max age to use for the cookie
      */
     public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
+    }
+
+    /**
+     * @param cookieMaxAge Set the max age to use for the cookie
+     */
+    void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+        this.cookieMaxAge = cookieMaxAge;
     }
 
     /**
@@ -100,35 +150,10 @@ public class HttpSessionConfiguration extends SessionConfiguration {
         return rememberMe;
     }
 
+    /**
+     * @param rememberMe Enable the remember me setting
+     */
     void setRememberMe(boolean rememberMe) {
         this.rememberMe = rememberMe;
-    }
-
-    void setBase64Encode(boolean base64Encode) {
-        this.base64Encode = base64Encode;
-    }
-
-    void setCookieMaxAge(TemporalAmount cookieMaxAge) {
-        this.cookieMaxAge = cookieMaxAge;
-    }
-
-    void setCookiePath(String cookiePath) {
-        this.cookiePath = cookiePath;
-    }
-
-    void setDomainName(String domainName) {
-        this.domainName = domainName;
-    }
-
-    void setCookieName(String cookieName) {
-        this.cookieName = cookieName;
-    }
-
-    void setPrefix(String prefix) {
-        this.prefix = prefix;
-    }
-
-   void setHeaderNames(String[] headerNames) {
-        this.headerNames = headerNames;
     }
 }
