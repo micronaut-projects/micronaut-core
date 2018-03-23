@@ -54,7 +54,8 @@ dependencies {
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "twitter-update-status"
     handler = "example.function.tweet.UpdateStatusFunction::updateStatus"
-    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    // ACTIVATE THIS FOR AWS Identity management
+    //role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
     memorySize = 256
