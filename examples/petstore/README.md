@@ -21,6 +21,16 @@ can subsequently communicate with each other through `consul` using `HTTP`.
 
 See the diagram below:
 
+                    frontend
+                        |
+                    storefront
+                    |        |
+                    api     consul
+                        |
+                     micronaut
+     |      |      |            |           |       |
+    vendors offers comments     functions  emails  pets
+          
 ![Petstore Architecture](jpg-file-icon.png?raw=true "petstore architecture")
 
 ## Micronaut Installation
