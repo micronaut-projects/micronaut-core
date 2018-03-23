@@ -16,13 +16,7 @@
 package io.micronaut.aop
 
 import groovy.transform.CompileStatic
-import groovyjarjarasm.asm.ClassReader
-import io.micronaut.context.annotation.Type
-import io.micronaut.core.order.OrderUtil
-import io.micronaut.core.type.Argument
-import io.micronaut.inject.ExecutableMethod
-import io.micronaut.aop.internal.InterceptorChain
-import io.micronaut.context.ExecutionHandleLocator
+import io.micronaut.aop.chain.InterceptorChain
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.type.Argument

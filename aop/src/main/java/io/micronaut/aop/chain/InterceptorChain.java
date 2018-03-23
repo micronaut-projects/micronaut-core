@@ -13,21 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package io.micronaut.aop.internal;
+package io.micronaut.aop.chain;
 
-import io.micronaut.aop.exceptions.UnimplementedAdviceException;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.MutableArgumentValue;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
@@ -42,11 +29,12 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -58,23 +46,26 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class InterceptorChain<B, R> implements InvocationContext<B,R> {
+    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
     protected final MutableConvertibleValues attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>());
     protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
-    private final boolean isIntroduction;
     private int index = 0;
 
     public InterceptorChain(Interceptor<B, R>[] interceptors,
                             B target,
                             ExecutableMethod<B, R> method,
                             Object...originalParameters) {
+        if(LOG.isTraceEnabled()) {
+            LOG.trace("Intercepted method [{}] invocation on target: {}", method, target );
+        }
         this.target = target;
         this.executionHandle = method;
         this.interceptors = new Interceptor[interceptors.length+1];
         System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
-        this.isIntroduction = target instanceof Introduced;
+        boolean isIntroduction = target instanceof Introduced;
         if(isIntroduction) {
             this.interceptors[this.interceptors.length-1] = context -> {
                 throw new UnimplementedAdviceException(method);
@@ -135,6 +126,10 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         else {
             interceptor = this.interceptors[index++];
         }
+        if(LOG.isTraceEnabled()) {
+            LOG.trace("Proceeded to next interceptor [{}] in chain for method invocation: {}", interceptor, executionHandle);
+        }
+
         return interceptor.intercept(this);
     }
 
