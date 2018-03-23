@@ -70,7 +70,7 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
 
     @Override
     public long getSize() {
-        return fileUpload.getMaxSize();
+        return fileUpload.definedLength();
     }
 
     @Override
