@@ -173,7 +173,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
         for (ByteBufHolder holder : receivedContent) {
             ByteBuf content = holder.content();
-            byteBufs.addComponent(true, content);
+            if (content != null) {
+                byteBufs.addComponent(true, content);
+            }
         }
         return byteBufs;
     }
