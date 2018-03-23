@@ -6,6 +6,8 @@
 |Singleton scope indicates only one instance of the bean should exist
 |link:{api}/io/micronaut/context/annotation/Context.html[@Context]
 |Context scope indicates that the bean should be created at the same time as the `ApplicationContext` (eager initialization)
+|link:{api}/io/micronaut/context/annotation/Prototype.html[@Prototype]
+|Prototype scope indicates that a new instance of the bean is created each time it is injected
 |link:{api}/io/micronaut/context/annotation/Infrastructure.html[@Infrastructure]
 |Infrastructure is a `@Context` scope stereotype that indicates the bean cannot be replaced
 |link:{api}/io/micronaut/runtime/context/scope/ThreadLocal.html[@ThreadLocal]
