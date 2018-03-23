@@ -15,7 +15,9 @@
  */
 package io.micronaut.annotation.processing;
 
+import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.processing.JavacFiler;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
 
@@ -62,6 +64,21 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         } catch (Exception e) {
             // ignore
         }
+        if(baseDir == null) {
+            // OpenJDK doesn't like resolving root so we have to use a dummy sub-directory. Very hacky this.
+            try {
+                URI uri = filer.getResource(StandardLocation.CLASS_OUTPUT, "", "-root").toUri();
+                if(uri != null) {
+                    File parentFile = new File(uri).getParentFile();
+                    File canonicalFile = parentFile.getCanonicalFile();
+                    if(canonicalFile.exists()) {
+                        baseDir = canonicalFile.toURI();
+                    }
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
         if(baseDir != null) {
             try {
                 this.targetDirectory = new File(baseDir);
@@ -70,11 +87,15 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             }
         }
         if(targetDirectory == null) {
-            Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
-            String javacDirectoryOption = javacOptions.get(Option.D);
-            if(javacDirectoryOption != null) {
+            try {
+                Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
+                String javacDirectoryOption = javacOptions.get(Option.D);
+                if(javacDirectoryOption != null) {
 
-                this.targetDirectory = new File(javacDirectoryOption);
+                    this.targetDirectory = new File(javacDirectoryOption);
+                }
+            } catch (Exception e) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, "No base directory for compilation of Java sources could be established");
             }
         }
     }

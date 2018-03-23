@@ -1,6 +1,5 @@
 buildscript {
     repositories {
-        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
@@ -9,7 +8,7 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath "org.anarres.jarjar:jarjar-gradle:1.0.0"
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
     }
 }
 
@@ -18,16 +17,10 @@ plugins {
 }
 
 repositories {
-    mavenLocal()
     maven { url "https://repo.grails.org/grails/core" }
 }
 
 version project.projectVersion
-
-ext {
-    // commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/master"
-    commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/4a7cf067b69c02bbfa9fe3d5c14ccc177b51ae59/"
-}
 
 subprojects { subproject ->
 
@@ -53,7 +46,6 @@ subprojects { subproject ->
 
 
     repositories {
-        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
     
@@ -65,6 +57,8 @@ subprojects { subproject ->
         apply plugin:"java"
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
+//        compileJava.options.compilerArgs.add '-parameters'
+//        compileTestJava.options.compilerArgs.add '-parameters'
         if(!subproject.name.contains('test-suite')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
@@ -93,6 +87,8 @@ subprojects { subproject ->
     }
 
     configurations {
+        shadowCompile
+        shadowRuntime
         documentation
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
@@ -109,6 +105,8 @@ subprojects { subproject ->
 
     dependencies {
         compile "org.slf4j:slf4j-api:$slf4jVersion"
+//        shadowCompile group:"org.slf4j", name:"slf4j-api", version:slf4jVersion
+
         compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
         testCompile([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
         testCompile "org.codehaus.groovy:groovy:$groovyVersion"
@@ -120,8 +118,8 @@ subprojects { subproject ->
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
         testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
-        compileOnly 'org.ow2.asm:asm:5.2'
-        compileOnly 'org.ow2.asm:asm-commons:5.2'
+        compileOnly "org.ow2.asm:asm:$asmVersion"
+        compileOnly "org.ow2.asm:asm-commons:$asmVersion"
 
         testCompile "org.ow2.asm:asm:$asmVersion"
         testCompile "org.ow2.asm:asm-commons:$asmVersion"

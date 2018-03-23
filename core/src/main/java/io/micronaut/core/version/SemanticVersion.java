@@ -93,9 +93,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
         if (version != null) {
             SemanticVersion thisVersion = new SemanticVersion(version);
             SemanticVersion otherVersion = new SemanticVersion(requiredVersion);
-            if (thisVersion.compareTo(otherVersion) != -1) {
-                return true;
-            }
+            return thisVersion.compareTo(otherVersion) != -1;
         }
         return false;
     }

@@ -1298,8 +1298,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // Argument.create( .. )
-        generatorAdapter.invokeStatic(
-                Type.getType(Argument.class),
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
                 METHOD_CREATE_ARGUMENT_FIELD
         );
 
@@ -1438,8 +1439,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
 
             // Argument.create( .. )
-            generatorAdapter.invokeStatic(
-                    Type.getType(Argument.class),
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
                     METHOD_CREATE_ARGUMENT_METHOD
             );
             // store the type reference
@@ -1981,10 +1983,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     buildTypeArguments(defaultConstructorVisitor, genericTypes.get(argumentName));
 
                     // Argument.create( .. )
-                    defaultConstructorVisitor.invokeStatic(
-                            Type.getType(Argument.class),
-                            METHOD_CREATE_ARGUMENT_CONSTRUCTOR
-                    );
+                    invokeInterfaceStaticMethod(defaultConstructorVisitor, Argument.class, METHOD_CREATE_ARGUMENT_CONSTRUCTOR);
                     // store the type reference
                     defaultConstructorVisitor.visitInsn(AASTORE);
                     // if we are not at the end of the array duplicate array onto the stack
@@ -2062,8 +2061,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
 
         // Argument.create( .. )
-        generatorAdapter.invokeStatic(
-                Type.getType(Argument.class),
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
                 METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
@@ -2096,8 +2096,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // Argument.create( .. )
-        generatorAdapter.invokeStatic(
-                Type.getType(Argument.class),
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
                 hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }

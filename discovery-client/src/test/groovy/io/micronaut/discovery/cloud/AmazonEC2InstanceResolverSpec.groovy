@@ -8,11 +8,13 @@ import io.micronaut.context.env.ComputePlatform
 import io.micronaut.context.env.Environment
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver
 import io.micronaut.discovery.cloud.aws.AmazonMetadataConfiguration
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.nio.file.Path
 import java.nio.file.Paths
 
+@Ignore
 class AmazonEC2InstanceResolverSpec extends Specification {
 
     void "test building ec2 metadata"() {
