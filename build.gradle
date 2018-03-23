@@ -12,6 +12,11 @@ buildscript {
         classpath "org.anarres.jarjar:jarjar-gradle:1.0.0"
     }
 }
+
+plugins {
+    id 'com.github.hierynomus.license' version '0.14.0' apply false
+}
+
 repositories {
     mavenLocal()
     maven { url "https://repo.grails.org/grails/core" }
@@ -141,4 +146,5 @@ allprojects {
             testOutputDir file('build/classes/groovy/test')
         }
     }
+    apply from: rootProject.file('gradle/license.gradle')
 }
