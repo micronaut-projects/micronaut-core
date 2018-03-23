@@ -15,9 +15,8 @@
  */
 package io.micronaut.discovery.client;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.Toggleable;
+import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CACHE_NAME;
+
 import io.micronaut.cache.CacheConfiguration;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
@@ -25,10 +24,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.inject.Named;
-
 import java.time.Duration;
-
-import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CACHE_NAME;
 
 /**
  * A cache configuration for the Discovery client cache
@@ -41,8 +37,15 @@ import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CA
 @Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
 public class DiscoveryClientCacheConfiguration extends CacheConfiguration implements Toggleable {
 
+    /**
+     * The prefix to use for all discovery client settings
+     */
     public static final String CACHE_NAME = "discoveryClient";
-    public static final String SETTING_ENABLED =  CacheConfiguration.PREFIX + ".discoveryClient.enabled";
+
+    /**
+     * Configuration property name for enabled discovery cache client
+     */
+    public static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
 
     private boolean enabled = true;
 
@@ -53,11 +56,17 @@ public class DiscoveryClientCacheConfiguration extends CacheConfiguration implem
         setInitialCapacity(5);
     }
 
+    /**
+     * @return Whether the discovery client is enabled
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * @param enabled Enable or disable the discovery client
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }

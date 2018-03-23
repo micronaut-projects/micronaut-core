@@ -16,17 +16,12 @@
 package io.micronaut.configuration.lettuce.test;
 
 import io.lettuce.core.RedisURI;
+import io.micronaut.configuration.lettuce.AbstractRedisConfiguration;
+import io.micronaut.configuration.lettuce.RedisSetting;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.core.io.socket.SocketUtils;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.configuration.lettuce.AbstractRedisConfiguration;
-import io.micronaut.configuration.lettuce.RedisSetting;
-import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.io.socket.SocketUtils;
@@ -40,7 +35,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * An bean for an embedded Redis server
+ * A bean for an embedded Redis server
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -87,7 +82,9 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
         }
     }
 
-
+    /**
+     * Configuration properties for embedded Redis
+     */
     @ConfigurationProperties(RedisSetting.REDIS_EMBEDDED)
     @Requires(classes = RedisServerBuilder.class )
     public static class Configuration {

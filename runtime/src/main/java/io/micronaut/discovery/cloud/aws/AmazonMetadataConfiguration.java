@@ -18,15 +18,11 @@ package io.micronaut.discovery.cloud.aws;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-
 /**
- * Default configuration for retrieving Amazon EC2 metadata
+ * Default configuration for retrieving Amazon EC2 metadata for {@link io.micronaut.context.env.ComputePlatform#AMAZON_EC2}
  *
  * @author graemerocher
  * @since 1.0
@@ -34,6 +30,10 @@ import io.micronaut.runtime.ApplicationConfiguration;
 @ConfigurationProperties(AmazonMetadataConfiguration.PREFIX)
 @Requires(env = Environment.AMAZON_EC2)
 public class AmazonMetadataConfiguration implements Toggleable {
+
+    /**
+     * Prefix for Amazon EC2 configuration metadata
+     */
     public static final String PREFIX = ApplicationConfiguration.PREFIX + "." + Environment.AMAZON_EC2 + ".metadata";
 
     private String url = "http://169.254.169.254/";
@@ -41,19 +41,38 @@ public class AmazonMetadataConfiguration implements Toggleable {
     private String instanceDocumentUrl;
     private boolean enabled = true;
 
+    /**
+     * @return Whether the Amazon EC2 configuration is enabled
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * @param enabled Enable or disable the Amazon EC2 configuration
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
+    /**
+     * @return The Url
+     */
     public String getUrl() {
         return url;
     }
 
+    /**
+     * @param url The url
+     */
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    /**
+     * @return The metadata Url
+     */
     public String getMetadataUrl() {
         if(metadataUrl == null) {
             return url + "/latest/meta-data/";
@@ -61,6 +80,16 @@ public class AmazonMetadataConfiguration implements Toggleable {
         return metadataUrl;
     }
 
+    /**
+     * @param metadataUrl The metadata Url
+     */
+    public void setMetadataUrl(String metadataUrl) {
+        this.metadataUrl = metadataUrl;
+    }
+
+    /**
+     * @return The instance document Url
+     */
     public String getInstanceDocumentUrl() {
         if(instanceDocumentUrl == null) {
             return url + "/latest/dynamic/instance-identity/document";
@@ -68,14 +97,9 @@ public class AmazonMetadataConfiguration implements Toggleable {
         return instanceDocumentUrl;
     }
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public void setMetadataUrl(String metadataUrl) {
-        this.metadataUrl = metadataUrl;
-    }
-
+    /**
+     * @param instanceDocumentUrl The instance document Url
+     */
     public void setInstanceDocumentUrl(String instanceDocumentUrl) {
         this.instanceDocumentUrl = instanceDocumentUrl;
     }
