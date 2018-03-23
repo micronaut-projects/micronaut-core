@@ -260,12 +260,43 @@ public class RequiresCondition implements Condition {
                     return SemanticVersion.isAtLeast(groovyVersion, version);
                 case JAVA:
                     String javaVersion = System.getProperty("java.version");
-                    return SemanticVersion.isAtLeast(javaVersion, version);
+                    try {
+                        return SemanticVersion.isAtLeast(javaVersion, version);
+                    } catch (Exception e) {
+                        // non-semantic versioning in play
+                        char majorVersion = resolveJavaMajorVersion(javaVersion);
+                        char requiredVersion = resolveJavaMajorVersion(version);
+
+                        if(majorVersion >= requiredVersion) {
+                            return true;
+                        }
+                    }
+                    return false;
                 default:
                     return SemanticVersion.isAtLeast(getClass().getPackage().getImplementationVersion(), version);
             }
         }
         return true;
+    }
+
+    private char resolveJavaMajorVersion(String javaVersion) {
+        char majorVersion = 0;
+        if(javaVersion.indexOf('.') > -1) {
+            String[] tokens = javaVersion.split("\\.");
+            majorVersion = tokens[0].charAt(0);
+            if(Character.isDigit(majorVersion)) {
+                if(majorVersion == '1' && tokens.length > 1) {
+                    majorVersion = tokens[1].charAt(0);
+                }
+            }
+        }
+        else {
+            char ch = javaVersion.charAt(0);
+            if( Character.isDigit(ch) ) {
+                majorVersion = ch;
+            }
+        }
+        return majorVersion;
     }
 
 

@@ -13,22 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package io.micronaut.aop.internal;
+package io.micronaut.aop.chain;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.core.type.ReturnType;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.Set;
 
 /**
  *

@@ -20,6 +20,9 @@ package io.micronaut.configuration.neo4j.bolt;
  * @since 1.0
  */
 public interface Neo4jBoltSettings {
+    /**
+     * The prefix to use for all Neo4j settings
+     */
     String PREFIX = "neo4j";
     /**
      * Default Neo4j URI

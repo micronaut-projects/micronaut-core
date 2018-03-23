@@ -16,9 +16,6 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationProperties;
-
-import java.util.TimeZone;
 
 /**
  * Allows configuration of properties for the {@link FileTypeHandler}
@@ -31,6 +28,9 @@ public class FileTypeHandlerConfiguration {
 
     protected int cacheSeconds = 60;
 
+    /**
+     * @return the cache seconds
+     */
     public int getCacheSeconds() {
         return cacheSeconds;
     }

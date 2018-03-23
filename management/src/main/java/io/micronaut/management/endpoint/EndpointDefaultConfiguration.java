@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 
 /**
@@ -28,14 +27,27 @@ import io.micronaut.core.util.Toggleable;
 @ConfigurationProperties(EndpointDefaultConfiguration.PREFIX)
 public class EndpointDefaultConfiguration implements Toggleable {
 
+    /**
+     * The prefix for endpoints settings
+     */
     public static final String PREFIX = "endpoints.all";
 
     private boolean enabled = true;
     private boolean sensitive;
 
+    /**
+     * @return Whether the endpoint is enabled
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /**
+     * @param enabled Enable the endpoint
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     /**
@@ -45,12 +57,10 @@ public class EndpointDefaultConfiguration implements Toggleable {
         return sensitive;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
+    /**
+     * @param sensitive Define the endpoint as sensitive
+     */
     public void setSensitive(boolean sensitive) {
         this.sensitive = sensitive;
     }
 }
-

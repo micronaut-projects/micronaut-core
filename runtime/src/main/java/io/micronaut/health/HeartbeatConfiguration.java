@@ -17,13 +17,11 @@ package io.micronaut.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.util.Toggleable;
 
 import java.time.Duration;
 
 /**
- * Configuration fo
+ * Configuration for heart beat
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,6 +39,9 @@ public class HeartbeatConfiguration implements Toggleable {
         return interval;
     }
 
+    /**
+     * @param interval The interval to publish {@link HeartbeatEvent} instances
+     */
     public void setInterval(Duration interval) {
         this.interval = interval;
     }
@@ -53,6 +54,9 @@ public class HeartbeatConfiguration implements Toggleable {
         return enabled;
     }
 
+    /**
+     * @param enabled Enable the publish of {@link HeartbeatEvent} event instances
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }

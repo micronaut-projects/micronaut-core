@@ -1,75 +1,27 @@
-import org.anarres.gradle.plugin.jarjar.JarjarTask
-
-// this is a hack because of how we replace jarjar'ed JAR need to manually supply dependencies to POM
-// Declare all dependencies in this map and not with the dependencies block!
-def deps = [
-        compile: [
-            project(":inject")
-        ]
-]
-
-ext.extraPomInfo = {
-    delegate.dependencies {
-        for(entry in deps) {
-            def scope = entry.key
-            def values = entry.value
-            for(dep in values) {
-                delegate.dependency {
-                    def groupId
-                    def artifactId
-                    def artifactVersion
-
-                    if(dep instanceof Project) {
-                        groupId = projectGroupId
-                        artifactId = dep.name
-                        artifactVersion = version
-                    }
-                    else {
-
-                        groupId = dep.group
-                        artifactId = dep.name
-                        artifactVersion = dep.version
-                    }
-
-                    delegate.groupId groupId
-                    delegate.artifactId artifactId
-                    delegate.version artifactVersion
-                    delegate.scope scope
-                }
-            }
-        }
-    }
-}
+apply plugin: 'com.github.johnrengelman.plugin-shadow'
 
 dependencies {
-    for(entry in deps) {
-        def scope = entry.key
-        for(dep in entry.value) {
-            "$scope"(dep)
-        }
+    shadowCompile project(":inject")
+    compile project(":inject")
+}
+
+shadowJar {
+    dependencies {
+        exclude(project(":inject"))
+        exclude(project(":core"))
+        exclude(dependency(group:'org.slf4j',name:'slf4j-api',version:slf4jVersion))
+        exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
+        exclude(dependency('org.ow2.asm:.*:.*'))
+        exclude(dependency('org.reactivestreams:.*:.*'))
+        exclude(dependency('com.google.code.findbugs:.*:.*'))
+        exclude(dependency('com.github.ben-manes.caffeine:.*:.*'))
     }
+
+    relocate "org.objectweb.asm", "io.micronaut.asm"
+    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+
 }
 
-
-
-def targetDir = new File(project.buildDir, "jarjar")
-def targetFile = new File(targetDir, "asm.jar")
-def jarjarTask = task("jarjarTask", type: JarjarTask) {
-    from(jar.outputs.files)
-    classRename "org.objectweb.asm.**", "io.micronaut.asm.@1"
-    destinationDir = targetDir
-    destinationName = targetFile.name
-}
-
-def jarjarOutputs = task("jarjarOutputs").doLast {
-    copy {
-        from zipTree(jarjarTask.outputs.files.first())
-        into(targetDir)
-    }
-    delete(jarjarTask.outputs.files)
-}
-jarjarOutputs.dependsOn(jarjarTask)
-task("rejar", type:Jar, dependsOn: jarjarOutputs) {
-    from(targetDir)
-    archiveName = "rejar.jar"
+tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
+    t.enabled = false
 }

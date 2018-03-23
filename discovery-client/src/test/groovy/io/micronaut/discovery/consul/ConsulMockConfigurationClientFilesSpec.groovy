@@ -50,7 +50,7 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'consul.client.config.enabled': true,
+                    (ConfigurationClient.ENABLED): true,
                     'micronaut.application.name'  : 'test-app',
                     'consul.client.config.format' : 'file',
                     'consul.client.host'          : 'localhost',
@@ -98,7 +98,7 @@ not:
 
         ApplicationContext applicationContext = ApplicationContext.run(
                 [
-                        'consul.client.config.enabled': true,
+                        (ConfigurationClient.ENABLED): true,
                         'consul.client.config.path':'/some-path/config',
                         'consul.client.config.format': 'file',
                         'micronaut.application.name':'test-app',

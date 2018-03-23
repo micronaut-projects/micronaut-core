@@ -19,41 +19,20 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.discovery.DiscoveryConfiguration;
+import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
 import io.micronaut.discovery.eureka.client.v2.LeaseInfo;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.discovery.DiscoveryConfiguration;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.ServiceInstanceIdGenerator;
-import io.micronaut.discovery.client.DiscoveryClientConfiguration;
-import io.micronaut.discovery.eureka.client.v2.*;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
-import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Configuration options for the Eureka client
@@ -65,8 +44,19 @@ import java.util.stream.Collectors;
 @RequiresEureka
 public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
+    /**
+     * The prefix to use for all Eureka client settings
+     */
     public static final String PREFIX = "eureka.client";
+
+    /**
+     * The configuration name for Eureka host
+     */
     public static final String HOST = PREFIX + ".host";
+
+    /**
+     * The configuration name for Eureka port
+     */
     public static final String PORT = PREFIX + ".port";
 
     private EurekaDiscoveryConfiguration discovery = new EurekaDiscoveryConfiguration();
@@ -89,6 +79,15 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     }
 
     /**
+     * @param discovery The discovery configuration
+     */
+    public void setDiscovery(EurekaDiscoveryConfiguration discovery) {
+        if(discovery != null) {
+            this.discovery = discovery;
+        }
+    }
+
+    /**
      * @return The default registration configuration
      */
     @Override
@@ -96,32 +95,43 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         return registration;
     }
 
-    public void setDiscovery(EurekaDiscoveryConfiguration discovery) {
-        if(discovery != null) {
-            this.discovery = discovery;
-        }
-    }
-
+    /**
+     * @return Whether should log Amazon Metadata errors
+     */
     public boolean shouldLogAmazonMetadataErrors() {
         return true;
     }
 
+    /**
+     * @return The Service ID
+     */
     @Override
     protected String getServiceID() {
         return EurekaClient.SERVICE_ID;
     }
 
-
+    /**
+     * Configuration properties for Eureka client discovery
+     */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class EurekaDiscoveryConfiguration extends DiscoveryConfiguration {
     }
 
+    /**
+     * Configuration properties for Eureka client registration
+     */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
     public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
 
+        /**
+         * Prefix for Eureka registration client
+         */
         public static final String PREFIX = EurekaConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
+        /**
+         * Configuration name property for Eureka IP address
+         */
         public static final String IP_ADDRESS =
                 EurekaConfiguration.PREFIX + '.' +
                 RegistrationConfiguration.PREFIX + '.' +
@@ -178,7 +188,5 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
             instanceInfo.setLeaseInfo(leaseInfo);
             return instanceInfo;
         }
-
     }
-
 }
