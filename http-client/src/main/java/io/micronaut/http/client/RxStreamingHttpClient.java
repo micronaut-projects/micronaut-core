@@ -51,7 +51,7 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
     }
 
     /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within particle use
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
      * {@link javax.inject.Inject} to inject a client instead
      *
      * @param url The base URL
