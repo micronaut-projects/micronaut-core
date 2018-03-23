@@ -28,6 +28,7 @@ import java.util.Collections;
  * @since 1.0
  */
 public interface BootstrapPropertySourceLocator {
+
     /**
      * An empty version that does nothing
      */

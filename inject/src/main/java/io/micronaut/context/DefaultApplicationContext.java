@@ -162,6 +162,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+        Environment environment = getEnvironment();
+        if(environment instanceof RuntimeConfiguredEnvironment) {
+            RuntimeConfiguredEnvironment rce = (RuntimeConfiguredEnvironment) environment;
+            if(!rce.isRuntimeConfigured()) {
+                initializeTypeConverters(this);
+            }
+        }
+
         super.initializeContext(contextScopeBeans, processedBeans);
     }
 
@@ -384,26 +392,26 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
-            initializeTypeConverters();
         }
-        private void initializeTypeConverters() {
-            Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
-            for (TypeConverter typeConverter : typeConverters) {
-                Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
-                if (genericTypes.length == 2) {
-                    Class source = genericTypes[0];
-                    Class target = genericTypes[1];
-                    if (source != null && target != null) {
-                        if (!(source == Object.class && target == Object.class)) {
-                            getConversionService().addConverter(source, target, typeConverter);
-                        }
+
+    }
+    void initializeTypeConverters(BeanContext beanContext) {
+        Collection<TypeConverter> typeConverters = beanContext.getBeansOfType(TypeConverter.class);
+        for (TypeConverter typeConverter : typeConverters) {
+            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
+            if (genericTypes.length == 2) {
+                Class source = genericTypes[0];
+                Class target = genericTypes[1];
+                if (source != null && target != null) {
+                    if (!(source == Object.class && target == Object.class)) {
+                        getConversionService().addConverter(source, target, typeConverter);
                     }
                 }
             }
-            Collection<TypeConverterRegistrar> registrars = getBeansOfType(TypeConverterRegistrar.class);
-            for (TypeConverterRegistrar registrar : registrars) {
-                registrar.register(conversionService);
-            }
+        }
+        Collection<TypeConverterRegistrar> registrars = beanContext.getBeansOfType(TypeConverterRegistrar.class);
+        for (TypeConverterRegistrar registrar : registrars) {
+            registrar.register(conversionService);
         }
     }
 
@@ -414,6 +422,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         RuntimeConfiguredEnvironment(String... environmentNames) {
             super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+        }
+
+        boolean isRuntimeConfigured() {
+            return bootstrapPropertySourceLocator != BootstrapPropertySourceLocator.EMPTY_LOCATOR;
         }
 
         @Override
@@ -447,6 +459,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 BootstrapApplicationContext bootstrapContext = new BootstrapApplicationContext(bootstrapEnvironment, environmentNames);
                 bootstrapContext.start();
                 if(bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
+                    initializeTypeConverters(bootstrapContext);
                     bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
                 }
                 else {

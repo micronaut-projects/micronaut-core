@@ -6,6 +6,7 @@ import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.consul.config.ConsulConfigurationClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -30,7 +31,7 @@ class ConsulMockConfigurationClientYamlSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'consul.client.config.enabled': true,
+                    (ConfigurationClient.ENABLED): true,
                     'consul.client.config.format': 'yaml',
                     'consul.client.host'         : 'localhost',
                     'consul.client.port'         : serverPort]

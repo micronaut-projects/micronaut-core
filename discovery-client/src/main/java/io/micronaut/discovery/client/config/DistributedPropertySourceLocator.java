@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.client.config;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.Environment;
@@ -43,6 +44,7 @@ import java.util.concurrent.TimeoutException;
  * @since 1.0
  */
 @Singleton
+@Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
 public class DistributedPropertySourceLocator implements BootstrapPropertySourceLocator {
     private static final Logger LOG = LoggerFactory.getLogger(DistributedPropertySourceLocator.class);
     private final ConfigurationClient configurationClient;
@@ -51,7 +53,7 @@ public class DistributedPropertySourceLocator implements BootstrapPropertySource
 
     public DistributedPropertySourceLocator(
             ConfigurationClient configurationClient,
-            @Value("${micronaut.config.readTimeout:10s}")
+            @Value("${"+ConfigurationClient.READ_TIMEOUT+":10s}")
             Duration readTimeout
     ) {
         this.configurationClient = configurationClient;
@@ -70,8 +72,8 @@ public class DistributedPropertySourceLocator implements BootstrapPropertySource
                     readTimeout.toMillis(),
                     TimeUnit.MILLISECONDS
             ).toList().blockingGet();
-            if(LOG.isDebugEnabled()) {
-                LOG.debug("Resolved {} configuration sources from client: {}", propertySources.size(), configurationClient);
+            if(LOG.isInfoEnabled()) {
+                LOG.info("Resolved {} configuration sources from client: {}", propertySources.size(), configurationClient);
             }
             return propertySources;
         } catch (RuntimeException e) {

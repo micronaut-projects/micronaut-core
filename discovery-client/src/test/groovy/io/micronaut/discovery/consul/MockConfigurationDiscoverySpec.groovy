@@ -4,6 +4,7 @@ import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
@@ -48,10 +49,10 @@ class MockConfigurationDiscoverySpec extends Specification {
 
         ApplicationContext applicationContext = ApplicationContext.run(
                 [
-                        'consul.client.config.enabled': true,
-                        'micronaut.application.name':'test-app',
-                        'consul.client.host': 'localhost',
-                        'consul.client.port': serverPort]
+                        (ConfigurationClient.ENABLED): true,
+                        'micronaut.application.name' :'test-app',
+                        'consul.client.host'         : 'localhost',
+                        'consul.client.port'         : serverPort]
         )
 
         when:"A configuration value is read"
