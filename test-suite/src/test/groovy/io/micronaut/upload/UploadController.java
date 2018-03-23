@@ -59,6 +59,11 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public String receiveBytes(byte[] data, String title) {
+        return title + ": " + data.length;
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public Publisher<HttpResponse> receiveFileUpload(FileUpload data, String title) {
         return Flowable.fromPublisher(data.transferTo(title + ".json"))
                        .map(success -> success ? HttpResponse.ok( "Uploaded" ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
