@@ -21,18 +21,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Part;
-import io.micronaut.http.multipart.FileUpload;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -59,9 +53,14 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receiveFileUpload(FileUpload data, String title) {
+    public Publisher<HttpResponse> receiveFileUpload(StreamingFileUpload data, String title) {
         return Flowable.fromPublisher(data.transferTo(title + ".json"))
                        .map(success -> success ? HttpResponse.ok( "Uploaded" ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public String receiveCompletedFileUpload(CompletedFileUpload data) {
+        return data.getFilename();
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
