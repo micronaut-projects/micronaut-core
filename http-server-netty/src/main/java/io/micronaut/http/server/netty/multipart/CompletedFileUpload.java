@@ -27,6 +27,10 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
+ * <p>Represents a completed {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
+ *
+ * <p>The <tt>CompletedFileUpload</tt> is not received until complete, and gives access to metadata within the upload as well as the contents of the uploaded file.</p>
+ *
  * @author Zachary Klein
  * @since 1.0
  */
