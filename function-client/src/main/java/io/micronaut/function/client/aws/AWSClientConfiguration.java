@@ -18,10 +18,10 @@ package io.micronaut.function.client.aws;
 import com.amazonaws.ClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
+ * Configuration options for AWS client
+ *
  * @author graemerocher
  * @since 1.0
  */

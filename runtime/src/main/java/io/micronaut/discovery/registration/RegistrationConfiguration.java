@@ -16,7 +16,6 @@
 package io.micronaut.discovery.registration;
 
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.core.util.Toggleable;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -30,20 +29,17 @@ import java.util.Optional;
  */
 public abstract class RegistrationConfiguration implements Toggleable {
 
+    /**
+     * The prefix to use for all client discovery registration settings
+     */
     public static final String PREFIX = "registration";
 
     private String healthPath;
-
     private int retryCount = -1;
-
     private Duration timeout;
-
     private Duration retryDelay = Duration.of(1, ChronoUnit.SECONDS);
-
     private boolean failFast = true;
-
     private boolean enabled = true;
-
     private boolean deregister = true;
 
     /**
@@ -54,6 +50,13 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * @param timeout The timeout for registration
+     */
+    public void setTimeout(Duration timeout) {
+        this.timeout = timeout;
+    }
+
+    /**
      * @return Whether to fail server startup if registration fails
      */
     public boolean isFailFast() {
@@ -61,10 +64,24 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * @param failFast Whether to fail server startup if registration fails
+     */
+    public void setFailFast(boolean failFast) {
+        this.failFast = failFast;
+    }
+
+    /**
      * @return Whether to deregister the service on shutdown
      */
     public boolean isDeregister() {
         return deregister;
+    }
+
+    /**
+     * @param deregister Whether to deregister the service on shutdown
+     */
+    public void setDeregister(boolean deregister) {
+        this.deregister = deregister;
     }
 
     /**
@@ -76,10 +93,24 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * @param enabled Whether service registration is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
      * @return The number of times to retry registration
      */
     public int getRetryCount() {
         return retryCount;
+    }
+
+    /**
+     * @param retryCount The retry count
+     */
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
     }
 
     /**
@@ -90,37 +121,23 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * @param retryDelay The retry delay
+     */
+    public void setRetryDelay(Duration retryDelay) {
+        this.retryDelay = retryDelay;
+    }
+
+    /**
      * @return The path to the health endpoint
      */
     public Optional<String> getHealthPath() {
         return Optional.ofNullable(healthPath);
     }
 
+    /**
+     * @param healthPath The health endpoint path
+     */
     public void setHealthPath(String healthPath) {
         this.healthPath = healthPath;
-    }
-
-    public void setTimeout(Duration timeout) {
-        this.timeout = timeout;
-    }
-
-    public void setRetryDelay(Duration retryDelay) {
-        this.retryDelay = retryDelay;
-    }
-
-    public void setRetryCount(int retryCount) {
-        this.retryCount = retryCount;
-    }
-
-    public void setFailFast(boolean failFast) {
-        this.failFast = failFast;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public void setDeregister(boolean deregister) {
-        this.deregister = deregister;
     }
 }

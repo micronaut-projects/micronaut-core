@@ -17,8 +17,6 @@ package io.micronaut.configurations.ribbon;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 
 import javax.inject.Singleton;
@@ -34,10 +32,7 @@ import javax.inject.Singleton;
 @ConfigurationProperties(DefaultRibbonClientConfig.PREFIX)
 public class DefaultRibbonClientConfig extends AbstractRibbonClientConfig {
 
-
     public DefaultRibbonClientConfig(Environment environment) {
         super(environment);
     }
-
-
 }

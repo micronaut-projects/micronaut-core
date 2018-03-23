@@ -15,7 +15,10 @@
  */
 package io.micronaut.function.client.aws;
 
-import com.amazonaws.auth.*;
+import com.amazonaws.auth.AWSCredentialsProviderChain;
+import com.amazonaws.auth.EC2ContainerCredentialsProviderWrapper;
+import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
+import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.handlers.RequestHandler2;
@@ -26,20 +29,22 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.env.Environment;
-import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
+ * Configuration options for AWS Lambda
+ *
  * @author graemerocher
  * @since 1.0
  */
 @ConfigurationProperties(AWSLambdaConfiguration.PREFIX)
 public class AWSLambdaConfiguration {
+
+    /**
+     * Prefix for AWS Lambda settings
+     */
     public static final String PREFIX = AWSConfiguration.PREFIX + ".lambda";
 
     private final AWSClientConfiguration clientConfiguration;
@@ -49,7 +54,6 @@ public class AWSLambdaConfiguration {
 
     public AWSLambdaConfiguration(AWSClientConfiguration clientConfiguration, Environment environment) {
         this.clientConfiguration = clientConfiguration;
-
 
         this.builder.setCredentials(new AWSCredentialsProviderChain(
                 new EnvironmentAWSCredentialsProvider(environment),
@@ -69,20 +73,29 @@ public class AWSLambdaConfiguration {
         return builder;
     }
 
+    /**
+     * @param metricsCollector The {@link RequestMetricCollector}
+     */
     @Inject
-    public void setMetricsCollector( @Nullable RequestMetricCollector metricsCollector) {
+    public void setMetricsCollector(@Nullable RequestMetricCollector metricsCollector) {
         if(metricsCollector != null) {
             builder.setMetricsCollector(metricsCollector);
         }
     }
 
+    /**
+     * @param endpointConfiguration The {@link AwsClientBuilder.EndpointConfiguration}
+     */
     @Inject
-    public void setEndpointConfiguration( @Nullable AwsClientBuilder.EndpointConfiguration endpointConfiguration) {
+    public void setEndpointConfiguration(@Nullable AwsClientBuilder.EndpointConfiguration endpointConfiguration) {
         if(endpointConfiguration != null) {
             builder.setEndpointConfiguration(endpointConfiguration);
         }
     }
 
+    /**
+     * @param handlers The {@link RequestHandler2}
+     */
     @Inject
     public void setRequestHandlers(@Nullable RequestHandler2...handlers) {
         if(ArrayUtils.isNotEmpty(handlers)) {

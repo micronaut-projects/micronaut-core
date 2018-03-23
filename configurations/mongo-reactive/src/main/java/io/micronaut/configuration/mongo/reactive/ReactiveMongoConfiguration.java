@@ -77,22 +77,33 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
         return clientSettings;
     }
 
-
+    /**
+     * @return The {@link ServerSettings#builder()}
+     */
     @Override
     public ServerSettings.Builder getServerSettings() {
         return serverSettings;
     }
 
+    /**
+     * @return The {@link ConnectionPoolSettings#builder()}
+     */
     @Override
     public ConnectionPoolSettings.Builder getPoolSettings() {
         return poolSettings;
     }
 
+    /**
+     * @return The {@link SocketSettings#builder()}
+     */
     @Override
     public SocketSettings.Builder getSocketSettings() {
         return socketSettings;
     }
 
+    /**
+     * @return The {@link SslSettings#builder()}
+     */
     @Override
     public SslSettings.Builder getSslSettings() {
         return sslSettings;
