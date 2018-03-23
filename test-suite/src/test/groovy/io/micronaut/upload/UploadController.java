@@ -27,6 +27,13 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Part;
+import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -50,6 +57,11 @@ public class UploadController {
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public String receivePlain(String data, String title) {
         return title + ": " + data;
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public String receiveBytes(byte[] data, String title) {
+        return title + ": " + data.length;
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)

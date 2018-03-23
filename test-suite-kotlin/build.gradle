@@ -5,7 +5,6 @@ plugins {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
-    compile project(':aop')
     compile project(':http-server-netty:')
     compile project(':runtime')
 

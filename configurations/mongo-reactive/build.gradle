@@ -1,4 +1,7 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 dependencies {
+    compile project(":aop")
     compile project(":runtime")
     compile project(":validation")
     compileOnly project(":inject-java")
@@ -13,3 +16,5 @@ dependencies {
     testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
     testCompile "org.mongodb:mongo-java-driver:$mongoVersion"
 }
+//compileJava.options.forkOptions.jvmArgs =['-verbose']
+//compileJava.options.fork=true

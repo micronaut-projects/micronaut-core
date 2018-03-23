@@ -15,7 +15,6 @@
  */
 package io.micronaut.configuration.lettuce.session;
 
-import io.lettuce.core.RedisURI;
 import io.micronaut.configuration.lettuce.RedisSetting;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.serialize.JdkSerializer;
@@ -23,13 +22,6 @@ import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
-import io.micronaut.session.http.HttpSessionConfiguration;
-import io.micronaut.configuration.lettuce.RedisSetting;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.serialize.JdkSerializer;
-import io.micronaut.core.serialize.ObjectSerializer;
-import io.micronaut.core.util.Toggleable;
-import io.micronaut.session.Session;
 import io.micronaut.session.http.HttpSessionConfiguration;
 
 import java.nio.charset.Charset;
@@ -64,6 +56,13 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
+     * @param serverName The server name
+     */
+    void setServerName(String serverName) {
+        this.serverName = serverName;
+    }
+
+    /**
      * @return The topic to use to publish the creation of new sessions
      */
     public String getSessionCreatedTopic() {
@@ -71,11 +70,24 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     *
+     * @param sessionCreatedTopic The topic to publish the creation of new sessions
+     */
+    void setSessionCreatedTopic(String sessionCreatedTopic) {
+        this.sessionCreatedTopic = sessionCreatedTopic;
+    }
+
+    /**
      * @return The key of the sorted set used to maintain a set of active sessions
      */
     public String getActiveSessionsKey() {
         return activeSessionsKey;
+    }
+
+    /**
+     * @param activeSessionsKey The key used to maintain a set of active sessions
+     */
+    void setActiveSessionsKey(String activeSessionsKey) {
+        this.activeSessionsKey = activeSessionsKey;
     }
 
     /**
@@ -86,10 +98,24 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
+     * @param namespace The key prefix to use for reading and writing sessions
+     */
+    void setNamespace(String namespace) {
+        this.namespace = namespace;
+    }
+
+    /**
      * @return The {@link ObjectSerializer} type to use for serializing values. Defaults to {@link JdkSerializer}
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
+    }
+
+    /**
+     * @param valueSerializer The {@link ObjectSerializer} type to use for serializing values
+     */
+    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
+        this.valueSerializer = valueSerializer;
     }
 
     /**
@@ -107,10 +133,24 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
+     * @param enableKeyspaceEvents Whether keyspace events should be enabled programmatically
+     */
+    void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
+        this.enableKeyspaceEvents = enableKeyspaceEvents;
+    }
+
+    /**
      * @return The {@link WriteMode} to use. Defaults to {@link WriteMode#BATCH}
      */
     public WriteMode getWriteMode() {
         return writeMode;
+    }
+
+    /**
+     * @param writeMode The {@link WriteMode}
+     */
+    void setWriteMode(WriteMode writeMode) {
+        this.writeMode = writeMode;
     }
 
     /**
@@ -120,37 +160,13 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
         return expiredSessionCheck;
     }
 
+    /**
+     * @param expiredSessionCheck The duration with which to check for expired sessions
+     */
     void setExpiredSessionCheck(Duration expiredSessionCheck) {
         this.expiredSessionCheck = expiredSessionCheck;
     }
 
-    void setWriteMode(WriteMode writeMode) {
-        this.writeMode = writeMode;
-    }
-
-    void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
-        this.enableKeyspaceEvents = enableKeyspaceEvents;
-    }
-
-    void setNamespace(String namespace) {
-        this.namespace = namespace;
-    }
-
-    void setServerName(String serverName) {
-        this.serverName = serverName;
-    }
-
-    void setSessionCreatedTopic(String sessionCreatedTopic) {
-        this.sessionCreatedTopic = sessionCreatedTopic;
-    }
-
-    void setActiveSessionsKey(String activeSessionsKey) {
-        this.activeSessionsKey = activeSessionsKey;
-    }
-
-    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
-        this.valueSerializer = valueSerializer;
-    }
     /**
      * The write mode for saving the session data
      */

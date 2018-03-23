@@ -17,8 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.inject.Inject;
@@ -32,6 +30,9 @@ import javax.inject.Inject;
 @ConfigurationProperties(DefaultHttpClientConfiguration.PREFIX)
 @Primary
 public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
+    /**
+     * Prefix for HTTP Client settings
+     */
     public static final String PREFIX = "micronaut.http.client";
 
     public DefaultHttpClientConfiguration() {

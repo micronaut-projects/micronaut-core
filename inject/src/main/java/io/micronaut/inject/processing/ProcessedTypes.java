@@ -13,26 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configurations.ribbon;
-
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.env.Environment;
-
-import javax.inject.Singleton;
+package io.micronaut.inject.processing;
 
 /**
- * The default configuration for Ribbon that delegates to the {@link Environment} to resolve properties
+ * Constants for processed type names
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Singleton
-@Primary
-@ConfigurationProperties(DefaultRibbonClientConfig.PREFIX)
-public class DefaultRibbonClientConfig extends AbstractRibbonClientConfig {
-
-    public DefaultRibbonClientConfig(Environment environment) {
-        super(environment);
-    }
+public interface ProcessedTypes {
+    String POST_CONSTRUCT = "javax.annotation.PostConstruct";
+    String PRE_DESTROY = "javax.annotation.PreDestroy";
 }

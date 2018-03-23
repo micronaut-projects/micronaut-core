@@ -17,8 +17,6 @@ package io.micronaut.http.ssl;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.util.Toggleable;
 
 import java.util.Optional;
 
@@ -42,7 +40,9 @@ public class SslConfiguration implements Toggleable {
     protected Optional<String[]> protocols = Optional.empty();
     protected Optional<String> protocol = Optional.of("TLS");
 
-
+    /**
+     * Configuration properties for SSL key
+     */
     @ConfigurationProperties("key")
     public static class KeyConfiguration {
         protected Optional<String> password = Optional.empty();
@@ -63,6 +63,9 @@ public class SslConfiguration implements Toggleable {
         }
     }
 
+    /**
+     * Configuration properties for SSL key store
+     */
     @ConfigurationProperties("keyStore")
     public static class KeyStoreConfiguration {
         protected Optional<String> path = Optional.empty();
@@ -99,6 +102,9 @@ public class SslConfiguration implements Toggleable {
         }
     }
 
+    /**
+     * Configuration properties for SSL trust store
+     */
     @ConfigurationProperties("trustStore")
     public static class TrustStoreConfiguration {
         protected Optional<String> path = Optional.empty();

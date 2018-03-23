@@ -104,7 +104,117 @@ class UploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.body().string() == 'bar: some data'
+    }
 
+    void "test file upload with wrong argument name for file"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("datax", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def body = response.body().string()
+        def json = new JsonSlurper().parseText(body)
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+        json.message == "Required argument [String data] not specified"
+    }
+
+    void "test file upload with wrong argument name for simple part"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .addFormDataPart("titlex", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def body = response.body().string()
+        def json = new JsonSlurper().parseText(body)
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+        json.message == "Required argument [String title] not specified"
+    }
+
+    void "test file upload with missing argument for simple part"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def body = response.body().string()
+        def json = new JsonSlurper().parseText(body)
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+        json.message == "Required argument [String title] not specified"
+    }
+
+    void "test file upload with missing argument for file part"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def body = response.body().string()
+        def json = new JsonSlurper().parseText(body)
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+        json.message == "Required argument [String data] not specified"
+    }
+
+    void "test file upload to byte array"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveBytes")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == 'bar: 9'
     }
 
     void "test simple in-memory file upload exceeds size"() {

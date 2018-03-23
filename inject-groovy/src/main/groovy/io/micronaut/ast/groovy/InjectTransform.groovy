@@ -31,6 +31,7 @@ import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
+import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -49,8 +50,6 @@ import org.codehaus.groovy.control.io.StringReaderSource
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
-import javax.annotation.PostConstruct
-import javax.annotation.PreDestroy
 import javax.inject.*
 import java.lang.reflect.Modifier
 
@@ -513,7 +512,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
-            } else if (methodAnnotationMetadata.hasStereotype(Inject, PostConstruct, PreDestroy)) {
+            } else if (methodAnnotationMetadata.hasStereotype(Inject.name, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
                 defineBeanDefinition(concreteClass)
 
                 if (!isConstructor) {
@@ -555,7 +554,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                        if (methodAnnotationMetadata.hasStereotype(PostConstruct.name)) {
+                        if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
                             getBeanWriter().visitPostConstructMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
@@ -564,7 +563,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
-                        } else if (methodAnnotationMetadata.hasStereotype(PreDestroy.name)) {
+                        } else if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
                             getBeanWriter().visitPreDestroyMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,

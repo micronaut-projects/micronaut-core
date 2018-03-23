@@ -38,13 +38,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 public abstract class AbstractRibbonClientConfig implements IClientConfig {
-    public static final String PREFIX = "ribbon";
 
+    /**
+     * The prefix to use for all Ribbon settings
+     */
+    public static final String PREFIX = "ribbon";
 
     private final Environment environment;
     private Map<IClientConfigKey, Object> customSettings = new ConcurrentHashMap<>();
     private VipAddressResolver resolver = null;
-
 
     public AbstractRibbonClientConfig(Environment environment) {
         this.environment = environment;
@@ -61,26 +63,41 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         }
     }
 
+    /**
+     * @see IClientConfig#getClientName()
+     */
     @Override
     public String getClientName() {
         return "default";
     }
 
+    /**
+     * @see IClientConfig#getNameSpace()
+     */
     @Override
     public String getNameSpace() {
         return PREFIX;
     }
 
+    /**
+     * @see IClientConfig#loadProperties(String)
+     */
     @Override
     public void loadProperties(String clientName) {
         // no-op, unnecessary
     }
 
+    /**
+     * @see IClientConfig#loadDefaultValues()
+     */
     @Override
     public void loadDefaultValues() {
         // no-op, unnecessary
     }
 
+    /**
+     * @see IClientConfig#getProperties()
+     */
     @Override
     public Map<String, Object> getProperties() {
         Map map = environment.getProperty(getNameSpace(), Argument.of(Map.class, String.class, Object.class)).orElse(Collections.EMPTY_MAP);
@@ -91,64 +108,84 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         return all;
     }
 
+    /**
+     * @see IClientConfig#setProperty(IClientConfigKey, Object)
+     */
     @Override
     public void setProperty(IClientConfigKey key, Object value) {
         set(key, value);
     }
 
+    /**
+     * @see IClientConfig#getProperty(IClientConfigKey)
+     */
     @Override
     public Object getProperty(IClientConfigKey key) {
         return get(key, null);
     }
 
+    /**
+     * @see IClientConfig#getProperty(IClientConfigKey, Object)
+     */
     @SuppressWarnings("unchecked")
     @Override
     public Object getProperty(IClientConfigKey key, Object defaultVal) {
         return get(key, defaultVal);
     }
 
+    /**
+     * @see IClientConfig#containsProperty(IClientConfigKey)
+     */
     @SuppressWarnings("unchecked")
     @Override
     public boolean containsProperty(IClientConfigKey key) {
         return key != null && (customSettings.containsKey(key) || environment.get(qualifyKey(key), key.type()).isPresent());
     }
 
+    /**
+     * @see IClientConfig#getPropertyAsInteger(IClientConfigKey, int)
+     */
     @Override
     public int getPropertyAsInteger(IClientConfigKey key, int defaultValue) {
         return get(key, Integer.class, defaultValue);
     }
 
+    /**
+     * @see IClientConfig#getPropertyAsString(IClientConfigKey, String)
+     */
     @Override
     public String getPropertyAsString(IClientConfigKey key, String defaultValue) {
         return get(key, String.class, defaultValue);
     }
 
+    /**
+     * @see IClientConfig#getPropertyAsBoolean(IClientConfigKey, boolean)
+     */
     @Override
     public boolean getPropertyAsBoolean(IClientConfigKey key, boolean defaultValue) {
         return get(key, Boolean.class, defaultValue);
     }
 
+    /**
+     * @see IClientConfig#get(IClientConfigKey)
+     */
     @Override
     public <T> T get(IClientConfigKey<T> key) {
         return get(key, null);
     }
 
+    /**
+     * @see IClientConfig#get(IClientConfigKey, Object)
+     */
     @Override
     public <T> T get(IClientConfigKey<T> key, T defaultValue) {
         Class<T> type = key.type();
         return get(key, type, defaultValue);
     }
 
-    protected <T> T get(IClientConfigKey<T> key, Class<T> type, T defaultValue) {
-        if(key == null) return null;
-        if(customSettings.containsKey(key)) {
-            return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
-        }
-        else {
-            return environment.getProperty(qualifyKey(key), type, defaultValue);
-        }
-    }
-
+    /**
+     * @see IClientConfig#set(IClientConfigKey, Object)
+     */
     @Override
     public <T> IClientConfig set(IClientConfigKey<T> key, T value) {
         if(key != null) {
@@ -162,6 +199,9 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         return this;
     }
 
+    /**
+     * @see IClientConfig#resolveDeploymentContextbasedVipAddresses()
+     */
     @Override
     public String resolveDeploymentContextbasedVipAddresses() {
         String deploymentContextBasedVipAddressesMacro = (String) getProperty(CommonClientConfigKey.DeploymentContextBasedVipAddresses);
@@ -169,6 +209,20 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
             return null;
         }
         return getVipAddressResolver().resolve(deploymentContextBasedVipAddressesMacro, this);
+    }
+
+    protected <T> T get(IClientConfigKey<T> key, Class<T> type, T defaultValue) {
+        if(key == null) return null;
+        if(customSettings.containsKey(key)) {
+            return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
+        }
+        else {
+            return environment.getProperty(qualifyKey(key), type, defaultValue);
+        }
+    }
+
+    protected String qualifyKey(IClientConfigKey key) {
+        return getNameSpace() + "." + key.key();
     }
 
     private VipAddressResolver getVipAddressResolver() {
@@ -181,9 +235,4 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         }
         return resolver;
     }
-
-    protected String qualifyKey(IClientConfigKey key) {
-        return getNameSpace() + "." + key.key();
-    }
-
 }

@@ -16,8 +16,8 @@
 package io.micronaut.aop.writer;
 
 import io.micronaut.aop.*;
-import io.micronaut.aop.internal.InterceptorChain;
-import io.micronaut.aop.internal.MethodInterceptorChain;
+import io.micronaut.aop.chain.InterceptorChain;
+import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;

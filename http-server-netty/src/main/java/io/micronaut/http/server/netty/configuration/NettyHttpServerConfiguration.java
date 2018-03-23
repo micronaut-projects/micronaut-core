@@ -1,28 +1,26 @@
 /*
  * Copyright 2017 original authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelOption;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelOption;
 
 import javax.inject.Inject;
 import java.util.Collections;
@@ -43,7 +41,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected Map<ChannelOption, Object> options = Collections.emptyMap();
     protected Worker worker;
     protected Parent parent;
-
 
     public NettyHttpServerConfiguration() {
     }
@@ -83,10 +80,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         return parent;
     }
 
+    /**
+     * Configuration for Netty worker
+     */
     @ConfigurationProperties("worker")
-    public static class Worker extends EventLoopConfig{
+    public static class Worker extends EventLoopConfig {
     }
 
+    /**
+     * Configuration for Netty parent
+     */
     @ConfigurationProperties("parent")
     public static class Parent extends EventLoopConfig {
     }
@@ -107,7 +110,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @return The I/O ratio to use
          */
         public OptionalInt getIoRatio() {
-            if(ioRatio != null) {
+            if (ioRatio != null) {
                 return OptionalInt.of(ioRatio);
             }
             return OptionalInt.empty();
@@ -117,7 +120,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @return The name of the configured executor to use
          */
         public Optional<String> getExecutorName() {
-            if(executor != null) {
+            if (executor != null) {
                 return Optional.of(executor);
             }
             return Optional.empty();
