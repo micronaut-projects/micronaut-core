@@ -61,6 +61,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    protected static Type getTypeReferenceForName(String className, String... genericTypes) {
+        String referenceString = getTypeDescriptor(className, genericTypes);
+        return Type.getType(referenceString);
+    }
+
     protected static Type getTypeReference(Object type) {
         if(type instanceof Class) {
             return Type.getType((Class)type);
