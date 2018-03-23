@@ -21,12 +21,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.multipart.FileUpload;
-import io.micronaut.http.annotation.Post;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;
@@ -43,7 +39,7 @@ public class UploadController {
 
     // tag::upload[]
     @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public Single<HttpResponse<String>> upload(FileUpload file, Optional<String> anotherAttribute) { // <2>
+    public Single<HttpResponse<String>> upload(StreamingFileUpload file, Optional<String> anotherAttribute) { // <2>
         Publisher<Boolean> uploadPublisher = file.transferTo(file.getFilename()); // <3>
         return Single.fromPublisher(uploadPublisher)  // <4>
                     .map(success -> {
