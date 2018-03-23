@@ -13,7 +13,11 @@ dependencies {
     compile(group:"com.fasterxml.jackson.core", name:"jackson-databind", version:jacksonVersion)
     compile(group:"io.reactivex.rxjava2", name:"rxjava", version:rxJava2Version)
 
-    shadow([
+    shadowRuntime([
+            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jdk8", version:jacksonVersion],
+            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jsr310", version:jacksonVersion]
+    ])
+    runtime([
             [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jdk8", version:jacksonVersion],
             [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jsr310", version:jacksonVersion]
     ])
@@ -33,7 +37,7 @@ dependencies {
 
 shadowJar {
     dependencies {
-        for(dep in project.configurations.shadowCompile.dependencies) {
+        for(dep in project.configurations.shadowCompile.dependencies + project.configurations.shadowRuntime.dependencies) {
             if(dep instanceof ProjectDependency) {
                 exclude(project(":$dep.name"))
             }
