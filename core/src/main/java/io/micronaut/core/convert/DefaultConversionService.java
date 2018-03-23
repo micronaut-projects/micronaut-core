@@ -7,6 +7,7 @@ import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -655,6 +656,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 newMap.put(key, value);
             }
             return Optional.of(newMap);
+        });
+
+        addConverter(Map.class, ConvertibleValues.class, (object, targetType, context) -> {
+            return Optional.of(new ConvertibleValuesMap<Object>(object));
         });
 
     }
