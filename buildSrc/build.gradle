@@ -5,4 +5,5 @@ repositories {
 }
 dependencies {
     compile 'org.asciidoctor:asciidoctorj:1.5.6'
+    compile "com.github.jengelman.gradle.plugins:shadow:2.0.2"
 }

@@ -4,13 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.DeserializerFactory;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Type;
@@ -19,7 +14,9 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.TimeZone;
 
 /**
  * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}
@@ -34,7 +31,8 @@ public class ObjectMapperFactory {
     public static final String MICRONAUT_MODULE = "micronaut";
 
     @Inject
-    protected Module[] jacksonModules = new Module[0];
+    // have to be fully qualified due to JDK Module type
+    protected com.fasterxml.jackson.databind.Module[] jacksonModules = new com.fasterxml.jackson.databind.Module[0];
 
     @Inject
     protected JsonSerializer[] serializers = new JsonSerializer[0];

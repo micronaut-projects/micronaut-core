@@ -2,7 +2,6 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
     compile project(":inject")
-    compile project(":aop")
     compile "javax.validation:validation-api:$validationVersion"
     compileOnly "org.grails:grails-datastore-core:$gormVersion"
 
