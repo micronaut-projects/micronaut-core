@@ -245,5 +245,27 @@ class UploadSpec extends AbstractMicronautSpec {
         json.message.contains("exceeds the maximum content length [1024]")
     }
 
+    void "test upload CompletedFileUpload object"() {
+        given:
+        def data = '{"title":"Test"}'
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("title", "bar")
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+                .build()
 
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveCompletedFileUpload")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def result = response.body().string()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == 'data.json'
+    }
 }
