@@ -58,7 +58,7 @@ public class IssuesControllerTest {
     // tag::test[]
     @Test
     public void testIssue() throws Exception {
-        String body = client.toBlocking().retrieve("/issues/show/12"); // <2>
+        String body = client.toBlocking().retrieve("/issues/12"); // <2>
         assertNotNull(body);
         assertEquals( // <3>
                 body,
