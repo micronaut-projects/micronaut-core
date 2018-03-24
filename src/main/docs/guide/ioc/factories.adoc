@@ -1,4 +1,4 @@
-In many cases, you may want to make available as a bean a class that is not part of your codebase. In this case, you cannot annotate the already compiled class. Instead, you should implement a link:{api}/io/micronaut/context/annotation/Factory.html[Factory].
+In many cases, you may want to make available as a bean a class that is not part of your codebase such as those provided by third-party libraries. In this case, you cannot annotate the already compiled class. Instead, you should implement a link:{api}/io/micronaut/context/annotation/Factory.html[Factory].
 
 A factory is a class annotated with the link:{api}/io/micronaut/context/annotation/Factory.html[Factory] annotation that provides 1 or more methods annotated with the link:{api}/io/micronaut/context/annotation/Bean.html[Bean] annotation.
 
