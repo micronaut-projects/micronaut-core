@@ -25,6 +25,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
+import java.io.File;
 import java.util.Optional;
 // end::imports[]
 
@@ -62,7 +63,7 @@ public class UploadController {
     // end::upload[]
 
     // tag::completedUpload[]
-    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/completed", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
     public HttpResponse<String> uploadCompleted(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
 
         try {
