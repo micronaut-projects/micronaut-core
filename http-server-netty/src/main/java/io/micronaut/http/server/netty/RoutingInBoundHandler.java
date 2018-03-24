@@ -31,6 +31,7 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
@@ -53,39 +54,11 @@ import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.micronaut.context.BeanLocator;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StreamUtils;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.*;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
-import io.micronaut.http.server.netty.async.DefaultCloseHandler;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.NettyPart;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.*;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -480,7 +453,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (data instanceof FileUpload) {
                                     Argument<?> argument = requiredInput.get();
                                     FileUpload fileUpload = (FileUpload) data;
-                                    if (io.micronaut.http.multipart.FileUpload.class.isAssignableFrom(argument.getType())) {
+                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
                                         currentPart = createPart(fileUpload);
                                         input = currentPart;
                                     }
