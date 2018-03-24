@@ -63,7 +63,7 @@ public class UploadController {
 
     // tag::completedUpload[]
     @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public HttpResponse<String> uploadBlocking(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
+    public HttpResponse<String> uploadCompleted(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
 
         try {
             Path path = Paths.get(file.getFilename()); //<3>
