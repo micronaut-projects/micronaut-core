@@ -1,4 +1,4 @@
-Handling of file uploads has special treatment in Micronaut. Support is provided for both streaming of data through non-blocking file uploads, as well as blocking uploads which resolve when the file upload is completed.
+Handling of file uploads has special treatment in Micronaut. Support is provided for both streaming of data through non-blocking file uploads, either as streaming uploads or completed uploads.
 
 == Streaming File Uploads
 
@@ -23,7 +23,7 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 
 == Completed File Uploads
 
-To receive files in a blocking manner, so that the route is resolved only after the entire file is available, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
+To receive complete file uploads, so that the route is resolved only after the entire file is available, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
 
 [source,java]
 ----
