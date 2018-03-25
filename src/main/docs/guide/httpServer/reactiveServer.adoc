@@ -1,5 +1,15 @@
-As mentioned previously, Micronaut is built on Netty and therefore from an I/O perspective it is designed to be used in a non-blocking manner.
+As mentioned previously, Micronaut is built on Netty which is designed around an Event loop model and non-blocking I/O.
 
-Most the of the examples you have seen so far return simple string responses that do not block and do not parse the request body (an operation that requires I/O).
+Although it is recommended to following a non-blocking approach, in particular when making remote calls to other microservices, Micronaut acknowledges the fact that in real world scenarios developers encounter situations where the need arises to interface with blocking APIs and in order to facilitate this features blocking operation detection.
 
-The following sections will discuss how to parse the request body in a non-blocking manner and how to return a response that does not block.
+If you controller method returns a non-blocking type such as an RxJava `Observable` or a `CompletableFuture` then Micronaut will use the Event loop thread to subscribe to the result.
+
+If however you return any other type then Micronaut will execute your `@Controller` method is a pre-configured I/O thread pool.
+
+This thread pool by default is a caching, unbound thread pool. However, you may wish to configure the nature of the thread pool. For example the following configuration will configure the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread per connection model):
+
+[source,yaml]
+----
+micronaut.server.executors.io.type=fixed
+micronaut.server.executors.io.nThreads=75
+----
