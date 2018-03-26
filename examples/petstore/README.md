@@ -30,8 +30,6 @@ See the diagram below:
                      micronaut
      |      |      |            |           |       |
     vendors offers comments     functions  emails  pets
-          
-![Petstore Architecture](jpg-file-icon.png?raw=true "petstore architecture")
 
 ## Micronaut Installation
 
