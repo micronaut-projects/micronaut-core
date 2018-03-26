@@ -21,16 +21,7 @@ can subsequently communicate with each other through `consul` using `HTTP`.
 
 See the diagram below:
 
-                    frontend
-                        |
-                    storefront
-                    |        |
-                    api     consul
-                        |
-                     micronaut
-     |      |      |            |           |       |
-    vendors offers comments     functions  emails  pets
-
+![Petstore Architecture](petstore.png?raw=true "petstore architecture")
 ## Micronaut Installation
 
 In the case you want Micronaut installed locally, go the Micronaut root folder and use gradle to install the Micronaut framework 
@@ -46,7 +37,7 @@ Using docker can help get the application up and running quite quickly.
 
 > _Note that if using a windows version of docker (specifically pre Windows 10 Pro) that `localhost` will be referred to 
 as `192.168.99.100`.  Anywhere in the petstore configuration when `localhost` is referenced, 
-typically in `application.properties`, this must be changed. `docker-machine ip` will give you the correct host._ 
+typically in `application.*` or index.js files, this must be changed. `docker-machine ip` will give you the correct host._ 
 
 ## Running Consul and Databases
 
@@ -91,11 +82,15 @@ The application is easily built and run in a docker container with the command b
 debug with breakpoints etc (a really handy way to learn Micronaut).
 
 ```
-./gradlew build
+./gradlew build -x test
 docker-compose build
-docker-compose up -d
+docker-compose up
 ```
+
+Wait till all the applications register with consul. 
 
 ## Open Petstore
 
 Access the app at [http://localhost:3000/](http://localhost:3000/).
+
+> Note on windows possibly reference the ip for `localhost`
