@@ -32,7 +32,7 @@ public interface FileUpload {
      * Gets the content of this part as an <tt>InputStream</tt>
      *
      * @return The content of this part as an <tt>InputStream</tt>
-     * @throws IOException If an error occurs in retrieving the contet
+     * @throws IOException If an error occurs in retrieving the content
      * as an <tt>InputStream</tt>
      */
     InputStream getInputStream() throws IOException;

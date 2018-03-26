@@ -32,6 +32,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -65,7 +66,11 @@ public class UploadController {
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public String receiveCompletedFileUpload(CompletedFileUpload data) {
-        return data.getFilename();
+        try {
+            return data.getFilename() + ": " + data.getBytes().length;
+        } catch (IOException e) {
+            return e.getMessage();
+        }
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)

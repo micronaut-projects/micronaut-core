@@ -266,6 +266,6 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-        result == 'data.json'
+        result == 'data.json: 16'
     }
 }
