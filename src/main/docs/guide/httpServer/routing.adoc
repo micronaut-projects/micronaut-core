@@ -47,7 +47,7 @@ include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
 <2> The link:{api}/io/micronaut/web/router/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
 <3> The value of the URI variable is referenced in the implementation
 
-Micronaut will map the URI `/issues/issue/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
+Micronaut will map the URI `/issues/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
 
 .Testing URI Variables
 [source,java]
@@ -62,7 +62,7 @@ include::{testsuite}/server/routes/IssuesControllerTest.java[tags=test, indent=4
 ----
 
 <1> For JUnit you can write methods to start and stop the server for the scope of the test
-<2> The tests sends a request to the URI `/issues/show/12`
+<2> The tests sends a request to the URI `/issues/12`
 <3> And then asserts the response is "Issue # 12"
 
 If you invoke the previous endpoint without the required URI variable or with an invalid type, Micronaut responds with the appropriate HTTP failure codes as illustrated in the next Spock test.
@@ -72,6 +72,40 @@ If you invoke the previous endpoint without the required URI variable or with an
 ----
 include::{testsuite}/server/routes/IssuesControllerSpec.groovy[indent=0]
 ----
+
+Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}`.
+
+The following table provides some examples of URI templates and what they match:
+
+.URI Template Matching
+|===
+|Template |Description|Matching URI
+
+|`/books/{id}`
+| Simple match
+| `/books/1`
+
+|`/books/{id:2}`
+| A variable of 2 characters max
+| `/books/10`
+
+|`/books{/id}`
+| An optional URI variable
+| `/books/10` or `/books`
+
+| `/book{/id:[a-zA-Z]+}`
+| An optional URI variable with regex
+| `/books/foo`
+
+| `/books{?max,offset}`
+| Optional query parameters
+| `/books?max=10&offset=10`
+
+| `/books{/path:.*}{.ext}`
+| Regex path match with extension
+| `/books/foo/bar.xml`
+
+|===
 
 === Routing Annotations
 
