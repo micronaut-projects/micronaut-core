@@ -64,3 +64,23 @@ With a `build.gradle` file similar to the above, you can now run your Micronaut 
 
 [source,bash]
 ~ ./gradlew run
+
+You can now use Kotlin in your Micronaut project:
+
+[source, kotlin]
+.src/main/kotlin/example/HelloController.kt
+----
+package example
+
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+@Controller("/")
+class HelloController {
+
+    @Get("/hello/{name}")
+    fun hello(name: String): String {
+        return "Hello $name"
+    }
+}
+----
