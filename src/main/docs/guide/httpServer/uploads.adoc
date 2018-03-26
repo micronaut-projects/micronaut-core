@@ -1,8 +1,8 @@
-Handling of file uploads has special treatment in Micronaut. Support is provided for both streaming of data through non-blocking file uploads, either as streaming uploads or completed uploads.
+Handling of file uploads has special treatment in Micronaut. Support is provided for streaming of uploads in a non-blocking manner through streaming uploads or completed uploads.
 
 == Streaming File Uploads
 
-To receive a file as a non-blocking file transfer, you can use the api:http.multipart.StreamingFileUpload[] interface:
+To receive a file as soon as the first chunk is available, you can use the api:http.multipart.StreamingFileUpload[] interface:
 
 .Using the Streaming File Upload Interface
 [source,java]
@@ -23,7 +23,7 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 
 == Completed File Uploads
 
-To receive complete file uploads, so that the route is resolved only after the entire file is available, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
+To delay route execution until the entire file has been read from the request, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
 
 [source,java]
 ----
@@ -39,3 +39,5 @@ include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, i
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
 <3> The `CompletedFileUpload` instance gives access to metadata about the upload (such as `filename` and `size`), as well as access to the file's contents as an `InputStream` or byte array.
+
+In addition to the api:http.server.netty.multipart.CompletedFileUpload[] class, it is possible to have a route argument of a `byte[]` to receive just the bytes of the file, or `String` to convert the contents of the file to a `String`.

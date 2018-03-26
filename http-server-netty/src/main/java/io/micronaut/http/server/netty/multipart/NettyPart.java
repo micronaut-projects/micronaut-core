@@ -66,7 +66,7 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf());
+        return new ByteBufInputStream(fileUpload.getByteBuf(), true);
     }
 
     @Override
@@ -284,10 +284,18 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
 
     }
 
-    @Override
+/*    @Override
     protected void doOnComplete() {
         if (!isComplete()) {
             super.doOnComplete();
+        }
+    }*/
+
+    @Override
+    protected void doAfterOnSubscribe(Subscription subscription) {
+        Optional<Subscriber<? super StreamingFileUpload>> currentSubscriber = currentSubscriber();
+        if (currentSubscriber.isPresent() && fileUpload.isCompleted()) {
+            currentSubscriber.get().onNext(this);
         }
     }
 

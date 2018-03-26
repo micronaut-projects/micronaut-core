@@ -16,20 +16,22 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
-import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * <p>Represents a completed {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
+ * Represents a completed part of a multipart request.
  *
- * <p>The <tt>CompletedFileUpload</tt> is not received until complete, and gives access to metadata within the upload as well as the contents of the uploaded file.</p>
+ * When used as an argument to an {@link io.micronaut.http.annotation.Controller} instance method, the route
+ * is not executed until the part has been fully received. Provides access to metadata about the file as
+ * well as the contents.
  *
  * @author Zachary Klein
  * @since 1.0
@@ -38,23 +40,34 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
 
     private final FileUpload fileUpload;
 
-    public CompletedFileUpload(io.netty.handler.codec.http.multipart.FileUpload fileUpload) {
+    public CompletedFileUpload(FileUpload fileUpload) {
         this.fileUpload = fileUpload;
+        fileUpload.retain();
     }
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream((fileUpload.getByteBuf()));
+        return new ByteBufInputStream(fileUpload.getByteBuf(), true);
     }
 
     @Override
     public byte[] getBytes() throws IOException {
-        return fileUpload.getByteBuf().array();
+        ByteBuf byteBuf = fileUpload.getByteBuf();
+        try {
+            return ByteBufUtil.getBytes(byteBuf);
+        } finally {
+            byteBuf.release();
+        }
     }
 
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
-        return fileUpload.getByteBuf().nioBuffer();
+        ByteBuf byteBuf = fileUpload.getByteBuf();
+        try {
+            return byteBuf.nioBuffer();
+        } finally {
+            byteBuf.release();
+        }
     }
 
     @Override

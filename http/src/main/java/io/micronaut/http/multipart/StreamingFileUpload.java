@@ -33,7 +33,7 @@ import java.io.File;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface StreamingFileUpload  extends FileUpload, Publisher<StreamingFileUpload> {
+public interface StreamingFileUpload extends FileUpload, Publisher<StreamingFileUpload> {
 
     /**
      * <p>A convenience method to write this uploaded item to disk.</p>
@@ -43,8 +43,6 @@ public interface StreamingFileUpload  extends FileUpload, Publisher<StreamingFil
      * @param location the name of the file to which the stream will be
      * written. The file is created relative to the location as
      * specified in the <tt>MultipartConfiguration</tt>
-     *
-     *
      *
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
@@ -58,7 +56,6 @@ public interface StreamingFileUpload  extends FileUpload, Publisher<StreamingFil
      * @param destination the destination of the file to which the stream will be
      * written.
      *
-     *
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     Publisher<Boolean> transferTo(File destination);
@@ -66,6 +63,8 @@ public interface StreamingFileUpload  extends FileUpload, Publisher<StreamingFil
     /**
      * Deletes the underlying storage for a file item, including deleting any
      * associated temporary disk file.
+     *
+     * @return A {@link Publisher} that outputs whether the delete was successful
      */
     Publisher<Boolean> delete();
 
