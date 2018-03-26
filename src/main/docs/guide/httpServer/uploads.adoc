@@ -21,6 +21,8 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 <3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method is used to transfer the file to the server. The method returns a rs:Publisher[]
 <4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
+WARNING: Note that the `getBytes` and `getByteBuffer` methods of api:http.multipart.StreamingFileUpload[] can only be called *once* per request.
+
 == Completed File Uploads
 
 To delay route execution until the entire file has been read from the request, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
@@ -40,4 +42,23 @@ include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, i
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
 <3> The `CompletedFileUpload` instance gives access to metadata about the upload (such as `filename` and `size`), as well as access to the file's contents as an `InputStream` or byte array.
 
+WARNING: Note that the `getBytes` and `getByteBuffer` methods of api:http.server.netty.multipart.CompletedFileUpload[] can only be called *once* per request.
+
+== Byte & String Uploads
+
 In addition to the api:http.server.netty.multipart.CompletedFileUpload[] class, it is possible to have a route argument of a `byte[]` to receive just the bytes of the file, or `String` to convert the contents of the file to a `String`.
+
+[source,java]
+----
+include::{testsuite}/server/upload/UploadController.java[tags=completedImports, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=bytesUpload, indent=4]
+
+}
+----
+
+<1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
+<2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
+<3> Note that you do not have access to metadata (such as file name) about the upload in this approach.

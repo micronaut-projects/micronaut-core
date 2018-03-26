@@ -50,6 +50,17 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
         return new ByteBufInputStream(fileUpload.getByteBuf(), true);
     }
 
+
+    /**
+     * Gets the content of this part as a <tt>byte[]</tt>
+     *
+     * <p>Because the contents of the file are released after being retrieved,
+     * this method can only be called <strong>once per request</strong></p>
+     *
+     * @return The content of this part as a <tt>byte[]</tt>
+     * @throws IOException If an error occurs in retrieving the content
+     * as a <tt>byte[]</tt>
+     */
     @Override
     public byte[] getBytes() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
@@ -60,6 +71,16 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
         }
     }
 
+    /**
+     * Gets the content of this part as a <tt>ByteBuffer</tt>
+     *
+     * <p>Because the contents of the file are released after being retrieved,
+     * this method can only be called <strong>once per request</strong></p>
+     *
+     * @return The content of this part as a <tt>ByteBuffer</tt>
+     * @throws IOException If an error occurs in retrieving the content
+     * as a <tt>ByteBuffer</tt>
+     */
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
