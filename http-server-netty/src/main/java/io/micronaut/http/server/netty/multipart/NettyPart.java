@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
-import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBuf;
@@ -24,17 +24,8 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.util.ReferenceCountUtil;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
-import io.micronaut.core.async.publisher.SingleSubscriberPublisher;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.async.subscriber.Emitter;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.multipart.FileUpload;
-import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.server.HttpServerConfiguration;
-import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -47,18 +38,15 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * An implementation of the {@link FileUpload} interface for Netty
+ * An implementation of the {@link StreamingFileUpload} interface for Netty
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.http.multipart.FileUpload, FileUpload> implements FileUpload, ByteBufHolder {
+public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.http.multipart.FileUpload, StreamingFileUpload> implements StreamingFileUpload, ByteBufHolder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyPart.class);
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
     private final ExecutorService ioExecutor;
@@ -78,7 +66,7 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf());
+        return new ByteBufInputStream(fileUpload.getByteBuf(), true);
     }
 
     @Override
@@ -154,10 +142,10 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
             return new AsyncSingleResultPublisher<>(ioExecutor, transferOperation);
         } else {
             fileUpload.retain();
-            return new SingleSubscriberProcessor<FileUpload, Boolean>() {
+            return new SingleSubscriberProcessor<StreamingFileUpload, Boolean>() {
 
                 @Override
-                protected void doOnNext(FileUpload message) {
+                protected void doOnNext(StreamingFileUpload message) {
                     if (message.isComplete()) {
                         ioExecutor.submit(() -> {
                                     Subscriber<? super Boolean> subscriber = getSubscriber();
@@ -284,9 +272,9 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
     @Override
     protected void doOnNext(io.netty.handler.codec.http.multipart.FileUpload message) {
         this.fileUpload = message;
-        Optional<Subscriber<? super FileUpload>> currentSubscriber = currentSubscriber();
+        Optional<Subscriber<? super StreamingFileUpload>> currentSubscriber = currentSubscriber();
         if (currentSubscriber.isPresent()) {
-            Subscriber<? super FileUpload> subscriber = currentSubscriber.get();
+            Subscriber<? super StreamingFileUpload> subscriber = currentSubscriber.get();
             if (message.isCompleted()) {
                 subscriber.onNext(this);
             } else {
@@ -296,15 +284,23 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
 
     }
 
-    @Override
+/*    @Override
     protected void doOnComplete() {
         if (!isComplete()) {
             super.doOnComplete();
         }
+    }*/
+
+    @Override
+    protected void doAfterOnSubscribe(Subscription subscription) {
+        Optional<Subscriber<? super StreamingFileUpload>> currentSubscriber = currentSubscriber();
+        if (currentSubscriber.isPresent() && fileUpload.isCompleted()) {
+            currentSubscriber.get().onNext(this);
+        }
     }
 
     @Override
-    protected void doSubscribe(Subscriber<? super FileUpload> subscriber) {
+    protected void doSubscribe(Subscriber<? super StreamingFileUpload> subscriber) {
         subscriber.onSubscribe(dataSubscription);
     }
 }

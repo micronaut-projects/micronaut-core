@@ -33,7 +33,7 @@ import javax.inject.Singleton;
 @Singleton
 public class IssuesController {
 
-    @Get("/show/{number}") // <2>
+    @Get("/{number}") // <2>
     String issue(Integer number) {
         return "Issue # " + number + "!"; // <3>
     }

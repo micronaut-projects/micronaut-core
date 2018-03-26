@@ -25,3 +25,4 @@ The way this is achieved is through a series of Java annotation processors, that
 
 The purpose of the annotation processors is to provide a similar programming model to Spring and Grails, but by pre-compiling all the information necessary to perform DI, define AOP proxies and configure your application to run in a microservices environment.
 
+Many of the APIs within Micronaut are heavily inspired by Spring and Grails. This is by design, and aids in bringing developers up to speed quickly.

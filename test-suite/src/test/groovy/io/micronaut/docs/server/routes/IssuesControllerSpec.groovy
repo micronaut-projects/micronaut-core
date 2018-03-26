@@ -3,9 +3,6 @@ package io.micronaut.docs.server.routes
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -22,7 +19,7 @@ class IssuesControllerSpec extends Specification{
 
     void "/issues/show/{number} with an invalid Integer number responds 400"() {
         when:
-        client.toBlocking().exchange("/issues/show/hello")
+        client.toBlocking().exchange("/issues/hello")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -31,7 +28,7 @@ class IssuesControllerSpec extends Specification{
 
     void "/issues/show/{number} without number responds 404"() {
         when:
-        client.toBlocking().exchange("/issues/show/")
+        client.toBlocking().exchange("/issues/")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
