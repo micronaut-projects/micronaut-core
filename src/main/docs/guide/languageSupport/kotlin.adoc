@@ -1,0 +1,66 @@
+Support for Kotlin in Micronaut is built upon the https://kotlinlang.org/docs/reference/kapt.htm[Kapt] compiler plugin, which includes support for Java annotation processors. To use Kotlin in your Micronaut application, you will simply need to add the proper dependencies to configure and run Kapt on your `kt` source files. Kapt will create Java "stub" classes for each of your Kotlin classes, which can then by processed by Java's annotation process. The stubs are not included in the final compiled application.
+
+TIP: Learn more about Kapt and its features from the https://kotlinlang.org/docs/reference/kapt.htm[official documentation.]
+
+If you are using Gradle, you can use the https://docs.gradle.org/current/userguide/application_plugin.html[Application] plugin to integrate the Kapt compilation step in your build:
+
+
+[source,groovy]
+.Example build.gradle
+----
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+    }
+}
+
+apply plugin: "kotlin" //<1>
+apply plugin: 'kotlin-kapt'
+
+apply plugin: "application"
+mainClassName = "example.Application" //<2>
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<3>
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
+    kapt "io.micronaut:inject-java:$projectVersion" //<4>
+
+    //Optional: use the following dependencies to support
+    //testing using Spek: http://spekframework.org/
+    kaptTest "io.micronaut:inject-java:$projectVersion"
+    testCompile "org.jetbrains.spek:spek-api:$spekVersion"
+    testRuntime "org.jetbrains.spek:spek-junit-platform-engine:$spekVersion"
+    testCompile "org.junit.jupiter:junit-jupiter-api:$junitVersion"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+----
+<1> Apply the Kotlin and Kapt plugins
+<2> Set a `mainClassName` (required by the Application plugin)
+<3> Add the Kotlin standard libraries
+<4> Place the Micronaut `inject-java` dependency under the `kapt` scope, which is provided by the Kapt plugin
+
+With a `build.gradle` file similar to the above, you can now run your Micronaut application using the `run` task (provided by the Application plugin):
+
+[source,bash]
+~ ./gradlew run
