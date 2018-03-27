@@ -77,4 +77,20 @@ public class UploadController {
     }
     // end::completedUpload[]
 
+    // tag::bytesUpload[]
+    @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    public HttpResponse<String> uploadBytes(byte[] file, String fileName) { // <2>
+
+        try {
+            Path path = Paths.get(fileName);
+            Files.write(path, file); // <3>
+
+            return HttpResponse.ok("Uploaded");
+        } catch (IOException exception) {
+            return HttpResponse.badRequest("Upload Failed");
+        }
+    }
+    // end::bytesUpload[]
+
+
 }
