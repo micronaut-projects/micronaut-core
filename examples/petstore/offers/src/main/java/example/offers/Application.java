@@ -18,14 +18,10 @@ package example.offers;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.runtime.Micronaut;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
-import io.micronaut.scheduling.Schedulers;
 import io.micronaut.scheduling.TaskScheduler;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.time.Duration;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author graemerocher
