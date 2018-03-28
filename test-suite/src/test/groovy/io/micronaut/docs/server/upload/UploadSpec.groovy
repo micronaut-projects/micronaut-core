@@ -58,4 +58,43 @@ class UploadSpec extends Specification {
         response.code() == HttpStatus.OK.code
         response.body().string() == "Uploaded" // <2>
     }
+
+    void "test completed file upload"() {
+        given:
+        OkHttpClient client = new OkHttpClient()
+        RequestBody body = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "file.json",
+                RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"}')
+        )
+                .build()
+
+        Request.Builder request = new Request.Builder()
+                .url(new URL(embeddedServer.getURL(), "/upload/completed"))
+                .post(body)
+        Response response = client.newCall(request.build()).execute()
+
+        expect:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == "Uploaded"
+    }
+
+    void "test file bytes upload"() {
+        given:
+        OkHttpClient client = new OkHttpClient()
+        RequestBody body = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "file.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .addFormDataPart("fileName", "bar")
+                .build()
+
+        Request.Builder request = new Request.Builder()
+                .url(new URL(embeddedServer.getURL(), "/upload/bytes"))
+                .post(body)// <2>
+        Response response = client.newCall(request.build()).execute()
+
+        expect:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == "Uploaded"
+    }
 }

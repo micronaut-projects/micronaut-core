@@ -18,6 +18,8 @@ package io.micronaut.management.endpoint;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 
+import java.util.Optional;
+
 /**
  * The default {@link Endpoint} configuration
  *
@@ -25,42 +27,28 @@ import io.micronaut.core.util.Toggleable;
  * @since 1.0
  */
 @ConfigurationProperties(EndpointDefaultConfiguration.PREFIX)
-public class EndpointDefaultConfiguration implements Toggleable {
+public class EndpointDefaultConfiguration {
 
     /**
      * The prefix for endpoints settings
      */
     public static final String PREFIX = "endpoints.all";
 
-    private boolean enabled = true;
-    private boolean sensitive;
+    private Optional<Boolean> enabled = Optional.empty();
+    private Optional<Boolean> sensitive = Optional.empty();
 
     /**
      * @return Whether the endpoint is enabled
      */
-    @Override
-    public boolean isEnabled() {
+    public Optional<Boolean> isEnabled() {
         return enabled;
-    }
-
-    /**
-     * @param enabled Enable the endpoint
-     */
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     /**
      * @return Does the endpoint expose sensitive information
      */
-    public boolean isSensitive() {
+    public Optional<Boolean> isSensitive() {
         return sensitive;
     }
 
-    /**
-     * @param sensitive Define the endpoint as sensitive
-     */
-    public void setSensitive(boolean sensitive) {
-        this.sensitive = sensitive;
-    }
 }
