@@ -13,21 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.function.client.aws;
+package io.micronaut.discovery.aws.route53.condition;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
+import io.micronaut.discovery.consul.ConsulConfiguration;
+
+import java.lang.annotation.*;
 
 /**
- * Configuration options for AWS
+ * Meta annotation for Consul requirements
  *
  * @author graemerocher
  * @since 1.0
  */
-@ConfigurationProperties(AWSConfiguration.PREFIX)
-public class AWSConfiguration {
-
-    /**
-     * Prefix for all AWS settings
-     */
-    public static final String PREFIX = "aws";
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.PACKAGE, ElementType.TYPE})
+@Requires(property = Route53DiscoveryConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
+public @interface RequiresRoute53 {
 }
