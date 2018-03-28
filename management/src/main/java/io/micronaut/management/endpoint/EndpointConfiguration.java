@@ -28,13 +28,13 @@ import java.util.Optional;
  * @since 1.0
  */
 @EachProperty(EndpointConfiguration.PREFIX)
-public class EndpointConfiguration implements Toggleable {
+public class EndpointConfiguration {
 
     public static final String PREFIX = "endpoints";
 
     private final String id;
-    private Optional<Boolean> enabled = Optional.empty();
-    private Optional<Boolean> sensitive = Optional.empty();
+    protected Optional<Boolean> enabled = Optional.empty();
+    protected Optional<Boolean> sensitive = Optional.empty();
 
     private EndpointDefaultConfiguration defaultConfiguration;
 
@@ -51,23 +51,23 @@ public class EndpointConfiguration implements Toggleable {
         return id;
     }
 
-    @Override
-    public boolean isEnabled() {
-        return enabled.orElseGet(()->defaultConfiguration.isEnabled());
+    /**
+     * @return Is the endpoint enabled. If not present, use the value of {@link Endpoint#defaultEnabled()}
+     */
+    public Optional<Boolean> isEnabled() {
+        if (enabled.isPresent()) {
+            return enabled;
+        }
+        return defaultConfiguration.isEnabled();
     }
 
     /**
-     * @return Does the endpoint expose sensitive information
+     * @return Does the endpoint expose sensitive information. If not present, use the value of {@link Endpoint#defaultSensitive()}
      */
-    public boolean isSensitive() {
-        return sensitive.orElseGet(()->defaultConfiguration.isSensitive());
-    }
-
-    public void setEnabled(Boolean enabled) {
-        this.enabled = Optional.ofNullable(enabled);
-    }
-
-    public void setSensitive(Boolean sensitive) {
-        this.sensitive = Optional.ofNullable(sensitive);
+    public Optional<Boolean> isSensitive() {
+        if (sensitive.isPresent()) {
+            return sensitive;
+        }
+        return defaultConfiguration.isSensitive();
     }
 }
