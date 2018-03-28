@@ -57,20 +57,18 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.multipart.*;
+import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.util.CharsetUtil;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
@@ -516,6 +514,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                     ).build();
 
                             nettyRequest = nettyRequestBuilder.getNettyRequest();
+                            HttpPostRequestEncoder postRequestEncoder  = nettyRequestBuilder.getPostRequestEncoder();
                             prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
                             if(LOG.isDebugEnabled()) {
                                 LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
@@ -526,7 +525,17 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             }
 
                             addFullHttpResponseHandler(request, channel, completableFuture, bodyType);
-                            writeAndCloseRequest(channel, nettyRequest);
+
+                            channel.write(nettyRequest);
+                            if (postRequestEncoder != null) {
+                                if (postRequestEncoder.isChunked()) {
+                                    channel.write(postRequestEncoder);
+                                }
+                                postRequestEncoder.cleanFiles();
+                            }
+                            channel.flush();
+                            closeChannelAsync(channel);
+
                         } catch (Exception e) {
                             completableFuture.completeExceptionally(e);
                         }
@@ -908,6 +917,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         return postRequestEncoder.finalizeRequest();
     }
 
+    private io.netty.handler.codec.http.HttpRequest buildMultipartRequest(HttpPostRequestEncoder postRequestEncoder, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        Object requestBody = bodyValue;
+        postRequestEncoder.addBodyFileUpload("data", (File) requestBody, MediaType.TEXT_PLAIN, false);
+        return postRequestEncoder.finalizeRequest();
+    }
+
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
         traceHeaders(headers);
@@ -1136,6 +1151,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                     Object bodyValue = body.get();
                     postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
                     nettyRequest = buildFormDataRequest(postRequestEncoder, bodyValue);
+                } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
+                    Object bodyValue = body.get();
+                    postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), true);
+                    nettyRequest = buildMultipartRequest(postRequestEncoder, bodyValue);
                 } else {
                     ByteBuf bodyContent = null;
                     if (hasBody) {
