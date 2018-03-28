@@ -20,6 +20,7 @@ import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -27,6 +28,7 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
+@Ignore
 class TtlHeartbeatSpec extends Specification {
 
 

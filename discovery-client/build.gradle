@@ -4,6 +4,17 @@ dependencies {
 
     compile project(":http-client")
     compile project(":validation")
+    compile project(":configurations:aws-common")
+    // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
+    compile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-core
+    compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/jmespath-java
+    compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-servicediscovery
+    compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+
+
 
     testRuntime project(":configurations:hibernate-validator")
     testCompile project(":management")
