@@ -20,13 +20,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Value
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.Client
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
@@ -43,11 +38,13 @@ class ClientScopeSpec extends Specification {
         given:
         // a mock consul server
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer,[(MockConsulServer.ENABLED):true])
+        waitFor(consulServer)
 
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
                 'consul.client.port': consulServer.port,
                 'micronaut.application.name': 'messageService'
         ])
+        waitForService(consulServer, 'messageService')
 
         MessageService messageClient = ApplicationContext.run(MessageService, [
                 'consul.client.port': consulServer.port
@@ -56,13 +53,9 @@ class ClientScopeSpec extends Specification {
         expect:
         messageClient.getMessage() == "Server ${messageServer.port}"
 
-
-
         cleanup:
         messageServer?.stop()
         consulServer?.stop()
-
-
     }
 
     @IgnoreIf({ !System.getenv('CONSUL_PORT') })
@@ -115,5 +108,26 @@ class ClientScopeSpec extends Specification {
         }
     }
 
+    void waitFor(EmbeddedServer embeddedServer) {
+        int attempts = 0
+        while (!embeddedServer.isRunning()) {
+            Thread.sleep(500)
+            attempts++
+            if (attempts > 5) {
+                break
+            }
+        }
+    }
 
+    void waitForService(EmbeddedServer consulServer, String serviceName) {
+        MockConsulServer consul = consulServer.applicationContext.getBean(MockConsulServer)
+        int attempts = 0
+        while (!Flowable.fromPublisher(consul.getServices()).blockingFirst().containsKey(serviceName)) {
+            Thread.sleep(500)
+            attempts++
+            if (attempts > 5) {
+                break
+            }
+        }
+    }
 }
