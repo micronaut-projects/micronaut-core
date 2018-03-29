@@ -1,0 +1,2 @@
+io.micronaut.cli.boot.GrailsApplicationCompilerAutoConfiguration
+io.micronaut.cli.boot.GrailsTestCompilerAutoConfiguration
