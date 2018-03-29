@@ -16,6 +16,16 @@ import javax.annotation.Nullable;
 @ConfigurationProperties("aws.route53.discovery")
 public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
 
+    String awsServiceId;
+
+    public String getAwsServiceId() {
+        return awsServiceId;
+    }
+
+    public void setAwsServiceId(String awsServiceId) {
+        this.awsServiceId = awsServiceId;
+    }
+
     @Override
     public boolean isEnabled() {
         return super.isEnabled();
@@ -25,5 +35,7 @@ public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
     }
+
+
 
 }
