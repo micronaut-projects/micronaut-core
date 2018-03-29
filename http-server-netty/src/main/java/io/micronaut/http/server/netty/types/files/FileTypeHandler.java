@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
@@ -103,7 +104,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     }
 
     protected MediaType getMediaType(String filename) {
-        String extension = getExtension(filename);
+        String extension = NameUtils.extension(filename);
         Optional<MediaType> mediaType = MediaType.forExtension(extension);
         return mediaType.orElse(MediaType.TEXT_PLAIN_TYPE);
 
@@ -133,20 +134,6 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         NettyHttpResponse response = (NettyHttpResponse)HttpResponse.notModified();
         setDateHeader(response);
         return response.getNativeResponse();
-    }
-
-    private String getExtension(String filename) {
-        int extensionPos = filename.lastIndexOf('.');
-        int lastUnixPos = filename.lastIndexOf('/');
-        int lastWindowsPos = filename.lastIndexOf('\\');
-        int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
-
-        int index = lastSeparator > extensionPos ? -1 : extensionPos;
-        if (index == -1) {
-            return "";
-        } else {
-            return filename.substring(index + 1);
-        }
     }
 
 }
