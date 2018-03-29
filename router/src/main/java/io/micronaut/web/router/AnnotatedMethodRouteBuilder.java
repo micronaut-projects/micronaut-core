@@ -25,16 +25,6 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.annotation.Error;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -44,7 +34,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Responsible for building {@link Route} instances for the annotations found in the {@link io.micronaut.web.router.annotation} package
+ * Responsible for building {@link Route} instances for the annotations found in the {@link io.micronaut.http.annotation} package
  *
  * @author Graeme Rocher
  * @since 1.0
