@@ -39,22 +39,29 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class Route53AutoNamingClientSpec extends Specification {
 
+
+
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ["aws.route53.registration.namespace":"vanderfox.net",
                //     "aws.route53.registration.namespaceId":"abc123",
-             "aws.route53.registration.dnsNamespaceType":"public",
-             //"aws.route53.registration.awsServiceId":"testId",
+
+             "aws.route53.registration.awsServiceId":"testId",
              //"aws.route53.registration.serviceId":"testId",
-             "aws.route53.registration.route53Alias":"vanderfox.net",
-             "aws.route53.registration.serviceName":"micronaut-integration-test",
-             "aws.route53.registration.serviceDescription":"micronaut-integration-test-desc",
-             "aws.route53.registration.dnsRecordTTL":1000L,
             "aws.route53.discovery.enabled":"true",
             "aws.route53.registration.enabled":"true",
             "micronaut.application.name":"testapp"]
     )
     @Shared Route53AutoNamingRegistrationClient client = embeddedServer.applicationContext.getBean(Route53AutoNamingRegistrationClient)
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
+    @Shared String namespaceId
+    @Shared String serviceId
+
+
+    def setupSpec() {
+        namespaceId = client.createNamespace(null,"testsite.com")
+        serviceId = client.createService(null,"test","micronaut-integration-test",namespaceId,1000L)
+        client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
+    }
 
     void "test is a discovery client"() {
         expect:
@@ -103,12 +110,13 @@ class Route53AutoNamingClientSpec extends Specification {
         then:
         status == HttpStatus.OK
 
-        cleanup:
-        //delete service and namespace we created
-        Route53AutoNamingRegistrationClient route53Client = (Route53AutoNamingRegistrationClient)client
-        route53Client.deleteService(route53Client.route53AutoRegistrationConfiguration.getAwsServiceId())
-        route53Client.deleteNamespace(route53Client.route53AutoRegistrationConfiguration.getNamespaceId())
 
+    }
+
+    def cleanupSpec() {
+        Route53AutoNamingRegistrationClient route53Client = (Route53AutoNamingRegistrationClient)client
+        route53Client.deleteService(serviceId)
+        route53Client.deleteNamespace(namespaceId)
 
     }
 }

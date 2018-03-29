@@ -1,5 +1,7 @@
 package io.micronaut.discovery.aws.route53.registration;
 
+import com.amazonaws.services.route53.model.GetHealthCheckStatusRequest;
+import com.amazonaws.services.route53.model.GetHealthCheckStatusResult;
 import com.amazonaws.services.servicediscovery.*;
 import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
@@ -26,43 +28,54 @@ import java.util.Map;
 
 
 @Singleton
-@Requires(beans = {Route53AutoNamingClient.class, Route53AutoRegistrationConfiguration.class})
+@Requires(beans = {Route53AutoRegistrationConfiguration.class})
 @Requires(property = "aws.route53.registration.enabled", value = "true", defaultValue = "false")
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 
     private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
-    private final Route53AutoNamingClient route53AutoNamingClient;
     private final Environment environment;
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ServiceInstanceIdGenerator idGenerator;
     private final AWSClientConfiguration clientConfiguration;
     private final AWSServiceDiscovery discoveryClient;
+    private Service discoveryService;
 
     protected static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
 
 
     protected Route53AutoNamingRegistrationClient(
             Environment environment,
-            Route53AutoNamingClient route53AutoNamingClient,
             HeartbeatConfiguration heartbeatConfiguration,
             Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
             ServiceInstanceIdGenerator idGenerator,
             AWSClientConfiguration clientConfiguration) {
         super(route53AutoRegistrationConfiguration);
         this.environment = environment;
-        this.route53AutoNamingClient = route53AutoNamingClient;
         this.heartbeatConfiguration = heartbeatConfiguration;
         this.route53AutoRegistrationConfiguration = route53AutoRegistrationConfiguration;
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+
     }
 
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         // this only work if you create a health status check when you register it
-        System.out.println("pulsate health status="+status.toString());
+        // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
+        if (discoveryService.getHealthCheckCustomConfig()!=null) {
+            CustomHealthStatus customHealthStatus = CustomHealthStatus.UNHEALTHY;
+            if (status.getOperational().isPresent()) {
+                customHealthStatus = CustomHealthStatus.HEALTHY;
+            }
+            discoveryClient.updateInstanceCustomHealthStatus(new UpdateInstanceCustomHealthStatusRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()).withStatus(customHealthStatus));
+        }
+
+        if (status.getOperational().isPresent() && !status.getOperational().get()) {
+            discoveryClient.deregisterInstance(new DeregisterInstanceRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()));
+            LOG.info("Health status is non operational, instance id "+instance.getInstanceId().get()+" was de-registered from the discovery service.");
+        }
     }
 
     @Override
@@ -80,55 +93,28 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         // check if service exists
         // register service if not
         // register instance to service
-        String requestId = ApplicationConfiguration.APPLICATION_NAME+":"+Long.toString(System.nanoTime());
-
-        if (route53AutoRegistrationConfiguration.getNamespaceId()==null) { // try to create these if they don't supply it with sensible defaults
-            if (route53AutoRegistrationConfiguration.getDnsNamespaceType()!=null &&
-                    route53AutoRegistrationConfiguration.getDnsNamespaceType().equalsIgnoreCase("public")) {
-                CreatePublicDnsNamespaceRequest publicDnsNamespaceRequest =
-                        new CreatePublicDnsNamespaceRequest().withCreatorRequestId(requestId)
-                                .withName(route53AutoRegistrationConfiguration.getRoute53Alias())
-                                .withDescription("test");
-                //TODO switch to async version
-                CreatePublicDnsNamespaceResult clientResult = discoveryClient.createPublicDnsNamespace(publicDnsNamespaceRequest);
-                String operationId = clientResult.getOperationId();
-
-
-                GetOperationResult opResult = checkOperation(operationId);
-                route53AutoRegistrationConfiguration.setNamespaceId(opResult.getOperation().getTargets().get("NAMESPACE"));
-
-            } else {
-                if (route53AutoRegistrationConfiguration.getDnsNamespaceType().equalsIgnoreCase("private")) {
-                    CreatePrivateDnsNamespaceRequest privateDnsNamespaceRequest =
-                            new CreatePrivateDnsNamespaceRequest().withCreatorRequestId(requestId)
-                                    .withName(route53AutoRegistrationConfiguration.getRoute53Alias())
-                                    .withDescription("test");
-                    //TODO switch to async version since this can take some time to complete
-
-                    CreatePrivateDnsNamespaceResult clientResult = discoveryClient.createPrivateDnsNamespace(privateDnsNamespaceRequest);
-                    String operationId = clientResult.getOperationId();
-                    GetOperationResult opResult = checkOperation(operationId);
-                    route53AutoRegistrationConfiguration.setNamespaceId(opResult.getOperation().getTargets().get("NAMESPACE"));
-
-                }
-            }
-        }
-
-        if (route53AutoRegistrationConfiguration.getAwsServiceId()==null) {
-            DnsRecord dnsRecord = new DnsRecord().withType(RecordType.CNAME).withTTL(route53AutoRegistrationConfiguration.getDnsRecordTTL());
-            DnsConfig dnsConfig = new DnsConfig().withDnsRecords(dnsRecord).withNamespaceId(route53AutoRegistrationConfiguration.getNamespaceId()).withRoutingPolicy(RoutingPolicy.WEIGHTED);
-            CreateServiceRequest createServiceRequest = new CreateServiceRequest().withDnsConfig(dnsConfig)
-                    .withDescription(route53AutoRegistrationConfiguration.getServiceDescription())
-                    .withName(route53AutoRegistrationConfiguration.getServiceName());
-            CreateServiceResult servicerResult = discoveryClient.createService(createServiceRequest);
-            Service createdService = servicerResult.getService();
-            route53AutoRegistrationConfiguration.setAwsServiceId(createdService.getId());
-        }
 
         Map<String,String> instanceAttributes = new HashMap<String,String>();
         // we need to build a url to register for apps to callback
         instanceAttributes.put("URI",instance.getURI().toString());
-        //TODO config sharing will go in map above ?
+        instanceAttributes.put("host",instance.getHost());
+        instanceAttributes.put("id",instance.getId());
+        instanceAttributes.put("port",Integer.toString(instance.getPort()));
+        instanceAttributes.put("isSecure",Boolean.toString(instance.isSecure()));
+        if(instance.getInstanceId().isPresent()) {
+            instanceAttributes.put("instanceId", instance.getInstanceId().get());
+        }
+        // dump all metadata since we can't put a map of maps - this may be a bad idea
+        instanceAttributes.putAll(instance.getMetadata().asMap());
+        if (instance.getZone().isPresent()) {
+            instanceAttributes.put("zone", instance.getZone().get());
+        }
+        if (instance.getGroup().isPresent()) {
+            instanceAttributes.put("group", instance.getGroup().get());
+        }
+        instanceAttributes.put("resolvedUri",instance.resolve(instance.getURI()).toString());
+
+        //TODO config sharing will go in map above or in ConfigurationManagement Service?
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
                 .withInstanceId(instance.getInstanceId().get()).withAttributes(instanceAttributes);
 
@@ -140,7 +126,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
 
-    GetOperationResult checkOperation(String operationId) {
+    private GetOperationResult checkOperation(String operationId) {
 
         String result = "";
         GetOperationResult opResult = null;
@@ -149,7 +135,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                 opResult = discoveryClient.getOperation(new GetOperationRequest().withOperationId(operationId));
                 result = opResult.getOperation().getStatus();
                 if (opResult.getOperation().getStatus().equals("SUCCESS")) {
-                    route53AutoRegistrationConfiguration.setNamespaceId(opResult.getOperation().getTargets().get("NAMESPACE"));
                     LOG.info("Successfully created namespace id "+opResult.getOperation().getTargets().get("NAMESPACE")+" please add this to your configs for future restarts.");
                     return opResult;
                 } else {
@@ -158,7 +143,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                         return opResult;
                     }
                 }
-                Thread.currentThread().sleep(1000);
+                Thread.currentThread().sleep(1000); // if you call this to much amazon will rate limit you
             }
         } catch (InterruptedException e) {
             LOG.error("Error polling for aws response operation:",e);
@@ -169,32 +154,65 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
 
     /**
      * these are convenience methods to help cleanup things like integration test data
-     * @param serviceDiscovery
      * @param serviceId
      */
-    public void deleteService(AWSServiceDiscovery serviceDiscovery, String serviceId) {
-        if (serviceDiscovery==null) {
-            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
-        }
+    public void deleteService(String serviceId) {
 
         DeleteServiceRequest deleteServiceRequest = new DeleteServiceRequest().withId(serviceId);
-        serviceDiscovery.deleteService(deleteServiceRequest);
+        discoveryClient.deleteService(deleteServiceRequest);
 
     }
 
     /**
      * these are convenience methods to help cleanup things like integration test data
-     * @param serviceDiscovery
+     *
      * @param namespaceId
      */
-    public void deleteNamespace(AWSServiceDiscovery serviceDiscovery, String namespaceId) {
+    public void deleteNamespace(String namespaceId) {
+
+        DeleteNamespaceRequest deleteNamespaceRequest = new DeleteNamespaceRequest().withId(namespaceId);
+        discoveryClient.deleteNamespace(deleteNamespaceRequest);
+
+    }
+
+
+    public String createNamespace(AWSServiceDiscovery serviceDiscovery, String name) {
         if (serviceDiscovery==null) {
             serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
         }
+        String requestId = Long.toString(System.nanoTime());
 
-        DeleteNamespaceRequest deleteNamespaceRequest = new DeleteNamespaceRequest().withId(namespaceId);
-        serviceDiscovery.deleteNamespace(deleteNamespaceRequest);
+        CreatePublicDnsNamespaceRequest publicDnsNamespaceRequest =
+                new CreatePublicDnsNamespaceRequest().withCreatorRequestId(requestId)
+                        .withName(name)
+                        .withDescription("test");
+        //TODO switch to async version
+        CreatePublicDnsNamespaceResult clientResult = discoveryClient.createPublicDnsNamespace(publicDnsNamespaceRequest);
+        String operationId = clientResult.getOperationId();
+
+
+        GetOperationResult opResult = checkOperation(operationId);
+        return opResult.getOperation().getTargets().get("NAMESPACE");
 
     }
+
+
+    public String createService(AWSServiceDiscovery serviceDiscovery, String name, String description, String namespaceId, Long ttl) {
+        if (serviceDiscovery==null) {
+            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+        }
+        DnsRecord dnsRecord = new DnsRecord().withType(RecordType.CNAME).withTTL(ttl);
+        DnsConfig dnsConfig = new DnsConfig().withDnsRecords(dnsRecord).withNamespaceId(namespaceId).withRoutingPolicy(RoutingPolicy.WEIGHTED);
+        CreateServiceRequest createServiceRequest = new CreateServiceRequest().withDnsConfig(dnsConfig)
+                .withDescription(description)
+                .withName(name);
+        CreateServiceResult servicerResult = serviceDiscovery.createService(createServiceRequest);
+        Service createdService = servicerResult.getService();
+        return createdService.getId();
+
+
+    }
+
+
 
 }

@@ -3,11 +3,11 @@ package io.micronaut.discovery.aws.route53.client;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
 import com.amazonaws.services.servicediscovery.model.*;
+import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.http.client.Client;
@@ -20,24 +20,38 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-
-
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
 @Requires(beans = Route53DiscoveryConfiguration.class)
+@Requires(beans = AWSClientConfiguration.class)
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
 public class Route53AutoNamingClient implements DiscoveryClient {
 
-    Route53ClientDiscoveryConfiguration route53ClientConfiguration;
+    AWSClientConfiguration awsClientConfiguration;
+
+    Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
+
+    Route53DiscoveryConfiguration route53DiscoveryConfiguration;
+
+    AWSServiceDiscovery discoveryClient;
+
+
     @Override
     public String getDescription() {
         return null;
     }
 
+
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        AWSServiceDiscovery client = AWSServiceDiscoveryClient.builder().build();
+        if (discoveryClient==null) {
+            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
+        }
+        if (serviceId==null) {
+            serviceId = route53ClientDiscoveryConfiguration.getAwsServiceId();  // we can default to the config file
+        }
+
         ListInstancesRequest instancesRequest = new ListInstancesRequest().withServiceId(serviceId);
-        ListInstancesResult instanceResult = client.listInstances(instancesRequest);
+        ListInstancesResult instanceResult = discoveryClient.listInstances(instancesRequest);
         List<ServiceInstance> serviceInstances = new ArrayList<ServiceInstance>();
         for (InstanceSummary instanceSummary : instanceResult.getInstances()) {
             try {
@@ -58,7 +72,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     public Publisher<List<String>> getServiceIds() {
 
         AWSServiceDiscovery client = AWSServiceDiscoveryClient.builder().build();
-        ServiceFilter serviceFilter = new ServiceFilter().withName(route53ClientConfiguration.getNamespace());
+        ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(route53ClientDiscoveryConfiguration.getNamespaceId());
         ListServicesRequest listServicesRequest = new ListServicesRequest().withFilters(serviceFilter);
         ListServicesResult response = client.listServices(listServicesRequest);
         List<ServiceSummary> services = response.getServices();
@@ -73,6 +87,6 @@ public class Route53AutoNamingClient implements DiscoveryClient {
 
     @Override
     public void close() throws IOException {
-
+        discoveryClient.shutdown();
     }
 }
