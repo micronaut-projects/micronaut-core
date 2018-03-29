@@ -29,6 +29,7 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author Graeme Rocher
@@ -160,13 +161,20 @@ Test test(Test test) {
             ))
 
         }).start().getBean(EmbeddedServer).start()
-
         String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def data = '{"a":10, "b":5}'
         def request = new Request.Builder()
                 .url("$url/sum")
                 .post(RequestBody.create( MediaType.parse(io.micronaut.http.MediaType.APPLICATION_JSON), data))
+
+        when:
+        def conditions = new PollingConditions()
+
+        then:
+        conditions.eventually {
+            server.isRunning()
+        }
 
         when:
         def response = client.newCall(request.build()).execute()
@@ -190,13 +198,20 @@ Test test(Test test) {
             ))
 
         }).start().getBean(EmbeddedServer).start()
-
         String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def data = '1.6'
         def request = new Request.Builder()
                 .url("$url/round")
                 .post(RequestBody.create( MediaType.parse("text/plain"), data))
+
+        when:
+        def conditions = new PollingConditions()
+
+        then:
+        conditions.eventually {
+            server.isRunning()
+        }
 
         when:
         def response = client.newCall(request.build()).execute()
@@ -226,6 +241,13 @@ Test test(Test test) {
         def request = new Request.Builder()
                 .url("$url/max")
 
+        when:
+        def conditions = new PollingConditions()
+
+        then:
+        conditions.eventually {
+            server.isRunning()
+        }
 
         when:
         def response = client.newCall(request.build()).execute()
