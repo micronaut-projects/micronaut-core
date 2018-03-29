@@ -1,0 +1,83 @@
+apply plugin:'application'
+apply plugin: 'com.github.johnrengelman.plugin-shadow'
+
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.apache.ant:ant:1.9.7"
+    compile "org.codehaus.groovy:groovy-ant:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    compile "org.codehaus.groovy:groovy-jmx:$groovyVersion"
+    compile "org.fusesource.jansi:jansi:1.14"
+    compile "jline:jline:2.12"
+    compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
+    compile "org.yaml:snakeyaml:1.14"
+    runtime "org.slf4j:slf4j-simple:$slf4jVersion"
+    runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
+
+    testCompile "net.sf.expectit:expectit-core:0.5.0"
+    testCompile "com.github.jnr:jnr-posix:3.0.6"
+}
+
+File outDir = new File(project.rootDir, 'bin')
+
+task micronautCreateStartScripts(type: MicronautCreateStartScripts) {
+    description = "Creates OS specific scripts to run grails-shell as a JVM application."
+    mainClassName = 'io.micronaut.cli.MicronautCli'
+    applicationName = 'mn'
+    defaultJvmOpts = ["-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=3"]
+    outputDir = outDir
+    classpath = configurations.runtime
+    projectArtifacts = tasks['jar'].outputs.files.collect { "dist/${it.name}" }
+    doLast {
+        ant.replace(file: new File(outDir, 'mn'), token: 'media/gradle.icns', value: 'media/icons/grails.icns')
+        ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
+    }
+}
+
+class MicronautCreateStartScripts extends org.gradle.api.tasks.application.CreateStartScripts {
+    Collection<String> projectArtifacts=[]
+
+    @org.gradle.api.tasks.TaskAction
+    void generate() {
+        def generator = new org.gradle.api.internal.plugins.StartScriptGenerator()
+        generator.applicationName = getApplicationName()
+        generator.mainClassName = getMainClassName()
+        generator.defaultJvmOpts = getDefaultJvmOpts()
+        generator.optsEnvironmentVar = getOptsEnvironmentVar()
+        generator.exitEnvironmentVar = getExitEnvironmentVar()
+        generator.classpath = ["bin/cli.jar"]
+        generator.scriptRelPath = "bin/${getUnixScript().name}"
+        generator.generateUnixScript(getUnixScript())
+        generator.generateWindowsScript(getWindowsScript())
+    }
+}
+
+jar {
+    mainClassName = "io.micronaut.cli.GrailsCli"
+    manifest {
+        attributes 'Implementation-Version': project.version
+    }
+}
+
+
+shadowJar {
+    baseName = 'cli'
+    classifier = null
+    version = null
+    destinationDir = outDir
+    relocate('org.codehaus.groovy', 'org.codehaus.groovy')
+    relocate('groovy', 'groovy')
+    mergeGroovyExtensionModules()
+    mergeServiceFiles()
+}
+
+shadowJar.dependsOn('micronautCreateStartScripts')
+
+clean {
+    delete outDir
+}
