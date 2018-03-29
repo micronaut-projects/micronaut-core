@@ -28,30 +28,25 @@ class MultipartFileUploadSpec extends Specification {
         file.createNewFile()
 
         when:
-
-        Flowable<HttpResponse<File>> flowable = Flowable.fromPublisher(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/upload", file)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                File
+                String
         ))
-        HttpResponse<File> response = flowable.blockingFirst()
-        def body = response.getBody()
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
 
         then:
-        body.isPresent()
+        body == "Uploaded 10 bytes"
     }
 
     @Controller('/multipart')
     static class MultipartController {
 
         @Post(uri = '/upload', consumes = MediaType.MULTIPART_FORM_DATA)
-        HttpResponse<String> upload(File data,
-                                           @Header String contentType, @Header long contentLength, @Header accept) {
-            assert contentType == MediaType.MULTIPART_FORM_DATA
-            assert contentLength == 13
-            assert accept == MediaType.TEXT_PLAIN
-            return HttpResponse.ok("Uploaded")
+        HttpResponse<String> upload(byte[] data) {
+            return HttpResponse.ok("Uploaded " + data.length + " bytes")
         }
 
     }
