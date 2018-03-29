@@ -38,7 +38,7 @@ class MultipartFileUploadSpec extends Specification {
         def body = response.getBody().get()
 
         then:
-        body == "Uploaded 10 bytes"
+        body == "Uploaded 9 bytes"
     }
 
     @Controller('/multipart')

@@ -807,8 +807,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         if (permitsBody) {
             Optional<I> body = request.getBody();
             if (body.isPresent()) {
-                MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-                headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                if (!headers.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                    MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+                    headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                }
                 if (nettyRequest instanceof FullHttpRequest) {
                     FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
                     headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
