@@ -31,7 +31,7 @@ import javax.inject.Inject
  * @author graemerocher
  * @since 1.0
  */
-class ClientScopeSpec extends Specification {
+class ClientScopeSpec extends Specification implements MockConsulSpec  {
 
 
     void "test that a client can be discovered using @Client scope"() {
@@ -105,29 +105,6 @@ class ClientScopeSpec extends Specification {
         @Get('/value')
         String value() {
             return "Server ${embeddedServer.port}"
-        }
-    }
-
-    void waitFor(EmbeddedServer embeddedServer) {
-        int attempts = 0
-        while (!embeddedServer.isRunning()) {
-            Thread.sleep(500)
-            attempts++
-            if (attempts > 5) {
-                break
-            }
-        }
-    }
-
-    void waitForService(EmbeddedServer consulServer, String serviceName) {
-        MockConsulServer consul = consulServer.applicationContext.getBean(MockConsulServer)
-        int attempts = 0
-        while (!Flowable.fromPublisher(consul.getServices()).blockingFirst().containsKey(serviceName)) {
-            Thread.sleep(500)
-            attempts++
-            if (attempts > 5) {
-                break
-            }
         }
     }
 }
