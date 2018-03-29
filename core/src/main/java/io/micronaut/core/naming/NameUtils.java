@@ -245,4 +245,25 @@ public class NameUtils {
         chars[0] = Character.toLowerCase(chars[0]);
         return new String(chars);
     }
+
+    /**
+     * Retrieves the extension of a file name.
+     * Ex: index.html -> html
+     *
+     * @param name The name of the file
+     * @return The file extension
+     */
+    public static String extension(String name) {
+        int extensionPos = name.lastIndexOf('.');
+        int lastUnixPos = name.lastIndexOf('/');
+        int lastWindowsPos = name.lastIndexOf('\\');
+        int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
+
+        int index = lastSeparator > extensionPos ? -1 : extensionPos;
+        if (index == -1) {
+            return "";
+        } else {
+            return name.substring(index + 1);
+        }
+    }
 }

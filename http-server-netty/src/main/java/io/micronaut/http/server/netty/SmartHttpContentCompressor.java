@@ -29,7 +29,7 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
         if (contentType == null) {
             return true;
         }
-        return !MediaType.isCompressible(contentType) || (contentLength != null && contentLength >= 0 && contentLength < 1024);
+        return !MediaType.isTextBased(contentType) || (contentLength != null && contentLength >= 0 && contentLength < 1024);
     }
 
     /**

@@ -41,11 +41,13 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -62,6 +64,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
@@ -765,12 +769,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
-                nettyRequest = buildFormDataRequest(postRequestEncoder, bodyValue);
+                postRequestEncoder = buildFormDataRequest(clientHttpRequest.getNettyRequest((ByteBuf) null), bodyValue);
+                nettyRequest = postRequestEncoder.finalizeRequest();
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), true);
-                nettyRequest = buildMultipartRequest(postRequestEncoder, bodyValue);
+                postRequestEncoder = buildMultipartRequest(clientHttpRequest.getNettyRequest((ByteBuf) null), bodyValue);
+                nettyRequest = postRequestEncoder.finalizeRequest();
             } else {
                 ByteBuf bodyContent = null;
                 if (hasBody) {
@@ -933,7 +937,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         };
     }
 
-    private io.netty.handler.codec.http.HttpRequest buildFormDataRequest(HttpPostRequestEncoder postRequestEncoder, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+    private HttpPostRequestEncoder buildFormDataRequest(io.netty.handler.codec.http.HttpRequest request, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(request, false);
+
         Object requestBody = bodyValue;
         Map<String, Object> formData;
         if (requestBody instanceof Map) {
@@ -950,13 +956,23 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 }
             }
         }
-        return postRequestEncoder.finalizeRequest();
+        return postRequestEncoder;
     }
 
-    private io.netty.handler.codec.http.HttpRequest buildMultipartRequest(HttpPostRequestEncoder postRequestEncoder, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        Object requestBody = bodyValue;
-        postRequestEncoder.addBodyFileUpload("data", (File) requestBody, MediaType.TEXT_PLAIN, false);
-        return postRequestEncoder.finalizeRequest();
+    private HttpPostRequestEncoder buildMultipartRequest(io.netty.handler.codec.http.HttpRequest request, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true);
+
+        if (bodyValue instanceof File) {
+            bodyValue = MultipartBody.builder(request, factory).addPart("file", (File) bodyValue).build();
+        }
+        if (bodyValue instanceof MultipartBody){
+            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getDatas());
+        } else {
+            throw new MultipartException(String.format("The type %s is not a supported type for a multipart request body", bodyValue.getClass().getName()));
+        }
+
+        return postRequestEncoder;
     }
 
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
