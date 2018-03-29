@@ -15,15 +15,11 @@
  */
 package io.micronaut.function.groovy
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.http.HttpStatus
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.http.HttpStatus
@@ -153,14 +149,7 @@ Test test(Test test) {
 
     void "test run JSON function as REST service"() {
         given:
-        EmbeddedServer server = ApplicationContext.build()
-                .environment({ env ->
-            env.addPropertySource(MapPropertySource.of(
-                    'test',
-                    ['math.multiplier':'2']
-            ))
-
-        }).start().getBean(EmbeddedServer).start()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['math.multiplier':'2'], 'test')
         String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def data = '{"a":10, "b":5}'
@@ -184,20 +173,12 @@ Test test(Test test) {
         response.body().string() == '15'
 
         cleanup:
-        if(server != null)
-            server.stop()
+        server?.stop()
     }
 
     void "test run function as REST service"() {
         given:
-        EmbeddedServer server = ApplicationContext.build()
-                                                  .environment({ env ->
-            env.addPropertySource(MapPropertySource.of(
-                    'test',
-                    ['math.multiplier':'2']
-            ))
-
-        }).start().getBean(EmbeddedServer).start()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['math.multiplier':'2'], 'test')
         String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def data = '1.6'
@@ -221,21 +202,12 @@ Test test(Test test) {
         response.body().string() == '4'
 
         cleanup:
-        if(server != null)
-            server.stop()
+        server?.stop()
     }
 
     void "test run supplier as REST service"() {
         given:
-        EmbeddedServer server = ApplicationContext.build()
-                .environment({ env ->
-            env.addPropertySource(MapPropertySource.of(
-                    'test',
-                    ['math.multiplier':'2']
-            ))
-
-        }).start().getBean(EmbeddedServer).start()
-
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['math.multiplier':'2'], 'test')
         String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def request = new Request.Builder()
@@ -257,7 +229,6 @@ Test test(Test test) {
         response.body().string() == String.valueOf(Integer.MAX_VALUE)
 
         cleanup:
-        if(server != null)
-            server.stop()
+        server?.stop()
     }
 }
