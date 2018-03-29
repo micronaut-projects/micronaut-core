@@ -120,7 +120,6 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     /**
      * Injects this instance
      * @param applicationContext The {@link ApplicationContext}
-     * @return This injected instance
      */
     protected void injectThis(ApplicationContext applicationContext) {
         if(applicationContext != null) {
