@@ -10,6 +10,8 @@ import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
+import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
+import io.micronaut.health.HealthStatus;
 import io.micronaut.http.client.Client;
 import org.reactivestreams.Publisher;
 
@@ -55,7 +57,8 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         List<ServiceInstance> serviceInstances = new ArrayList<ServiceInstance>();
         for (InstanceSummary instanceSummary : instanceResult.getInstances()) {
             try {
-                ServiceInstance serviceInstance = ServiceInstance.builder(instanceSummary.getId(),new URI((String)instanceSummary.getAttributes().get("URI"))).build();
+                String uri = "http://"+instanceSummary.getAttributes().get("URI");
+                ServiceInstance serviceInstance = new EC2ServiceInstance(instanceSummary.getId(),new URI(uri)).metadata(instanceSummary.getAttributes()).build();
                 serviceInstances.add(serviceInstance);
             } catch (URISyntaxException e) {
                 e.printStackTrace();

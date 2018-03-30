@@ -15,6 +15,11 @@
  */
 package io.micronaut.discovery.route53
 
+import com.amazonaws.services.ec2.AmazonEC2Client
+import com.amazonaws.services.ec2.model.RunInstancesRequest
+import com.amazonaws.services.ec2.model.RunInstancesResult
+import com.amazonaws.services.ec2.model.StopInstancesRequest
+import com.amazonaws.services.ec2.model.TerminateInstancesRequest
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
@@ -36,6 +41,7 @@ import javax.validation.ConstraintViolationException
  * @since 1.0
  */
 //@IgnoreIf({ !System.getenv('AWS_ACCESS_KEY_ID') && !System.getenv('AWS_SECRET_ACCESS_KEY')})
+@IgnoreIf({ !System.getenv('AWS_SUBNET_ID')})
 @Stepwise
 class Route53AutoNamingClientSpec extends Specification {
 
@@ -55,20 +61,33 @@ class Route53AutoNamingClientSpec extends Specification {
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
     @Shared String namespaceId
     @Shared String serviceId
+    @Shared createdInstanceId
+    @Shared AmazonEC2Client amazonEC2Client
 
 
     def setupSpec() {
         namespaceId = client.createNamespace(null,"testsite.com")
         serviceId = client.createService(null,"test","micronaut-integration-test",namespaceId,1000L)
         client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
+        amazonEC2Client = new AmazonEC2Client(client.clientConfiguration.clientConfiguration)
+        // start an tiny instance to add to the service we don't care about keys and such
+        RunInstancesRequest runInstancesRequest =
+                new RunInstancesRequest();
+        runInstancesRequest.withImageId("ami-1853ac65")
+                .withInstanceType("t2.nano")
+                .withMinCount(1)
+                .withMaxCount(1)
+                .withSubnetId(System.getenv('AWS_SUBNET_ID'))
+        RunInstancesResult result = amazonEC2Client.runInstances(
+                runInstancesRequest);
+        createdInstanceId = result.getReservation().getInstances()[0].instanceId
+
     }
 
     void "test is a discovery client"() {
         expect:
         discoveryClient instanceof CompositeDiscoveryClient
         client instanceof DiscoveryServiceAutoRegistration
-//        embeddedServer.applicationContext.getBean(EurekaConfiguration).readTimeout.isPresent()
-//        embeddedServer.applicationContext.getBean(EurekaConfiguration).readTimeout.get().getSeconds() == 5
     }
     
 
@@ -78,7 +97,7 @@ class Route53AutoNamingClientSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 10)
 
         when:
-        def instanceId = "myapp-1"
+        def instanceId = createdInstanceId
         def appId = "myapp"
         def builder = ServiceInstance.builder("test", new URI("/v1")).instanceId(instanceId)
         ServiceInstance serviceInstance = builder.build()
@@ -115,8 +134,16 @@ class Route53AutoNamingClientSpec extends Specification {
 
     def cleanupSpec() {
         Route53AutoNamingRegistrationClient route53Client = (Route53AutoNamingRegistrationClient)client
-        route53Client.deleteService(serviceId)
-        route53Client.deleteNamespace(namespaceId)
+        if (serviceId) {
+            route53Client.deleteService(serviceId)
+        }
+        if (namespaceId) {
+            route53Client.deleteNamespace(namespaceId)
+        }
+
+        if (createdInstanceId) {
+            amazonEC2Client.terminateInstances(new TerminateInstancesRequest().withInstanceIds([createdInstanceId]))
+        }
 
     }
 }
