@@ -55,7 +55,6 @@ public interface MediaTypeCodec {
      * @param object The object to encode
      * @param outputStream The input stream
      * @param <T> The generic type
-     * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
