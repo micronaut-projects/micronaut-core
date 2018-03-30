@@ -25,6 +25,8 @@ public class DefaultAccessRefreshToken implements AccessRefreshToken {
     private String accessToken;
     private String refreshToken;
 
+    public DefaultAccessRefreshToken() {}
+
     public DefaultAccessRefreshToken(String accessToken, String refreshToken) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;

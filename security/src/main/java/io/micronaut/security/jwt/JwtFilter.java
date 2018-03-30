@@ -107,7 +107,7 @@ public class JwtFilter implements HttpServerFilter {
                     log.debug("Proceed since the user is authenticated and a role matches the access list in intercept url map.");
                     return chain.proceed(request);
                 }
-                return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
+                return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
 
             } else {
                 log.debug("Unauthorized request, no token found in request");
