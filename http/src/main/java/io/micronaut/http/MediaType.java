@@ -58,6 +58,9 @@ public class MediaType implements CharSequence {
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
         textTypePatterns.add(Pattern.compile("^.*\\+text$"));
         textTypePatterns.add(Pattern.compile("^.*\\+xml$"));
+
+        mediaTypeFileExtensions = new HashMap<>(4);
+        mediaTypeFileExtensions.put("txt", MediaType.TEXT_PLAIN);
     }
 
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];

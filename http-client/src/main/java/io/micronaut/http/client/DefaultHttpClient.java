@@ -958,7 +958,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true);
 
         if (bodyValue instanceof File) {
-            bodyValue = MultipartBody.builder(request, factory).addPart("file", (File) bodyValue).build();
+            bodyValue = MultipartBody.builder(request, factory).addPart("data", (File) bodyValue).build();
         }
         if (bodyValue instanceof MultipartBody){
             postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getDatas());
