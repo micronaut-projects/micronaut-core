@@ -825,12 +825,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         }
     }
 
-    private void writeAndCloseRequest(Channel channel, io.netty.handler.codec.http.HttpRequest nettyRequest) {
-        channel.writeAndFlush(nettyRequest).addListener(f -> {
-            closeChannelAsync(channel);
-        });
-    }
-
     private <O> void addFullHttpResponseHandler(io.micronaut.http.HttpRequest<?> request, Channel channel, CompletableFuture<io.micronaut.http.HttpResponse<O>> completableFuture, io.micronaut.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
 
