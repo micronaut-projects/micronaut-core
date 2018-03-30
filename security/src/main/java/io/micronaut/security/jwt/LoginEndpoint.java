@@ -24,10 +24,10 @@ public class LoginEndpoint {
 
     @Write
     public HttpResponse login(@Body UsernamePassword usernamePassword) {
-        List<String> roles = Arrays.asList("ROLE_USER");
         AuthenticationResponse authenticationResponse = authenticator.authenticate(usernamePassword);
         if ( authenticationResponse instanceof UserDetails ) {
-            return HttpResponse.ok().body(accessRefreshTokenGenerator.generate(new DefaultUserDetails(usernamePassword.getUsername(), roles)));
+            UserDetails userDetails = (UserDetails) authenticationResponse;
+            return HttpResponse.ok().body(accessRefreshTokenGenerator.generate(new DefaultUserDetails(userDetails.getUsername(), userDetails.getRoles())));
         }
         return HttpResponse.status(HttpStatus.UNAUTHORIZED);
     }
