@@ -7,6 +7,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
@@ -29,7 +30,7 @@ class MultipartFileUploadSpec extends Specification {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/upload", file)
+                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file))
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String

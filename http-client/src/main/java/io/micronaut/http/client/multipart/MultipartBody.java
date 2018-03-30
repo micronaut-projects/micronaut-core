@@ -22,33 +22,31 @@ import java.util.List;
  * @author James Kleeh
  * @since 1.0
  */
-public class MultipartBody {
+public final class MultipartBody {
 
-    private final List<InterfaceHttpData> datas;
+    private final List<Part> parts;
 
-    private MultipartBody(List<InterfaceHttpData> datas) {
-        this.datas = datas;
+    private MultipartBody(List<Part> parts) {
+        this.parts = parts;
     }
 
-    public List<InterfaceHttpData> getDatas() {
+    public List<InterfaceHttpData> getDatas(HttpRequest request, HttpDataFactory factory) {
+        List<InterfaceHttpData> datas = new ArrayList<>(parts.size());
+        for (Part part: parts) {
+            datas.add(part.getData(request, factory));
+        }
         return datas;
     }
 
-    public static Builder builder(HttpRequest request, HttpDataFactory factory) {
-        return new Builder(request, factory);
+    public static Builder builder() {
+        return new Builder();
     }
 
     public static class Builder {
 
-        private final HttpRequest request;
-        private final HttpDataFactory factory;
+        private Builder() { }
 
-        private Builder(HttpRequest request, HttpDataFactory factory) {
-            this.request = request;
-            this.factory = factory;
-        }
-
-        private List<InterfaceHttpData> datas = new ArrayList<>();
+        private List<Part> parts = new ArrayList<>();
 
         public Builder addPart(String name, File file) {
             return addPart(name, file.getName(), file);
@@ -79,41 +77,24 @@ public class MultipartBody {
         }
 
         public Builder addPart(String name, String value) {
-            if (value == null) {
-                value = "";
-            }
-            if (name == null) {
-                throw new IllegalArgumentException("Adding parts with a null name is not allowed");
-            }
-            datas.add(factory.createAttribute(request, name, value));
+            parts.add(new StringPart(name, value));
             return this;
         }
 
         private Builder addFilePart(AbstractFilePart filePart) {
-            MediaType mediaType = filePart.contentType;
-            String contentType = mediaType.toString();
-            String encoding = mediaType.isTextBased() ? null : "binary";
-
-            FileUpload fileUpload = factory.createFileUpload(request, filePart.name, filePart.filename, contentType,
-                    encoding, null, filePart.getLength());
-            try {
-                filePart.setContent(fileUpload);
-                datas.add(fileUpload);
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
+            parts.add(filePart);
             return this;
         }
 
         public MultipartBody build() {
-            if (datas.isEmpty()) {
+            if (parts.isEmpty()) {
                 throw new MultipartException("Cannot create a MultipartBody with no parts");
             }
-            return new MultipartBody(datas);
+            return new MultipartBody(parts);
         }
     }
 
-    private static class Part {
+    private static abstract class Part {
         protected final String name;
 
         private Part(String name) {
@@ -121,6 +102,26 @@ public class MultipartBody {
                 throw new IllegalArgumentException("Adding parts with a null name is not allowed");
             }
             this.name = name;
+        }
+
+        abstract InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory);
+    }
+
+    private static class StringPart extends Part {
+        protected final String value;
+
+        private StringPart(String name, String value) {
+            super(name);
+            if (value == null) {
+                this.value = "";
+            } else {
+                this.value = value;
+            }
+        }
+
+        @Override
+        InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
+            return factory.createAttribute(request, name, value);
         }
     }
 
@@ -144,6 +145,22 @@ public class MultipartBody {
         abstract void setContent(FileUpload fileUpload) throws IOException;
 
         abstract long getLength();
+
+        @Override
+        InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
+            MediaType mediaType = contentType;
+            String contentType = mediaType.toString();
+            String encoding = mediaType.isTextBased() ? null : "binary";
+
+            FileUpload fileUpload = factory.createFileUpload(request, name, filename, contentType,
+                    encoding, null, getLength());
+            try {
+                setContent(fileUpload);
+            } catch (IOException e) {
+                throw new IllegalArgumentException(e);
+            }
+            return fileUpload;
+        }
     }
 
     private static class FilePart extends AbstractFilePart {
@@ -158,10 +175,12 @@ public class MultipartBody {
             this.data = data;
         }
 
+        @Override
         void setContent(FileUpload fileUpload) throws IOException {
             fileUpload.setContent(data);
         }
 
+        @Override
         long getLength() {
             return data.length();
         }
@@ -181,10 +200,12 @@ public class MultipartBody {
             this.contentLength = contentLength;
         }
 
+        @Override
         void setContent(FileUpload fileUpload) throws IOException {
             fileUpload.setContent(data);
         }
 
+        @Override
         long getLength() {
             return contentLength;
         }
@@ -202,10 +223,12 @@ public class MultipartBody {
             this.data = data;
         }
 
+        @Override
         void setContent(FileUpload fileUpload) throws IOException {
             fileUpload.setContent(new ByteArrayInputStream(data));
         }
 
+        @Override
         long getLength() {
             return data.length;
         }

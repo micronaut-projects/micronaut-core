@@ -962,12 +962,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     private HttpPostRequestEncoder buildMultipartRequest(io.netty.handler.codec.http.HttpRequest request, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true);
-
-        if (bodyValue instanceof File) {
-            bodyValue = MultipartBody.builder(request, factory).addPart("file", (File) bodyValue).build();
+        if (bodyValue instanceof MultipartBody.Builder) {
+            bodyValue = ((MultipartBody.Builder) bodyValue).build();
         }
         if (bodyValue instanceof MultipartBody){
-            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getDatas());
+            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getDatas(request, factory));
         } else {
             throw new MultipartException(String.format("The type %s is not a supported type for a multipart request body", bodyValue.getClass().getName()));
         }
