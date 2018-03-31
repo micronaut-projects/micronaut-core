@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.reactivex.Flowable;
@@ -28,7 +29,7 @@ public class ConfigurationInfoSource implements InfoSource {
 
     public ConfigurationInfoSource(Environment environment) {
         this.environment = environment;
-        this.supplier = InfoSource.cachedSupplier(this::retrieveConfigurationInfo);
+        this.supplier = SupplierUtil.memoized(this::retrieveConfigurationInfo);
     }
 
     @Override
