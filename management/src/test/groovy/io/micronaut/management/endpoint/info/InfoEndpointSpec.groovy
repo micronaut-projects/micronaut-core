@@ -52,7 +52,7 @@ class InfoEndpointSpec extends Specification {
 
         @Override
         Publisher<PropertySource> getSource() {
-            return Flowable.just(new MapPropertySource("foo", [ordered: 'first'])).delay(3, TimeUnit.SECONDS)
+            return Flowable.just(new MapPropertySource("foo", [ordered: 'first']))
         }
 
         @Override
