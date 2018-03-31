@@ -6,7 +6,6 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.management.info.source.InfoSource
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.junit.Ignore
@@ -14,6 +13,7 @@ import org.reactivestreams.Publisher
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.util.concurrent.TimeUnit
 
 class InfoEndpointSpec extends Specification {
 
@@ -52,7 +52,7 @@ class InfoEndpointSpec extends Specification {
 
         @Override
         Publisher<PropertySource> getSource() {
-            return Flowable.just(new MapPropertySource("foo", [ordered: 'first']))
+            return Flowable.just(new MapPropertySource("foo", [ordered: 'first'])).delay(3, TimeUnit.SECONDS)
         }
 
         @Override

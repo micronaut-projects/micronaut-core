@@ -1,7 +1,6 @@
-package io.micronaut.management.info.aggregator;
+package io.micronaut.management.endpoint.info;
 
 import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.info.source.InfoSource;
 import org.reactivestreams.Publisher;
 
 /**
