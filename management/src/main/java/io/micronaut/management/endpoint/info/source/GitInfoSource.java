@@ -1,9 +1,10 @@
-package io.micronaut.management.info.source;
+package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
+import io.micronaut.management.endpoint.info.InfoSource;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;

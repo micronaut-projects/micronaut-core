@@ -41,6 +41,8 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -1556,7 +1558,12 @@ public class DefaultBeanContext implements BeanContext {
             return Collections.unmodifiableCollection(existing);
         }
 
-        Collection<T> beansOfTypeList = new HashSet<>();
+        Collection<T> beansOfTypeList;
+        if (Ordered.class.isAssignableFrom(beanType)) {
+            beansOfTypeList = new TreeSet<>(OrderUtil.comparator);
+        } else {
+            beansOfTypeList = new HashSet<>();
+        }
         Collection<BeanDefinition<T>> processedDefinitions = new ArrayList<>();
 
         boolean allCandidatesAreSingleton = false;

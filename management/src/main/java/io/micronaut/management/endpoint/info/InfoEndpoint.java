@@ -3,8 +3,6 @@ package io.micronaut.management.endpoint.info;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
-import io.micronaut.management.info.aggregator.InfoAggregator;
-import io.micronaut.management.info.source.InfoSource;
 import org.reactivestreams.Publisher;
 
 /**
