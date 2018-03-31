@@ -18,6 +18,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 
+
+/**
+ * <p>An {@link InfoSource} that retrieves values under the <i>info</i> key from configuration sources. </p>
+ *
+ * @author Zachary Klein
+ * @since 1.0
+ */
 //TODO: @Refreshable
 @Singleton
 @Requires(beans = InfoEndpoint.class)

@@ -8,6 +8,12 @@ import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 
+/**
+ * <p>An {@link InfoSource} that retrieves info from build properties. </p>
+ *
+ * @author Zachary Klein
+ * @since 1.0
+ */
 //TODO: @Refreshable
 @Singleton
 @Requires(beans = InfoEndpoint.class)
