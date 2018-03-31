@@ -12,20 +12,21 @@ public interface InfoSource extends Ordered {
 
     Publisher<PropertySource> getSource();
 
-    static <T> Supplier<T> cachedSupplier(Supplier<T> delegate) {
-        AtomicReference<T> value = new AtomicReference<>();
-        return () -> {
-            T val = value.get();
-            if (val == null) {
-                synchronized(value) {
-                    val = value.get();
-                    if (val == null) {
-                        val = Objects.requireNonNull(delegate.get());
-                        value.set(val);
-                    }
-                }
+    static <T> Supplier<T> cachedSupplier(Supplier<T> actual) {
+        return new Supplier<T>() {
+            Supplier<T> delegate = this::initialize;
+            boolean initialized;
+            public T get() {
+                return delegate.get();
             }
-            return val;
+            private synchronized T initialize() {
+                if (!initialized) {
+                    T value = actual.get();
+                    delegate = () -> value;
+                    initialized = true;
+                }
+                return delegate.get();
+            }
         };
     }
 }
