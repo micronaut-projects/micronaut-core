@@ -8,12 +8,9 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import org.junit.Ignore
 import org.reactivestreams.Publisher
 import spock.lang.Specification
-
 import javax.inject.Singleton
-import java.util.concurrent.TimeUnit
 
 class InfoEndpointSpec extends Specification {
 
@@ -31,7 +28,6 @@ class InfoEndpointSpec extends Specification {
     }
 
 
-    @Ignore //TODO: Passes randomly due to lost order of property sources
     void "test ordering of info sources"() {
 
         given:
