@@ -5,6 +5,7 @@ import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
 import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
@@ -15,6 +16,8 @@ import io.micronaut.health.HealthStatus;
 import io.micronaut.http.client.Client;
 import org.reactivestreams.Publisher;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -22,17 +25,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+@Singleton
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
+@Requires(env= Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
 public class Route53AutoNamingClient implements DiscoveryClient {
 
+    @Inject
     AWSClientConfiguration awsClientConfiguration;
 
+    @Inject
     Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
 
+    @Inject
     Route53DiscoveryConfiguration route53DiscoveryConfiguration;
+
 
     AWSServiceDiscovery discoveryClient;
 
