@@ -12,6 +12,9 @@ import io.micronaut.discovery.ServiceInstanceIdGenerator;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
+import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
+import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver;
+import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -25,13 +28,22 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 
 @Singleton
+@Requires(env= Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
 @Requires(property = "aws.route53.registration.enabled", value = "true", defaultValue = "false")
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
+
+    public static final String AWS_INSTANCE_PORT = "AWS_INSTANCE_PORT";
+    public static final String AWS_INSTANCE_IPV4 = "AWS_INSTANCE_IPV4";
+    public static final String AWS_INSTANCE_CNAME = "AWS_INSTANCE_CNAME";
+    public static final String AWS_INSTANCE_IPV6 = "AWS_INSTANCE_IPV6";
+    public static final String AWS_ALIAS_DNS_NAME = "AWS_ALIAS_DNS_NAME";
+
 
     private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
     private final Environment environment;
@@ -39,6 +51,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private final ServiceInstanceIdGenerator idGenerator;
     private final AWSClientConfiguration clientConfiguration;
     private final AWSServiceDiscovery discoveryClient;
+    private final AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
 
     protected static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
@@ -49,7 +62,8 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             HeartbeatConfiguration heartbeatConfiguration,
             Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
             ServiceInstanceIdGenerator idGenerator,
-            AWSClientConfiguration clientConfiguration) {
+            AWSClientConfiguration clientConfiguration,
+            AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver) {
         super(route53AutoRegistrationConfiguration);
         this.environment = environment;
         this.heartbeatConfiguration = heartbeatConfiguration;
@@ -57,6 +71,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+        this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
 
     }
 
@@ -95,28 +110,40 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         // register instance to service
 
         Map<String,String> instanceAttributes = new HashMap<String,String>();
-        // we need to build a url to register for apps to callback
-        instanceAttributes.put("URI",instance.getURI().toString());
-        instanceAttributes.put("host",instance.getHost());
-        instanceAttributes.put("id",instance.getId());
-        instanceAttributes.put("port",Integer.toString(instance.getPort()));
-        instanceAttributes.put("isSecure",Boolean.toString(instance.isSecure()));
-        if(instance.getInstanceId().isPresent()) {
-            instanceAttributes.put("instanceId", instance.getInstanceId().get());
+
+        // you can't just put anything in there like a custom config. Only certain things are allowed or you get weird errors
+        // see https://docs.aws.amazon.com/Route53/latest/APIReference/API_autonaming_RegisterInstance.html
+        //if the service uses A records use these
+        if (instance.getPort()>0) {
+            instanceAttributes.put("AWS_INSTANCE_PORT", Integer.toString(instance.getPort()));
         }
-        // dump all metadata since we can't put a map of maps - this may be a bad idea
-        instanceAttributes.putAll(instance.getMetadata().asMap());
-        if (instance.getZone().isPresent()) {
-            instanceAttributes.put("zone", instance.getZone().get());
+        if (amazonComputeInstanceMetadataResolver!=null) {
+            Optional<ComputeInstanceMetadata> instanceMetadata = amazonComputeInstanceMetadataResolver.resolve(environment);
+            if (instanceMetadata.isPresent()) {
+                ComputeInstanceMetadata computeInstanceMetadata = instanceMetadata.get();
+                if (computeInstanceMetadata.getPublicIpV4()!=null) {
+                    instanceAttributes.put(AWS_INSTANCE_IPV4, computeInstanceMetadata.getPublicIpV4());
+                } else { if (computeInstanceMetadata.getPrivateIpV4()!=null) {
+                    instanceAttributes.put(AWS_INSTANCE_IPV4, computeInstanceMetadata.getPrivateIpV4());
+                }}
+
+                if (!instanceAttributes.containsKey(AWS_INSTANCE_IPV4)) {
+                    // try ip v6
+                    if (computeInstanceMetadata.getPublicIpV4()!=null) {
+                        instanceAttributes.put(AWS_INSTANCE_IPV6, computeInstanceMetadata.getPublicIpV6());
+                    } else { if (computeInstanceMetadata.getPrivateIpV6()!=null) {
+                        instanceAttributes.put(AWS_INSTANCE_IPV6, computeInstanceMetadata.getPrivateIpV6());
+                    }}
+                }
+            }
+        } else {
+            //TODO we can call ec2 service and find the info we need but this may be overkill
         }
-        if (instance.getGroup().isPresent()) {
-            instanceAttributes.put("group", instance.getGroup().get());
-        }
-        instanceAttributes.put("resolvedUri",instance.resolve(instance.getURI()).toString());
+
 
         //TODO config sharing will go in map above or in ConfigurationManagement Service?
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
-                .withInstanceId(instance.getInstanceId().get()).withAttributes(instanceAttributes);
+                .withInstanceId(instance.getInstanceId().get()).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
 
         RegisterInstanceResult instanceResult = discoveryClient.registerInstance(instanceRequest);
         GetOperationResult opResult = checkOperation(instanceResult.getOperationId());
@@ -201,7 +228,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         if (serviceDiscovery==null) {
             serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
         }
-        DnsRecord dnsRecord = new DnsRecord().withType(RecordType.CNAME).withTTL(ttl);
+        DnsRecord dnsRecord = new DnsRecord().withType(RecordType.A).withTTL(ttl);
         DnsConfig dnsConfig = new DnsConfig().withDnsRecords(dnsRecord).withNamespaceId(namespaceId).withRoutingPolicy(RoutingPolicy.WEIGHTED);
         CreateServiceRequest createServiceRequest = new CreateServiceRequest().withDnsConfig(dnsConfig)
                 .withDescription(description)
