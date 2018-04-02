@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,17 +11,16 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.io.scan;
 
 import io.micronaut.core.annotation.AnnotatedTypeInfo;
+import io.micronaut.core.reflect.ClassUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import io.micronaut.core.annotation.AnnotatedTypeInfo;
-import io.micronaut.core.reflect.ClassUtils;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -48,7 +47,6 @@ class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo
         boolean isAnnotation = ((access & Opcodes.ACC_ANNOTATION) != 0);
         this.isAbstract = isInterface || isAnnotation || ((access & Opcodes.ACC_ABSTRACT) != 0);
     }
-
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {

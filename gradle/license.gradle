@@ -13,4 +13,8 @@ license {
     exclude '**/*.txt'
     exclude '**/*.html'
     exclude '**/*.xml'
+    exclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+    exclude '**/io/micronaut/core/io/scan/Attribute.java'
+    exclude '**/io/micronaut/core/io/scan/Context.java'
+    exclude '**/io/micronaut/core/util/AntPathMatcher.java'
 }
