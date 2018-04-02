@@ -62,51 +62,55 @@ class RabbitConfigurationSpec extends Specification {
             applicationContext.close()
     }
 
-    void "default rabbit configuration with connection"() {
-        given:
-            ApplicationContext applicationContext = new DefaultApplicationContext("test")
-            applicationContext.start()
-
-        expect: "connection factory bean is available"
-            applicationContext.containsBean(ConnectionFactory)
-            applicationContext.containsBean(Connection)
-            applicationContext.containsBean(Channel)
-
-        when: "the connection factory is returned"
-            ConnectionFactory cf = applicationContext.getBean(ConnectionFactory)
-            Connection publisherConnection = applicationContext.getBean(Connection)
-            Channel publisherChannel = applicationContext.getBean(Channel)
-
-        then: "the rabbit beans are available"
-            cf
-            publisherConnection
-            publisherChannel
-
-        when: "the queue has been set"
-            publisherChannel.queueDeclare("hello", false, false, false, null)
-
-        then: "publish a message"
-            String originalMessage = "Hello World!"
-            publisherChannel.basicPublish("", "hello", null, originalMessage.getBytes("UTF-8"))
-
-        when: "a consumer is present"
-            // TODO: for some reason the output message is only available on the first run or if you edit this block, try adding a println
-            Connection consumerConnection = applicationContext.getBean(Connection)
-            Channel consumerChannel = consumerConnection.createChannel()
-            consumerChannel.queueDeclare("hello", false, false, false, null)
-
-            Consumer consumer = new DefaultConsumer(consumerChannel) {
-                @Override
-                void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
-                    String message = new String(body, "UTF-8");
-                    System.out.println(" [x] Received '" + message + "'");
-                }
-            }
-
-        then: "consume the message"
-            consumerChannel.basicConsume("hello", true, consumer)
-
-        cleanup:
-            applicationContext.close()
-    }
+    /**
+     * This test requires a running rabbit instance to be successful. Also while the test always passes you do not always
+     * see the message come through (I have a suspicion that may be due to timing).
+     */
+//    void "default rabbit configuration with connection"() {
+//        given:
+//            ApplicationContext applicationContext = new DefaultApplicationContext("test")
+//            applicationContext.start()
+//
+//        expect: "connection factory bean is available"
+//            applicationContext.containsBean(ConnectionFactory)
+//            applicationContext.containsBean(Connection)
+//            applicationContext.containsBean(Channel)
+//
+//        when: "the connection factory is returned"
+//            ConnectionFactory cf = applicationContext.getBean(ConnectionFactory)
+//            Connection publisherConnection = applicationContext.getBean(Connection)
+//            Channel publisherChannel = applicationContext.getBean(Channel)
+//
+//        then: "the rabbit beans are available"
+//            cf
+//            publisherConnection
+//            publisherChannel
+//
+//        when: "the queue has been set"
+//            publisherChannel.queueDeclare("hello", false, false, false, null)
+//
+//        then: "publish a message"
+//            String originalMessage = "Hello World!"
+//            publisherChannel.basicPublish("", "hello", null, originalMessage.getBytes("UTF-8"))
+//
+//        when: "a consumer is present"
+//            // TODO: for some reason the output message is only available on the first run or if you edit this block, try adding a println
+//            Connection consumerConnection = applicationContext.getBean(Connection)
+//            Channel consumerChannel = consumerConnection.createChannel()
+//            consumerChannel.queueDeclare("hello", false, false, false, null)
+//
+//            Consumer consumer = new DefaultConsumer(consumerChannel) {
+//                @Override
+//                void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+//                    String message = new String(body, "UTF-8");
+//                    System.out.println(" [x] Received '" + message + "'");
+//                }
+//            }
+//
+//        then: "consume the message"
+//            consumerChannel.basicConsume("hello", true, consumer)
+//
+//        cleanup:
+//            applicationContext.close()
+//    }
 }
