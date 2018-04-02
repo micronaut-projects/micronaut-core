@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,6 @@ import org.neo4j.driver.v1.AuthTokens;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.GraphDatabase;
 import org.neo4j.driver.v1.exceptions.ServiceUnavailableException;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.retry.annotation.Retryable;
 
 import javax.inject.Singleton;
 import java.net.URI;
@@ -44,41 +41,43 @@ public class Neo4jDriverBuilder {
     private final Neo4jBoltConfiguration boltConfiguration;
 
     public Neo4jDriverBuilder(Neo4jBoltConfiguration boltConfiguration) {
-        if(boltConfiguration == null) {
+        if (boltConfiguration == null) {
             throw new IllegalArgumentException("Configuration cannot be null");
         }
         this.boltConfiguration = boltConfiguration;
     }
 
+    /**
+     * Builds the Neo4j driver and retries the connection if there is a {@link ServiceUnavailableException} exception
+     * @return The Neo4j driver
+     */
     @Retryable(ServiceUnavailableException.class)
     public Driver buildDriver() {
         Neo4jBoltConfiguration configuration = this.boltConfiguration;
         List<URI> uris = configuration.getUris();
         Optional<AuthToken> configuredAuthToken = configuration.getAuthToken();
         AuthToken authToken = configuredAuthToken.orElse(null);
-        if(uris.size() == 1) {
+        if (uris.size() == 1) {
             URI uri = uris.get(0);
             String userInfo = uri.getUserInfo();
-            if(authToken == null && StringUtils.hasText(userInfo)) {
+            if (authToken == null && StringUtils.hasText(userInfo)) {
                 String[] info = userInfo.split(":");
-                if(info.length == 2) {
+                if (info.length == 2) {
                     authToken = AuthTokens.basic(info[0], info[1]);
                 }
             }
             return GraphDatabase.driver(
-                    uri,
-                    authToken,
-                    configuration.getConfig()
+                uri,
+                authToken,
+                configuration.getConfig()
             );
-        }
-        else if(!uris.isEmpty()) {
+        } else if (!uris.isEmpty()) {
             return GraphDatabase.routingDriver(
-                    uris,
-                    authToken,
-                    configuration.getConfig()
+                uris,
+                authToken,
+                configuration.getConfig()
             );
-        }
-        else {
+        } else {
             throw new ConfigurationException("At least one Neo4j URI should be specified eg. neo4j.uri=" + Neo4jBoltConfiguration.DEFAULT_URI);
         }
     }
