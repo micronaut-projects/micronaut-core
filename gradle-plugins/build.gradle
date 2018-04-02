@@ -1,0 +1,13 @@
+apply plugin: 'groovy'
+
+dependencies {
+    compile gradleApi()
+    compile project(":cli")
+    compile "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.0"
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Version': project.version
+    }
+}

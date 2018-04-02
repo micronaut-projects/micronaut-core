@@ -1,4 +1,5 @@
 package io.micronaut.cli.profile.commands.script
+
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.*

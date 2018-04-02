@@ -36,7 +36,7 @@ import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedExc
 @CompileStatic
 class MavenProfileRepository extends AbstractJarProfileRepository {
 
-    public static final RepositoryConfiguration DEFAULT_REPO = new RepositoryConfiguration("grailsCentral", new URI("https://repo.grails.org/grails/core"), true)
+    public static final RepositoryConfiguration DEFAULT_REPO = new RepositoryConfiguration("micronautCentral", new URI("https://repo.micronaut.io/"), true)
 
     List<RepositoryConfiguration> repositoryConfigurations
     AetherGrapeEngine grapeEngine
@@ -134,7 +134,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                 grapeEngine.grab(profile)
             }
 
-            def localData = new File(System.getProperty("user.home"),"/.m2/repository/org/grails/profiles")
+            def localData = new File(System.getProperty("user.home"),"/.m2/repository/io/micronaut/profiles")
             if(localData.exists()) {
                 localData.eachDir { File dir ->
                     if(!dir.name.startsWith('.')) {

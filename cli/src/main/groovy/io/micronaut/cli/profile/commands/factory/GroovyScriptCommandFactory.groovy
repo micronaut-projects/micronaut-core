@@ -65,8 +65,8 @@ class GroovyScriptCommandFactory extends ResourceResolvingCommandFactory<GroovyS
 
         def importCustomizer = new ImportCustomizer()
         importCustomizer.addStarImports("io.micronaut.cli.interactive.completers")
-        importCustomizer.addStarImports("grails.util")
-        importCustomizer.addStarImports("grails.codegen.model")
+        importCustomizer.addStarImports("io.micronaut.cli.util")
+        importCustomizer.addStarImports("io.micronaut.cli.codegen.model")
         configuration.addCompilationCustomizers(importCustomizer,new ASTTransformationCustomizer(new GroovyScriptCommandTransform()))
         def classLoader = new GroovyClassLoader(Thread.currentThread().contextClassLoader, configuration)
         return classLoader
