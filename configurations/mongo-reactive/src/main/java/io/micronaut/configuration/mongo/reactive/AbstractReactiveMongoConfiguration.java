@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,24 @@
  */
 package io.micronaut.configuration.mongo.reactive;
 
+import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
+import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
+
 import com.mongodb.ConnectionString;
-import com.mongodb.ServerAddress;
 import com.mongodb.async.client.MongoClientSettings;
-import com.mongodb.connection.*;
+import com.mongodb.connection.ClusterSettings;
+import com.mongodb.connection.ConnectionPoolSettings;
+import com.mongodb.connection.ServerSettings;
+import com.mongodb.connection.SocketSettings;
+import com.mongodb.connection.SslSettings;
 import com.mongodb.reactivestreams.client.MongoClients;
-import io.micronaut.context.env.Environment;
-import org.bson.codecs.pojo.PojoCodecProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
+import org.bson.codecs.pojo.PojoCodecProvider;
 
 import javax.validation.constraints.NotBlank;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
-
-import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
-import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 /**
  * Abstract Mongo configuration type
@@ -59,31 +59,14 @@ abstract class AbstractReactiveMongoConfiguration {
     }
 
     /**
-     * @return The {@link ClusterSettings#builder()}
-     */
-    public abstract ClusterSettings.Builder getClusterSettings();
-
-    /**
-     * @return The {@link MongoClientSettings#builder()}
-     */
-    public abstract MongoClientSettings.Builder getClientSettings();
-
-    public abstract ServerSettings.Builder getServerSettings();
-
-    public abstract ConnectionPoolSettings.Builder getPoolSettings();
-
-    public abstract SocketSettings.Builder getSocketSettings();
-
-    public abstract SslSettings.Builder getSslSettings();
-
-    /**
      * Sets the MongoDB URI
+     *
      * @param uri The MongoDB URI
      */
     public void setUri(String uri) {
         this.uri = uri;
         Optional<ConnectionString> connectionString = getConnectionString();
-        if(connectionString.isPresent()) {
+        if (connectionString.isPresent()) {
             ConnectionString cs = connectionString.get();
 
             getServerSettings().applyConnectionString(cs);
@@ -94,16 +77,45 @@ abstract class AbstractReactiveMongoConfiguration {
         }
     }
 
-
     /**
      * @return The MongoDB {@link ConnectionString}
      */
     public Optional<ConnectionString> getConnectionString() {
-        if(StringUtils.isNotEmpty(uri)) {
+        if (StringUtils.isNotEmpty(uri)) {
             return Optional.of(new ConnectionString(uri));
         }
         return Optional.empty();
     }
+
+    /**
+     * @return The {@link ClusterSettings#builder()}
+     */
+    public abstract ClusterSettings.Builder getClusterSettings();
+
+    /**
+     * @return The {@link MongoClientSettings#builder()}
+     */
+    public abstract MongoClientSettings.Builder getClientSettings();
+
+    /**
+     * @return The {@link ServerSettings#builder()}
+     */
+    public abstract ServerSettings.Builder getServerSettings();
+
+    /**
+     * @return The {@link ConnectionPoolSettings#builder()}
+     */
+    public abstract ConnectionPoolSettings.Builder getPoolSettings();
+
+    /**
+     * @return The {@link SocketSettings#builder()}
+     */
+    public abstract SocketSettings.Builder getSocketSettings();
+
+    /**
+     * @return The {@link SslSettings#builder()}
+     */
+    public abstract SslSettings.Builder getSslSettings();
 
     /**
      * @return Builds the {@link MongoClientSettings}
@@ -115,18 +127,17 @@ abstract class AbstractReactiveMongoConfiguration {
         SocketSettings.Builder socketSettings = getSocketSettings();
         ServerSettings.Builder serverSettings = getServerSettings();
 
-
         MongoClientSettings.Builder clientSettings = getClientSettings();
         clientSettings.applicationName(getApplicationName());
         clientSettings.clusterSettings(clusterSettings.build())
-                      .serverSettings(serverSettings.build())
-                      .connectionPoolSettings(poolSettings.build())
-                      .socketSettings(socketSettings.build())
-                      .sslSettings(sslSettings.build())  ;
+            .serverSettings(serverSettings.build())
+            .connectionPoolSettings(poolSettings.build())
+            .socketSettings(socketSettings.build())
+            .sslSettings(sslSettings.build());
 
         clientSettings.codecRegistry(
-                fromRegistries(MongoClients.getDefaultCodecRegistry(),
-                        fromProviders(PojoCodecProvider.builder().automatic(true).build()))
+            fromRegistries(MongoClients.getDefaultCodecRegistry(),
+                fromProviders(PojoCodecProvider.builder().automatic(true).build()))
 
         );
         return clientSettings.build();
