@@ -1,0 +1,5 @@
+import groovy.transform.*
+
+@Field Object object
+
+json g.render(object)
