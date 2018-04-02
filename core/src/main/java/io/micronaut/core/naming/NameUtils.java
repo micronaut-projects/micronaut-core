@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,6 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class NameUtils {
-
-
 
     /**
      * Converts class name to property name using JavaBean decapitalization
@@ -76,7 +74,6 @@ public class NameUtils {
         return name.substring(0, 1).toUpperCase(Locale.ENGLISH) + rest;
     }
 
-
     /**
      * Converts camel case to hyphenated, lowercase form
      *
@@ -107,15 +104,21 @@ public class NameUtils {
      */
     public static String dehyphenate(String name) {
         return Arrays.stream(name.split("-"))
-                .map((str) -> {
-                    if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                    }
-                    return str;
-                })
-                .collect(Collectors.joining(""));
+            .map((str) -> {
+                if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
+                    return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+                }
+                return str;
+            })
+            .collect(Collectors.joining(""));
     }
 
+    /**
+     * Returns the package name for a class represented as string
+     *
+     * @param className The class name
+     * @return The package name
+     */
     public static String getPackageName(String className) {
         int i = className.lastIndexOf('.');
         if (i > -1) {
@@ -134,55 +137,12 @@ public class NameUtils {
         return separateCamelCase(camelCase, false, '_');
     }
 
-    private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
-        if (!lowerCase) {
-            StringBuilder newName = new StringBuilder();
-            boolean first = true;
-            char last = '0';
-            for (char c : name.toCharArray()) {
-                if (first) {
-                    newName.append(c);
-                    first = false;
-                } else {
-                    if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
-                        newName.append(separatorChar).append(c);
-                    } else {
-                        if (c == '.') first = true;
-                        newName.append(c);
-                    }
-                }
-                last = c;
-            }
-            return newName.toString();
-        } else {
-
-            StringBuilder newName = new StringBuilder();
-            char[] chars = name.toCharArray();
-            boolean first = true;
-            char last = '0';
-            for (char c : chars) {
-
-                if (Character.isLowerCase(c) || !Character.isLetter(c)) {
-                    first = false;
-                    newName.append(c);
-                } else {
-                    char lowerCaseChar = Character.toLowerCase(c);
-                    if (first) {
-                        first = false;
-                        newName.append(lowerCaseChar);
-                    } else if (Character.isUpperCase(last) || last == '.') {
-                        newName.append(lowerCaseChar);
-                    } else {
-                        newName.append(separatorChar).append(lowerCaseChar);
-                    }
-                }
-                last = c;
-            }
-
-            return newName.toString();
-        }
-    }
-
+    /**
+     * Returns the simple name for a class represented as string
+     *
+     * @param className The class name
+     * @return The simple name of the class
+     */
     public static String getSimpleName(String className) {
         int i = className.lastIndexOf('.');
         if (i > -1) {
@@ -225,9 +185,8 @@ public class NameUtils {
      * <li>UNLESS the second character is also Upper Case, when the String is
      * returned unchanged <eul>
      *
-     * @param name -
-     *            the String to decapitalize
-     * @return the decapitalized version of the String
+     * @param name The String to decapitalize
+     * @return The decapitalized version of the String
      */
     public static String decapitalize(String name) {
 
@@ -244,5 +203,53 @@ public class NameUtils {
         char[] chars = name.toCharArray();
         chars[0] = Character.toLowerCase(chars[0]);
         return new String(chars);
+    }
+
+    private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
+        if (!lowerCase) {
+            StringBuilder newName = new StringBuilder();
+            boolean first = true;
+            char last = '0';
+            for (char c : name.toCharArray()) {
+                if (first) {
+                    newName.append(c);
+                    first = false;
+                } else {
+                    if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
+                        newName.append(separatorChar).append(c);
+                    } else {
+                        if (c == '.') first = true;
+                        newName.append(c);
+                    }
+                }
+                last = c;
+            }
+            return newName.toString();
+        } else {
+            StringBuilder newName = new StringBuilder();
+            char[] chars = name.toCharArray();
+            boolean first = true;
+            char last = '0';
+            for (char c : chars) {
+
+                if (Character.isLowerCase(c) || !Character.isLetter(c)) {
+                    first = false;
+                    newName.append(c);
+                } else {
+                    char lowerCaseChar = Character.toLowerCase(c);
+                    if (first) {
+                        first = false;
+                        newName.append(lowerCaseChar);
+                    } else if (Character.isUpperCase(last) || last == '.') {
+                        newName.append(lowerCaseChar);
+                    } else {
+                        newName.append(separatorChar).append(lowerCaseChar);
+                    }
+                }
+                last = c;
+            }
+
+            return newName.toString();
+        }
     }
 }
