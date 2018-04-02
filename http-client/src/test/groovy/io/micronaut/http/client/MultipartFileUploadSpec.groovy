@@ -13,9 +13,6 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
-import io.reactivex.FlowableSubscriber
-import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Consumer
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import org.reactivestreams.Publisher
@@ -23,10 +20,8 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
-import spock.lang.IgnoreRest
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.atomic.AtomicLong
 
@@ -78,30 +73,36 @@ class MultipartFileUploadSpec extends Specification {
         ))
         HttpResponse<String> response = flowable.blockingFirst()
         def body = response.getBody().get()
+        def newFile = new File(uploadDir, "Walking The Himalayas.txt")
 
         then:
         body == "Uploaded"
-        new File(uploadDir, "Walking The Himalayas.txt").exists()
+        newFile.exists()
+        newFile.text == file.text
+
     }
 
-    @Ignore
     void "test upload big FileUpload object via transferTo"() {
         given:
         def val = 'Big '+ 'xxxx' * 500
-        byte[] data = '{"title":"'+val+'"}'.bytes
+        def data = '{"title":"'+val+'"}'
+        File datafile = new File(uploadDir, "data.json")
+        datafile.createNewFile()
+        datafile.text = data
         MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data",  datafile.name, MediaType.APPLICATION_JSON_TYPE, datafile)
                 .addPart("title", "bar")
-                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data)
                 .build()
 
         when:
-        BlockingHttpClient blockingHttpClient = client.toBlocking()
-        HttpResponse<String> response = blockingHttpClient.retrieve(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/streamBigFileUpload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
-        )
+        ))
+
+        HttpResponse<String> response = flowable.blockingFirst()
         def body = response.getBody().get()
         def file = new File(uploadDir, "bar.json")
 
