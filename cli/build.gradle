@@ -19,6 +19,9 @@ dependencies {
     runtime "org.slf4j:slf4j-simple:$slf4jVersion"
     runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 
+    compileOnly gradleApi()
+    compileOnly "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3"
+
     testCompile "net.sf.expectit:expectit-core:0.5.0"
     testCompile "com.github.jnr:jnr-posix:3.0.6"
 }
