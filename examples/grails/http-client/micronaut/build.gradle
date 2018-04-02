@@ -51,6 +51,7 @@ dependencies {
     testCompile "org.grails:grails-plugin-testing"
     testCompile "org.grails:grails-web-testing-support"
 
+    compile 'io.micronaut:http-client:1.0.0-SNAPSHOT'
     compile 'io.micronaut:inject:1.0.0-SNAPSHOT'
 }
 
