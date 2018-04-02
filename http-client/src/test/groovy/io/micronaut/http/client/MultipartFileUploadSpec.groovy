@@ -3,23 +3,40 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Part
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
+import io.reactivex.FlowableSubscriber
+import io.reactivex.annotations.NonNull
+import io.reactivex.functions.Consumer
+import io.reactivex.schedulers.Schedulers
+import io.reactivex.subjects.PublishSubject
+import org.reactivestreams.Publisher
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
+import spock.lang.IgnoreRest
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
+
+import java.util.concurrent.atomic.AtomicLong
 
 class MultipartFileUploadSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
     @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-    @Shared File uploadDir = File.createTempDir()
 
+    static final File uploadDir = File.createTempDir()
 
     void "test multipart file request"() {
         given:
@@ -41,12 +58,241 @@ class MultipartFileUploadSpec extends Specification {
         body == "Uploaded 9 bytes"
     }
 
+    void "test upload FileUpload object via transferTo"() {
+        given:
+        File file = new File(uploadDir, "walkingthehimalayas.txt")
+        file.text = "test file"
+        file.createNewFile()
+
+        when:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", file)
+                .addPart("title", "Walking The Himalayas")
+                .build()
+
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/streamFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+
+        then:
+        body == "Uploaded"
+        new File(uploadDir, "Walking The Himalayas.txt").exists()
+    }
+
+    @Ignore
+    void "test upload big FileUpload object via transferTo"() {
+        given:
+        def val = 'Big '+ 'xxxx' * 500
+        byte[] data = '{"title":"'+val+'"}'.bytes
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data)
+                .build()
+
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        HttpResponse<String> response = blockingHttpClient.retrieve(
+                HttpRequest.POST("/multipart/streamBigFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+        def body = response.getBody().get()
+        def file = new File(uploadDir, "bar.json")
+
+        then:
+        response.code() == HttpStatus.OK.code
+        body == "Uploaded"
+        file.exists()
+        file.text == data
+    }
+
+    void "test non-blocking upload with publisher receiving bytes"() {
+        given:
+        def data = 'some data ' * 500
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/receivePublisher", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.length() == data.length()
+        result == data
+
+    }
+
+    @Ignore
+    void "test non-blocking upload with publisher receiving two objects"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", data.bytes)
+                .addPart("title", "bar")
+                .build()
+
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/receiveTwoFlowParts", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.length() == data.length()
+        result == data
+
+    }
+
+    @Ignore
+    void "test non-blocking upload with publisher receiving converted JSON"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/recieveFlowData", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+        def body = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        body == 'Data{title=\'Test\'}'
+
+        when:"a large document with partial data is uploaded"
+        def val = 'Big '+ 'xxxx' * 200
+        data = '{"title":"'+val+'"}'
+        requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/recieveFlowData", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        response = flowable.blockingFirst()
+        body = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        body.contains(val) // TODO: optimize this to use Jackson non-blocking and JsonNode
+
+
+    }
+
+
     @Controller('/multipart')
     static class MultipartController {
+
 
         @Post(uri = '/upload', consumes = MediaType.MULTIPART_FORM_DATA)
         HttpResponse<String> upload(byte[] data) {
             return HttpResponse.ok("Uploaded " + data.length + " bytes")
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> streamFileUpload(StreamingFileUpload data, String title) {
+            return Flowable.fromPublisher(data.transferTo(new File(uploadDir, title + ".txt"))).map ({success->
+                success ? HttpResponse.ok("Uploaded") :
+                HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")
+            })
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> streamBigFileUpload(StreamingFileUpload data, String title) {
+            return Flowable.fromPublisher(data.transferTo(new File(uploadDir, title + ".json"))).map ({success->
+                success ? HttpResponse.ok("Uploaded") :
+                        HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")
+            })
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> receivePublisher(@Part Flowable<byte[]> data) {
+            StringBuilder builder = new StringBuilder()
+            AtomicLong length = new AtomicLong(0)
+            PublishSubject<HttpResponse> subject = PublishSubject.create()
+            data
+                    .subscribeOn(Schedulers.io())
+                    .subscribe(
+                    new Subscriber<byte[]>() {
+                        Subscription subscription
+                        @Override
+                        void onSubscribe(Subscription s) {
+                            s.request(1)
+                            this.subscription = s
+                        }
+
+                        @Override
+                        void onNext(byte[] bytes) {
+                            builder.append(new String(bytes))
+                            length.addAndGet(bytes.length)
+                            subscription.request(1)
+                        }
+
+                        @Override
+                        void onError(Throwable t) {
+                            subject.onError(t)
+                        }
+
+                        @Override
+                        void onComplete() {
+                            subject.onNext(HttpResponse.ok(builder.toString()))
+                            subject.onComplete()
+                        }
+                    })
+            return subject.toFlowable(BackpressureStrategy.ERROR)
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
+            return Flowable.just(data.flatMap({left, right -> left == right ? left.toString() : left.toString() + " " + right.toString()})).map({success-> HttpResponse.ok()})
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> receiveTwoFlowParts(@Part Flowable<Data> dataPublisher, @Part Flowable<String> titlePublisher) {
+            return titlePublisher.zipWith(dataPublisher, {title, data -> HttpResponse.ok( title + ": " + data.toString() )})
+        }
+
+        static class Data {
+            String title
+
+            @Override
+            String toString() {
+                return "Data{" +
+                        "title='" + title + '\'' +
+                        '}'
+            }
         }
 
     }
