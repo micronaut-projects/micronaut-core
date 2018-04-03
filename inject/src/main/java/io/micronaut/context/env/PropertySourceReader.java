@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,14 +31,16 @@ import java.util.Set;
  * @since 1.0
  */
 public interface PropertySourceReader {
+
     /**
      * Read a property source from an input stream
      *
-     * @param name The name of the property source
+     * @param name  The name of the property source
      * @param input The bytes
      * @return A map of string to values
      */
-    Map<String,Object> read(String name, InputStream input) throws IOException;
+    Map<String, Object> read(String name, InputStream input) throws IOException;
+
     /**
      * @return The extensions this reader supports
      */
@@ -49,16 +51,15 @@ public interface PropertySourceReader {
     /**
      * Read a property source from bytes
      *
-     * @param name The name of the property source
+     * @param name  The name of the property source
      * @param bytes The bytes
      * @return A map of string to values
      */
     default Map<String, Object> read(String name, byte[] bytes) {
-        try(InputStream input = new ByteArrayInputStream(bytes)) {
+        try (InputStream input = new ByteArrayInputStream(bytes)) {
             return read(name, input);
-        }
-        catch (Throwable e) {
-            throw new ConfigurationException("Error reading property source ["+name+"]: " + e.getMessage(),e);
+        } catch (Throwable e) {
+            throw new ConfigurationException("Error reading property source [" + name + "]: " + e.getMessage(), e);
         }
     }
 }
