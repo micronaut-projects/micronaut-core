@@ -66,7 +66,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
 
     /**
      * The {@link ObjectSerializer} to use for serializing keys. Defaults to {@link DefaultStringKeySerializer}
-     * @return
+     * @return The optional {@link ObjectSerializer} class
      */
     public Optional<Class<ObjectSerializer>> getKeySerializer() {
         return Optional.ofNullable(keySerializer);

@@ -20,7 +20,6 @@ import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -28,8 +27,7 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-@Ignore
-class TtlHeartbeatSpec extends Specification {
+class TtlHeartbeatSpec extends Specification implements MockConsulSpec {
 
 
     void "test that the server reports a TTL heartbeat when configured to do so"() {
@@ -38,6 +36,7 @@ class TtlHeartbeatSpec extends Specification {
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer,
                 [(MockConsulServer.ENABLED):true]
         )
+        waitFor(consulServer)
 
         when:"An application is started that sends a heart beat to consul"
         String serviceId = 'myService'
@@ -48,6 +47,7 @@ class TtlHeartbeatSpec extends Specification {
                  'micronaut.application.name': serviceId,
                  'micronaut.heartbeat.interval':'1s'] // short heart beat interval
         )
+        waitForService(consulServer, 'myService')
 
         DiscoveryClient discoveryClient = application.applicationContext.getBean(DiscoveryClient)
         PollingConditions conditions = new PollingConditions(timeout: 30 )
