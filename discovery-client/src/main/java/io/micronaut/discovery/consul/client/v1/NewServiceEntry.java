@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.CollectionUtils;
 
 import java.net.InetAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A service entry in Consul. See https://www.consul.io/api/catalog.html#service
@@ -50,15 +51,27 @@ public class NewServiceEntry extends AbstractServiceEntry {
         return checks;
     }
 
+    /**
+     * See https://www.consul.io/api/agent/service.html#checks
+     *
+     * @param checks The health checks
+     * @return The {@link NewServiceEntry} instance
+     */
     public NewServiceEntry checks(List<NewCheck> checks) {
-        if(checks != null) {
+        if (checks != null) {
             this.checks.addAll(checks);
         }
         return this;
     }
 
+    /**
+     * See https://www.consul.io/api/agent/service.html#checks
+     *
+     * @param check The health check
+     * @return The {@link NewServiceEntry} instance
+     */
     public NewServiceEntry check(NewCheck check) {
-        if(check != null) {
+        if (check != null) {
             this.checks.add(check);
         }
         return this;
@@ -94,7 +107,7 @@ public class NewServiceEntry extends AbstractServiceEntry {
     }
 
     void setChecks(List<HTTPCheck> checks) {
-        if(CollectionUtils.isNotEmpty(checks)) {
+        if (CollectionUtils.isNotEmpty(checks)) {
             this.checks.addAll(checks);
         }
     }
