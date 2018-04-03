@@ -1,33 +1,21 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Part;
-import io.micronaut.http.server.binding.binders.AnnotatedRequestArgumentBinder;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.ChunkedFileUpload;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -45,6 +33,8 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.ChunkedFileUpload;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.handler.codec.http.multipart.HttpData;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -59,7 +49,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,Publisher> {
+public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part, Publisher> {
     private final NettyHttpServerConfiguration httpServerConfiguration;
     private final ConversionService<?> conversionService;
 
@@ -77,7 +67,7 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
     @Override
     public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
         Optional<MediaType> contentType = source.getContentType();
-        if(contentType.isPresent() && MediaType.MULTIPART_FORM_DATA_TYPE.equals(contentType.get())) {
+        if (contentType.isPresent() && MediaType.MULTIPART_FORM_DATA_TYPE.equals(contentType.get())) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             Argument<Publisher> argument = context.getArgument();
             String argumentName = argument.getName();
@@ -85,10 +75,11 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             final ArgumentConversionContext<?> typeContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
             if (nativeRequest instanceof StreamedHttpRequest) {
-                return ()-> Optional.of(subscriber -> {
+                return () -> Optional.of(subscriber -> {
                     Subscriber<HttpData> contentSubscriber = new CompletionAwareSubscriber<HttpData>() {
                         int position = 0;
                         String partName;
+
                         @Override
                         protected void doOnSubscribe(Subscription subscription) {
                             subscriber.onSubscribe(subscription);
@@ -97,40 +88,36 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                         @Override
                         protected void doOnNext(HttpData data) {
                             String name = data.getName();
-                            if(partName == null || !partName.equals(name)) {
+                            if (partName == null || !partName.equals(name)) {
                                 // reset the position
                                 position = 0;
                             }
                             partName = name;
-                            if(partName.equals(expectedInputName) ) {
+                            if (partName.equals(expectedInputName)) {
 
-                                if(data instanceof FileUpload) {
+                                if (data instanceof FileUpload) {
                                     FileUpload upload = (FileUpload) data;
                                     position += upload.length();
                                     data = new ChunkedFileUpload(position, upload);
                                 }
 
                                 Optional<?> converted = conversionService.convert(data, typeContext);
-                                if(converted.isPresent()) {
+                                if (converted.isPresent()) {
                                     subscriber.onNext(converted.get());
-                                }
-                                else {
-                                    if(data.isCompleted()) {
+                                } else {
+                                    if (data.isCompleted()) {
                                         Optional<ConversionError> lastError = typeContext.getLastError();
-                                        if( lastError.isPresent() ) {
+                                        if (lastError.isPresent()) {
                                             onError(new ConversionErrorException(argument, lastError.get()));
-                                        }
-                                        else {
+                                        } else {
                                             onError(new UnsatisfiedRouteException(argument));
                                         }
-                                    }
-                                    else {
+                                    } else {
                                         // not enough data so keep going
                                         subscription.request(1);
                                     }
                                 }
-                            }
-                            else {
+                            } else {
                                 // not the data we want so keep going
                                 subscription.request(1);
                             }

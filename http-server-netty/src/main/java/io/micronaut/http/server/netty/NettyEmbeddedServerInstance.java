@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import java.util.Optional;
  */
 @Prototype
 class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
+
     private final String id;
     private final NettyHttpServer nettyHttpServer;
     private final Environment environment;
@@ -48,11 +49,12 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private ConvertibleValues<String> instanceMetadata;
 
     NettyEmbeddedServerInstance(
-            @Parameter String id,
-            @Parameter NettyHttpServer nettyHttpServer,
-            Environment environment,
-            @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
-            ServiceInstanceMetadataContributor...metadataContributors) {
+        @Parameter String id,
+        @Parameter NettyHttpServer nettyHttpServer,
+        Environment environment,
+        @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
+        ServiceInstanceMetadataContributor... metadataContributors) {
+
         this.id = id;
         this.nettyHttpServer = nettyHttpServer;
         this.environment = environment;
@@ -77,11 +79,11 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
 
     @Override
     public ConvertibleValues<String> getMetadata() {
-        if(instanceMetadata == null) {
-            Map<String,String> cloudMetadata = new HashMap<>();
+        if (instanceMetadata == null) {
+            Map<String, String> cloudMetadata = new HashMap<>();
             if (computeInstanceMetadataResolver != null) {
                 Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
-                if(resolved.isPresent()) {
+                if (resolved.isPresent()) {
                     cloudMetadata = resolved.get().getMetadata();
                 }
             }
@@ -89,10 +91,10 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
                 metadataContributor.contribute(this, cloudMetadata);
             }
             Map<String, String> metadata = nettyHttpServer.getServerConfiguration()
-                    .getApplicationConfiguration()
-                    .getInstance()
-                    .getMetadata();
-            if (cloudMetadata!=null) {
+                .getApplicationConfiguration()
+                .getInstance()
+                .getMetadata();
+            if (cloudMetadata != null) {
                 cloudMetadata.putAll(metadata);
             }
             instanceMetadata = ConvertibleValues.of(cloudMetadata);

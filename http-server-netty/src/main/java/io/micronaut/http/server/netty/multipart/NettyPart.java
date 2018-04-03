@@ -1,31 +1,31 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.core.async.processor.SingleSubscriberProcessor;
+import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.multipart.MultipartException;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.micronaut.core.async.processor.SingleSubscriberProcessor;
-import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -47,6 +47,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.http.multipart.FileUpload, StreamingFileUpload> implements StreamingFileUpload, ByteBufHolder {
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyPart.class);
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
     private final ExecutorService ioExecutor;
@@ -54,10 +55,11 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
     private final Subscription dataSubscription;
 
     public NettyPart(
-            io.netty.handler.codec.http.multipart.FileUpload httpData,
-            HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
-            ExecutorService ioExecutor,
-            Subscription subscription) {
+        io.netty.handler.codec.http.multipart.FileUpload httpData,
+        HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
+        ExecutorService ioExecutor,
+        Subscription subscription) {
+
         this.configuration = multipartConfiguration;
         this.fileUpload = httpData;
         this.ioExecutor = ioExecutor;
@@ -125,15 +127,14 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
     public Publisher<Boolean> transferTo(File destination) {
         Supplier<Boolean> transferOperation = () -> {
             try {
-                if(LOG.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     LOG.debug("Transferring file {} to location {}", fileUpload.getFilename(), destination);
                 }
                 return destination != null && fileUpload.renameTo(destination);
             } catch (IOException e) {
                 throw new MultipartException("Error transferring file: " + fileUpload.getName(), e);
-            }
-            finally {
-                if(fileUpload.refCnt() > 0) {
+            } finally {
+                if (fileUpload.refCnt() > 0) {
                     fileUpload.release();
                 }
             }
@@ -148,17 +149,16 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
                 protected void doOnNext(StreamingFileUpload message) {
                     if (message.isComplete()) {
                         ioExecutor.submit(() -> {
-                                    Subscriber<? super Boolean> subscriber = getSubscriber();
-                                    try {
-                                        subscriber.onNext(transferOperation.get());
-                                        subscriber.onComplete();
-                                    } catch (Exception e) {
-                                        subscriber.onError(e);
-                                    }
+                                Subscriber<? super Boolean> subscriber = getSubscriber();
+                                try {
+                                    subscriber.onNext(transferOperation.get());
+                                    subscriber.onComplete();
+                                } catch (Exception e) {
+                                    subscriber.onError(e);
                                 }
+                            }
                         );
-                    }
-                    else {
+                    } else {
                         getSubscriber().onError(new MultipartException("Transfer did not complete"));
                     }
                 }
@@ -184,33 +184,9 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
         });
     }
 
-    protected ByteBuf getByteBuf() throws IOException {
-        ByteBuf byteBuf;
-        if (fileUpload instanceof ChunkedFileUpload) {
-            ChunkedFileUpload chunkedFileUpload = (ChunkedFileUpload) fileUpload;
-            byteBuf = chunkedFileUpload.getCurrentChunk();
-        } else {
-            byteBuf = fileUpload.getByteBuf();
-        }
-        return byteBuf;
-    }
-
     @Override
     public ByteBuf content() {
         return fileUpload.content();
-    }
-
-    protected File createTemp(String location)  {
-        File tempFile;
-        try {
-            tempFile = File.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location);
-        } catch (IOException e) {
-            throw new MultipartException("Unable to create temp directory: " + e.getMessage(), e);
-        }
-        if (tempFile.delete()) {
-            return tempFile;
-        }
-        return null;
     }
 
     @Override
@@ -268,6 +244,29 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
         return fileUpload.release(decrement);
     }
 
+    protected ByteBuf getByteBuf() throws IOException {
+        ByteBuf byteBuf;
+        if (fileUpload instanceof ChunkedFileUpload) {
+            ChunkedFileUpload chunkedFileUpload = (ChunkedFileUpload) fileUpload;
+            byteBuf = chunkedFileUpload.getCurrentChunk();
+        } else {
+            byteBuf = fileUpload.getByteBuf();
+        }
+        return byteBuf;
+    }
+
+    protected File createTemp(String location) {
+        File tempFile;
+        try {
+            tempFile = File.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location);
+        } catch (IOException e) {
+            throw new MultipartException("Unable to create temp directory: " + e.getMessage(), e);
+        }
+        if (tempFile.delete()) {
+            return tempFile;
+        }
+        return null;
+    }
 
     @Override
     protected void doOnNext(io.netty.handler.codec.http.multipart.FileUpload message) {
@@ -281,7 +280,6 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
                 dataSubscription.request(1);
             }
         }
-
     }
 
 /*    @Override
