@@ -1,6 +1,8 @@
 package io.micronaut.management.endpoint.info.impl;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.EmptyPropertySource;
+import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.management.endpoint.info.InfoAggregator;
@@ -40,7 +42,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
         for (int i = 0; i < sources.length; i++) {
             int index = i;
             Single<Map.Entry<Integer, PropertySource>> single = Flowable.fromPublisher(sources[i].getSource())
-                    .firstOrError()
+                    .first(new EmptyPropertySource())
                     .map((source) -> new AbstractMap.SimpleEntry<>(index, source));
             publishers.add(single.toFlowable());
         }
