@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ public interface ClientFilterChain extends FilterChain {
 
     @Override
     default Publisher<? extends HttpResponse<?>> proceed(HttpRequest<?> request) {
-        if(!(request instanceof MutableHttpRequest)) {
+        if (!(request instanceof MutableHttpRequest)) {
             throw new IllegalArgumentException("A MutableHttpRequest is required");
         }
-        return proceed((MutableHttpRequest)request);
+        return proceed((MutableHttpRequest) request);
     }
 }
