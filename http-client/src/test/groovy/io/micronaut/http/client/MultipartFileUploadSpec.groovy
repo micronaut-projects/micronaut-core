@@ -45,7 +45,7 @@ class MultipartFileUploadSpec extends Specification {
         uploadDir.delete()
     }
 
-    void "test multipart file request"() {
+    void "test multipart file request byte[]"() {
         given:
         File file = new File(uploadDir, "data.txt")
         file.text = "test file"
@@ -65,6 +65,25 @@ class MultipartFileUploadSpec extends Specification {
         body == "Uploaded 9 bytes"
     }
 
+    void "test multipart file request byte[] without content type"() {
+        given:
+        File file = new File(uploadDir, "data.txt")
+        file.text = "test file"
+        file.createNewFile()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.name, file.bytes))
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+
+        then:
+        body == "Uploaded 9 bytes"
+    }
 
     void "test upload FileUpload object via CompletedFileUpload"() {
         given:
@@ -90,6 +109,65 @@ class MultipartFileUploadSpec extends Specification {
 
         then:
         body == "Uploaded 9 bytes"
+        newFile.exists()
+        newFile.text == file.text
+
+    }
+
+    void "test upload InputStream"() {
+        given:
+        File file = new File(uploadDir, "walkingthehimalayas.txt")
+        file.createNewFile()
+        file << "test file input stream"
+
+        when:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", file.name, MediaType.TEXT_PLAIN_TYPE, file.newInputStream(), file.length())
+                .addPart("title", "Walking The Himalayas")
+                .build()
+
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+        def newFile = new File(uploadDir, "Walking The Himalayas.txt")
+
+        then:
+        body == "Uploaded ${file.length()} bytes"
+        newFile.exists()
+        newFile.text == file.text
+
+    }
+
+
+    void "test upload InputStream without ContentType"() {
+        given:
+        File file = new File(uploadDir, "walkingthehimalayas.txt")
+        file.createNewFile()
+        file << "test file input stream"
+
+        when:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", file.name, file.newInputStream(), file.length())
+                .addPart("title", "Walking The Himalayas")
+                .build()
+
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+        def newFile = new File(uploadDir, "Walking The Himalayas.txt")
+
+        then:
+        body == "Uploaded ${file.length()} bytes"
         newFile.exists()
         newFile.text == file.text
 
