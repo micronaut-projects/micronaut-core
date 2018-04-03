@@ -24,6 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+/**
+ * @author Rvanderwerf
+ * @since 1.0
+ */
 @Singleton
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
 @Requires(env= Environment.AMAZON_EC2)

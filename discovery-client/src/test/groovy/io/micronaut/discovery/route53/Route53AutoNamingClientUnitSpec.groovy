@@ -47,9 +47,10 @@ import spock.lang.*
 import spock.util.concurrent.PollingConditions
 
 /**
- * @author graemerocher
+ * @author Rvanderwerf
  * @since 1.0
  */
+
 @Stepwise
 class Route53AutoNamingClientUnitSpec extends Specification {
 
@@ -70,14 +71,10 @@ class Route53AutoNamingClientUnitSpec extends Specification {
     @Shared String serviceId
     @Shared String createdInstanceId
 
-
-
     def setupSpec() {
         namespaceId = "asdb123"
         serviceId = "123abcdf"
         client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
-
-
 
         createdInstanceId = "i-12123321"
         // we will need to call our getInstance Details since we are not running this on a real aws server and trick the resolver for the test

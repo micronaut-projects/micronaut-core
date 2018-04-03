@@ -11,6 +11,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
+ * @author Rvanderwerf
+ * @since 1.0
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env= Environment.AMAZON_EC2)
