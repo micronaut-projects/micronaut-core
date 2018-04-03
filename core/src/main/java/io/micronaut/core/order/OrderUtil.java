@@ -45,11 +45,7 @@ public class OrderUtil {
      *
      * @return the comparator
      */
-    public static final Comparator<Object> reverseComparator = Collections.reverseOrder((o1, o2) -> {
-        int order1 = getOrder(o1);
-        int order2 = getOrder(o2);
-        return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
-    });
+    public static final Comparator<Object> reverseComparator = Collections.reverseOrder(comparator);
 
     /**
      * Sort the given list
