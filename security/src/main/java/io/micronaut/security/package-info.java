@@ -15,9 +15,9 @@
  */
 
 /**
- * Contains classes specific to CORS support within Micronaut
+ * Contains classes specific to Security capabilities within Micronaut
  *
- * @author Graeme Rocher
+ * @author Sergio del Amo
  * @since 1.0
  */
 @Configuration
