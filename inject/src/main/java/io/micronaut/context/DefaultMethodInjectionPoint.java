@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.BeanInstantiationException;
@@ -21,6 +36,7 @@ import java.util.Arrays;
  */
 @Internal
 class DefaultMethodInjectionPoint implements MethodInjectionPoint {
+
     private final Method method;
     private final Argument[] arguments;
     private final boolean requiresReflection;
@@ -30,9 +46,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     DefaultMethodInjectionPoint(BeanDefinition declaringBean,
                                 Method method,
                                 boolean requiresReflection,
-                                Argument...arguments) {
+                                Argument... arguments) {
         this.method = method;
-        this.annotationElements = new AnnotatedElement[] { method, declaringBean.getBeanType()};
+        this.annotationElements = new AnnotatedElement[]{method, declaringBean.getBeanType()};
         this.requiresReflection = requiresReflection;
         if (requiresReflection) {
             this.method.setAccessible(true);
@@ -45,11 +61,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Field field,
                                 Method method,
                                 boolean requiresReflection,
-                                Argument...arguments) {
+                                Argument... arguments) {
         this.method = method;
-        this.annotationElements = new AnnotatedElement[] { field, method, declaringComponent.getBeanType()};
+        this.annotationElements = new AnnotatedElement[]{field, method, declaringComponent.getBeanType()};
         this.requiresReflection = requiresReflection;
-        if(requiresReflection) {
+        if (requiresReflection) {
             this.method.setAccessible(true);
         }
         this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
@@ -94,20 +110,20 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     @Override
     public Object invoke(Object instance, Object... args) {
         Argument[] componentTypes = getArguments();
-        if(componentTypes.length != args.length) {
-            throw new BeanInstantiationException("Invalid bean argument count specified. Required: "+componentTypes.length+" . Received: " + args.length);
+        if (componentTypes.length != args.length) {
+            throw new BeanInstantiationException("Invalid bean argument count specified. Required: " + componentTypes.length + " . Received: " + args.length);
         }
 
         for (int i = 0; i < componentTypes.length; i++) {
             Class componentType = componentTypes[i].getType();
-            if(!componentType.isInstance(args[i])) {
-                throw new BeanInstantiationException("Invalid bean argument received ["+args[i]+"] at position ["+i+"]. Required type is: " + componentType.getName());
+            if (!componentType.isInstance(args[i])) {
+                throw new BeanInstantiationException("Invalid bean argument received [" + args[i] + "] at position [" + i + "]. Required type is: " + componentType.getName());
             }
         }
         try {
             return method.invoke(instance, args);
         } catch (Throwable e) {
-            throw new BeanInstantiationException("Cannot inject arguments for method ["+method+"] using arguments ["+ Arrays.asList(args)+"]:" + e.getMessage(), e);
+            throw new BeanInstantiationException("Cannot inject arguments for method [" + method + "] using arguments [" + Arrays.asList(args) + "]:" + e.getMessage(), e);
         }
     }
 

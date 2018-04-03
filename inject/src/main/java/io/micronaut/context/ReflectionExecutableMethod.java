@@ -1,33 +1,35 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.context.annotation.Executable;
 
 import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A fallback implementation of {@link ExecutableMethod} that uses reflection in the case where no invocation data has
@@ -36,7 +38,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
+class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
 
     private final BeanDefinition<T> beanDefinition;
     private final Method method;
@@ -48,25 +50,23 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
         this.method.setAccessible(true);
 
         Class<?>[] parameterTypes = method.getParameterTypes();
-        if(parameterTypes.length > 0) {
-
+        if (parameterTypes.length > 0) {
             Annotation[][] parameterAnnotations = method.getParameterAnnotations();
             List<Argument> arguments = new ArrayList<>(parameterTypes.length);
 
             for (int i = 0; i < parameterTypes.length; i++) {
                 Class<? extends Annotation> qualifierType = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i])
-                                                                          .map(Annotation::annotationType).orElse(null);
+                    .map(Annotation::annotationType).orElse(null);
                 arguments.add(Argument.of(
-                        method,
-                        "arg" + i,
-                        i,
-                        qualifierType
+                    method,
+                    "arg" + i,
+                    i,
+                    qualifierType
                 ));
             }
             this.arguments = arguments.toArray(new Argument[arguments.size()]);
-        }
-        else {
-            this.arguments =  Argument.ZERO_ARGUMENTS;
+        } else {
+            this.arguments = Argument.ZERO_ARGUMENTS;
         }
     }
 
@@ -155,7 +155,7 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
 
         @Override
         public AnnotatedElement[] getAnnotatedElements() {
-            return new AnnotatedElement[] { method.getAnnotatedReturnType(), method};
+            return new AnnotatedElement[]{method.getAnnotatedReturnType(), method};
         }
     }
 }
