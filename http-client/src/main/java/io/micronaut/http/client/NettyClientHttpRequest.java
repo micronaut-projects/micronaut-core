@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,31 @@
  */
 package io.micronaut.http.client;
 
+import com.typesafe.netty.http.DefaultStreamedHttpRequest;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
+import io.micronaut.http.netty.cookies.NettyCookie;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
-import com.typesafe.netty.http.DefaultStreamedHttpRequest;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -50,7 +54,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
+class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
@@ -181,10 +185,9 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
 
     HttpRequest getNettyRequest(Publisher<HttpContent> bodyPublisher) {
         HttpRequest request;
-        if(bodyPublisher != null) {
+        if (bodyPublisher != null) {
             request = new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString(), bodyPublisher);
-        }
-        else {
+        } else {
             request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString());
         }
         request.headers().setAll(headers.getNettyHeaders());
@@ -195,14 +198,14 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
-                                                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().setAll(headers.getNettyHeaders());
         return req;
     }
 
     private String resolveUriPath() {
         URI uri = getUri();
-        if(StringUtils.isNotEmpty(uri.getScheme())) {
+        if (StringUtils.isNotEmpty(uri.getScheme())) {
             try {
                 // obtain just the path
                 uri = new URI(null, null, null, -1, uri.getPath(), uri.getQuery(), uri.getFragment());
