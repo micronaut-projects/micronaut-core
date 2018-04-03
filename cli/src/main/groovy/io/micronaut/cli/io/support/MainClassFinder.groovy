@@ -130,7 +130,7 @@ class MainClassFinder {
             if (file.isDirectory()) {
                 def files = file.listFiles()?.findAll { File f ->
                     (f.isDirectory() && !f.name.startsWith('.') && !f.hidden) ||
-                            (f.isFile() && f.name.endsWith(GrailsResourceUtils.CLASS_EXTENSION))
+                            (f.isFile() && f.name.endsWith(ResourceUtils.CLASS_EXTENSION))
                 }
 
                 if(files) {

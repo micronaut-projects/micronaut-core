@@ -19,7 +19,7 @@ import io.micronaut.cli.util.NameUtils
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.runtime.MetaClassHelper
 import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.GrailsResourceUtils
+import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.Resource
 
 /**
@@ -74,7 +74,7 @@ trait ModelBuilder {
      * @return The {@link Model} instance
      */
     Model model(Resource resource) {
-        def className = GrailsResourceUtils.getClassName(resource)
+        def className = ResourceUtils.getClassName(resource)
         model(className)
     }
 

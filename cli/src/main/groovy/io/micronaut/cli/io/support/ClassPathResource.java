@@ -66,7 +66,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
      * @see java.lang.ClassLoader#getResourceAsStream(String)
      */
     public ClassPathResource(String path, ClassLoader classLoader) {
-        String pathToUse = GrailsResourceUtils.cleanPath(path);
+        String pathToUse = ResourceUtils.cleanPath(path);
         if (pathToUse.startsWith("/")) {
             pathToUse = pathToUse.substring(1);
         }
@@ -83,7 +83,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
      * @see java.lang.Class#getResourceAsStream
      */
     public ClassPathResource(String path, Class<?> clazz) {
-        this.path = GrailsResourceUtils.cleanPath(path);
+        this.path = ResourceUtils.cleanPath(path);
         this.clazz = clazz;
     }
 
@@ -95,7 +95,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
      * @param clazz the class to load resources with, if any
      */
     protected ClassPathResource(String path, ClassLoader classLoader, Class<?> clazz) {
-        this.path = GrailsResourceUtils.cleanPath(path);
+        this.path = ResourceUtils.cleanPath(path);
         this.classLoader = classLoader;
         this.clazz = clazz;
     }
@@ -180,7 +180,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
      * relative to the path of the underlying resource of this descriptor.
      */
     public Resource createRelative(String relativePath) {
-        String pathToUse = GrailsResourceUtils.applyRelativePath(path, relativePath);
+        String pathToUse = ResourceUtils.applyRelativePath(path, relativePath);
         return new ClassPathResource(pathToUse, classLoader, clazz);
     }
 
@@ -189,7 +189,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
      * resource refers to.
      */
     public String getFilename() {
-        return GrailsResourceUtils.getFilename(path);
+        return ResourceUtils.getFilename(path);
     }
 
     /**
@@ -199,7 +199,7 @@ public class ClassPathResource extends AbstractFileResolvingResource {
         StringBuilder builder = new StringBuilder("class path resource [");
 
         if (clazz != null) {
-            builder.append(GrailsResourceUtils.classPackageAsResourcePath(clazz));
+            builder.append(ResourceUtils.classPackageAsResourcePath(clazz));
             builder.append('/');
         }
 

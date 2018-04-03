@@ -18,8 +18,6 @@ package io.micronaut.cli.io
 import io.micronaut.cli.util.CliSettings
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
-import io.micronaut.cli.io.support.GrailsResourceUtils
-
 
 /**
  * Utility methods for interacting with resources
@@ -28,7 +26,7 @@ import io.micronaut.cli.io.support.GrailsResourceUtils
  * @since 3.0
  */
 @CompileStatic
-class ResourceUtils extends GrailsResourceUtils {
+class ResourceUtils extends io.micronaut.cli.io.support.ResourceUtils {
 
     /**
      * Obtains the package names for the project. Works at development time only, do not use at runtime.

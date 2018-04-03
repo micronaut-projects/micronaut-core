@@ -129,7 +129,7 @@ public class DefaultResourceLoader implements ResourceLoader {
 
         @Override
         public Resource createRelative(String relativePath) {
-            String pathToUse = GrailsResourceUtils.applyRelativePath(getPath(), relativePath);
+            String pathToUse = ResourceUtils.applyRelativePath(getPath(), relativePath);
             return new ClassPathContextResource(pathToUse, getClassLoader());
         }
     }

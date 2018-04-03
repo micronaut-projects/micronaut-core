@@ -16,7 +16,7 @@
 package io.micronaut.cli.interactive.completers
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.io.support.GrailsResourceUtils
+import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.util.CliSettings
 
@@ -34,6 +34,6 @@ class DomainClassCompleter extends ClassNameCompleter {
 
     @Override
     boolean isValidResource(Resource resource) {
-        GrailsResourceUtils.isDomainClass(resource.getURL())
+        ResourceUtils.isDomainClass(resource.getURL())
     }
 }

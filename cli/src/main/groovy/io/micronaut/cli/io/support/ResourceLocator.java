@@ -65,7 +65,7 @@ public class ResourceLocator {
     private void initializeForSearchLocation(String searchLocation) {
         String searchLocationPlusSlash = searchLocation.endsWith("/") ? searchLocation : searchLocation + FILE_SEPARATOR;
         try {
-            File[] directories = new File(searchLocationPlusSlash + GrailsResourceUtils.GRAILS_APP_DIR).listFiles(new FileFilter() {
+            File[] directories = new File(searchLocationPlusSlash + ResourceUtils.GRAILS_APP_DIR).listFiles(new FileFilter() {
                 public boolean accept(File file) {
                     return file.isDirectory() && !file.isHidden();
                 }
@@ -157,7 +157,7 @@ public class ResourceLocator {
             }
             if (resource == null || !resource.exists()) {
                 for(String ext : new String[]{".groovy", ".java"}) {
-                    resource = resolveExceptionSafe(GrailsResourceUtils.DOMAIN_DIR_PATH + "**/" + className + ext);
+                    resource = resolveExceptionSafe(ResourceUtils.DOMAIN_DIR_PATH + "**/" + className + ext);
                     if (resource != null && resource.exists()) {
                         classNameToResourceCache.put(className, resource);
                         break;

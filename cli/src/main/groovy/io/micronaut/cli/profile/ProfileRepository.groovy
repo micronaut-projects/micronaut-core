@@ -28,7 +28,7 @@ import io.micronaut.cli.io.support.Resource
  */
 interface ProfileRepository {
 
-    String DEFAULT_PROFILE_NAME = 'web'
+    String DEFAULT_PROFILE_NAME = 'base'
 
     /**
      * Obtains a named {@link Profile}
