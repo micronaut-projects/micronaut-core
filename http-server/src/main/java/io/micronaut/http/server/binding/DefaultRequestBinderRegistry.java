@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.binding;
 
@@ -30,7 +30,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.server.binding.binders.*;
+import io.micronaut.http.server.binding.binders.AnnotatedRequestArgumentBinder;
+import io.micronaut.http.server.binding.binders.CookieAnnotationBinder;
+import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
+import io.micronaut.http.server.binding.binders.HeaderAnnotationBinder;
+import io.micronaut.http.server.binding.binders.ParameterAnnotationBinder;
+import io.micronaut.http.server.binding.binders.RequestArgumentBinder;
+import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -54,15 +60,14 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final ConversionService<?> conversionService;
     private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache = Caffeine.newBuilder().maximumSize(30).build();
 
-    public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
+    public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder... binders) {
         this.conversionService = conversionService;
 
-
         for (RequestArgumentBinder binder : binders) {
-            if(binder instanceof AnnotatedRequestArgumentBinder) {
-                AnnotatedRequestArgumentBinder<?,?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
+            if (binder instanceof AnnotatedRequestArgumentBinder) {
+                AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
                 Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-                if(binder instanceof TypedRequestArgumentBinder) {
+                if (binder instanceof TypedRequestArgumentBinder) {
                     TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                     Argument argumentType = typedRequestArgumentBinder.argumentType();
                     byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
@@ -70,13 +75,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     for (Class<?> itfce : allInterfaces) {
                         byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
                     }
-                }
-                else {
+                } else {
                     byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
                 }
 
-            }
-            else if(binder instanceof TypedRequestArgumentBinder) {
+            } else if (binder instanceof TypedRequestArgumentBinder) {
                 TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                 byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             }
@@ -89,11 +92,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
         byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
-        byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>)(context, source) -> {
+        byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>) (context, source) -> {
             Cookies cookies = source.getCookies();
             String name = context.getArgument().getName();
             Cookie cookie = cookies.get(name);
-            if(cookie == null) {
+            if (cookie == null) {
                 cookie = cookies.get(NameUtils.hyphenate(name));
             }
             Cookie finalCookie = cookie;
@@ -104,24 +107,22 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     @Override
     public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument, HttpRequest<?> source) {
         Optional<Annotation> annotation = argument.findAnnotationWithStereoType(Bindable.class);
-        if(annotation.isPresent()) {
+        if (annotation.isPresent()) {
             Class<? extends Annotation> annotationType = annotation.get().annotationType();
             RequestArgumentBinder<T> binder = findBinder(argument, annotationType);
-            if(binder ==  null) {
+            if (binder == null) {
                 binder = byAnnotation.get(annotationType);
             }
-            if(binder != null) {
+            if (binder != null) {
                 return Optional.of(binder);
             }
-        }
-        else {
+        } else {
             RequestArgumentBinder<T> binder = byType.get(argument.typeHashCode());
-            if(binder != null) {
+            if (binder != null) {
                 return Optional.of(binder);
-            }
-            else {
+            } else {
                 binder = byType.get(Argument.of(argument.getType()).typeHashCode());
-                if(binder != null) {
+                if (binder != null) {
                     return Optional.of(binder);
                 }
             }
@@ -133,15 +134,15 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         TypeAndAnnotation key = new TypeAndAnnotation(argument, annotationType);
         return argumentBinderCache.get(key, key1 -> {
             RequestArgumentBinder requestArgumentBinder = byTypeAndAnnotation.get(key1);
-            if(requestArgumentBinder == null) {
+            if (requestArgumentBinder == null) {
                 Class<?> javaType = key1.type.getType();
                 Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(javaType);
                 for (Class itfce : allInterfaces) {
                     requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(itfce), annotationType));
-                    if(requestArgumentBinder != null) break;
+                    if (requestArgumentBinder != null) break;
                 }
 
-                if(requestArgumentBinder == null) {
+                if (requestArgumentBinder == null) {
                     // try the raw type
                     requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(argument.getType()), annotationType));
                 }
@@ -153,8 +154,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     protected void registerDefaultConverters(ConversionService<?> conversionService) {
         conversionService.addConverter(
-                CharSequence.class,
-                MediaType.class,(object, targetType, context) -> Optional.of(new MediaType(object.toString())));
+            CharSequence.class,
+            MediaType.class, (object, targetType, context) -> Optional.of(new MediaType(object.toString())));
 
     }
 
