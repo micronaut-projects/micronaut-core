@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class AnnotationUtils {
     /**
      * Return whether the given element is annotated with the given annotation stereotype
      *
-     * @param element The element
+     * @param element    The element
      * @param stereotype The stereotype
      * @return True if it is
      */
@@ -60,7 +60,7 @@ public class AnnotationUtils {
     /**
      * Return whether the given element is annotated with the given annotation stereotypes
      *
-     * @param element The element
+     * @param element     The element
      * @param stereotypes The stereotypes
      * @return True if it is
      */
@@ -71,7 +71,7 @@ public class AnnotationUtils {
     /**
      * Return whether the given element is annotated with any of the given annotation stereotypes
      *
-     * @param element The element
+     * @param element     The element
      * @param stereotypes The stereotypes
      * @return True if it is
      */
@@ -84,7 +84,7 @@ public class AnnotationUtils {
         }
         AnnotationMetadata annotationMetadata = getAnnotationMetadata(element);
         for (String stereotype : stereotypes) {
-            if(annotationMetadata.hasStereotype(stereotype)) {
+            if (annotationMetadata.hasStereotype(stereotype)) {
                 return true;
             }
         }
@@ -93,6 +93,7 @@ public class AnnotationUtils {
 
     /**
      * Get the annotation metadata for the given element
+     *
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
@@ -102,7 +103,8 @@ public class AnnotationUtils {
 
     /**
      * Get the annotation metadata for the given element
-     * @param parent The parent
+     *
+     * @param parent  The parent
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
@@ -112,6 +114,7 @@ public class AnnotationUtils {
 
     /**
      * Resolve the {@link Qualifier} to use for the given element
+     *
      * @param element The element
      * @return The Qualifier or null
      */
@@ -121,6 +124,7 @@ public class AnnotationUtils {
 
     /**
      * Check whether the method is annotated
+     *
      * @param method The method
      * @return True if it is annotated with non internal annotations
      */
@@ -128,12 +132,10 @@ public class AnnotationUtils {
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             String typeName = annotationMirror.getAnnotationType().toString();
-            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(typeName)) {
+            if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(typeName)) {
                 return true;
             }
         }
         return false;
     }
-
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 
@@ -31,7 +30,7 @@ public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
     private final File targetDirectory;
     private final Filer filer;
 
-    BeanDefinitionWriterVisitor(Filer filer,  File targetDirectory) {
+    BeanDefinitionWriterVisitor(Filer filer, File targetDirectory) {
         this.targetDirectory = targetDirectory;
         this.filer = filer;
     }
@@ -52,7 +51,7 @@ public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
     @Override
     public Optional<File> visitMetaInfFile(String path) throws IOException {
         return Optional.ofNullable(targetDirectory).map(root ->
-                new File(root, "META-INF" + File.separator + path)
+            new File(root, "META-INF" + File.separator + path)
         );
     }
 }
