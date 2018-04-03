@@ -90,7 +90,6 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.net.ssl.SSLEngine;
 import java.io.Closeable;
-import java.io.File;
 import java.net.Proxy.Type;
 import java.net.SocketAddress;
 import java.net.URI;
@@ -960,7 +959,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             bodyValue = ((MultipartBody.Builder) bodyValue).build();
         }
         if (bodyValue instanceof MultipartBody){
-            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getDatas(request, factory));
+            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getData(request, factory));
         } else {
             throw new MultipartException(String.format("The type %s is not a supported type for a multipart request body", bodyValue.getClass().getName()));
         }
