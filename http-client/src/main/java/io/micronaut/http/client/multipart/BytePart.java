@@ -15,20 +15,43 @@ import java.io.IOException;
 class BytePart extends AbstractFilePart {
     private final byte[] data;
 
+    /**
+     *
+     * @param name parameter name
+     * @param filename name of the file
+     * @param data file content bytes
+     */
     BytePart(String name, String filename, byte[] data) {
         this(name, filename, null, data);
     }
 
+    /**
+     *
+     * @param name parameter name
+     * @param filename name of the file
+     * @param data content byte[]
+     * @param contentType data content type
+     */
     BytePart(String name, String filename, MediaType contentType, byte[] data) {
         super(name, filename, contentType);
         this.data = data;
     }
 
+    /**
+     * Copy the data content into {@link FileUpload}
+     *
+     * @param fileUpload an object of class extending {@link FileUpload}
+     * @throws IOException
+     */
     @Override
     void setContent(FileUpload fileUpload) throws IOException {
         fileUpload.setContent(new ByteArrayInputStream(data));
     }
 
+    /**
+     *
+     * @return length of file data
+     */
     @Override
     long getLength() {
         return data.length;

@@ -14,6 +14,11 @@ class StringPart extends Part {
 
     protected final String value;
 
+    /**
+     *
+     * @param name parameter name
+     * @param value String value
+     */
     StringPart(String name, String value) {
         super(name);
         if (value == null) {
@@ -23,6 +28,13 @@ class StringPart extends Part {
         }
     }
 
+    /**
+     * Create an object of {@link InterfaceHttpData} from {@link StringPart}
+     *
+     * @param request associated request
+     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
+     * @return {@link InterfaceHttpData} object
+     */
     @Override
     InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
         return factory.createAttribute(request, name, value);
