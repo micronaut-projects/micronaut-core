@@ -1,5 +1,6 @@
 package io.micronaut.discovery.aws.route53.registration;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.services.servicediscovery.*;
 import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
@@ -22,6 +23,10 @@ import java.util.Map;
 import java.util.Optional;
 
 
+/**
+ * @author Rvanderwerf
+ * @since 1.0
+ */
 @Singleton
 @Requires(env= Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
@@ -61,7 +66,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.route53AutoRegistrationConfiguration = route53AutoRegistrationConfiguration;
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
-        this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+        try {
+            this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+        } catch (SdkClientException ske) {
+            LOG.warn("Warning: cannot find any AWS credentials. Please verify your configuration.",ske);
+        }
         this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
 
     }

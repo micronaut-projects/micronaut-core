@@ -12,6 +12,10 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * @author Rvanderwerf
+ * @since 1.0
+ */
 public class EC2ServiceInstance implements ServiceInstance, ServiceInstance.Builder {
     String id;
     URI uri;

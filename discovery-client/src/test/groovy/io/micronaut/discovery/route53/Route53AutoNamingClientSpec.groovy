@@ -41,17 +41,17 @@ import spock.lang.*
 import spock.util.concurrent.PollingConditions
 
 /**
- * @author graemerocher
+ * @author Rvanderwerf
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('AWS_SUBNET_ID')})
+@IgnoreIf({ !System.getenv('AWS_NAMESPACE_NAME') || !System.getenv('AWS_SUBNET_ID')})
 @Stepwise
 class Route53AutoNamingClientSpec extends Specification {
 
 
 
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ["aws.route53.registration.namespace":"vanderfox.net",
+            ["aws.route53.registration.namespace":System.getenv("AWS_NAMESPACE_NAME"),
              "aws.route53.registration.awsServiceId":"testId",
             "aws.route53.discovery.enabled":"true",
             "aws.route53.registration.enabled":"true",
@@ -68,7 +68,7 @@ class Route53AutoNamingClientSpec extends Specification {
 
 
     def setupSpec() {
-        namespaceId = client.createNamespace(null,"vanderfox.net")
+        namespaceId = client.createNamespace(null,System.getenv("AWS_NAMESPACE_NAME"))
         serviceId = client.createService(null,"test","micronaut-integration-test",namespaceId,1000L)
         client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
         amazonEC2Client = new AmazonEC2Client(client.clientConfiguration.clientConfiguration)
