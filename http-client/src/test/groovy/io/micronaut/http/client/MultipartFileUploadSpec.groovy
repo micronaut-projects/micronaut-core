@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Part
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.StreamingFileUpload
+import io.micronaut.http.server.netty.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
@@ -36,6 +37,14 @@ class MultipartFileUploadSpec extends Specification {
 
     static final File uploadDir = File.createTempDir()
 
+    void cleanup() {
+        uploadDir.listFiles()*.delete()
+    }
+
+    void cleanupSpec() {
+        uploadDir.delete()
+    }
+
     void "test multipart file request"() {
         given:
         File file = new File(uploadDir, "data.txt")
@@ -54,6 +63,36 @@ class MultipartFileUploadSpec extends Specification {
 
         then:
         body == "Uploaded 9 bytes"
+    }
+
+
+    void "test upload FileUpload object via CompletedFileUpload"() {
+        given:
+        File file = new File(uploadDir, "walkingthehimalayas.txt")
+        file.text = "test file"
+        file.createNewFile()
+
+        when:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", file)
+                .addPart("title", "Walking The Himalayas")
+                .build()
+
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+        def newFile = new File(uploadDir, "Walking The Himalayas.txt")
+
+        then:
+        body == "Uploaded 9 bytes"
+        newFile.exists()
+        newFile.text == file.text
+
     }
 
     void "test upload FileUpload object via transferTo"() {
@@ -222,6 +261,14 @@ class MultipartFileUploadSpec extends Specification {
         @Post(uri = '/upload', consumes = MediaType.MULTIPART_FORM_DATA)
         HttpResponse<String> upload(byte[] data) {
             return HttpResponse.ok("Uploaded " + data.length + " bytes")
+        }
+
+        @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+        Publisher<HttpResponse> completeFileUpload(CompletedFileUpload data, String title) {
+            File newFile = new File(uploadDir, title + ".txt")
+            newFile.createNewFile()
+            newFile.append(data.getInputStream())
+            return Flowable.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes"))
         }
 
         @Post(consumes = MediaType.MULTIPART_FORM_DATA)
