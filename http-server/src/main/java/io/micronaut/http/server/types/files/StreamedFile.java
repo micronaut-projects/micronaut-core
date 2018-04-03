@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class StreamedFile implements FileCustomizableResponseType {
         String path = url.getPath();
         int idx = path.lastIndexOf(File.separatorChar);
         if (idx > -1) {
-            this.name = path.substring(idx+1);
+            this.name = path.substring(idx + 1);
         } else {
             this.name = path;
         }
