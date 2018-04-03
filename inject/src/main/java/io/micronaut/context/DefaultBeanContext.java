@@ -47,6 +47,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.*;
@@ -1555,15 +1556,10 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.trace("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
                 }
             }
-            return Collections.unmodifiableCollection(existing);
+            return existing;
         }
 
-        Collection<T> beansOfTypeList;
-        if (Ordered.class.isAssignableFrom(beanType)) {
-            beansOfTypeList = new TreeSet<>(OrderUtil.comparator);
-        } else {
-            beansOfTypeList = new HashSet<>();
-        }
+        HashSet<T> beansOfTypeList = new HashSet<>();
         Collection<BeanDefinition<T>> processedDefinitions = new ArrayList<>();
 
         boolean allCandidatesAreSingleton = false;
@@ -1619,14 +1615,14 @@ public class DefaultBeanContext implements BeanContext {
                     }
                     addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, reduced.size() == 1);
                 }
-                beans = Collections.unmodifiableCollection(beansOfTypeList);
+                beans = beansOfTypeList;
             } else {
 
                 if (LOG.isDebugEnabled() && beansOfTypeList.isEmpty()) {
                     LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 allCandidatesAreSingleton = true;
-                beans = Collections.unmodifiableCollection(beansOfTypeList);
+                beans = beansOfTypeList;
             }
         } else if (!candidates.isEmpty()) {
             boolean hasNonSingletonCandidate = false;
@@ -1645,10 +1641,16 @@ public class DefaultBeanContext implements BeanContext {
             if (!hasNonSingletonCandidate) {
                 allCandidatesAreSingleton = true;
             }
-            beans = Collections.unmodifiableCollection(beansOfTypeList);
+            beans = beansOfTypeList;
         } else {
             allCandidatesAreSingleton = true;
-            beans = Collections.unmodifiableCollection(beansOfTypeList);
+            beans = beansOfTypeList;
+        }
+
+        if (Ordered.class.isAssignableFrom(beanType)) {
+            beans = beans.stream().sorted(OrderUtil.comparator).collect(StreamUtils.toImmutableCollection());
+        } else {
+            beans = Collections.unmodifiableCollection(beans);
         }
 
         if (allCandidatesAreSingleton) {

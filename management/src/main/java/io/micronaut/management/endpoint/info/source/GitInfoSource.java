@@ -5,6 +5,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
+import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -18,7 +19,7 @@ import javax.inject.Singleton;
 //TODO: @Refreshable
 @Singleton
 @Requires(beans = InfoEndpoint.class)
-@Requires(property = "endpoints.info.git.enabled")//, notEquals = "false")
+@Requires(property = "endpoints.info.git.enabled", notEquals = "false")
 public class GitInfoSource implements InfoSource {
 
     private ResourceResolver resourceResolver;
@@ -29,10 +30,6 @@ public class GitInfoSource implements InfoSource {
 
     @Override
     public Publisher<PropertySource> getSource() {
-
-
-        //TODO: Create a property source from git properties
-        //Inject resourceResolver
-        return null;
+        return Flowable.empty();
     }
 }
