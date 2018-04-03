@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.function.client;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Primary;
 
 import javax.inject.Singleton;
@@ -41,7 +40,7 @@ class DefaultFunctionInvokerChooser implements FunctionInvokerChooser {
     public <I, O> Optional<FunctionInvoker<I, O>> choose(FunctionDefinition definition) {
         for (FunctionInvokerChooser chooser : choosers) {
             Optional<FunctionInvoker<I, O>> chosen = chooser.choose(definition);
-            if(chosen.isPresent()) {
+            if (chosen.isPresent()) {
                 return chosen;
             }
         }
