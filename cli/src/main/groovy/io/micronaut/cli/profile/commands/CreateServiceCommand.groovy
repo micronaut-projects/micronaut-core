@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.util.NameUtils
 import org.eclipse.aether.graph.Dependency
 import io.micronaut.cli.build.logging.ConsoleAntBuilder

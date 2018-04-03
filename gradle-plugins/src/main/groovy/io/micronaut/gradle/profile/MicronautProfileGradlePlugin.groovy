@@ -16,6 +16,7 @@
 package io.micronaut.gradle.profile
 
 import groovy.transform.CompileStatic
+import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.gradle.profile.task.ProfileCompilerTask
 import org.apache.tools.ant.DirectoryScanner
@@ -98,7 +99,7 @@ class MicronautProfileGradlePlugin extends BasePlugin {
 
         def processResources = project.tasks.create("processResources", Copy) { Copy c ->
             c.with(spec1, spec2, spec3, spec4)
-            c.into(new File(resourcesDir, "/META-INF/micronaut-profile"))
+            c.into(new File(resourcesDir, "/META-INF/profile"))
 
             c.doFirst {
                 DirectoryScanner.defaultExcludes.each { String file -> DirectoryScanner.removeDefaultExclude(file) }
@@ -116,18 +117,8 @@ class MicronautProfileGradlePlugin extends BasePlugin {
             if(templatesDir.exists()) {
                 task.templatesDir = templatesDir
             }
-            File scriptCommand = null
             URL resource = GroovyScriptCommand.getResource('/' + "io.micronaut.cli.profile.commands.script.GroovyScriptCommand".replace(".", "/") + ".class")
-            if(resource?.protocol == 'jar') {
-                def absolutePath = resource?.path
-                if (absolutePath) {
-                    try {
-                        scriptCommand = Paths.get(new URL(absolutePath.substring(0, absolutePath.lastIndexOf("!"))).toURI()).toFile()
-                    } catch (MalformedURLException e) {
-                        //no-op
-                    }
-                }
-            }
+            File scriptCommand = IOUtils.findJarFile(resource)
             task.classpath = project.files(project.configurations.getByName(RUNTIME_CONFIGURATION) + scriptCommand)
         }
 

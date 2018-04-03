@@ -46,7 +46,7 @@ public class FileSystemResource implements Resource {
     public FileSystemResource(File file) {
         assertNotNull(file, "File must not be null");
         this.file = file;
-        path = GrailsResourceUtils.cleanPath(file.getPath());
+        path = ResourceUtils.cleanPath(file.getPath());
     }
 
     /**
@@ -57,7 +57,7 @@ public class FileSystemResource implements Resource {
     public FileSystemResource(String path) {
         assertNotNull(path, "Path must not be null");
         file = new File(path);
-        this.path = GrailsResourceUtils.cleanPath(path);
+        this.path = ResourceUtils.cleanPath(path);
     }
 
     /**
@@ -149,7 +149,7 @@ public class FileSystemResource implements Resource {
      * relative to the path of the underlying file of this resource descriptor.
      */
     public Resource createRelative(String relativePath) {
-        String pathToUse = GrailsResourceUtils.applyRelativePath(path, relativePath);
+        String pathToUse = ResourceUtils.applyRelativePath(path, relativePath);
         return new FileSystemResource(pathToUse);
     }
 

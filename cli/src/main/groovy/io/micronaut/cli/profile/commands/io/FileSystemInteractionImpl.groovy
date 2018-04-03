@@ -20,7 +20,7 @@ import io.micronaut.cli.build.logging.MicronautConsole
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.io.support.DefaultResourceLoader
 import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.GrailsResourceUtils
+import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.PathMatchingResourcePatternResolver
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.io.support.ResourceLoader
@@ -196,7 +196,7 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
      * @return The class name
      */
     String className(Resource resource) {
-        GrailsResourceUtils.getClassName(resource)
+        ResourceUtils.getClassName(resource)
     }
 
     /**

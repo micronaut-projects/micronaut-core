@@ -33,7 +33,7 @@ import io.micronaut.cli.profile.ProfileRepositoryAware
 class ListProfilesCommand implements Command, ProfileRepositoryAware {
 
     final String name = "list-profiles"
-    final CommandDescription description = new CommandDescription(name, "Lists the available profiles", "grails list-profiles")
+    final CommandDescription description = new CommandDescription(name, "Lists the available profiles", "mn list-profiles")
 
     ProfileRepository profileRepository
 

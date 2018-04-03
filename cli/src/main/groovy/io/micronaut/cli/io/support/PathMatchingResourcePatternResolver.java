@@ -342,7 +342,7 @@ public class PathMatchingResourcePatternResolver {
      * @see #doFindPathMatchingJarResources
      */
     protected boolean isJarResource(Resource resource) throws IOException {
-        return GrailsResourceUtils.isJarURL(resource.getURL());
+        return ResourceUtils.isJarURL(resource.getURL());
     }
 
     /**
@@ -366,7 +366,7 @@ public class PathMatchingResourcePatternResolver {
         if (con instanceof JarURLConnection) {
             // Should usually be the case for traditional JAR files.
             JarURLConnection jarCon = (JarURLConnection) con;
-            GrailsResourceUtils.useCachesIfNecessary(jarCon);
+            ResourceUtils.useCachesIfNecessary(jarCon);
             jarFile = jarCon.getJarFile();
             jarFileUrl = jarCon.getJarFileURL().toExternalForm();
             JarEntry jarEntry = jarCon.getJarEntry();
@@ -378,10 +378,10 @@ public class PathMatchingResourcePatternResolver {
             // being arbitrary as long as following the entry format.
             // We'll also handle paths with and without leading "file:" prefix.
             String urlFile = rootDirResource.getURL().getFile();
-            int separatorIndex = urlFile.indexOf(GrailsResourceUtils.JAR_URL_SEPARATOR);
+            int separatorIndex = urlFile.indexOf(ResourceUtils.JAR_URL_SEPARATOR);
             if (separatorIndex != -1) {
                 jarFileUrl = urlFile.substring(0, separatorIndex);
-                rootEntryPath = urlFile.substring(separatorIndex + GrailsResourceUtils.JAR_URL_SEPARATOR.length());
+                rootEntryPath = urlFile.substring(separatorIndex + ResourceUtils.JAR_URL_SEPARATOR.length());
                 jarFile = getJarFile(jarFileUrl);
             }
             else {
@@ -424,13 +424,13 @@ public class PathMatchingResourcePatternResolver {
      * Resolve the given jar file URL into a JarFile object.
      */
     protected JarFile getJarFile(String jarFileUrl) throws IOException {
-        if (jarFileUrl.startsWith(GrailsResourceUtils.FILE_URL_PREFIX)) {
+        if (jarFileUrl.startsWith(ResourceUtils.FILE_URL_PREFIX)) {
             try {
-                return new JarFile(GrailsResourceUtils.toURI(jarFileUrl).getSchemeSpecificPart());
+                return new JarFile(ResourceUtils.toURI(jarFileUrl).getSchemeSpecificPart());
             }
             catch (URISyntaxException ex) {
                 // Fallback for URLs that are not valid URIs (should hardly ever happen).
-                return new JarFile(jarFileUrl.substring(GrailsResourceUtils.FILE_URL_PREFIX.length()));
+                return new JarFile(jarFileUrl.substring(ResourceUtils.FILE_URL_PREFIX.length()));
             }
         }
         return new JarFile(jarFileUrl);

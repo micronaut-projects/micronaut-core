@@ -90,7 +90,7 @@ public class UrlResource extends AbstractFileResolvingResource {
      */
     private URL getCleanedUrl(URL originalUrl, String originalPath) {
         try {
-            return new URL(GrailsResourceUtils.cleanPath(originalPath));
+            return new URL(ResourceUtils.cleanPath(originalPath));
         }
         catch (MalformedURLException ex) {
             // Cleaned URL path cannot be converted to URL

@@ -50,7 +50,7 @@ import jline.internal.NonBlockingInputStream
 import java.util.concurrent.*
 
 /**
- * Main class for the Grails command line. Handles interactive mode and running Grails commands within the context of a profile
+ * Main class for the Micronaut command line. Handles interactive mode and running Micronaut commands within the context of a profile
  *
  * @author Lari Hotari
  * @author Graeme Rocher
@@ -64,8 +64,8 @@ class MicronautCli {
     public static final String DEFAULT_PROFILE_NAME = ProfileRepository.DEFAULT_PROFILE_NAME
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
-    private static final String USAGE_MESSAGE = "create-app [NAME] --profile=web"
-    private static final String PLUGIN_USAGE_MESSAGE = "create-plugin [NAME] --profile=web-plugin"
+    private static final String USAGE_MESSAGE = "create-service [NAME]"
+    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME],[NAME],[NAME]"
     private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original() // store original System.in, System.out and System.err
     private static ExecutionContext currentExecutionContext = null
 
@@ -115,7 +115,7 @@ class MicronautCli {
     List<RepositoryConfiguration> profileRepositories = [MavenProfileRepository.DEFAULT_REPO]
 
     /**
-     * Obtains a value from USER_HOME/.grails/settings.yml
+     * Obtains a value from USER_HOME/.micronaut/settings.yml
      *
      * @param key the property name to resolve
      * @param targetType the expected type of the property value
@@ -177,9 +177,9 @@ class MicronautCli {
     }
 
     private int getBaseUsage() {
-        System.out.println "Usage: \n\t $USAGE_MESSAGE \n\t $PLUGIN_USAGE_MESSAGE \n\n"
+        System.out.println "Usage: \n\t $USAGE_MESSAGE \n\t $FEDERATION_USAGE_MESSAGE \n\n"
         this.execute "list-profiles"
-        System.out.println "\nType 'grails help' or 'grails -h' for more information."
+        System.out.println "\nType 'mn help' or 'mn -h' for more information."
 
         return 1
     }
@@ -194,11 +194,11 @@ class MicronautCli {
         CommandLine mainCommandLine = cliParser.parse(args)
 
         if(mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
-            System.setProperty("grails.verbose", "true")
-            System.setProperty("grails.full.stacktrace", "true")
+            System.setProperty("micronaut.verbose", "true")
+            System.setProperty("micronaut.full.stacktrace", "true")
         }
         if(mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
-            System.setProperty("grails.show.stacktrace", "true")
+            System.setProperty("micronaut.show.stacktrace", "true")
         }
 
         if(mainCommandLine.hasOption(CommandLine.VERSION_ARGUMENT) || mainCommandLine.hasOption('v')) {
@@ -698,21 +698,21 @@ class MicronautCli {
     private static class ProjectContextImpl implements ProjectContext {
         MicronautConsole console = MicronautConsole.getInstance()
         File baseDir
-        CodeGenConfig grailsConfig
+        CodeGenConfig cliConfig
 
         @Override
         public String navigateConfig(String... path) {
-            grailsConfig.navigate(path)
+            cliConfig.navigate(path)
         }
 
         @Override
         ConfigMap getConfig() {
-            return grailsConfig
+            return cliConfig
         }
 
         @Override
         public <T> T navigateConfigForType(Class<T> requiredType, String... path) {
-            grailsConfig.navigate(requiredType, path)
+            cliConfig.navigate(requiredType, path)
         }        
     }
 }

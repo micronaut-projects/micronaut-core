@@ -39,7 +39,7 @@ abstract class AbstractJarProfileRepository implements ProfileRepository {
 
     protected final List<Profile> allProfiles = []
     protected final Map<String, Profile> profilesByName = [:]
-    protected static final String DEFAULT_PROFILE_GROUPID = "io.micronaut.cli.profiles"
+    protected static final String DEFAULT_PROFILE_GROUPID = "io.micronaut.profiles"
 
     private Set<URL> registeredUrls = []
 
@@ -93,10 +93,10 @@ abstract class AbstractJarProfileRepository implements ProfileRepository {
         if(registeredUrls.contains(url)) return
 
         def classLoader = new URLClassLoader([url] as URL[], parent)
-        def profileYml = classLoader.getResource("META-INF/grails-profile/profile.yml")
+        def profileYml = classLoader.getResource("META-INF/profile/profile.yml")
         if (profileYml != null) {
             registeredUrls.add(url)
-            def profile = new JarProfile(this, new ClassPathResource("META-INF/grails-profile/", classLoader), classLoader)
+            def profile = new JarProfile(this, new ClassPathResource("META-INF/profile/", classLoader), classLoader)
             profile.profileRepository = this
             allProfiles.add profile
             profilesByName[profile.name] = profile

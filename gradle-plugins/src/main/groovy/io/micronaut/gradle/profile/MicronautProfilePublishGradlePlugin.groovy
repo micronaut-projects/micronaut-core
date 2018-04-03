@@ -39,7 +39,7 @@ class MicronautProfilePublishGradlePlugin extends MicronautCentralPublishGradleP
 
     @Override
     protected Map<String, String> getDefaultExtraArtifact(Project project) {
-        [source: "${project.buildDir}/classes/profile/META-INF/micronaut-profile/profile.yml".toString(),
+        [source: "${project.buildDir}/classes/profile/META-INF/profile/profile.yml".toString(),
          classifier: defaultClassifier,
          extension : 'yml']
     }

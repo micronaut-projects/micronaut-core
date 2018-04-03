@@ -132,7 +132,9 @@ subprojects { subproject ->
     }
 
     dependencies {
-        compile "org.slf4j:slf4j-api:$slf4jVersion"
+        if (subproject.name != "bom") {
+            compile "org.slf4j:slf4j-api:$slf4jVersion"
+        }
 //        shadowCompile group:"org.slf4j", name:"slf4j-api", version:slf4jVersion
 
         compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])

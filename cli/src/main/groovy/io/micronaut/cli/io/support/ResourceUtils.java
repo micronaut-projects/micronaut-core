@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  * @author Juergen Hoeller
  * @since 2.0
  */
-public class GrailsResourceUtils {
+public class ResourceUtils {
 
     public static final String CLASS_EXTENSION = ".class";
 
@@ -89,19 +89,7 @@ public class GrailsResourceUtils {
      */
     public static final String GRAILS_APP_DIR = "grails-app";
 
-    /**
-     * The name of the Web app dir within Grails
-     */
-    public static final String WEB_APP_DIR = "web-app";
 
-    /**
-     * The path to the views directory
-     */
-    public static final String VIEWS_DIR_PATH = GRAILS_APP_DIR + "/views/";
-    /**
-     * The path to the views directory without a trailing slash
-     */
-    public static final String VIEWS_DIR_PATH_NO_SLASH = GRAILS_APP_DIR + "/views";
 
     public static final String DOMAIN_DIR_PATH = GRAILS_APP_DIR + "/domain/";
 
@@ -144,20 +132,20 @@ public class GrailsResourceUtils {
     static {
         String fs = REGEX_FILE_SEPARATOR;
 
-        GRAILS_RESOURCE_PATTERN_FIRST_MATCH = Pattern.compile(createGrailsResourcePattern(fs, GRAILS_APP_DIR +fs+ "conf" +fs + "spring"));
-        GRAILS_RESOURCE_PATTERN_THIRD_MATCH = Pattern.compile(createGrailsResourcePattern(fs, GRAILS_APP_DIR +fs +"[\\w-]+"));
-        GRAILS_RESOURCE_PATTERN_SEVENTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "src" + fs + "main" + fs + "java"));
-        GRAILS_RESOURCE_PATTERN_EIGHTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "src" + fs + "main" + fs + "groovy"));
+        GRAILS_RESOURCE_PATTERN_FIRST_MATCH = Pattern.compile(createResourcePattern(fs, GRAILS_APP_DIR +fs+ "conf" +fs + "spring"));
+        GRAILS_RESOURCE_PATTERN_THIRD_MATCH = Pattern.compile(createResourcePattern(fs, GRAILS_APP_DIR +fs +"[\\w-]+"));
+        GRAILS_RESOURCE_PATTERN_SEVENTH_MATCH = Pattern.compile(createResourcePattern(fs, "src" + fs + "main" + fs + "java"));
+        GRAILS_RESOURCE_PATTERN_EIGHTH_MATCH = Pattern.compile(createResourcePattern(fs, "src" + fs + "main" + fs + "groovy"));
 
-        GRAILS_RESOURCE_PATTERN_NINTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "src" + fs + "test" + fs + "groovy"));
-        GRAILS_RESOURCE_PATTERN_TENTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "src" + fs + "test" + fs + "java"));
-        GRAILS_RESOURCE_PATTERN_ELEVENTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "src" + fs + "test" + fs + "functional"));
+        GRAILS_RESOURCE_PATTERN_NINTH_MATCH = Pattern.compile(createResourcePattern(fs, "src" + fs + "test" + fs + "groovy"));
+        GRAILS_RESOURCE_PATTERN_TENTH_MATCH = Pattern.compile(createResourcePattern(fs, "src" + fs + "test" + fs + "java"));
+        GRAILS_RESOURCE_PATTERN_ELEVENTH_MATCH = Pattern.compile(createResourcePattern(fs, "src" + fs + "test" + fs + "functional"));
 
-        GRAILS_RESOURCE_PATTERN_FIFTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "grails-tests"));
+        GRAILS_RESOURCE_PATTERN_FIFTH_MATCH = Pattern.compile(createResourcePattern(fs, "grails-tests"));
         fs = "/";
-        GRAILS_RESOURCE_PATTERN_SECOND_MATCH = Pattern.compile(createGrailsResourcePattern(fs, GRAILS_APP_DIR +fs+ "conf" +fs + "spring"));
-        GRAILS_RESOURCE_PATTERN_FOURTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, GRAILS_APP_DIR +fs +"[\\w-]+"));
-        GRAILS_RESOURCE_PATTERN_SIXTH_MATCH = Pattern.compile(createGrailsResourcePattern(fs, "grails-tests"));
+        GRAILS_RESOURCE_PATTERN_SECOND_MATCH = Pattern.compile(createResourcePattern(fs, GRAILS_APP_DIR +fs+ "conf" +fs + "spring"));
+        GRAILS_RESOURCE_PATTERN_FOURTH_MATCH = Pattern.compile(createResourcePattern(fs, GRAILS_APP_DIR +fs +"[\\w-]+"));
+        GRAILS_RESOURCE_PATTERN_SIXTH_MATCH = Pattern.compile(createResourcePattern(fs, "grails-tests"));
     }
 
     public static final Pattern[] patterns = new Pattern[]{
@@ -194,7 +182,7 @@ public class GrailsResourceUtils {
         protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
             return this.size() > 100;
         }
-    }, new Closure(GrailsResourceUtils.class) {
+    }, new Closure(ResourceUtils.class) {
 
         @Override
         public Object call(Object... args) {
@@ -203,7 +191,7 @@ public class GrailsResourceUtils {
         }
     });
 
-    private static String createGrailsResourcePattern(String separator, String base) {
+    private static String createResourcePattern(String separator, String base) {
         return ".+" + separator + base + separator + "(.+)\\.(groovy|java)$";
     }
 

@@ -41,7 +41,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
      */
     public File getFile() throws IOException {
         URL url = getURL();
-        return GrailsResourceUtils.getFile(url, getDescription());
+        return ResourceUtils.getFile(url, getDescription());
     }
 
     /**
@@ -50,9 +50,9 @@ public abstract class AbstractFileResolvingResource implements Resource {
      */
     protected File getFileForLastModifiedCheck() throws IOException {
         URL url = getURL();
-        if (GrailsResourceUtils.isJarURL(url)) {
-            URL actualUrl = GrailsResourceUtils.extractJarFileURL(url);
-            return GrailsResourceUtils.getFile(actualUrl, "Jar URL");
+        if (ResourceUtils.isJarURL(url)) {
+            URL actualUrl = ResourceUtils.extractJarFileURL(url);
+            return ResourceUtils.getFile(actualUrl, "Jar URL");
         }
         return getFile();
     }
@@ -62,7 +62,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
      * resource, provided that it refers to a file in the file system.
      */
     protected File getFile(URI uri) throws IOException {
-        return GrailsResourceUtils.getFile(uri, getDescription());
+        return ResourceUtils.getFile(uri, getDescription());
     }
 
     /**
@@ -78,7 +78,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
     public boolean exists() {
         try {
             URL url = getURL();
-            if (GrailsResourceUtils.isFileURL(url)) {
+            if (ResourceUtils.isFileURL(url)) {
                 // Proceed with file system resolution...
                 return getFile().exists();
             }
@@ -120,7 +120,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
     public boolean isReadable() {
         try {
             URL url = getURL();
-            if (GrailsResourceUtils.isFileURL(url)) {
+            if (ResourceUtils.isFileURL(url)) {
                 // Proceed with file system resolution...
                 File file = getFile();
                 return (file.canRead() && !file.isDirectory());
@@ -134,7 +134,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
 
     public long contentLength() throws IOException {
         URL url = getURL();
-        if (GrailsResourceUtils.isFileURL(url)) {
+        if (ResourceUtils.isFileURL(url)) {
             // Proceed with file system resolution...
             return getFile().length();
         }
@@ -149,7 +149,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
 
     public long lastModified() throws IOException {
         URL url = getURL();
-        if (GrailsResourceUtils.isFileURL(url) || GrailsResourceUtils.isJarURL(url)) {
+        if (ResourceUtils.isFileURL(url) || ResourceUtils.isJarURL(url)) {
             // Proceed with file system resolution...
             return getFile().lastModified();
         }

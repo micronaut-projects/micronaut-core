@@ -27,7 +27,6 @@ import org.gradle.api.file.FileVisitDetails
 import org.gradle.api.tasks.*
 import org.gradle.api.tasks.compile.AbstractCompile
 import org.gradle.api.tasks.incremental.IncrementalTaskInputs
-import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommandTransform
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.Yaml
@@ -74,7 +73,7 @@ class ProfileCompilerTask extends AbstractCompile {
 
     @Override
     void setDestinationDir(File destinationDir) {
-        profileFile = new File(destinationDir, "META-INF/micronaut-profile/profile.yml")
+        profileFile = new File(destinationDir, "META-INF/profile/profile.yml")
         super.setDestinationDir(destinationDir)
     }
 
