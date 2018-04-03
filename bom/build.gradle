@@ -1,0 +1,32 @@
+publishing {
+    publications {
+        maven(MavenPublication) {
+            pom.withXml {
+                def xml = asNode()
+                def profiles = new Properties()
+                profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
+
+                xml.children().last() + {
+                    def mkp = delegate
+
+                    mkp.dependencyManagement {
+                        mkp.dependencies {
+
+                            for(profile in profiles) {
+                                mkp.dependency {
+                                    mkp.groupId 'io.micronaut.profiles'
+                                    mkp.artifactId profile.key
+                                    def version = profile.value
+                                    if(!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
+                                        throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
+                                    }
+                                    mkp.version(version)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

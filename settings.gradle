@@ -28,6 +28,7 @@ include "jdbc"
 include "runtime-groovy"
 include "cli"
 include "gradle-plugins"
+include "bom"
 
 // configurations
 include "configurations:gorm"
