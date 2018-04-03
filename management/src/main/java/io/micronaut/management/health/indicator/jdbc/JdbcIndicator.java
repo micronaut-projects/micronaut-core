@@ -65,8 +65,9 @@ public class JdbcIndicator implements HealthIndicator {
             Optional<Throwable> throwable = Optional.empty();
             Map<String, Object> details = null;
             String key;
+            Connection connection = null;
             try {
-                Connection connection = dataSource.getConnection();
+                connection = dataSource.getConnection();
                 if (connection.isValid(3)) {
                     DatabaseMetaData metaData = connection.getMetaData();
                     key = metaData.getURL();
@@ -82,6 +83,14 @@ public class JdbcIndicator implements HealthIndicator {
                     key = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
                 } catch (Exception n) {
                     key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
+                }
+            } finally {
+                if (connection != null) {
+                    try {
+                        connection.close();
+                    } catch (SQLException e) {
+                        //no-op
+                    }
                 }
             }
 

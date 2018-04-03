@@ -28,12 +28,12 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface FileUpload {
+
     /**
      * Gets the content of this part as an <tt>InputStream</tt>
      *
      * @return The content of this part as an <tt>InputStream</tt>
      * @throws IOException If an error occurs in retrieving the content
-     * as an <tt>InputStream</tt>
      */
     InputStream getInputStream() throws IOException;
 
@@ -42,7 +42,6 @@ public interface FileUpload {
      *
      * @return The content of this part as a <tt>byte[]</tt>
      * @throws IOException If an error occurs in retrieving the content
-     * as a <tt>byte[]</tt>
      */
     byte[] getBytes() throws IOException;
 
@@ -51,7 +50,6 @@ public interface FileUpload {
      *
      * @return The content of this part as a <tt>ByteBuffer</tt>
      * @throws IOException If an error occurs in retrieving the content
-     * as a <tt>ByteBuffer</tt>
      */
     ByteBuffer getByteBuffer() throws IOException;
 
@@ -65,28 +63,28 @@ public interface FileUpload {
     /**
      * Gets the name of this part
      *
-     * @return The name of this part as a <tt>String</tt>
+     * @return The name of this part
      */
     String getName();
 
     /**
      * Gets the name of this part
      *
-     * @return The name of this part as a <tt>String</tt>
+     * @return The name of this part
      */
     String getFilename();
 
     /**
      * Returns the size of the part.
      *
-     * @return a <code>long</code> specifying the size of this part, in bytes.
+     * @return The size of this part, in bytes.
      */
     long getSize();
 
     /**
      * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state
      *
-     * @return A <code>boolean</code> value of <code>true</code> if the part is fully uploaded
+     * @return True if the part is fully uploaded
      */
     boolean isComplete();
 }

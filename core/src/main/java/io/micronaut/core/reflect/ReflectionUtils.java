@@ -272,7 +272,6 @@ public class ReflectionUtils {
      * Finds a field in the type or super type
      * @param type The type
      * @param name The field name
-     * @return An {@link Optional} of field
      */
     public static void setFieldIfPossible(Class type, String name, Object value) {
         Optional<Field> declaredField = findDeclaredField(type, name);

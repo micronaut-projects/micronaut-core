@@ -21,7 +21,13 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 <3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method is used to transfer the file to the server. The method returns a rs:Publisher[]
 <4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
-WARNING: Note that the `getBytes` and `getByteBuffer` methods of api:http.multipart.StreamingFileUpload[] can only be called *once* per request.
+WARNING: Note that the api:http.multipart.FileUpload.getInputStream()[], api:http.multipart.FileUpload.getBytes()[] and api:http.multipart.FileUpload.getByteBuffer()[] methods of api:http.server.netty.multipart.StreamingFileUpload[] can only be called *once*. The data will be released after the first invocation.
+
+=== Other Streaming Types
+
+In addition to the api:http.server.netty.multipart.StreamingFileUpload[] class, it is possible to have a route argument of a `Publisher<byte[]>` to receive a publisher of the bytes of the file.
+
+//TODO: Add code example
 
 == Completed File Uploads
 
@@ -42,9 +48,9 @@ include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, i
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
 <3> The `CompletedFileUpload` instance gives access to metadata about the upload (such as `filename` and `size`), as well as access to the file's contents as an `InputStream` or byte array.
 
-WARNING: Note that the `getBytes` and `getByteBuffer` methods of api:http.server.netty.multipart.CompletedFileUpload[] can only be called *once* per request.
+WARNING: Note that the api:http.multipart.FileUpload.getInputStream()[], api:http.multipart.FileUpload.getBytes()[] and api:http.multipart.FileUpload.getByteBuffer()[] methods of api:http.server.netty.multipart.CompletedFileUpload[] can only be called *once*. The data will be released after the first invocation.
 
-== Byte & String Uploads
+=== Other Completed Types
 
 In addition to the api:http.server.netty.multipart.CompletedFileUpload[] class, it is possible to have a route argument of a `byte[]` to receive just the bytes of the file, or `String` to convert the contents of the file to a `String`.
 

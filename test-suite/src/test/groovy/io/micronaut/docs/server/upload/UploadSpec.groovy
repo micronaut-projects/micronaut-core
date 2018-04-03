@@ -15,8 +15,6 @@
  */
 package io.micronaut.docs.server.upload
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpStatus
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient

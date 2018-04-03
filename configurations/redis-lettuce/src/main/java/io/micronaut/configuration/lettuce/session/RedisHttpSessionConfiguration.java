@@ -140,14 +140,14 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @return The {@link WriteMode} to use. Defaults to {@link WriteMode#BATCH}
+     * @return The {@link RedisHttpSessionConfiguration.WriteMode} to use. Defaults to {@link RedisHttpSessionConfiguration.WriteMode#BATCH}
      */
     public WriteMode getWriteMode() {
         return writeMode;
     }
 
     /**
-     * @param writeMode The {@link WriteMode}
+     * @param writeMode The {@link RedisHttpSessionConfiguration.WriteMode}
      */
     void setWriteMode(WriteMode writeMode) {
         this.writeMode = writeMode;
