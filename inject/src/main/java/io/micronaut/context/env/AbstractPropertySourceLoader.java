@@ -16,6 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.value.ValueException;
 import io.micronaut.core.util.Toggleable;
@@ -40,7 +42,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     }
 
     @Override
-    public Optional<PropertySource> load(String resourceName, Environment environment, String environmentName) {
+    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, String environmentName) {
         if(isEnabled()) {
             Set<String> extensions = getExtensions();
             for (String ext : extensions) {
@@ -50,7 +52,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 }
                 String qualifiedName = fileName;
                 fileName += "." + ext;
-                Map<String,Object> finalMap = loadProperties(environment, qualifiedName, fileName);
+                Map<String,Object> finalMap = loadProperties(resourceLoader, qualifiedName, fileName);
 
                 int order = this.getOrder();
                 if(environmentName != null) {
@@ -73,8 +75,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
         return Optional.empty();
     }
 
-    private Map<String, Object> loadProperties(Environment environment, String qualifiedName, String fileName) {
-        Optional<InputStream> config = readInput(environment, fileName);
+    private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
+        Optional<InputStream> config = readInput(resourceLoader, fileName);
         if(config.isPresent()) {
             try(InputStream input = config.get()) {
                 return read(qualifiedName, input);
@@ -93,8 +95,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
         return finalMap;
     }
 
-    protected Optional<InputStream> readInput(Environment environment, String fileName) {
-        return environment.getResourceAsStream(fileName);
+    protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
+        return resourceLoader.getResourceAsStream(fileName);
     }
 
     protected abstract void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException;
