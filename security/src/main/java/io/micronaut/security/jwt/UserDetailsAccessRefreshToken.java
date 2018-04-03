@@ -9,6 +9,8 @@ public class UserDetailsAccessRefreshToken implements AccessRefreshToken {
     private String accessToken;
     private String refreshToken;
 
+    public UserDetailsAccessRefreshToken() {}
+
     public UserDetailsAccessRefreshToken(String username, List<String> roles, String accessToken, String refreshToken) {
         this.username = username;
         this.roles = roles;

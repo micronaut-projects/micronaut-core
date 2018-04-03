@@ -1,0 +1,24 @@
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+micronaut:
+  application:
+    name: security
+  security:
+    enabled: true
+    jwt:
+      login: true
+      refresh: true
+      secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+      defaultExpiration: 30
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+ldap:
+  server: ldap.forumsys.com
+  port: 389
+  bindDN: cn=read-only-admin,dc=example,dc=com
+  bindPassword: password
