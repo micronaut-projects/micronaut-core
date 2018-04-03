@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
+import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.security.InterceptUrlMapPattern;
@@ -42,7 +43,7 @@ import io.micronaut.core.util.PathMatcher;
  * @since 1.0
  */
 @Filter("/**")
-public class JwtFilter implements HttpServerFilter {
+public class JwtFilter extends OncePerRequestHttpServerFilter {
     private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
     protected final SecurityConfiguration securityConfiguration;
     protected final JwtConfiguration jwtConfiguration;
@@ -55,7 +56,11 @@ public class JwtFilter implements HttpServerFilter {
      * @param tokenReader The {@link TokenReader} instance
      * @param tokenValidator The {@link TokenValidator} instance
      */
-    public JwtFilter(BeanContext beanContext, SecurityConfiguration securityConfiguration, JwtConfiguration jwtConfiguration, TokenReader tokenReader, TokenValidator tokenValidator) {
+    public JwtFilter(BeanContext beanContext,
+                     SecurityConfiguration securityConfiguration,
+                     JwtConfiguration jwtConfiguration,
+                     TokenReader tokenReader,
+                     TokenValidator tokenValidator) {
         this.beanContext = beanContext;
         this.securityConfiguration = securityConfiguration;
         this.jwtConfiguration = jwtConfiguration;
@@ -64,13 +69,18 @@ public class JwtFilter implements HttpServerFilter {
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+
         if ( securityConfiguration.isEnabled() ) {
 
             List<InterceptUrlMapPattern> patterns = endpointsInterceptUrlMap();
+            patterns.addAll(interceptUrlMapPatternsOfSecurityControllers(jwtConfiguration));
             final boolean useInterceptUrlMap = securityConfiguration.getSecurityConfigType().equals(SecurityConfigType.INTERCEPT_URL_MAP);
             if ( useInterceptUrlMap ) {
-                patterns.addAll(securityConfiguration.getInterceptUrlMap());
+                List<InterceptUrlMapPattern> configInterceptUrlMap = securityConfiguration.getInterceptUrlMap();
+                if ( configInterceptUrlMap != null ) {
+                    patterns.addAll(configInterceptUrlMap);
+                }
             }
             List<InterceptUrlMapPattern> patternsForRequest = patternsForRequest(request, patterns);
             if ( matchesAccess(patternsForRequest, Arrays.asList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY)) ) {
@@ -79,10 +89,10 @@ public class JwtFilter implements HttpServerFilter {
 
             String token = tokenReader.findToken(request);
             if (token != null) {
-                log.debug("Token {} found in request", token);
+                log.debug("Token {} found in request {} {}", token, request.getMethod().toString(), request.getPath());
                 Map<String, Object> claims = tokenValidator.validateTokenAndGetClaims(token);
                 if ( claims == null ) {
-                    log.debug("Unauthorized request. Fetched claims null. Token validation failed.", token);
+                    log.debug("Unauthorized request {} {}. Fetched claims null. Token validation failed.", request.getMethod().toString(), request.getPath(), token);
                     return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 }
                 log.debug("Claims: {}", claims.keySet().stream().reduce((a, b) -> a + "=>" + claims.get(a) + ", " + b + "=>" + claims.get(b)).get());
@@ -94,12 +104,16 @@ public class JwtFilter implements HttpServerFilter {
                 }
 
                 if ( !claims.containsKey(jwtConfiguration.getRolesClaimName())) {
-                    log.debug("Unauthorized request. Claims did not contained {}", jwtConfiguration.getRolesClaimName());
+                    log.debug("Unauthorized request {} {}. Claims did not contained {}", request.getMethod().toString(), request.getPath(), jwtConfiguration.getRolesClaimName());
                     return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 }
                 Object rolesObj = claims.get(jwtConfiguration.getRolesClaimName());
                 if ( !areRolesListOfStrings(rolesObj) ) {
-                    log.debug("Unauthorized request. roles not instance of List<String> {}", rolesObj.toString());
+                    log.debug("Unauthorized request {} {}. roles not instance of List<String> {}", request.getMethod().toString(), request.getPath(), rolesObj.toString());
+                    return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
+                }
+                if (patternsForRequest.isEmpty()) {
+                    log.debug("Unauthorized request {}, {}, no token found in request", request.getMethod().toString(), request.getPath());
                     return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 }
                 List<String> roles = (List<String>) rolesObj;
@@ -110,7 +124,7 @@ public class JwtFilter implements HttpServerFilter {
                 return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
 
             } else {
-                log.debug("Unauthorized request, no token found in request");
+                log.debug("Unauthorized request {}, {}, no token found in request", request.getMethod().toString(), request.getPath());
                 return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
             }
         } else {
@@ -170,5 +184,21 @@ public class JwtFilter implements HttpServerFilter {
         sb.append(ec.getId());
         return sb.toString();
     }
+
+    private List<InterceptUrlMapPattern> interceptUrlMapPatternsOfSecurityControllers(JwtConfiguration jwtConfiguration) {
+        final List<InterceptUrlMapPattern> results = new ArrayList<>();
+        final List<String> access = Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY);
+        if ( jwtConfiguration != null) {
+            if ( jwtConfiguration.isLogin() ) {
+                results.add(new InterceptUrlMapPattern("/login", access, HttpMethod.POST));
+            }
+
+            if ( jwtConfiguration.isRefresh() ) {
+                results.add(new InterceptUrlMapPattern("/oauth/access_token", access, HttpMethod.POST));
+            }
+        }
+        return results;
+    }
+
 
 }

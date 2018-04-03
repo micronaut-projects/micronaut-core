@@ -1,0 +1,13 @@
+plugins {
+    id 'java'
+}
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+dependencies {
+    compile "io.micronaut:http:${projectVersion}"
+}
+compileJava {
+    options.compilerArgs += ["-parameters"]
+}

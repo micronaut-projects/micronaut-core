@@ -1,0 +1,42 @@
+router:
+  static:
+    resources:
+      enabled: true
+      mapping: /**
+      paths:
+        - classpath:static
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+micronaut:
+  application:
+    name: books
+  security:
+    enabled: true
+    jwt:
+      secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+    interceptUrlMap:
+      -
+        pattern: /images/*
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /books/grails
+        httpMethod: GET
+        access:
+          - ROLE_GRAILS
+      -
+        pattern: /books/groovy
+        httpMethod: GET
+        access:
+          - ROLE_GROOVY
+endpoints:
+  beans:
+    enabled: true
+    sensitive: true
+  health:
+    enabled: true
+    sensitive: false

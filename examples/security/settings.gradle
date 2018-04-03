@@ -1,0 +1,6 @@
+include 'books'
+include 'books-api'
+include 'gateway'
+include 'security'
+
+rootProject.name = 'security-sample'

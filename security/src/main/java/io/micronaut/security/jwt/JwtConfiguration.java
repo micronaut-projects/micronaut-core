@@ -23,6 +23,7 @@ import javax.validation.constraints.NotBlank;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores configuration for JWT
@@ -59,6 +60,10 @@ public class JwtConfiguration implements SignatureConfiguration, EncryptionConfi
 
     Integer refreshTokenExpiration = null;
 
+    private boolean login = false;
+
+    private boolean refresh = false;
+
     /** Full path to the public key so that {@code new File(publicKeyPath).exists() == true} */
     @Nullable
     private String publicKeyPath;
@@ -69,6 +74,23 @@ public class JwtConfiguration implements SignatureConfiguration, EncryptionConfi
 
     @NotBlank
     private String secret;
+
+
+    public boolean isLogin() {
+        return login;
+    }
+
+    public void setLogin(boolean login) {
+        this.login = login;
+    }
+
+    public boolean isRefresh() {
+        return refresh;
+    }
+
+    public void setRefresh(boolean refresh) {
+        this.refresh = refresh;
+    }
 
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
