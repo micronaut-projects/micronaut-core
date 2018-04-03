@@ -20,6 +20,13 @@ abstract class AbstractFilePart extends Part {
     protected final String filename;
     protected final MediaType contentType;
 
+    /**
+     * Constructor to create an object
+     *
+     * @param name parameter name
+     * @param filename name of file
+     * @param contentType file content type
+     */
     AbstractFilePart(String name, String filename, @Nullable MediaType contentType) {
         super(name);
         if (filename == null) {
@@ -37,6 +44,13 @@ abstract class AbstractFilePart extends Part {
 
     abstract long getLength();
 
+    /**
+     * Create an object of {@link InterfaceHttpData} from {@link AbstractFilePart}
+     *
+     * @param request associated request
+     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
+     * @return {@link InterfaceHttpData} object
+     */
     @Override
     InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
         MediaType mediaType = contentType;

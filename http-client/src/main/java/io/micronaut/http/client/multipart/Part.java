@@ -13,6 +13,10 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 abstract class Part {
     protected final String name;
 
+    /**
+     *
+     * @param name parameter name
+     */
     Part(String name) {
         if (name == null) {
             throw new IllegalArgumentException("Adding parts with a null name is not allowed");
@@ -20,5 +24,11 @@ abstract class Part {
         this.name = name;
     }
 
+    /**
+     *
+     * @param request associated request
+     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
+     * @return {@link InterfaceHttpData} object
+     */
     abstract InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory);
 }
