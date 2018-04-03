@@ -16,21 +16,14 @@
 package io.micronaut.discovery.route53
 
 import com.amazonaws.services.ec2.AmazonEC2Client
-import com.amazonaws.services.ec2.model.DescribeInstancesRequest
-import com.amazonaws.services.ec2.model.DescribeInstancesResult
-import com.amazonaws.services.ec2.model.Instance
-import com.amazonaws.services.ec2.model.InstanceNetworkInterface
-import com.amazonaws.services.ec2.model.InstanceStateChange
-import com.amazonaws.services.ec2.model.RunInstancesRequest
-import com.amazonaws.services.ec2.model.RunInstancesResult
-import com.amazonaws.services.ec2.model.StopInstancesRequest
-import com.amazonaws.services.ec2.model.TerminateInstancesRequest
-import com.amazonaws.services.ec2.model.TerminateInstancesResult
+import com.amazonaws.services.ec2.model.*
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery
+import com.amazonaws.services.servicediscovery.model.DeregisterInstanceRequest
 import com.amazonaws.services.servicediscovery.model.DeregisterInstanceResult
 import com.amazonaws.services.servicediscovery.model.GetOperationRequest
 import com.amazonaws.services.servicediscovery.model.GetOperationResult
 import com.amazonaws.services.servicediscovery.model.InstanceSummary
+import com.amazonaws.services.servicediscovery.model.ListInstancesRequest
 import com.amazonaws.services.servicediscovery.model.ListInstancesResult
 import com.amazonaws.services.servicediscovery.model.ListServicesRequest
 import com.amazonaws.services.servicediscovery.model.ListServicesResult
@@ -48,23 +41,17 @@ import io.micronaut.discovery.aws.route53.registration.Route53AutoNamingRegistra
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration
 import io.micronaut.discovery.cloud.NetworkInterface
 import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata
-import io.micronaut.http.HttpStatus
-import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.*
 import spock.util.concurrent.PollingConditions
 
-import javax.validation.ConstraintViolationException
-
 /**
  * @author graemerocher
  * @since 1.0
  */
-//@IgnoreIf({ !System.getenv('AWS_ACCESS_KEY_ID') && !System.getenv('AWS_SECRET_ACCESS_KEY')})
-@IgnoreIf({ !System.getenv('AWS_SUBNET_ID')})
 @Stepwise
-class Route53AutoNamingClientSpec extends Specification {
+class Route53AutoNamingClientUnitSpec extends Specification {
 
 
 
@@ -82,50 +69,93 @@ class Route53AutoNamingClientSpec extends Specification {
     @Shared String namespaceId
     @Shared String serviceId
     @Shared String createdInstanceId
-    @Shared AmazonEC2Client amazonEC2Client
+
 
 
     def setupSpec() {
-        namespaceId = client.createNamespace(null,"vanderfox.net")
-        serviceId = client.createService(null,"test","micronaut-integration-test",namespaceId,1000L)
+        namespaceId = "asdb123"
+        serviceId = "123abcdf"
         client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
-        amazonEC2Client = new AmazonEC2Client(client.clientConfiguration.clientConfiguration)
-        // start an tiny instance to add to the service we don't care about keys and such
-        RunInstancesRequest runInstancesRequest =
-                new RunInstancesRequest();
-        runInstancesRequest.withImageId("ami-1853ac65")
-                .withInstanceType("t2.nano")
-                .withMinCount(1)
-                .withMaxCount(1)
-                .withSubnetId(System.getenv('AWS_SUBNET_ID'))
-        RunInstancesResult result = amazonEC2Client.runInstances(
-                runInstancesRequest);
-        createdInstanceId = result.getReservation().getInstances()[0].instanceId
-        // we will need to call our getInstance Details since we are not running this on a real aws server and trick the resolver for the test
-        DescribeInstancesResult instanceResult = amazonEC2Client.describeInstances(new DescribeInstancesRequest().withInstanceIds(createdInstanceId))
-        AmazonEC2InstanceMetadata metadata = new AmazonEC2InstanceMetadata()
-        Instance instanceInfo = instanceResult.reservations.get(0).instances.get(0)
-        metadata.instanceId = instanceInfo.instanceId
-        metadata.publicIpV4 = instanceInfo.getPublicIpAddress()
-        metadata.privateIpV4 = instanceInfo.getPrivateIpAddress()
-        metadata.machineType = instanceInfo.getInstanceType()
-        metadata.localHostname = instanceInfo.getPrivateDnsName()
-        metadata.publicHostname = instanceInfo.getPublicDnsName()
 
-        List instanceNetworkInterfaces = instanceInfo.getNetworkInterfaces()
-        metadata.interfaces = new ArrayList<NetworkInterface>()
-        instanceNetworkInterfaces.each { InstanceNetworkInterface networkInterface ->
-            NetworkInterface micronautNetworkInterface = new NetworkInterface()
-            micronautNetworkInterface.ipv4 = networkInterface.privateIpAddress
-            micronautNetworkInterface.network = networkInterface.subnetId
-            micronautNetworkInterface.mac = networkInterface.macAddress
-            micronautNetworkInterface.name = networkInterface.networkInterfaceId
-            metadata.interfaces.add(micronautNetworkInterface)
-        }
+
+
+        createdInstanceId = "i-12123321"
+        // we will need to call our getInstance Details since we are not running this on a real aws server and trick the resolver for the test
+        AmazonEC2InstanceMetadata metadata = new AmazonEC2InstanceMetadata()
+        metadata.instanceId = createdInstanceId
+        metadata.publicIpV4 = "10.0.0.2"
+        metadata.privateIpV4 = "10.0.0.3"
+
+        metadata.machineType = "t2.nano"
+        metadata.localHostname = "i12123321.ec2.internal"
+
+
+        NetworkInterface micronautNetworkInterface = new NetworkInterface()
+        micronautNetworkInterface.ipv4 = "10.0.0.3"
+        micronautNetworkInterface.network = "s-123123"
+        micronautNetworkInterface.mac = "0a:0d:0c:3a"
+        micronautNetworkInterface.name = "eth0"
+        metadata.interfaces = [micronautNetworkInterface]
+
 
         client.amazonComputeInstanceMetadataResolver.cachedMetadata = metadata
         route53AutoNamingClient.route53ClientDiscoveryConfiguration.awsServiceId = serviceId
         route53AutoNamingClient.route53ClientDiscoveryConfiguration.namespaceId = namespaceId
+
+        client.amazonComputeInstanceMetadataResolver.cachedMetadata = metadata
+        client.discoveryClient = Mock(AWSServiceDiscovery)
+        client.discoveryService = Mock(Service)
+        client.discoveryService.id = serviceId
+        client.discoveryService.name = namespaceId
+        client.discoveryService.instanceCount = 1
+        RegisterInstanceResult registerInstanceResult = Mock(RegisterInstanceResult)
+        registerInstanceResult.operationId = "adslkdfaskljfdsaklj"
+
+
+        client.discoveryClient.registerInstance(_) >> registerInstanceResult
+        GetOperationRequest operationRequest = Mock(GetOperationRequest)
+/*
+        GetOperationResult operationResult = Mock(GetOperationResult)
+        Operation operation = new Operation()
+        operation.id = "123456"
+        operation.status = "SUCCESS"
+        operationResult.operation = operation
+*/
+
+        client.discoveryClient.getOperation(_) >> { GetOperationRequest request ->
+            GetOperationResult operationResult = new GetOperationResult()
+            Operation operation = new Operation()
+            operation.id = "123456"
+            operation.status = "SUCCESS"
+            operationResult.operation = operation
+            operationResult
+        }
+
+        //client.checkOperation(_) >> operationResult
+        DeregisterInstanceResult deregisterInstanceResult = Mock(DeregisterInstanceResult)
+        deregisterInstanceResult.operationId = "123123123213"
+        client.discoveryClient.deregisterInstance(_ as DeregisterInstanceRequest) >> deregisterInstanceResult
+
+        route53AutoNamingClient.discoveryClient = client.discoveryClient
+        route53AutoNamingClient.discoveryClient.listInstances(_) >> { ListInstancesRequest request ->
+            ListInstancesResult listInstancesResult = new ListInstancesResult()
+            InstanceSummary instanceSummary = new InstanceSummary()
+            instanceSummary.id = createdInstanceId
+            instanceSummary.addAttributesEntry(("URI"),"/v1")
+            listInstancesResult.instances = [instanceSummary] as List<InstanceSummary>
+            listInstancesResult
+        }
+        ListServicesRequest listServicesRequest = Mock(ListServicesRequest)
+        route53AutoNamingClient.discoveryClient.listServices(_) >> { ListServicesRequest request ->
+            ListServicesResult listServicesResult = new ListServicesResult()
+            ServiceSummary serviceSummary = new ServiceSummary()
+            serviceSummary.instanceCount = 1
+            serviceSummary.name = "123456"
+            serviceSummary.id = serviceId
+            listServicesResult.services = [serviceSummary] as List<ServiceSummary>
+            listServicesResult
+        }
+
 
     }
 
@@ -133,6 +163,7 @@ class Route53AutoNamingClientSpec extends Specification {
         expect:
         discoveryClient instanceof CompositeDiscoveryClient
         client instanceof DiscoveryServiceAutoRegistration
+
     }
     
 
@@ -164,20 +195,4 @@ class Route53AutoNamingClientSpec extends Specification {
 
     }
 
-    def cleanupSpec() {
-        Route53AutoNamingRegistrationClient route53Client = (Route53AutoNamingRegistrationClient)client
-        if (createdInstanceId) {
-            TerminateInstancesResult termResult = amazonEC2Client.terminateInstances(new TerminateInstancesRequest().withInstanceIds([createdInstanceId]))
-            InstanceStateChange state = termResult.getTerminatingInstances().get(0)
-            Thread.currentThread().sleep(15000)
-        }
-        if (serviceId) {
-            route53Client.deleteService(serviceId)
-        }
-        if (namespaceId) {
-            route53Client.deleteNamespace(namespaceId)
-        }
-
-
-    }
 }
