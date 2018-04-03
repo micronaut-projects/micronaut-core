@@ -1,6 +1,7 @@
 dependencies {
     compile project(":function")
     compile project(":http-client")
+    compile project(":configurations:aws-common")
     compileOnly project(":inject-java")
     compileOnly project(":function-aws")
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
