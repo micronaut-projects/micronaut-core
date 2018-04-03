@@ -13,6 +13,8 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
+import io.reactivex.FlowableSubscriber
+import io.reactivex.annotations.NonNull
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import org.reactivestreams.Publisher
@@ -20,6 +22,7 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
+import spock.lang.IgnoreRest
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -41,7 +44,7 @@ class MultipartFileUploadSpec extends Specification {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file))
+                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.name, MediaType.TEXT_PLAIN_TYPE, file))
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -143,7 +146,7 @@ class MultipartFileUploadSpec extends Specification {
         given:
         def data = '{"title":"Test"}'
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("data", "data.json", data.bytes)
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .addPart("title", "bar")
                 .build()
 
@@ -165,7 +168,6 @@ class MultipartFileUploadSpec extends Specification {
 
     }
 
-    @Ignore
     void "test non-blocking upload with publisher receiving converted JSON"() {
         given:
         def data = '{"title":"Test"}'
@@ -179,7 +181,7 @@ class MultipartFileUploadSpec extends Specification {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/multipart/recieveFlowData", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
         def response = flowable.blockingFirst()
@@ -277,7 +279,7 @@ class MultipartFileUploadSpec extends Specification {
 
         @Post(consumes = MediaType.MULTIPART_FORM_DATA)
         Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
-            return Flowable.just(data.flatMap({left, right -> left == right ? left.toString() : left.toString() + " " + right.toString()})).map({success-> HttpResponse.ok()})
+            return data.flatMap({ Flowable.just(it)}, {left, right -> left == right ? left.toString() : left.toString() + " " + right.toString()}).map({result-> HttpResponse.ok(result)})
         }
 
         @Post(consumes = MediaType.MULTIPART_FORM_DATA)
