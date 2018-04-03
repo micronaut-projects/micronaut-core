@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package io.micronaut.management.health.indicator;
 
-import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.management.health.aggregator.HealthAggregator;
 import org.reactivestreams.Publisher;
 
 /**

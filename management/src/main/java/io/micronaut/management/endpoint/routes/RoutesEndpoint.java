@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,17 @@
  */
 package io.micronaut.management.endpoint.routes;
 
+import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.web.router.Router;
-import io.micronaut.http.annotation.HttpMethodMapping;
 import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to display application routes</p>
  *
- * @see HttpMethodMapping
- *
  * @author James Kleeh
+ * @see HttpMethodMapping
  * @since 1.0
  */
 @Endpoint("routes")
