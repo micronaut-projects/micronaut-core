@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.multipart;
 
@@ -20,9 +20,6 @@ import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.util.ReferenceCountUtil;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.http.server.netty.multipart.ChunkedFileUpload;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -36,16 +33,16 @@ import java.util.Optional;
  */
 @Singleton
 public class ChunkedFileUploadToByteArrayConverter implements TypeConverter<ChunkedFileUpload, byte[]> {
+
     @Override
     public Optional<byte[]> convert(ChunkedFileUpload upload, Class<byte[]> targetType, ConversionContext context) {
         try {
             ByteBuf byteBuf = null;
             try {
                 byteBuf = upload.getCurrentChunk();
-                if(byteBuf.hasArray() && upload.isCompleted()) {
+                if (byteBuf.hasArray() && upload.isCompleted()) {
                     return Optional.of(byteBuf.array());
-                }
-                else {
+                } else {
                     int len = byteBuf.readableBytes();
                     byte[] bytes = new byte[len];
                     byteBuf.readBytes(bytes);
