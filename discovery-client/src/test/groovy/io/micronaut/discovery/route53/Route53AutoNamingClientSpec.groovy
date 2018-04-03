@@ -23,21 +23,8 @@ import com.amazonaws.services.ec2.model.InstanceNetworkInterface
 import com.amazonaws.services.ec2.model.InstanceStateChange
 import com.amazonaws.services.ec2.model.RunInstancesRequest
 import com.amazonaws.services.ec2.model.RunInstancesResult
-import com.amazonaws.services.ec2.model.StopInstancesRequest
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest
 import com.amazonaws.services.ec2.model.TerminateInstancesResult
-import com.amazonaws.services.servicediscovery.AWSServiceDiscovery
-import com.amazonaws.services.servicediscovery.model.DeregisterInstanceResult
-import com.amazonaws.services.servicediscovery.model.GetOperationRequest
-import com.amazonaws.services.servicediscovery.model.GetOperationResult
-import com.amazonaws.services.servicediscovery.model.InstanceSummary
-import com.amazonaws.services.servicediscovery.model.ListInstancesResult
-import com.amazonaws.services.servicediscovery.model.ListServicesRequest
-import com.amazonaws.services.servicediscovery.model.ListServicesResult
-import com.amazonaws.services.servicediscovery.model.Operation
-import com.amazonaws.services.servicediscovery.model.RegisterInstanceResult
-import com.amazonaws.services.servicediscovery.model.Service
-import com.amazonaws.services.servicediscovery.model.ServiceSummary
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.discovery.CompositeDiscoveryClient
@@ -48,20 +35,15 @@ import io.micronaut.discovery.aws.route53.registration.Route53AutoNamingRegistra
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration
 import io.micronaut.discovery.cloud.NetworkInterface
 import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata
-import io.micronaut.http.HttpStatus
-import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.*
 import spock.util.concurrent.PollingConditions
 
-import javax.validation.ConstraintViolationException
-
 /**
  * @author graemerocher
  * @since 1.0
  */
-//@IgnoreIf({ !System.getenv('AWS_ACCESS_KEY_ID') && !System.getenv('AWS_SECRET_ACCESS_KEY')})
 @IgnoreIf({ !System.getenv('AWS_SUBNET_ID')})
 @Stepwise
 class Route53AutoNamingClientSpec extends Specification {
