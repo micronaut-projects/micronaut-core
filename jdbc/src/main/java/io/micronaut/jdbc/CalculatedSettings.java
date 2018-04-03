@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.jdbc;
 
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
@@ -69,7 +68,7 @@ public class CalculatedSettings {
                 final String url = basicJdbcConfiguration.getUrl();
                 if (StringUtils.hasText(url)) {
                     JdbcDatabaseManager.findDatabase(url).ifPresent(db ->
-                            calculatedDriverClassName = db.getDriverClassName());
+                        calculatedDriverClassName = db.getDriverClassName());
                 }
 
                 if (!StringUtils.hasText(calculatedDriverClassName) && embeddedDatabaseConnection.isPresent()) {
@@ -79,13 +78,11 @@ public class CalculatedSettings {
                 if (!StringUtils.hasText(calculatedDriverClassName)) {
                     throw new ConfigurationException(String.format("Error configuring data source '%s'. No driver class name specified", basicJdbcConfiguration.getName()));
                 }
-
             }
         }
 
         return calculatedDriverClassName;
     }
-
 
     /**
      * Determines the URL based on the configured value. If the URL is
@@ -171,5 +168,4 @@ public class CalculatedSettings {
     private boolean driverClassIsPresent(String className) {
         return ClassUtils.isPresent(className, this.getClass().getClassLoader());
     }
-
 }
