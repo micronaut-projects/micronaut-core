@@ -12,7 +12,6 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
-import io.micronaut.health.HealthStatus;
 import io.micronaut.http.client.Client;
 import org.reactivestreams.Publisher;
 
@@ -83,10 +82,13 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Override
     public Publisher<List<String>> getServiceIds() {
 
-        AWSServiceDiscovery client = AWSServiceDiscoveryClient.builder().build();
+        if (discoveryClient==null) {
+            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
+        }
+
         ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(route53ClientDiscoveryConfiguration.getNamespaceId());
         ListServicesRequest listServicesRequest = new ListServicesRequest().withFilters(serviceFilter);
-        ListServicesResult response = client.listServices(listServicesRequest);
+        ListServicesResult response = discoveryClient.listServices(listServicesRequest);
         List<ServiceSummary> services = response.getServices();
         List<String> serviceIds = new ArrayList<String>();
         for (ServiceSummary service : services) {

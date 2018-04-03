@@ -1,7 +1,5 @@
 package io.micronaut.discovery.aws.route53.registration;
 
-import com.amazonaws.services.route53.model.GetHealthCheckStatusRequest;
-import com.amazonaws.services.route53.model.GetHealthCheckStatusResult;
 import com.amazonaws.services.servicediscovery.*;
 import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
@@ -10,22 +8,15 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
-import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver;
-import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.inject.Singleton;
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import java.io.IOException;
-import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +41,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ServiceInstanceIdGenerator idGenerator;
     private final AWSClientConfiguration clientConfiguration;
-    private final AWSServiceDiscovery discoveryClient;
+    private AWSServiceDiscovery discoveryClient;
     private final AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
 
@@ -96,9 +87,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     @Override
     protected void deregister(ServiceInstance instance) {
 
-        DeregisterInstanceRequest deregisterInstanceRequest = new DeregisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
-                .withInstanceId(instance.getInstanceId().get());
-        discoveryClient.deregisterInstance(deregisterInstanceRequest);
+        if (instance.getInstanceId().isPresent()) {
+            DeregisterInstanceRequest deregisterInstanceRequest = new DeregisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
+                    .withInstanceId(instance.getInstanceId().get());
+            discoveryClient.deregisterInstance(deregisterInstanceRequest);
+        }
     }
 
     @Override
@@ -141,7 +134,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         }
 
 
-        //TODO config sharing will go in map above or in ConfigurationManagement Service?
+        assert instance.getInstanceId().isPresent();
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
                 .withInstanceId(instance.getInstanceId().get()).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
 
@@ -162,7 +155,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                 opResult = discoveryClient.getOperation(new GetOperationRequest().withOperationId(operationId));
                 result = opResult.getOperation().getStatus();
                 if (opResult.getOperation().getStatus().equals("SUCCESS")) {
-                    LOG.info("Successfully created namespace id "+opResult.getOperation().getTargets().get("NAMESPACE")+" please add this to your configs for future restarts.");
+                    LOG.info("Successfully get operation id "+operationId);
                     return opResult;
                 } else {
                     if (opResult.getOperation().getStatus().equals("FAIL")){
