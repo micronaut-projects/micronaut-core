@@ -3,6 +3,7 @@ package io.micronaut.context.env.groovy;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.ResourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,8 +44,8 @@ public class GroovyPropertySourceLoader extends AbstractPropertySourceLoader {
     }
 
     @Override
-    protected Optional<InputStream> readInput(Environment environment, String fileName) {
-        Stream<URL> urls = environment.getResources(fileName);
+    protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
+        Stream<URL> urls = resourceLoader.getResources(fileName);
         Stream<URL> urlStream = urls.filter(url -> !url.getPath().contains("src/main/groovy"));
         Optional<URL> config = urlStream.findFirst();
         if(config.isPresent()) {

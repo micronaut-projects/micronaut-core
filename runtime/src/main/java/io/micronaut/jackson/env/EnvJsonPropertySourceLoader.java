@@ -43,7 +43,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     }
 
     @Override
-    protected Optional<InputStream> readInput(Environment environment, String fileName) {
+    protected Optional<InputStream> readInput(String fileName) {
         if(fileName.equals("application.json")) {
             String v = getEnvValue();
             if(v != null) {
