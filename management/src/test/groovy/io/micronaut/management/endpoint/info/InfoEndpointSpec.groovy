@@ -29,7 +29,6 @@ class InfoEndpointSpec extends Specification {
 
 
     void "test ordering of info sources"() {
-
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['info.ordered': 'second'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
