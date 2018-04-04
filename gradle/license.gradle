@@ -23,4 +23,5 @@ license {
     exclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
     exclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
     exclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+    exclude '**/org/atinject/tck/auto/Tck.kt'
 }
