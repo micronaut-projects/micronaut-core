@@ -51,10 +51,6 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
         super(ssl, resourceResolver);
     }
 
-    @Inject public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
-        super(ssl, new ResourceResolver());
-    }
-
     public SslConfiguration getSslConfiguration() {
         return ssl;
     }
