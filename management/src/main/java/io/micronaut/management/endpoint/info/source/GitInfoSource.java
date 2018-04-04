@@ -4,6 +4,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.*;
 import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.cli.Option;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
@@ -28,11 +30,14 @@ import java.util.function.Supplier;
 @Requires(property = "endpoints.info.git.enabled", notEquals = "false")
 public class GitInfoSource implements InfoSource {
 
+    private static final String EXTENSION = ".properties";
+    private static final String PREFIX = "classpath:";
+
     @Value("${endpoints.info.git.location:git.properties}")
     private String gitPropertiesPath;
 
     private ResourceResolver resourceResolver;
-    private final Supplier<MapPropertySource> supplier;
+    private final Supplier<Optional<PropertySource>> supplier;
 
     public GitInfoSource(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
@@ -41,26 +46,32 @@ public class GitInfoSource implements InfoSource {
 
     @Override
     public Publisher<PropertySource> getSource() {
-        return Flowable.just(supplier.get());
+        Optional<PropertySource> propertySource = supplier.get();
+        return propertySource.map(Flowable::just).orElse(Flowable.empty());
     }
 
+    private Optional<PropertySource> retrieveGitInfo() {
+        StringBuilder pathBuilder = new StringBuilder();
 
-    private MapPropertySource retrieveGitInfo() {
-        Optional<URL> url = resourceResolver.getResource("classpath:" + gitPropertiesPath);
-        if (url.isPresent()) {
-            PropertiesPropertySourceLoader propertySourceLoader = new PropertiesPropertySourceLoader();
-            String propertySourceName = gitPropertiesPath;
-
-            try {
-                if (propertySourceName != null) {
-                    Map<String, Object> properties = propertySourceLoader.read(propertySourceName, url.get().openStream());
-                    return new MapPropertySource("git", new LinkedHashMap<>(properties));
-                }
-            } catch (IOException ex) {
-            }
-
+        if (!gitPropertiesPath.startsWith(PREFIX)) {
+            pathBuilder.append(PREFIX);
         }
-        return null;
+
+        if (gitPropertiesPath.endsWith(EXTENSION)) {
+            int index = gitPropertiesPath.indexOf(EXTENSION);
+            pathBuilder.append(gitPropertiesPath, 0, index);
+        } else {
+            pathBuilder.append(gitPropertiesPath);
+        }
+        String path = pathBuilder.toString();
+
+        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(path);
+        if (resourceLoader.isPresent()) {
+            PropertiesPropertySourceLoader propertySourceLoader = new PropertiesPropertySourceLoader();
+            return propertySourceLoader.load(path, resourceLoader.get(), null);
+        }
+
+        return Optional.empty();
     }
 }
 

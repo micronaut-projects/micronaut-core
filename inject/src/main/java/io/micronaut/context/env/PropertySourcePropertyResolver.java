@@ -207,21 +207,29 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
         Arrays.stream(catalog)
                 .filter(Objects::nonNull)
-                .forEach((m) -> m.keySet().forEach(k -> {
-                    String rootKey;
+                .map(Map::entrySet)
+                .flatMap(Collection::stream)
+                .forEach((Map.Entry<String, Object> entry) -> {
+                    String k = entry.getKey();
+                    Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
+                    Map finalMap = map;
                     int index = k.indexOf('.');
                     if (index != -1) {
-                        rootKey = k.substring(0, index);
+                        String[] keys = k.split("\\.");
+                        for (int i = 0; i < keys.length -1; i++) {
+                            if (!finalMap.containsKey(keys[i])) {
+                                finalMap.put(keys[i], new HashMap<>());
+                            }
+                            Object next = finalMap.get(keys[i]);
+                            if (next instanceof Map) {
+                                finalMap = ((Map) next);
+                            }
+                        }
+                        finalMap.put(keys[keys.length -1], value);
                     } else {
-                        rootKey = k;
+                        finalMap.put(k, value);
                     }
-                    Map<String, Object> entries = resolveEntriesForKey(rootKey, false);
-                    if(entries.size() > 1) {
-                        map.put(rootKey, resolveSubMap(rootKey, entries));
-                    } else {
-                        map.putAll(entries);
-                    }
-                }));
+                });
 
         return map;
     }
