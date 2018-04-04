@@ -2,12 +2,13 @@ package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.handler.codec.http.multipart.HttpDataFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * A class representing a InputStream data {@link Part} in {@link MultipartBody} to build a Netty multipart request.
+ * A class representing a {@link InputStream} data in {@link MultipartBody} to build a Netty multipart request.
  *
  * @author Puneet Behl
  * @since 1.0
@@ -18,10 +19,10 @@ class InputStreamPart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param data file InputStream data
-     * @param contentLength length of data
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param data The {@link InputStream} to copy the content from
+     * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
      */
     InputStreamPart(String name, String filename, InputStream data, long contentLength) {
         this(name, filename, null, data, contentLength);
@@ -29,11 +30,11 @@ class InputStreamPart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param contentType content type of data in {@link InputStream}
-     * @param data file InputStream data
-     * @param contentLength length of data
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param contentType The type of the content, example - "application/json", "text/plain" etc
+     * @param data The {@link InputStream} to copy the content from
+     * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
      */
     InputStreamPart(String name, String filename, MediaType contentType, InputStream data, long contentLength) {
         super(name, filename, contentType);
@@ -44,8 +45,7 @@ class InputStreamPart extends AbstractFilePart {
     /**
      * Copy the {@link InputStream} data content into {@link FileUpload}
      *
-     * @param fileUpload an object of class extending {@link FileUpload}
-     * @throws IOException
+     * @see AbstractFilePart#setContent
      */
     @Override
     void setContent(FileUpload fileUpload) throws IOException {
@@ -54,7 +54,7 @@ class InputStreamPart extends AbstractFilePart {
 
     /**
      *
-     * @return length of file data
+     * @see AbstractFilePart#getLength()
      */
     @Override
     long getLength() {
