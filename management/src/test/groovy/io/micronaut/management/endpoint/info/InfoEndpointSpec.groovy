@@ -43,6 +43,21 @@ class InfoEndpointSpec extends Specification {
 
     }
 
+    void "test git info source"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['info.ordered': 'second'], 'test')
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().git.branch == "master"
+        response.body().git.commit.id == "97ef2a6753e1ce4999a19779a62368bbca997e53"
+        response.body().git.commit.time == "1522546237"
+    }
+
     @Singleton
     static class TestingInfoSource implements InfoSource {
 
