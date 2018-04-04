@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,6 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
