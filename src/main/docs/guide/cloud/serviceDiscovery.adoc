@@ -59,7 +59,7 @@ Next step is creating the Service and DNS records.
 .Create Service
 [source,bash]
 ----
-aws create-service --name yourservicename --create-request-id somenumber --descrption someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
+aws create-service --name yourservicename --create-request-id somenumber --description someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
 ----
 
 
