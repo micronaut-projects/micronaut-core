@@ -1,22 +1,22 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.cache;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.nio.charset.Charset;
@@ -34,14 +34,18 @@ import java.util.OptionalLong;
 @EachProperty(CacheConfiguration.PREFIX)
 public class CacheConfiguration {
 
+    /**
+     * The prefix for cache configuration
+     */
     public static final String PREFIX = "micronaut.caches";
+
+    protected Charset charset;
 
     private Integer initialCapacity;
     private Long maximumSize;
     private Long maximumWeight;
     private Duration expireAfterWrite;
     private Duration expireAfterAccess;
-    protected Charset charset;
 
     private final String cacheName;
 
@@ -79,7 +83,6 @@ public class CacheConfiguration {
     }
 
     /**
-     *
      * @return The expiry to use after the value is written
      */
     public Optional<Duration> getExpireAfterWrite() {
