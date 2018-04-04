@@ -1,3 +1,18 @@
+/*
+ * Copyright 2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.annotation.Requires;
@@ -28,7 +43,7 @@ import java.util.function.Supplier;
 @Singleton
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.git.enabled", notEquals = "false")
-public class GitInfoSource implements InfoSource {
+public class GitInfoSource implements PropertiesInfoSource {
 
     private static final String EXTENSION = ".properties";
     private static final String PREFIX = "classpath:";
@@ -51,27 +66,7 @@ public class GitInfoSource implements InfoSource {
     }
 
     private Optional<PropertySource> retrieveGitInfo() {
-        StringBuilder pathBuilder = new StringBuilder();
-
-        if (!gitPropertiesPath.startsWith(PREFIX)) {
-            pathBuilder.append(PREFIX);
-        }
-
-        if (gitPropertiesPath.endsWith(EXTENSION)) {
-            int index = gitPropertiesPath.indexOf(EXTENSION);
-            pathBuilder.append(gitPropertiesPath, 0, index);
-        } else {
-            pathBuilder.append(gitPropertiesPath);
-        }
-        String path = pathBuilder.toString();
-
-        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(path);
-        if (resourceLoader.isPresent()) {
-            PropertiesPropertySourceLoader propertySourceLoader = new PropertiesPropertySourceLoader();
-            return propertySourceLoader.load(path, resourceLoader.get(), null);
-        }
-
-        return Optional.empty();
+        return retrievePropertiesPropertySource(gitPropertiesPath, PREFIX, EXTENSION, resourceResolver);
     }
 }
 
