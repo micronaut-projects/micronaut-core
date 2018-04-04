@@ -29,11 +29,9 @@ class StringPart extends Part {
     }
 
     /**
-     * Create an object of {@link InterfaceHttpData} from {@link StringPart}
+     * Create an object of {@link InterfaceHttpData} to build Netty multipart request body
      *
-     * @param request associated request
-     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
-     * @return {@link InterfaceHttpData} object
+     * @see Part#getData(HttpRequest, HttpDataFactory)
      */
     @Override
     InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {

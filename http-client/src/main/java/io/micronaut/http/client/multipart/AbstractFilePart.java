@@ -11,7 +11,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
- * An abstract class used by a {@link FilePart}, {@link BytePart}, & {@link InputStreamPart} to build a Netty multipart request.
+ * The base class used by a {@link FilePart}, {@link BytePart}, & {@link InputStreamPart} to build a Netty multipart request.
  *
  * @author Puneet Behl
  * @since 1.0
@@ -23,9 +23,9 @@ abstract class AbstractFilePart extends Part {
     /**
      * Constructor to create an object
      *
-     * @param name parameter name
-     * @param filename name of file
-     * @param contentType file content type
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param contentType The type of the content, example - "application/json", "text/plain" etc
      */
     AbstractFilePart(String name, String filename, @Nullable MediaType contentType) {
         super(name);
@@ -40,16 +40,24 @@ abstract class AbstractFilePart extends Part {
         }
     }
 
+    /**
+     * Copy the content into {@link FileUpload} object
+     *
+     * @param fileUpload The {@link FileUpload} to write the content to
+     * @throws IOException
+     */
     abstract void setContent(FileUpload fileUpload) throws IOException;
 
+    /**
+     *
+     * @return The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+     */
     abstract long getLength();
 
     /**
-     * Create an object of {@link InterfaceHttpData} from {@link AbstractFilePart}
+     * Create an object of {@link InterfaceHttpData} to build Netty multipart request
      *
-     * @param request associated request
-     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
-     * @return {@link InterfaceHttpData} object
+     * @see Part#getData(HttpRequest, HttpDataFactory)
      */
     @Override
     InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {

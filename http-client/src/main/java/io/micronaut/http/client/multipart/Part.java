@@ -5,17 +5,21 @@ import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 
 /**
- * An abstract base class representing multiple parts in the {@link MultipartBody} to build a Netty multipart request.
+ * The base class representing multiple parts in the {@link MultipartBody} to build a Netty multipart request.
  *
  * @author Puneet Behl
  * @since 1.0
  */
 abstract class Part {
+
+    /**
+     * Name of the parameter in Multipart request body
+     */
     protected final String name;
 
     /**
      *
-     * @param name parameter name
+     * @param name Name of the parameter
      */
     Part(String name) {
         if (name == null) {
@@ -26,9 +30,9 @@ abstract class Part {
 
     /**
      *
-     * @param request associated request
-     * @param factory An object of class extending {@link HttpDataFactory}, to enable creation of InterfaceHttpData objects from {@link Part}
-     * @return {@link InterfaceHttpData} object
+     * @param request Associated request
+     * @param factory The factory used to create the {@link InterfaceHttpData}
+     * @return {@link InterfaceHttpData} object to build Netty multipart request body
      */
     abstract InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory);
 }

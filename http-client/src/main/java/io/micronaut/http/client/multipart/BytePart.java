@@ -17,9 +17,9 @@ class BytePart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param data file content bytes
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param data The content to copy in {@link FileUpload}
      */
     BytePart(String name, String filename, byte[] data) {
         this(name, filename, null, data);
@@ -27,10 +27,10 @@ class BytePart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param data content byte[]
-     * @param contentType data content type
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param contentType The type of the content, example - "application/json", "text/plain" etc
+     * @param data The content to copy in {@link FileUpload}
      */
     BytePart(String name, String filename, MediaType contentType, byte[] data) {
         super(name, filename, contentType);
@@ -38,10 +38,9 @@ class BytePart extends AbstractFilePart {
     }
 
     /**
-     * Copy the data content into {@link FileUpload}
+     * Copy the byte data into {@link FileUpload} object
      *
-     * @param fileUpload an object of class extending {@link FileUpload}
-     * @throws IOException
+     * @see AbstractFilePart#setContent(FileUpload)
      */
     @Override
     void setContent(FileUpload fileUpload) throws IOException {
@@ -50,7 +49,7 @@ class BytePart extends AbstractFilePart {
 
     /**
      *
-     * @return length of file data
+     * @see AbstractFilePart#getLength()
      */
     @Override
     long getLength() {

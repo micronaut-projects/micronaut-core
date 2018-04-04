@@ -7,7 +7,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * A class representing a File object {@link Part} in {@link MultipartBody} to build a Netty multipart request.
+ * A class representing a File object in {@link MultipartBody} to build a Netty multipart request.
  *
  * @author Puneet Behl
  * @since 1.0
@@ -18,9 +18,9 @@ class FilePart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param data file object
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param data The file to copy the content from
      */
     FilePart(String name, String filename, File data) {
         this(name, filename, null, data);
@@ -28,10 +28,10 @@ class FilePart extends AbstractFilePart {
 
     /**
      *
-     * @param name parameter name
-     * @param filename name of the file
-     * @param contentType file content type
-     * @param data file object
+     * @param name Parameter name to bind in the multipart request
+     * @param filename Name of the file
+     * @param contentType The type of the content, example - "application/json", "text/plain" etc
+     * @param data The file to copy the content from
      */
     FilePart(String name, String filename, MediaType contentType, File data) {
         super(name, filename, contentType);
@@ -39,10 +39,9 @@ class FilePart extends AbstractFilePart {
     }
 
     /**
-     * Copy the data content into {@link FileUpload}
+     * Copy the file content into {@link FileUpload}
      *
-     * @param fileUpload an object of class extending {@link FileUpload}
-     * @throws IOException
+     * @see AbstractFilePart#setContent(FileUpload)
      */
     @Override
     void setContent(FileUpload fileUpload) throws IOException {
@@ -51,7 +50,7 @@ class FilePart extends AbstractFilePart {
 
     /**
      *
-     * @return length of file data
+     * @see AbstractFilePart#getLength()
      */
     @Override
     long getLength() {
