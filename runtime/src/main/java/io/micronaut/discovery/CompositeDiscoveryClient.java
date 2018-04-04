@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,10 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.cache.CacheConfiguration;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
-import io.micronaut.cache.CacheConfiguration;
-import io.micronaut.core.util.ArrayUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -51,7 +50,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
-        if(ArrayUtils.isEmpty(discoveryClients)) {
+        if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
         Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(serviceId)));
@@ -64,7 +63,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<String>> getServiceIds() {
-        if(ArrayUtils.isEmpty(discoveryClients)) {
+        if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
         Stream<Flowable<List<String>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getServiceIds()));
@@ -84,6 +83,6 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public String toString() {
-        return "compositeDiscoveryClient("+Arrays.stream(discoveryClients).map(DiscoveryClient::getDescription).collect(Collectors.joining(",")) +")";
+        return "compositeDiscoveryClient(" + Arrays.stream(discoveryClients).map(DiscoveryClient::getDescription).collect(Collectors.joining(",")) + ")";
     }
 }

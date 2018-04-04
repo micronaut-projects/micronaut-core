@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -34,6 +33,7 @@ import java.util.Map;
  */
 @Singleton
 public class ConvertibleMultiValuesSerializer extends JsonSerializer<ConvertibleMultiValues<?>> {
+
     @Override
     public boolean isEmpty(SerializerProvider provider, ConvertibleMultiValues<?> value) {
         return value.isEmpty();
@@ -47,12 +47,11 @@ public class ConvertibleMultiValuesSerializer extends JsonSerializer<Convertible
             String fieldName = entry.getKey();
             List<?> v = entry.getValue();
             int len = v.size();
-            if(len > 0) {
+            if (len > 0) {
                 gen.writeFieldName(fieldName);
-                if(len == 1) {
+                if (len == 1) {
                     gen.writeObject(v.get(0));
-                }
-                else {
+                } else {
                     gen.writeStartArray();
 
                     for (Object o : v) {
@@ -61,7 +60,6 @@ public class ConvertibleMultiValuesSerializer extends JsonSerializer<Convertible
                     gen.writeEndArray();
                 }
             }
-
         }
         gen.writeEndObject();
     }
