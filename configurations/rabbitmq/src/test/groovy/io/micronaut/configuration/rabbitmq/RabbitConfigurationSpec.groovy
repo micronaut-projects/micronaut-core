@@ -10,6 +10,8 @@ import com.rabbitmq.client.Envelope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.core.io.socket.SocketUtils
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 class RabbitConfigurationSpec extends Specification {
@@ -37,27 +39,6 @@ class RabbitConfigurationSpec extends Specification {
             cf.getConnectionTimeout() == 60000
             cf.getHandshakeTimeout() == 10000
             cf.getShutdownTimeout() == 10000
-
-        cleanup:
-            applicationContext.close()
-    }
-
-    void "override default rabbit configuration"() {
-        given:
-            ApplicationContext applicationContext = new DefaultApplicationContext("test")
-            applicationContext.start()
-
-        expect: "connection factory bean is available"
-            applicationContext.containsBean(ConnectionFactory)
-
-        when: "when the connection factory is returned and values are overridden"
-            ConnectionFactory cf = applicationContext.getBean(ConnectionFactory)
-            cf.setHost("myNewHost")
-            cf.setPort(9999)
-
-        then: "overridden configuration is available"
-            cf.getHost() == "myNewHost"
-            cf.getPort() == 9999
 
         cleanup:
             applicationContext.close()
@@ -138,7 +119,8 @@ class RabbitConfigurationSpec extends Specification {
 
     /** ================================================================================================================
      * The following tests only run when a working rabbit instance is available
-     * ============================================================================================================== */
+//     * ============================================================================================================== */
+//    @IgnoreIf({ !SocketUtils.isTcpPortAvailable(5672) })
 //    void "default rabbit configuration is overridden when configuration properties are passed in and are available from a new connection"() {
 //        given:
 //        ApplicationContext applicationContext = ApplicationContext.run(
@@ -180,6 +162,7 @@ class RabbitConfigurationSpec extends Specification {
 //        applicationContext.close()
 //    }
 //
+//    @IgnoreIf({ !SocketUtils.isTcpPortAvailable(5672) })
 //    void "default rabbit configuration with connection"() {
 //        given:
 //            ApplicationContext applicationContext = new DefaultApplicationContext("test")
