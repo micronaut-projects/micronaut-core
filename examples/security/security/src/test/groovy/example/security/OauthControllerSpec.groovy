@@ -8,11 +8,11 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.security.UsernamePassword
-import io.micronaut.security.jwt.AccessRefreshToken
-import io.micronaut.security.jwt.DefaultAccessRefreshToken
-import io.micronaut.security.jwt.TokenRefreshRequest
-import io.micronaut.security.jwt.TokenValidator
+import io.micronaut.security.controllers.TokenRefreshRequest
+import io.micronaut.security.controllers.UsernamePassword
+import io.micronaut.security.token.AccessRefreshToken
+import io.micronaut.security.token.DefaultAccessRefreshToken
+import io.micronaut.security.token.validator.TokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.AutoCleanup
 import spock.lang.Ignore

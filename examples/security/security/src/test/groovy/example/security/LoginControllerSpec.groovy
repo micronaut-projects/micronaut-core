@@ -1,7 +1,6 @@
 package example.security
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -9,11 +8,10 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.security.UsernamePassword
-import io.micronaut.security.jwt.AccessRefreshToken
-import io.micronaut.security.jwt.DefaultAccessRefreshToken
-import io.micronaut.security.jwt.TokenRefreshRequest
-import io.micronaut.security.jwt.TokenValidator
+import io.micronaut.security.controllers.UsernamePassword
+import io.micronaut.security.token.AccessRefreshToken
+import io.micronaut.security.token.DefaultAccessRefreshToken
+import io.micronaut.security.token.validator.TokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -43,7 +41,7 @@ class LoginControllerSpec extends Specification {
         when:
         HttpResponse<AccessRefreshToken> rsp = client.toBlocking().exchange(HttpRequest.create(HttpMethod.POST, '/login')
                 .accept(MediaType.APPLICATION_JSON_TYPE)
-                .body(new UsernamePassword('euler', 'password')),DefaultAccessRefreshToken)
+                .body(new UsernamePassword('euler', 'password')), DefaultAccessRefreshToken)
 
         then:
         rsp.status.code == 200

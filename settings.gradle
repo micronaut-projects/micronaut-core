@@ -27,6 +27,7 @@ include "validation"
 include "jdbc"
 include "runtime-groovy"
 include "security"
+include "security-passwordencoder"
 
 // configurations
 include "configurations:gorm"

@@ -3,13 +3,13 @@ plugins {
     id 'groovy'
     id "application"
 }
-mainClassName = "example.security.books.BooksApplication"
+mainClassName = "example.books.BooksApplication"
 ext {
     pac4jVersion = '2.3.1'
 }
 jar {
     manifest {
-        attributes 'Main-Class': "example.security.books.BooksApplication"
+        attributes 'Main-Class': "example.books.BooksApplication"
     }
 }
 repositories {

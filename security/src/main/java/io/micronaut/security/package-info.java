@@ -26,3 +26,4 @@ package io.micronaut.security;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.security.config.SecurityConfiguration;
