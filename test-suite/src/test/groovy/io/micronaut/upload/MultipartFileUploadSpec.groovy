@@ -1,4 +1,4 @@
-package io.micronaut.http.client
+package io.micronaut.upload
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -8,14 +8,13 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Part
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.http.server.netty.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
-import io.reactivex.FlowableSubscriber
-import io.reactivex.annotations.NonNull
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import org.reactivestreams.Publisher
@@ -23,7 +22,6 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
-import spock.lang.IgnoreRest
 import spock.lang.Shared
 import spock.lang.Specification
 

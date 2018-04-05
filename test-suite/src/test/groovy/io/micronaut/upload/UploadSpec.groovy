@@ -16,13 +16,13 @@
 package io.micronaut.upload
 
 import groovy.json.JsonSlurper
-import io.micronaut.http.HttpStatus
-import okhttp3.MediaType
-import okhttp3.MultipartBody
-import okhttp3.Request
-import okhttp3.RequestBody
 import io.micronaut.AbstractMicronautSpec
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.multipart.MultipartBody
+import io.reactivex.Flowable
 
 /**
  * @author Graeme Rocher
@@ -32,52 +32,53 @@ class UploadSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        ['micronaut.server.multipart.maxFileSize':'1KB']
+        ['micronaut.server.multipart.maxFileSize': '1KB']
     }
 
     void "test simple in-memory file upload with JSON"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"}'))
-                    .addFormDataPart("title", "bar")
-                    .build()
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
+                .addPart("title", "bar")
+                .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receiveJson")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveJson", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'bar: Data{title=\'Foo\'}'
+        response.getBody().get() == 'bar: Data{title=\'Foo\'}'
 
     }
 
     void "test simple in-memory file upload with invalid JSON"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"'))
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"'.bytes)
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receiveJson")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveJson", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                String
+        ))
+
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
 
         when:
-        def json = new JsonSlurper().parseText(response.body().string())
+        def json = new JsonSlurper().parseText(response.getBody().get())
 
         then:
         json.message.contains("Failed to convert argument [data]")
@@ -87,41 +88,41 @@ class UploadSpec extends AbstractMicronautSpec {
 
     void "test simple in-memory file upload "() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'bar: some data'
+        response.getBody().get() == 'bar: some data'
     }
 
     void "test file upload with wrong argument name for file"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("datax", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("datax", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        def body = response.body().string()
+        Flowable<HttpResponse> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
         def json = new JsonSlurper().parseText(body)
 
         then:
@@ -131,20 +132,20 @@ class UploadSpec extends AbstractMicronautSpec {
 
     void "test file upload with wrong argument name for simple part"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
-                .addFormDataPart("titlex", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, 'some data'.bytes)
+                .addPart("titlex", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        def body = response.body().string()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
         def json = new JsonSlurper().parseText(body)
 
         then:
@@ -154,19 +155,19 @@ class UploadSpec extends AbstractMicronautSpec {
 
     void "test file upload with missing argument for simple part"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        def body = response.body().string()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
         def json = new JsonSlurper().parseText(body)
 
         then:
@@ -176,19 +177,19 @@ class UploadSpec extends AbstractMicronautSpec {
 
     void "test file upload with missing argument for file part"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        def body = response.body().string()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
         def json = new JsonSlurper().parseText(body)
 
         then:
@@ -198,45 +199,45 @@ class UploadSpec extends AbstractMicronautSpec {
 
     void "test file upload to byte array"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE,'some data'.bytes)
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receiveBytes")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveBytes", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'bar: 9'
+        response.getBody().get() == 'bar: 9'
     }
 
     void "test simple in-memory file upload exceeds size"() {
         given:
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data' * 1000))
-                .addFormDataPart("title", "bar")
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, ('some data' * 1000).bytes)
+                .addPart("title", "bar")
                 .build()
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receivePlain")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receivePlain", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.REQUEST_ENTITY_TOO_LARGE.code
-        response.message() =='Request Entity Too Large'
-        def body = response.body().string()
+        response.reason() == 'Request Entity Too Large'
+        def body = response.getBody().get()
 
         when:
         def json = new JsonSlurper().parseText(body)
@@ -248,21 +249,21 @@ class UploadSpec extends AbstractMicronautSpec {
     void "test upload CompletedFileUpload object"() {
         given:
         def data = '{"title":"Test"}'
-        RequestBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("title", "bar")
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .build()
 
 
         when:
-        def request = new Request.Builder()
-                .url("$server/upload/receiveCompletedFileUpload")
-                .post(requestBody)
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        def result = response.body().string()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveCompletedFileUpload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def result = response.getBody().get()
 
         then:
         response.code() == HttpStatus.OK.code
