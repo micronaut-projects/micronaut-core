@@ -24,6 +24,8 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
+import spock.lang.Ignore
+import spock.lang.IgnoreRest
 
 /**
  * @author Graeme Rocher
@@ -113,7 +115,7 @@ class UploadSpec extends AbstractMicronautSpec {
     void "test file upload with wrong argument name for file"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("datax", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("wrong-name", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
                 .addPart("title", "bar")
                 .build()
 
@@ -140,8 +142,8 @@ class UploadSpec extends AbstractMicronautSpec {
     void "test file upload with wrong argument name for simple part"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, 'some data'.bytes)
-                .addPart("titlex", "bar")
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("wrong-name", "bar")
                 .build()
 
         when:
@@ -151,7 +153,7 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
