@@ -1,5 +1,9 @@
-In order to build a multipart request you will need to specify following:
+The Micronaut HTTP Client supports the ability to create a multipart request in very simple way. Basically, in order to build a multipart request you will need to specify following:
 
 * Set the content type of the request to "multipart/form-data".
 * Add one or more different sets to the request.
+
+For example:
+
+
 

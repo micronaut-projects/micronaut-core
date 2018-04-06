@@ -1,25 +1,33 @@
 package io.micronaut.upload
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-
 // tag::imports[]
+import io.reactivex.Flowable
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+// end::imports[]
+
+// tag::multipartBody[]
+import io.micronaut.http.client.multipart.MultipartBody
+// end::multipartBody[]
+
+// tag::controllerImports[]
+import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.http.server.netty.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+// end::controllerImports[]
+
+// tag::spockImports[]
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-// end::completedImports[]
+// end::spockImports[]
 
 class MultipartFileUploadSpec extends Specification {
 
@@ -43,9 +51,11 @@ class MultipartFileUploadSpec extends Specification {
         file.text = "test file"
         file.createNewFile()
 
+        MultipartBody requestBody = MultipartBody.builder().addPart("data", file.name, MediaType.TEXT_PLAIN_TYPE, file)
+
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.name, MediaType.TEXT_PLAIN_TYPE, file))
+                HttpRequest.POST("/multipart/upload", requestBody) // <1>
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -187,7 +197,7 @@ class MultipartFileUploadSpec extends Specification {
         Publisher<HttpResponse> streamFileUpload(StreamingFileUpload data, String title) {
             return Flowable.fromPublisher(data.transferTo(new File(uploadDir, title + ".txt"))).map ({success->
                 success ? HttpResponse.ok("Uploaded") :
-                HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")
+                        HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")
             })
         }
 
