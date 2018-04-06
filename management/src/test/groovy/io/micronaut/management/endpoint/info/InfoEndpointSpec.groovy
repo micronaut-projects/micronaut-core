@@ -57,7 +57,7 @@ class InfoEndpointSpec extends Specification {
 
     }
 
-    void "test git info source"() {
+    void "test info sources"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
@@ -65,16 +65,24 @@ class InfoEndpointSpec extends Specification {
         when:
         def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
 
-        then:
+        then: "git info is returned"
         response.code() == HttpStatus.OK.code
         response.body().git.branch == "master"
         response.body().git.commit.id == "97ef2a6753e1ce4999a19779a62368bbca997e53"
         response.body().git.commit.time == "1522546237"
+
+        and: "build info is returned"
+        response.code() == HttpStatus.OK.code
+        response.body().build.artifact == "test"
+        response.body().build.group == "io.micronaut"
+        response.body().build.name == "test"
+
     }
 
-    void "test build info source"() {
+
+    void "test the git endpoint with alternate location"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.git.location': 'othergit.properties'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -82,10 +90,9 @@ class InfoEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().build.artifact == "test"
-        response.body().build.group == "io.micronaut"
-        response.body().build.name == "test"
+        response.body().git.branch == "master2"
     }
+
 
     @Singleton
     static class TestingInfoSource implements InfoSource {
