@@ -21,6 +21,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 
@@ -72,13 +73,15 @@ class UploadSpec extends AbstractMicronautSpec {
                 String
         ))
 
-        HttpResponse<String> response = flowable.blockingFirst()
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.BAD_REQUEST.reason
+
 
         when:
-        def json = new JsonSlurper().parseText(response.getBody().get())
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
 
         then:
         json.message.contains("Failed to convert argument [data]")
@@ -121,12 +124,16 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody().get()
-        def json = new JsonSlurper().parseText(body)
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.BAD_REQUEST.reason
+
+        when:
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
+
+        then:
         json.message == "Required argument [String data] not specified"
     }
 
@@ -145,11 +152,15 @@ class UploadSpec extends AbstractMicronautSpec {
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody().get()
-        def json = new JsonSlurper().parseText(body)
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.BAD_REQUEST.reason
+
+        when:
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
+
+        then:
         json.message == "Required argument [String title] not specified"
     }
 
@@ -166,12 +177,16 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody().get()
-        def json = new JsonSlurper().parseText(body)
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.BAD_REQUEST.reason
+
+        when:
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
+
+        then:
         json.message == "Required argument [String title] not specified"
     }
 
@@ -188,12 +203,16 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody().get()
-        def json = new JsonSlurper().parseText(body)
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.BAD_REQUEST.reason
+
+        when:
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
+
+        then:
         json.message == "Required argument [String data] not specified"
     }
 
@@ -232,15 +251,14 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.REQUEST_ENTITY_TOO_LARGE.code
-        response.reason() == 'Request Entity Too Large'
-        def body = response.getBody().get()
+        def e = thrown(HttpClientResponseException)
+        e.message == HttpStatus.REQUEST_ENTITY_TOO_LARGE.reason
 
         when:
-        def json = new JsonSlurper().parseText(body)
+        def json = new JsonSlurper().parseText(e.response.getBody().get())
 
         then:
         json.message.contains("exceeds the maximum content length [1024]")
