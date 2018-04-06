@@ -28,10 +28,11 @@ import java.util.Set;
 /**
  * <p>Exposes an {@link Endpoint} to refresh application state via a {@link RefreshEvent}</p>
  *
- * @author Graeme Rocher
  * @see io.micronaut.runtime.context.scope.refresh.RefreshScope
  * @see RefreshEvent
  * @see io.micronaut.runtime.context.scope.Refreshable
+ *
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Endpoint("refresh")
