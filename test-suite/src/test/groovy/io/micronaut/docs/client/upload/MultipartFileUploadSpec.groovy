@@ -1,15 +1,16 @@
-package io.micronaut.upload
+package io.micronaut.docs.client.upload
 
 // tag::imports[]
 import io.reactivex.Flowable
-import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.MediaType
 // end::imports[]
 
-// tag::multipartBody[]
+// tag::multipartBodyImports[]
 import io.micronaut.http.client.multipart.MultipartBody
-// end::multipartBody[]
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
+
+// end::multipartBodyImports[]
 
 // tag::controllerImports[]
 import io.micronaut.context.ApplicationContext
@@ -21,19 +22,28 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.http.server.netty.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+
 // end::controllerImports[]
 
 // tag::spockImports[]
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
 // end::spockImports[]
 
+// tag::class[]
 class MultipartFileUploadSpec extends Specification {
+// end::class[]
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+    @Shared
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     static final File uploadDir = File.createTempDir()
 
@@ -47,15 +57,55 @@ class MultipartFileUploadSpec extends Specification {
 
     void "test multipart file request byte[]"() {
         given:
+        // tag::file[]
         File file = new File(uploadDir, "data.txt")
         file.text = "test file"
         file.createNewFile()
 
-        MultipartBody requestBody = MultipartBody.builder().addPart("data", file.name, MediaType.TEXT_PLAIN_TYPE, file)
+        // end::file[]
+
+        // tag::multipartBody[]
+        MultipartBody requestBody = MultipartBody.builder()     // <1>
+                .addPart(                                       // <2>
+                    "data",                               // <3>
+                    file.name,                                  // <4>
+                    MediaType.TEXT_PLAIN_TYPE,                  // <5>
+                    file                                        // <6>
+                ).build()                                       // <7>
+
+        // end::multipartBody[]
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/upload", requestBody) // <1>
+
+                // tag::request[]
+                HttpRequest.POST("/multipart/upload", requestBody)       // <1>
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
+                        .accept(MediaType.TEXT_PLAIN_TYPE),              // <3>
+
+                // end::request[]
+
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def body = response.getBody().get()
+
+        then:
+        body == "Uploaded 9 bytes"
+    }
+
+    void "test multipart file request byte[] with content type"() {
+
+        // tag::multipartBodyBytes[]
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "sample.txt", MediaType.TEXT_PLAIN_TYPE, "test content".bytes)
+                .build()
+
+        // end::multipartBodyBytes[]
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/multipart/upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
