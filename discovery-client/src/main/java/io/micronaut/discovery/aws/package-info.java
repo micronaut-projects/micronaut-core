@@ -13,21 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.function.client.aws;
-
-import com.amazonaws.ClientConfiguration;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS client
+ * This package contains client APIs, service discovery and distributed configuration integration between Micronaut and Consul (https://www.consul.io)
  *
  * @author graemerocher
  * @since 1.0
  */
-@ConfigurationProperties("client")
-public class AWSClientConfiguration extends AWSConfiguration {
+@Configuration
+@Requires(classes = {AWSClientConfiguration.class, AWSServiceDiscovery.class})
+package io.micronaut.discovery.aws;
 
-    @ConfigurationBuilder
-    ClientConfiguration clientConfiguration = new ClientConfiguration();
-}
+import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
+import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
