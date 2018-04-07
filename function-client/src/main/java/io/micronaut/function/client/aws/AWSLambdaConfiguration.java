@@ -29,6 +29,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.configurations.aws.*;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
