@@ -25,6 +25,8 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
+import java.io.File;
+import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 // end::imports[]
 
@@ -48,8 +50,12 @@ public class UploadController {
 
     // tag::upload[]
     @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public Single<HttpResponse<String>> upload(StreamingFileUpload file, Optional<String> anotherAttribute) { // <2>
-        Publisher<Boolean> uploadPublisher = file.transferTo(file.getFilename()); // <3>
+    public Single<HttpResponse<String>> upload(StreamingFileUpload file, Optional<String> anotherAttribute) throws IOException { // <2>
+        File tempFile = File.createTempFile(file.getFilename(), "temp");
+        if (tempFile.exists()) {
+            tempFile.delete();
+        }
+        Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
         return Single.fromPublisher(uploadPublisher)  // <4>
                     .map(success -> {
                         if (success) {
@@ -67,8 +73,12 @@ public class UploadController {
     public HttpResponse<String> uploadCompleted(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
 
         try {
-            Path path = Paths.get(file.getFilename()); //<3>
-            Files.write(path, file.getBytes());
+            File tempFile = File.createTempFile(file.getFilename(), "temp"); //<3>
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+            Path path = Paths.get(tempFile.getAbsolutePath());
+            Files.write(path, file.getBytes()); //<3>
 
             return HttpResponse.ok("Uploaded");
         } catch (IOException exception) {
@@ -82,7 +92,11 @@ public class UploadController {
     public HttpResponse<String> uploadBytes(byte[] file, String fileName) { // <2>
 
         try {
-            Path path = Paths.get(fileName);
+            File tempFile = File.createTempFile(fileName, "temp");
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+            Path path = Paths.get(tempFile.getAbsolutePath());
             Files.write(path, file); // <3>
 
             return HttpResponse.ok("Uploaded");
