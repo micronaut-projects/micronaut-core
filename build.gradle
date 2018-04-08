@@ -24,7 +24,6 @@ version project.projectVersion
 
 ext {
     distInstallDir = file("$buildDir/dist-tmp")
-    homeDistDir = file("dist")
     homeBinDir = file("bin")
     homeLibDir = file("lib")
     homeSrcDir = file("src")
@@ -83,26 +82,6 @@ subprojects { subproject ->
                 // issues.
                 maxErrors = 9_999
                 maxWarnings = 9_999
-            }
-
-            task installToHomeDist(type: Upload) {
-                configuration = configurations.archives
-                repositories {
-                    flatDir name: 'libs', dirs: distInstallDir
-                }
-            }
-
-            project.tasks.withType(org.gradle.api.publish.maven.tasks.PublishToMavenLocal) { org.gradle.api.publish.maven.tasks.PublishToMavenLocal t ->
-                t.dependsOn installToHomeDist
-                t.doLast {
-                    ant.copy(todir: homeDistDir, flatten: true, includeEmptyDirs: false) {
-                        fileset dir: distInstallDir
-                    }
-                }
-            }
-
-            clean {
-                delete homeDistDir
             }
         }
     }

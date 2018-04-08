@@ -474,7 +474,7 @@ abstract class AbstractProfile implements Profile {
             def requiredArguments = cmd?.description?.arguments
             int requiredArgumentCount = requiredArguments?.findAll() { CommandArgument ca -> ca.required }?.size() ?: 0
             if(commandLine.remainingArgs.size() < requiredArgumentCount) {
-                context.console.error "Command [$commandName] missing required arguments: ${requiredArguments*.name}. Type 'grails help $commandName' for more info."
+                context.console.error "Command [$commandName] missing required arguments: ${requiredArguments*.name}. Type 'mn help $commandName' for more info."
                 return false
             }
             else {

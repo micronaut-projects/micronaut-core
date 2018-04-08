@@ -96,10 +96,10 @@ grails [environment]* [target] [arguments]*'
 
 '''
             console.addStatus("Examples:")
-            console.log('$ grails dev run-app')
-            console.log('$ grails create-app books')
+            console.log('$ mn dev run-app')
+            console.log('$ mn create-app books')
             console.log ''
-            console.addStatus('Available Commands (type grails help \'command-name\' for more info):')
+            console.addStatus('Available Commands (type mn help \'command-name\' for more info):')
             console.addStatus("${'Command Name'.padRight(37)} Command Description")
             console.println('-' * 100)
             for (CommandDescription desc : allCommands) {
