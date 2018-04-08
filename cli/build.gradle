@@ -72,6 +72,7 @@ shadowJar {
     destinationDir = outDir
     relocate('org.codehaus.groovy', 'org.codehaus.groovy')
     relocate('groovy', 'groovy')
+    relocate('org.apache', 'org.apache')
     mergeGroovyExtensionModules()
     mergeServiceFiles()
 }

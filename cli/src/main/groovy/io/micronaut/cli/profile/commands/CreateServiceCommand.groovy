@@ -76,7 +76,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     protected void populateDescription() {
-        description.argument(name: "Application Name", description: "The name of the application to create.", required: false)
+        description.argument(name: "Service Name", description: "The name of the service to create.", required: false)
     }
 
     @Override
@@ -265,7 +265,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
                 else {
                     File tmpDir = unzipProfile(ant, location)
-                    skeletonDir = new File(tmpDir, "META-INF/grails-profile/features/$f.name/skeleton")
+                    skeletonDir = new File(tmpDir, "META-INF/profile/features/$f.name/skeleton")
                 }
 
                 targetDirectory = targetDirs[f.profile]
@@ -279,7 +279,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
             replaceBuildTokens(profileName, profileInstance, features, projectTargetDirectory)
             cmd.console.addStatus(
-                "${name == 'create-plugin' ? 'Plugin' : 'Application'} created at ${projectTargetDirectory.absolutePath}"
+                "Service created at ${projectTargetDirectory.absolutePath}"
             )
             if (profileInstance.instructions) {
                 cmd.console.addStatus(profileInstance.instructions)
@@ -579,7 +579,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         else {
             // establish the JAR file name and extract
             def tmpDir = unzipProfile(ant, skeletonResource)
-            skeletonDir = new File(tmpDir, "META-INF/grails-profile/skeleton")
+            skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
         }
         copySrcToTarget(ant, skeletonDir, excludes, profile.binaryExtensions)
 

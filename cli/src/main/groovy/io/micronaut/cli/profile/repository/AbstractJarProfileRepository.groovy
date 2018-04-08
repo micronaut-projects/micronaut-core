@@ -78,7 +78,7 @@ abstract class AbstractJarProfileRepository implements ProfileRepository {
         String groupId = DEFAULT_PROFILE_GROUPID
         String version = null
 
-        Map<String, Map> defaultValues = MicronautCli.getSetting("grails.profiles", Map, [:])
+        Map<String, Map> defaultValues = MicronautCli.getSetting("profiles", Map, [:])
         defaultValues.remove("repositories")
         def data = defaultValues.get(profileName)
         if(data instanceof Map) {
