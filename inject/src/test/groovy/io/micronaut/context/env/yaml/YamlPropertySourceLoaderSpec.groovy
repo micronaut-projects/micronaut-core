@@ -40,7 +40,7 @@ dataSource:
     password: 'test'
 '''.bytes))
                 }
-                else if(path.endsWith("/application.yml")) {
+                else if(path.endsWith("application.yml")) {
                     return Optional.of(new ByteArrayInputStream('''\
 hibernate:
     cache:
