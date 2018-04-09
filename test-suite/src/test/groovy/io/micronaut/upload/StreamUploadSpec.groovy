@@ -112,7 +112,6 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     }
 
-    @Ignore
     void "test non-blocking upload with publisher receiving two objects"() {
         given:
         def data = '{"title":"Test"}'
@@ -135,8 +134,8 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-        result.length() == data.length()
-        result == data
+        result.length() == 21
+        result == "bar: $data"
 
     }
 

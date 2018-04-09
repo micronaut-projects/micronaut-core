@@ -258,8 +258,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         List<PropertySource> propertySources = readPropertySourceList(name);
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Processing property source: {}", propertySource.getName());
+            }
             processPropertySource(propertySource, propertySource.getConvention());
         }
+
     }
 
     protected List<PropertySource> readPropertySourceList(String name) {
@@ -270,6 +274,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
+                if(LOG.isDebugEnabled()) {
+                    LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                }
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
             }
         }

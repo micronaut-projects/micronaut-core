@@ -18,7 +18,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload
+import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 
@@ -112,7 +112,7 @@ class MultipartFileUploadSpec extends Specification {
         def body = response.getBody().get()
 
         then:
-        body == "Uploaded 9 bytes"
+        body == "Uploaded 12 bytes"
     }
 
     void "test multipart file request byte[] without content type"() {
