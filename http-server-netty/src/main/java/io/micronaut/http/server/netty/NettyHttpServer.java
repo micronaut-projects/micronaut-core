@@ -210,51 +210,42 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     private void bindServerToHost(ServerBootstrap serverBootstrap, Optional<String> host, AtomicInteger attempts) {
-        ChannelFuture future;
-
         if(LOG.isDebugEnabled()) {
             LOG.debug("Binding server to port: {}", serverPort);
         }
         try {
             if(host.isPresent()) {
-                future = serverBootstrap.bind(host.get(), serverPort).sync();
+                serverBootstrap.bind(host.get(), serverPort).sync();
             }
             else {
-                future = serverBootstrap.bind(serverPort).sync();
+                serverBootstrap.bind(serverPort).sync();
             }
-        } catch (InterruptedException e) {
-            return;
-        }
 
-        future.addListener(op -> {
-            if (!future.isSuccess()) {
-                Throwable cause = op.cause();
-                if (LOG.isErrorEnabled()) {
-                    if(cause instanceof BindException) {
-                        LOG.error("Unable to start server. Port already {} in use.", serverPort);
-                    }
-                    else {
-                        LOG.error("Error starting Micronaut server: " + cause.getMessage(), cause);
-                    }
-                }
-                int attemptCount = attempts.getAndIncrement();
-                if(serverConfiguration.getPort() == -1 && attemptCount < 3) {
-                    serverPort = SocketUtils.findAvailableTcpPort();
-                    bindServerToHost(serverBootstrap, host, attempts);
+            applicationContext.publishEvent(new ServerStartupEvent(this));
+            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+            applicationName.ifPresent(id -> {
+                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+            });
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                if(e instanceof BindException) {
+                    LOG.error("Unable to start server. Port already {} in use.", serverPort);
                 }
                 else {
-                    stop();
+                    LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            else {
-                applicationContext.publishEvent(new ServerStartupEvent(this));
-                Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-                applicationName.ifPresent(id -> {
-                    this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                    applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-                });
+            int attemptCount = attempts.getAndIncrement();
+            if(serverConfiguration.getPort() == -1 && attemptCount < 3) {
+                serverPort = SocketUtils.findAvailableTcpPort();
+                bindServerToHost(serverBootstrap, host, attempts);
             }
-        });
+            else {
+                stop();
+            }
+        }
+
     }
 
     @Override
