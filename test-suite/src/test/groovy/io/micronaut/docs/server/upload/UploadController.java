@@ -26,18 +26,16 @@ import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
-import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 // end::imports[]
 
 // tag::completedImports[]
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedFileUpload;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 // end::completedImports[]
 /**
  * @author Graeme Rocher

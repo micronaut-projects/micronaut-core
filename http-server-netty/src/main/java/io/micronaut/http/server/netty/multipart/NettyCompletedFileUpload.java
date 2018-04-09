@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
-import io.micronaut.http.multipart.PartData;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -37,11 +37,11 @@ import java.util.Optional;
  * @author Zachary Klein
  * @since 1.0
  */
-public class CompletedFileUpload implements io.micronaut.http.multipart.FileUpload, PartData {
+public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     private final FileUpload fileUpload;
 
-    public CompletedFileUpload(FileUpload fileUpload) {
+    public NettyCompletedFileUpload(FileUpload fileUpload) {
         this.fileUpload = fileUpload;
         fileUpload.retain();
     }
