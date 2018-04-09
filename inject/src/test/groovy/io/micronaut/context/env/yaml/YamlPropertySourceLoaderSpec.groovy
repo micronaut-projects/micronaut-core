@@ -32,7 +32,6 @@ class YamlPropertySourceLoaderSpec extends Specification {
 
             @Override
             Optional<InputStream> getResourceAsStream(String path) {
-                println "path = $path"
                 if(path.endsWith('-test.yml')) {
                     return Optional.of(new ByteArrayInputStream('''\
 dataSource:
