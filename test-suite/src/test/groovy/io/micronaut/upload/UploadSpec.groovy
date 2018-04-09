@@ -24,8 +24,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
-import spock.lang.Ignore
-import spock.lang.IgnoreRest
 
 /**
  * @author Graeme Rocher
