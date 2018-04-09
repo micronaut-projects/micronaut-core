@@ -196,7 +196,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     }
 
     /**
-     * <p>Extended version of {@link UriTemplateParser} that builds
+     * <p>Extended version of {@link UriTemplate.UriTemplateParser} that builds
      * a regular expression to match a path. Note that fragments (#) and queries (?) are ignored for the purposes of matching.</p>
      */
     protected static class UriMatchTemplateParser extends UriTemplateParser {
