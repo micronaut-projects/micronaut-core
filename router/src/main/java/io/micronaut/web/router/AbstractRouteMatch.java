@@ -295,17 +295,18 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> oldVariables = getVariables();
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
         for (Argument requiredArgument : getArguments()) {
-            String name = requiredArgument.getName();
-            Object value = argumentValues.get(name);
-            if (value != null) {
-                if (value instanceof UnresolvedArgument) {
-                    newVariables.put(resolveInputName(requiredArgument), value);
-                } else {
+            Object value = argumentValues.get(requiredArgument.getName());
+            if(value != null) {
+                String name = resolveInputName(requiredArgument);
+                if(value instanceof UnresolvedArgument) {
+                    newVariables.put(name, value);
+                }
+                else {
                     ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
                     Optional converted = conversionService.convert(value, conversionContext);
                     Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if (result != null) {
-                        newVariables.put(resolveInputName(requiredArgument), result);
+                    if(result != null) {
+                        newVariables.put(name, result);
                     }
                 }
             }

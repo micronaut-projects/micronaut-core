@@ -296,6 +296,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                     List<AnnotationNode> annotationNodes = node.annotations
                     Set<ClassNode> interfacesToVisit = []
+
                     populateIntroducedInterfaces(annotationNodes, interfacesToVisit)
 
                     if (!interfacesToVisit.isEmpty()) {

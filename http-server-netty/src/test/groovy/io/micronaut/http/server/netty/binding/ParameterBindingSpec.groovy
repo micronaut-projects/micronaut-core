@@ -81,6 +81,10 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
+        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+
     }
 
     @Controller(produces = MediaType.TEXT_PLAIN)
@@ -160,6 +164,21 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             } else {
                 "Parameter Value: none"
             }
+        }
+
+        @Get('/query')
+        String query(String name) {
+            "Parameter Value: $name"
+        }
+
+        @Get('/queryName/{name}')
+        String queryName(String name) {
+            "Parameter Value: $name"
+        }
+
+        @Post('/query')
+        String queryPost(@QueryValue String name) {
+            "Parameter Value: $name"
         }
     }
 }

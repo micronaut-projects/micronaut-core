@@ -48,10 +48,10 @@ class MyBean  {
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
+        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
 
         when:
         def context = new DefaultBeanContext()

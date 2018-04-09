@@ -26,6 +26,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -68,6 +69,49 @@ class RefreshEndpointSpec extends Specification {
     }
 
 
+    void "test refresh endpoint with all parameter"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        def response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        String firstResponse = response.body()
+
+        when: "/refresh is called"
+        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+
+        when:
+        response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+
+        then: "subsequent response does not change"
+        response.code() == HttpStatus.OK.code
+        response.body() == firstResponse
+
+        when: "/refresh is called with `all` body parameter"
+        response = rxClient.exchange(HttpRequest.POST("/refresh", '{"force": true}'), String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+
+        when:
+        response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+
+        then: "Response is now different"
+        response.code() == HttpStatus.OK.code
+        response.body() != firstResponse
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+
     @Controller("/refreshTest")
     static class TestController {
         private final RefreshBean refreshBean
@@ -80,6 +124,11 @@ class RefreshEndpointSpec extends Specification {
         String index() {
             refreshBean.testConfigProps() + ' ' + refreshBean.testValue()
         }
+
+        @Get('/external')
+        String external() {
+            "${refreshBean.testExternal()} ${refreshBean.external}"
+        }
     }
 
     @Refreshable
@@ -89,6 +138,7 @@ class RefreshEndpointSpec extends Specification {
 
         @Value('${foo.bar}')
         String foo
+        Integer external
 
         RefreshBean(MyConfig config) {
             this.config = config
@@ -98,8 +148,18 @@ class RefreshEndpointSpec extends Specification {
             return foo
         }
 
+        Integer testExternal() {
+            if (!external) external = testExternalResource()
+
+            external
+        }
+
         String testConfigProps() {
             return config.bar
+        }
+
+        static Integer testExternalResource() {
+            return new Date().time.intValue()
         }
     }
 
