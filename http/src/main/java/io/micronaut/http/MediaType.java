@@ -67,6 +67,14 @@ public class MediaType implements CharSequence {
         compressiblePatterns.add(Pattern.compile("^.*\\+xml$"));
     }
 
+    /**
+     * Default file extension used for JSON
+     */
+    public static final String EXTENSION_JSON = "json";
+    /**
+     * Default file extension used for XML
+     */
+    public static final String EXTENSION_XML = "xml";
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
 
     /**

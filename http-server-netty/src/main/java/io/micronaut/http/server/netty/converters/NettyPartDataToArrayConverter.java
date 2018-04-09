@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,38 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.multipart;
+package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
-import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.multipart.FileUpload;
+import io.micronaut.http.server.netty.multipart.NettyPartData;
 
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.util.Optional;
 
+/**
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
-public class FileUploadToByteArrayConverter implements TypeConverter<FileUpload, byte[]> {
+public class NettyPartDataToArrayConverter implements TypeConverter<NettyPartData, byte[]> {
 
     private final ConversionService conversionService;
 
-    protected FileUploadToByteArrayConverter(ConversionService conversionService) {
+    protected NettyPartDataToArrayConverter(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 
     @Override
-    public Optional<byte[]> convert(FileUpload upload, Class<byte[]> targetType, ConversionContext context) {
+    public Optional<byte[]> convert(NettyPartData object, Class<byte[]> targetType, ConversionContext context) {
         try {
-            if (!upload.isCompleted()) {
-                return Optional.empty();
-            }
-            ByteBuf byteBuf = upload.getByteBuf();
-            return conversionService.convert(byteBuf, targetType, context);
-        } catch (Exception e) {
+            return conversionService.convert(object.getByteBuf(), targetType, context);
+        } catch (IOException e) {
             context.reject(e);
             return Optional.empty();
         }
     }
 }
-

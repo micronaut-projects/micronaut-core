@@ -21,12 +21,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.reactivex.subjects.PublishSubject;
+import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -74,10 +74,10 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receivePublisher(@Part Flowable<byte[]> data) {
+    public Publisher<HttpResponse> receivePublisher(Flowable<byte[]> data) {
         StringBuilder builder = new StringBuilder();
         AtomicLong length = new AtomicLong(0);
-        PublishSubject<HttpResponse> subject = PublishSubject.create();
+        ReplaySubject<HttpResponse> subject = ReplaySubject.create();
         data
             .subscribeOn(Schedulers.io())
             .subscribe(
@@ -111,14 +111,13 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
-        return data.flatMap(Flowable::just, (left, right) -> left == right ? left.toString() : left.toString() + " " + right.toString())
-                   .map(HttpResponse::ok);
+    public Publisher<HttpResponse> recieveFlowData(Data data) {
+        return Flowable.just(HttpResponse.ok(data.toString()));
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receiveTwoFlowParts(@Part Flowable<Data> dataPublisher, @Part Flowable<String> titlePublisher) {
-        return titlePublisher.zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data.toString() ));
+    public Publisher<HttpResponse> receiveTwoFlowParts(@Part("data") Flowable<String> dataPublisher, @Part("title") Flowable<String> titlePublisher) {
+        return titlePublisher.zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data ));
     }
 
     public static class Data {

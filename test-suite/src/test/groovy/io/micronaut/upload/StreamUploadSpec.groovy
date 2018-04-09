@@ -30,9 +30,7 @@ import spock.lang.Ignore
  */
 class StreamUploadSpec extends AbstractMicronautSpec {
 
-
-
-
+    //@Ignore
     void "test upload FileUpload object via transferTo"() {
         given:
         def data = '{"title":"Test"}'
@@ -57,6 +55,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         result == "Uploaded"
     }
 
+    //@Ignore
     void "test upload big FileUpload object via transferTo"() {
         given:
         def val = 'Big '+ 'xxxx' * 500
@@ -86,6 +85,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         file.text == data
     }
 
+
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
         def data = 'some data ' * 500
@@ -112,7 +112,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     }
 
-    @Ignore
+    //@Ignore
     void "test non-blocking upload with publisher receiving two objects"() {
         given:
         def data = '{"title":"Test"}'
@@ -130,15 +130,14 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         def response = client.newCall(
                 request.build()
         ).execute()
-        def result = response.body().string()
 
         then:
         response.code() == HttpStatus.OK.code
-        result.length() == data.length()
-        result == data
+        response.body().string() == "bar: $data"
 
     }
 
+    //@Ignore
     void "test non-blocking upload with publisher receiving converted JSON"() {
         given:
         def data = '{"title":"Test"}'

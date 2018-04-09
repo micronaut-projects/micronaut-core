@@ -27,9 +27,9 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 
 We still need auto-configurations for the following:
 
-* Apache Kafka
-* Cassandra
-* RabbitMQ
+* Apache Kafka (ivan)
+* Cassandra (nero)
+* RabbitMQ (ben)
 
 ### Security / JWT Token Solution
 
@@ -76,7 +76,7 @@ Built in distributed tracing should be activated by default and allow integratio
 
 #### Metrics
 
-Built in metrics support on-top of Micro Meter
+Built in metrics support on-top of Micro Meter (jack)
 
 #### File Upload Features
 

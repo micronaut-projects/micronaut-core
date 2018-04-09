@@ -60,6 +60,7 @@ public class HttpGetTest {
         assertTrue(body.isPresent());
         assertEquals(body.get(), "success");
 
+        client.stop();
         applicationContext.stop();
     }
 
@@ -83,6 +84,7 @@ public class HttpGetTest {
         assertEquals(list.size(), 1);
         assertTrue(list.get(0) instanceof HttpGetSpec.Book);
 
+        client.stop();
         applicationContext.stop();
     }
 }

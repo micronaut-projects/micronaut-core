@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -27,27 +28,23 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * Represents a completed part of a multipart request.
- * <p>
- * When used as an argument to an {@link io.micronaut.http.annotation.Controller} instance method, the route
- * is not executed until the part has been fully received. Provides access to metadata about the file as
- * well as the contents.
+ * A Netty implementation of {@link CompletedFileUpload}
  *
  * @author Zachary Klein
  * @since 1.0
  */
-public class CompletedFileUpload implements io.micronaut.http.multipart.FileUpload {
+public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     private final FileUpload fileUpload;
 
-    public CompletedFileUpload(FileUpload fileUpload) {
+    public NettyCompletedFileUpload(FileUpload fileUpload) {
         this.fileUpload = fileUpload;
         fileUpload.retain();
     }
 
     /**
      * Gets the content of this part as a <tt>InputStream</tt>
-     * <p>
+     *
      * <p>The contents of the file will be released when the stream is closed.
      * This method should only be called <strong>once</strong></p>
      *
@@ -62,7 +59,7 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
 
     /**
      * Gets the content of this part as a <tt>byte[]</tt>
-     * <p>
+     *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
@@ -81,7 +78,7 @@ public class CompletedFileUpload implements io.micronaut.http.multipart.FileUplo
 
     /**
      * Gets the content of this part as a <tt>ByteBuffer</tt>
-     * <p>
+     *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
