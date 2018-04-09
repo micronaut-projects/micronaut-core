@@ -30,30 +30,6 @@ import java.util.Optional;
 public interface FileUpload {
 
     /**
-     * Gets the content of this part as an <tt>InputStream</tt>
-     *
-     * @return The content of this part as an <tt>InputStream</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    InputStream getInputStream() throws IOException;
-
-    /**
-     * Gets the content of this part as a <tt>byte[]</tt>
-     *
-     * @return The content of this part as a <tt>byte[]</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    byte[] getBytes() throws IOException;
-
-    /**
-     * Gets the content of this part as a <tt>ByteBuffer</tt>
-     *
-     * @return The content of this part as a <tt>ByteBuffer</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    ByteBuffer getByteBuffer() throws IOException;
-
-    /**
      * Gets the content type of this part.
      *
      * @return The content type of this part.
