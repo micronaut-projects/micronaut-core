@@ -430,6 +430,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             AtomicBoolean executed = new AtomicBoolean(false);
             ConcurrentHashMap<String, LongAdder> partPositions = new ConcurrentHashMap<>();
             ConcurrentHashMap<String, ReplaySubject> subjects = new ConcurrentHashMap<>();
+            ConcurrentHashMap<String, StreamingFileUpload> streamingUploads = new ConcurrentHashMap<>();
             ConversionService conversionService = ConversionService.SHARED;
 
             @Override
@@ -458,6 +459,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 subjects.computeIfAbsent(name, (key) -> ReplaySubject.create());
 
                                 ReplaySubject subject = subjects.get(name);
+                                Flowable flowable = subject.toFlowable(BackpressureStrategy.BUFFER);
                                 Object part = data;
 
                                 if (data instanceof FileUpload) {
@@ -466,6 +468,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     partPositions.get(name).add(fileUpload.length());
 
                                     part = new NettyPartData(fileUpload, partPositions.get(name).longValue());
+
+                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
+                                        streamingUploads.computeIfAbsent(name, (key) ->
+                                                new NettyStreamingFileUpload(
+                                                        fileUpload,
+                                                        serverConfiguration.getMultipart(),
+                                                        ioExecutor,
+                                                        flowable));
+                                    }
                                 }
 
                                 Optional<?> converted = conversionService.convert(part, argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
@@ -478,20 +489,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     subscription.request(1);
                                 }
 
-                                value = () -> subject.toFlowable(BackpressureStrategy.BUFFER);
+                                value = () -> {
+                                    if (streamingUploads.containsKey(name)) {
+                                        return streamingUploads.get(name);
+                                    } else {
+                                        return flowable;
+                                    }
+                                };
 
                             } else {
                                 value = () -> message;
                             }
 
                             if (!executed) {
-                                if (StreamingFileUpload.class.isAssignableFrom(argument.getType()) && data instanceof FileUpload) {
-                                    Map<String,Object> variables = routeMatch.getVariables();
-                                    if (variables.get(name) instanceof UnresolvedArgument) {
-                                        Flowable flowable = (Flowable) value.get();
-                                        value = () -> new NettyStreamingFileUpload((FileUpload) data, serverConfiguration.getMultipart(), ioExecutor, flowable);
-                                    }
-                                }
                                 routeMatch = routeMatch.fulfill(Collections.singletonMap(argument.getName(), value.get()));
                             }
 
