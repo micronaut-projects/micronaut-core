@@ -215,11 +215,15 @@ public class NettyHttpServer implements EmbeddedServer {
         if(LOG.isDebugEnabled()) {
             LOG.debug("Binding server to port: {}", serverPort);
         }
-        if(host.isPresent()) {
-            future = serverBootstrap.bind(host.get(), serverPort);
-        }
-        else {
-            future = serverBootstrap.bind(serverPort);
+        try {
+            if(host.isPresent()) {
+                future = serverBootstrap.bind(host.get(), serverPort).sync();
+            }
+            else {
+                future = serverBootstrap.bind(serverPort).sync();
+            }
+        } catch (InterruptedException e) {
+            return;
         }
 
         future.addListener(op -> {
