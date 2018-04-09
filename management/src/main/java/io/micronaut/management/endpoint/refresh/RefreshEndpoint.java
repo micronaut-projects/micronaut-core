@@ -49,7 +49,7 @@ public class RefreshEndpoint {
     /**
      * Refresh application state only if environment has changed (unless <code>force</code> is set to true)
      *
-     * @param force optional body property to indicate whether to force all {@link io.micronaut.runtime.context.scope.Refreshable} beans to be refreshed
+     * @param force {@link Nullable} body property to indicate whether to force all {@link io.micronaut.runtime.context.scope.Refreshable} beans to be refreshed
      * @return array of change keys if applicable
      */
     @Write
