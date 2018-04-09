@@ -52,6 +52,7 @@ import spock.util.concurrent.PollingConditions
  */
 
 @Stepwise
+@Ignore
 class Route53AutoNamingClientUnitSpec extends Specification {
 
 
