@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,13 @@
  */
 package io.micronaut.configurations.hystrix;
 
-import com.netflix.hystrix.*;
-import io.micronaut.aop.InterceptPhase;
-import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.annotation.Property;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.MethodExecutionHandle;
+import com.netflix.hystrix.HystrixCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixObservableCommand;
+import com.netflix.hystrix.HystrixThreadPoolKey;
+import com.netflix.hystrix.HystrixThreadPoolProperties;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -84,14 +77,13 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
         Class<io.micronaut.configurations.hystrix.annotation.HystrixCommand> annotationType = io.micronaut.configurations.hystrix.annotation.HystrixCommand.class;
         io.micronaut.configurations.hystrix.annotation.Hystrix settings = context.getAnnotation(io.micronaut.configurations.hystrix.annotation.Hystrix.class);
         io.micronaut.configurations.hystrix.annotation.HystrixCommand cmd = context.getAnnotation(annotationType);
-        if(cmd == null) {
+        if (cmd == null) {
             return context.proceed();
-        }
-        else {
+        } else {
 
             String hystrixGroup = resolveHystrixGroup(context, settings);
             String commandName = cmd.value();
-            if(StringUtils.isEmpty(commandName)) {
+            if (StringUtils.isEmpty(commandName)) {
                 commandName = context.getMethodName();
             }
             boolean hasSettings = settings != null;
@@ -102,10 +94,10 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
             Class<Object> javaReturnType = returnType.getType();
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
-            if(Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
+            if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
                 String finalCommandName = commandName;
                 HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getTargetMethod(), method ->
-                        buildObservableSetter(hystrixGroup, finalCommandName,settings)
+                    buildObservableSetter(hystrixGroup, finalCommandName, settings)
                 );
 
                 HystrixObservableCommand<Object> command = new HystrixObservableCommand<Object>(setter) {
@@ -114,7 +106,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     protected Observable<Object> construct() {
                         Object result = context.proceed();
                         return ConversionService.SHARED.convert(result, Observable.class)
-                                .orElseThrow(()->new IllegalStateException("Unsupported Reactive type: " + javaReturnType)) ;
+                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
                     }
 
                     @Override
@@ -126,11 +118,11 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     @Override
                     protected Observable<Object> resumeWithFallback() {
                         Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
-                        if(fallbackMethod.isPresent()) {
+                        if (fallbackMethod.isPresent()) {
                             MethodExecutionHandle<Object> handle = fallbackMethod.get();
                             Object result = handle.invoke(context.getParameterValues());
                             Optional<Observable> converted = ConversionService.SHARED.convert(result, Observable.class);
-                            if(converted.isPresent()) {
+                            if (converted.isPresent()) {
                                 return converted.get();
                             }
                         }
@@ -142,7 +134,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                         return !wrapExceptions || super.shouldNotBeWrapped(underlying);
                     }
                 };
-                if(isFuture) {
+                if (isFuture) {
                     CompletableFuture future = new CompletableFuture();
                     command.toObservable().toSingle().subscribe(new SingleSubscriber<Object>() {
                         @Override
@@ -156,16 +148,14 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                         }
                     });
                     return future;
-                }
-                else {
+                } else {
                     return ConversionService.SHARED.convert(command.toObservable(), returnType.asArgument())
-                            .orElseThrow(()-> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                        .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
                 }
-            }
-            else {
+            } else {
                 String finalCommandName = commandName;
                 HystrixCommand.Setter setter = setterMap.computeIfAbsent(context.getTargetMethod(), method ->
-                        buildSetter(hystrixGroup, finalCommandName, threadPool, settings)
+                    buildSetter(hystrixGroup, finalCommandName, threadPool, settings)
                 );
 
                 HystrixCommand<Object> hystrixCommand = new HystrixCommand<Object>(setter) {
@@ -182,7 +172,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     @Override
                     protected Object getFallback() {
                         Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
-                        if(fallbackMethod.isPresent()) {
+                        if (fallbackMethod.isPresent()) {
                             MethodExecutionHandle<Object> handle = fallbackMethod.get();
                             return handle.invoke(context.getParameterValues());
                         }
@@ -198,13 +188,13 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     return hystrixCommand.execute();
                 } catch (Exception e) {
 
-                    if(!wrapExceptions) {
+                    if (!wrapExceptions) {
                         // unpack the original exception
                         //noinspection ConstantConditions
-                        if(e instanceof ExecutionException) {
+                        if (e instanceof ExecutionException) {
                             Throwable cause = e.getCause();
-                            if(cause instanceof RuntimeException) {
-                                throw (RuntimeException)cause;
+                            if (cause instanceof RuntimeException) {
+                                throw (RuntimeException) cause;
                             }
                         }
                     }
@@ -219,16 +209,16 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
         HystrixCommand.Setter setter = HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
         HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
         setter.andCommandKey(commandKey);
-        if(StringUtils.isNotEmpty(threadPool)) {
+        if (StringUtils.isNotEmpty(threadPool)) {
             setter.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey(threadPool));
         }
-        if(settings != null) {
+        if (settings != null) {
             Property[] properties = settings.commandProperties();
             if (ArrayUtils.isNotEmpty(properties)) {
 
                 HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
                 setter.andCommandPropertiesDefaults(
-                        instance
+                    instance
                 );
             }
             Property[] threadPoolProps = settings.threadPoolProperties();
@@ -236,7 +226,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                 HystrixThreadPoolProperties.Setter threadPoolPropsInstance = buildThreadPoolProperties(properties);
                 setter.andThreadPoolPropertiesDefaults(
-                        threadPoolPropsInstance
+                    threadPoolPropsInstance
                 );
 
             }
@@ -252,26 +242,26 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
     private HystrixThreadPoolProperties.Setter buildThreadPoolProperties(Property[] properties) {
         return buildPropertiesDynamic(
-                properties,
-                HystrixThreadPoolProperties.Setter.class,
-                HystrixThreadPoolProperties.defaultSetter());
+            properties,
+            HystrixThreadPoolProperties.Setter.class,
+            HystrixThreadPoolProperties.defaultSetter());
     }
 
     private <T> T buildPropertiesDynamic(Property[] properties, Class<T> setterClass, T instance) {
         for (Property property : properties) {
             String name = property.name();
-            if(StringUtils.isNotEmpty(name)) {
+            if (StringUtils.isNotEmpty(name)) {
                 String value = property.value();
-                if(StringUtils.isNotEmpty(value)) {
+                if (StringUtils.isNotEmpty(value)) {
                     String methodName = "with" + NameUtils.capitalize(name);
                     Optional<Method> method = ReflectionUtils.findMethodsByName(setterClass, methodName)
-                            .findFirst();
-                    if(method.isPresent()) {
+                        .findFirst();
+                    if (method.isPresent()) {
                         Method m = method.get();
                         Class<?>[] parameterTypes = m.getParameterTypes();
-                        if(parameterTypes.length == 1) {
+                        if (parameterTypes.length == 1) {
                             Optional<?> converted = ConversionService.SHARED.convert(value, parameterTypes[0]);
-                            if(converted.isPresent()) {
+                            if (converted.isPresent()) {
 
                                 try {
                                     Object v = converted.get();
@@ -295,13 +285,13 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
         HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
         setter.andCommandKey(commandKey);
 
-        if(settings != null) {
+        if (settings != null) {
             Property[] properties = settings.commandProperties();
-            if(ArrayUtils.isNotEmpty(properties)) {
+            if (ArrayUtils.isNotEmpty(properties)) {
 
                 HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
                 setter.andCommandPropertiesDefaults(
-                        instance
+                    instance
                 );
             }
 
@@ -312,7 +302,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     private String resolveHystrixGroup(MethodInvocationContext<Object, Object> context,
                                        io.micronaut.configurations.hystrix.annotation.Hystrix ann) {
         String group = ann != null ? ann.group() : null;
-        if(StringUtils.isEmpty(group)) {
+        if (StringUtils.isEmpty(group)) {
             return context.getValue("io.micronaut.http.client.Client", "id", String.class).orElse(context.getDeclaringType().getSimpleName());
         }
         return group;

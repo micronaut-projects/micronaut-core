@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,14 @@
 package io.micronaut.ast.groovy.config
 
 import groovy.transform.CompileStatic
-import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
-import org.codehaus.groovy.ast.ClassHelper
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.InnerClassNode
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
-
-
+import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.InnerClassNode
 
 /**
  * Implementation of ConfigurationMetadataBuilder for Groovy
@@ -55,19 +51,18 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
             }))
 
             prependSuperclasses(declaringType, path)
-            while( declaringType != null && declaringType instanceof  InnerClassNode ) {
+            while (declaringType != null && declaringType instanceof InnerClassNode) {
                 // we have an inner class, so prepend inner class
-                declaringType = ((InnerClassNode)declaringType).getOuterClass()
-                if(declaringType != null) {
+                declaringType = ((InnerClassNode) declaringType).getOuterClass()
+                if (declaringType != null) {
 
-                        Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(declaringType).getValue(ConfigurationReader.class, String.class)
-                        if(parentConfig.isPresent()) {
-                            path.insert(0, parentConfig.get() + '.')
-                            prependSuperclasses(declaringType, path)
-                        }
-                        else {
-                            break
-                        }
+                    Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(declaringType).getValue(ConfigurationReader.class, String.class)
+                    if (parentConfig.isPresent()) {
+                        path.insert(0, parentConfig.get() + '.')
+                        prependSuperclasses(declaringType, path)
+                    } else {
+                        break
+                    }
 
                 }
 
@@ -76,21 +71,21 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
         })
     }
 
-    private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {
-        ClassNode superclass = declaringType.getSuperClass()
-        while(superclass != ClassHelper.OBJECT_TYPE) {
-            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(superclass).getValue(ConfigurationReader.class, String.class)
-            if(parentConfig.isPresent()) {
-                path.insert(0, parentConfig.get() + '.')
-                superclass = declaringType.getSuperClass()
-            }
-            else {
-                break
-            }
-        }
-    }
     @Override
     protected String getTypeString(ClassNode type) {
         return AstGenericUtils.resolveTypeReference(type)
+    }
+
+    private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {
+        ClassNode superclass = declaringType.getSuperClass()
+        while (superclass != ClassHelper.OBJECT_TYPE) {
+            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(superclass).getValue(ConfigurationReader.class, String.class)
+            if (parentConfig.isPresent()) {
+                path.insert(0, parentConfig.get() + '.')
+                superclass = declaringType.getSuperClass()
+            } else {
+                break
+            }
+        }
     }
 }

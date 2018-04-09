@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +34,8 @@ public interface HealthAggregator<T> {
     Publisher<T> aggregate(HealthIndicator[] indicators);
 
     /**
-     * @param name The name of the new health result
+     * @param name    The name of the new health result
      * @param results The health results to aggregate.
-     *
      * @return An aggregated {@link HealthResult}.
      */
     Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpParameters;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -43,10 +37,12 @@ import java.util.Optional;
  */
 @Internal
 public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B> {
+
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
     protected final ConversionService<?> conversionService;
     protected final HttpMethod httpMethod;
     protected final URI uri;
+
     private NettyHttpParameters httpParameters;
     private MediaType mediaType;
     private Charset charset;
@@ -80,16 +76,6 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             }
         }
         return httpParameters;
-    }
-
-    private NettyHttpParameters decodeParameters(String uri) {
-        QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
-    }
-
-    protected QueryStringDecoder createDecoder(String uri) {
-        Charset charset = getCharacterEncoding();
-        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
     @Override
@@ -158,10 +144,20 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return path;
     }
 
+    protected abstract Charset initCharset(Charset characterEncoding);
+
+    protected QueryStringDecoder createDecoder(String uri) {
+        Charset charset = getCharacterEncoding();
+        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
+    }
+
     private String decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return queryStringDecoder.rawPath();
     }
 
-    protected abstract Charset initCharset(Charset characterEncoding);
+    private NettyHttpParameters decodeParameters(String uri) {
+        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package io.micronaut.health;
 
 /**
  * <p>Strategy interface for retrieving and updating the current {@link HealthStatus} of the application</p>
- *
+ * <p>
  * <p>Implementations of this class should be thread safe</p>
  *
  * @author Graeme Rocher
@@ -37,5 +37,4 @@ public interface CurrentHealthStatus {
      * @return The previous {@link HealthStatus}
      */
     HealthStatus update(HealthStatus newStatus);
-
 }

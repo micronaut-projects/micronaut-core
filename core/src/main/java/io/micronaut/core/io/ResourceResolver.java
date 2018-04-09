@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,8 +40,8 @@ public class ResourceResolver {
 
     public ResourceResolver() {
         this(new ResourceLoader[]{
-                ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
-                FileSystemResourceLoader.defaultLoader()});
+            ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
+            FileSystemResourceLoader.defaultLoader()});
     }
 
     /**
@@ -53,9 +53,9 @@ public class ResourceResolver {
      */
     public <T extends ResourceLoader> Optional<T> getLoader(Class<T> resolverType) {
         return Arrays.stream(resourceLoaders)
-                .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
-                .map(rl -> (T) rl)
-                .findFirst();
+            .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
+            .map(rl -> (T) rl)
+            .findFirst();
     }
 
     /**
@@ -66,8 +66,8 @@ public class ResourceResolver {
      */
     public Optional<ResourceLoader> getSupportingLoader(String prefix) {
         return Arrays.stream(resourceLoaders)
-                .filter(rl -> rl.supportsPrefix(prefix))
-                .findFirst();
+            .filter(rl -> rl.supportsPrefix(prefix))
+            .findFirst();
     }
 
     /**
@@ -129,5 +129,4 @@ public class ResourceResolver {
             return Stream.empty();
         }
     }
-
 }

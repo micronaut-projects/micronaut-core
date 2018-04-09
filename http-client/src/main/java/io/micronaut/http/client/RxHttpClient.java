@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,11 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.reactivex.Flowable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.reactivex.Flowable;
 
 import java.net.URL;
 
@@ -86,5 +84,4 @@ public interface RxHttpClient extends HttpClient {
     static RxHttpClient create(URL url) {
         return new DefaultHttpClient(url);
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,8 @@ public interface HealthResult {
 
     /**
      * Creates a builder to build a {@link HealthResult}
-     * @param name The name of the result
+     *
+     * @param name   The name of the result
      * @param status The status
      * @return The builder
      */
@@ -57,19 +58,20 @@ public interface HealthResult {
 
     /**
      * Creates a builder to build a {@link HealthResult}
+     *
      * @param name The name of the result
      * @return The builder
      */
     static Builder builder(String name) {
         return new Builder(name);
     }
-    
+
     class Builder {
 
         private final String name;
         private Optional<HealthStatus> status;
         private Optional<Object> details;
-        
+
         Builder(String name, HealthStatus status) {
             this.name = name;
             this.status = Optional.ofNullable(status);
@@ -105,7 +107,6 @@ public interface HealthResult {
             return details(error);
         }
 
-
         /**
          * Sets the details of the result
          *
@@ -119,6 +120,7 @@ public interface HealthResult {
 
         /**
          * Builds the result
+         *
          * @return The {@link HealthResult}
          */
         public HealthResult build() {

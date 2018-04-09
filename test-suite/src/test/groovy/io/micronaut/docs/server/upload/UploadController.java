@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,18 +26,16 @@ import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
-import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 // end::imports[]
 
 // tag::completedImports[]
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedFileUpload;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 // end::completedImports[]
 /**
  * @author Graeme Rocher

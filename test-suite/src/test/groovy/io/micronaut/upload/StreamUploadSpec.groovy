@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.upload
 
@@ -30,9 +30,7 @@ import spock.lang.Ignore
  */
 class StreamUploadSpec extends AbstractMicronautSpec {
 
-
-
-
+    //@Ignore
     void "test upload FileUpload object via transferTo"() {
         given:
         def data = '{"title":"Test"}'
@@ -57,6 +55,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         result == "Uploaded"
     }
 
+    //@Ignore
     void "test upload big FileUpload object via transferTo"() {
         given:
         def val = 'Big '+ 'xxxx' * 500
@@ -86,6 +85,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         file.text == data
     }
 
+
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
         def data = 'some data ' * 500
@@ -112,7 +112,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     }
 
-    @Ignore
+    //@Ignore
     void "test non-blocking upload with publisher receiving two objects"() {
         given:
         def data = '{"title":"Test"}'
@@ -130,15 +130,14 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         def response = client.newCall(
                 request.build()
         ).execute()
-        def result = response.body().string()
 
         then:
         response.code() == HttpStatus.OK.code
-        result.length() == data.length()
-        result == data
+        response.body().string() == "bar: $data"
 
     }
 
+    //@Ignore
     void "test non-blocking upload with publisher receiving converted JSON"() {
         given:
         def data = '{"title":"Test"}'

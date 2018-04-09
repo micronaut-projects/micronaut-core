@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,11 @@
 package io.micronaut.discovery.consul.config;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.*;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
+import io.micronaut.context.env.PropertiesPropertySourceLoader;
+import io.micronaut.context.env.PropertySource;
+import io.micronaut.context.env.PropertySourceLoader;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.reflect.ClassUtils;
@@ -41,7 +45,17 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.*;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
@@ -59,7 +73,6 @@ public class ConsulConfigurationClient implements ConfigurationClient {
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private ExecutorService executionService;
 
-
     public ConsulConfigurationClient(ConsulClient consulClient, ConsulConfiguration consulConfiguration, Environment environment) {
         this.consulClient = consulClient;
         this.consulConfiguration = consulConfiguration;
@@ -72,6 +85,11 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                 }
             }
         }
+    }
+
+    @Override
+    public String getDescription() {
+        return consulClient.getDescription();
     }
 
     @Override
@@ -108,12 +126,12 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             return Flowable.error(throwable);
         };
         Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(consulClient.readValues(commonConfigPath, dc, null, null))
-                .onErrorResumeNext(errorHandler);
+            .onErrorResumeNext(errorHandler);
         if (hasApplicationSpecificConfig) {
             configurationValues = Flowable.concat(
-                    configurationValues,
-                    Flowable.fromPublisher(consulClient.readValues(applicationSpecificPath, dc, null, null))
-                            .onErrorResumeNext(errorHandler)
+                configurationValues,
+                Flowable.fromPublisher(consulClient.readValues(applicationSpecificPath, dc, null, null))
+                    .onErrorResumeNext(errorHandler)
             );
         }
 
@@ -135,19 +153,18 @@ public class ConsulConfigurationClient implements ConfigurationClient {
 
                         switch (format) {
                             case FILE:
-
                                 String fileName = key.substring(pathPrefix.length());
                                 int i = fileName.lastIndexOf('.');
                                 if (i > -1) {
                                     String ext = fileName.substring(i + 1, fileName.length());
                                     fileName = fileName.substring(0, i);
                                     PropertySourceLoader propertySourceLoader = resolveLoader(ext);
-                                    if(propertySourceLoader != null) {
-                                        String propertySourceName = resolvePropertySourceName(Environment.DEFAULT_NAME, fileName,  activeNames);
-                                        if(hasApplicationSpecificConfig && propertySourceName == null) {
-                                            propertySourceName = resolvePropertySourceName(serviceId.get(), fileName,  activeNames);
+                                    if (propertySourceLoader != null) {
+                                        String propertySourceName = resolvePropertySourceName(Environment.DEFAULT_NAME, fileName, activeNames);
+                                        if (hasApplicationSpecificConfig && propertySourceName == null) {
+                                            propertySourceName = resolvePropertySourceName(serviceId.get(), fileName, activeNames);
                                         }
-                                        if(propertySourceName != null) {
+                                        if (propertySourceName != null) {
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(propertySourceName, decoded);
                                             Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
@@ -155,8 +172,8 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                         }
                                     }
                                 }
-
                                 break;
+
                             case NATIVE:
                                 String property = null;
                                 Set<String> propertySourceNames = null;
@@ -176,6 +193,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                     }
                                 }
                                 break;
+
                             case JSON:
                             case YAML:
                             case PROPERTIES:
@@ -185,7 +203,6 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                     String formatName = format.name().toLowerCase(Locale.ENGLISH);
                                     PropertySourceLoader propertySourceLoader = resolveLoader(formatName);
 
-
                                     if (propertySourceLoader == null) {
                                         emitter.onError(new ConfigurationException("No PropertySourceLoader found for format [" + format + "]. Ensure ConfigurationClient is running within Micronaut container."));
                                         return;
@@ -194,19 +211,15 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
                                             for (String propertySourceName : propertySourceNames) {
-
                                                 Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
                                                 values.putAll(properties);
                                             }
                                         }
                                     }
                                 }
-
                                 break;
                         }
-
                     }
-
                 }
 
                 for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
@@ -230,7 +243,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         });
         if (executionService != null) {
             return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
-                    executionService
+                executionService
             ));
         } else {
             return propertySourceFlowable;
@@ -241,13 +254,12 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         String propertySourceName = null;
         if (fileName.startsWith(rootName)) {
             String envString = fileName.substring(rootName.length());
-            if(StringUtils.isEmpty(envString)) {
+            if (StringUtils.isEmpty(envString)) {
                 propertySourceName = rootName;
-            }
-            else if(envString.startsWith("-")) {
+            } else if (envString.startsWith("-")) {
                 String env = envString.substring(1);
-                if(activeNames.contains(env)) {
-                    propertySourceName = rootName + '['+ env + ']';
+                if (activeNames.contains(env)) {
+                    propertySourceName = rootName + '[' + env + ']';
                 }
             }
         }
@@ -283,7 +295,6 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             this.executionService = executionService;
         }
     }
-
 
     private Set<String> resolvePropertySourceNames(String finalPath, String key, Set<String> activeNames) {
         Set<String> propertySourceNames = null;
@@ -335,10 +346,5 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         if (property.indexOf('/') == -1)
             return property;
         return null;
-    }
-
-    @Override
-    public String getDescription() {
-        return consulClient.getDescription();
     }
 }

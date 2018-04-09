@@ -1,24 +1,42 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.type.Argument;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.ArrayUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -52,10 +70,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected static String getTypeDescriptor(Object type) {
-        if(type instanceof Class) {
-            return Type.getDescriptor((Class)type);
-        }
-        else {
+        if (type instanceof Class) {
+            return Type.getDescriptor((Class) type);
+        } else {
             String className = type.toString();
             return getTypeDescriptor(className, new String[0]);
         }
@@ -67,20 +84,18 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected static Type getTypeReference(Object type) {
-        if(type instanceof Class) {
-            return Type.getType((Class)type);
-        }
-        else if(type instanceof String) {
+        if (type instanceof Class) {
+            return Type.getType((Class) type);
+        } else if (type instanceof String) {
             String className = type.toString();
 
             String internalName = getInternalName(className);
-            if(className.endsWith("[]")) {
+            if (className.endsWith("[]")) {
                 internalName = "[L" + internalName + ";";
             }
             return Type.getObjectType(internalName);
-        }
-        else {
-            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
+        } else {
+            throw new IllegalArgumentException("Type reference [" + type + "] should be a Class or a String representing the class name");
         }
     }
 
@@ -138,7 +153,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
-
     protected static void pushReturnValue(MethodVisitor methodVisitor, Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
@@ -165,20 +179,17 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                         methodVisitor.visitInsn(FRETURN);
                         break;
                 }
-
-            }
-            else {
+            } else {
                 methodVisitor.visitInsn(ARETURN);
             }
-        }
-        else {
+        } else {
             methodVisitor.visitInsn(ARETURN);
         }
     }
 
     protected static Class getWrapperType(Object type) {
         if (isPrimitive(type)) {
-            return ReflectionUtils.getWrapperType((Class)type);
+            return ReflectionUtils.getWrapperType((Class) type);
         }
         return null;
     }
@@ -280,33 +291,30 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected static Type getObjectType(Object type) {
-        if(type instanceof Class) {
-            return Type.getType((Class)type);
-        }
-        else if(type instanceof String) {
+        if (type instanceof Class) {
+            return Type.getType((Class) type);
+        } else if (type instanceof String) {
             String className = type.toString();
 
             String internalName = getTypeDescriptor(className);
             return Type.getType(internalName);
-        }
-        else {
-            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
+        } else {
+            throw new IllegalArgumentException("Type reference [" + type + "] should be a Class or a String representing the class name");
         }
     }
+
     protected static String getTypeDescriptor(String className, String... genericTypes) {
-        if(NAME_TO_TYPE_MAP.containsKey(className)) {
+        if (NAME_TO_TYPE_MAP.containsKey(className)) {
             return NAME_TO_TYPE_MAP.get(className);
-        }
-        else {
+        } else {
             String internalName = getInternalName(className);
             StringBuilder start;
-            if(className.endsWith("[]")) {
+            if (className.endsWith("[]")) {
                 start = new StringBuilder("[L" + internalName);
-            }
-            else {
+            } else {
                 start = new StringBuilder('L' + internalName);
             }
-            if(genericTypes != null && genericTypes.length >0) {
+            if (genericTypes != null && genericTypes.length > 0) {
                 start.append('<');
                 for (String genericType : genericTypes) {
                     start.append(getTypeDescriptor(genericType));
@@ -317,7 +325,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
-    protected static String getMethodDescriptor(String returnType, String...argumentTypes) {
+    protected static String getMethodDescriptor(String returnType, String... argumentTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
 
@@ -359,11 +367,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return builder.toString();
     }
 
-
-    protected static String getConstructorDescriptor(Object...argumentTypes) {
+    protected static String getConstructorDescriptor(Object... argumentTypes) {
         return getConstructorDescriptor(Arrays.asList(argumentTypes));
     }
-
 
     protected static String getConstructorDescriptor(Collection<Object> argList) {
         StringBuilder builder = new StringBuilder();
@@ -379,14 +385,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     /**
      * Writes the class file to disk in the given directory
      *
-     * @param targetDir The target directory
+     * @param targetDir   The target directory
      * @param classWriter The current class writer
-     * @param className The class name
+     * @param className   The class name
      */
     protected void writeClassToDisk(File targetDir, ClassWriter classWriter, String className) throws IOException {
-        if(targetDir != null) {
+        if (targetDir != null) {
 
-            String fileName = className.replace('.','/') + ".class";
+            String fileName = className.replace('.', '/') + ".class";
             File targetFile = new File(targetDir, fileName);
             targetFile.getParentFile().mkdirs();
 
@@ -406,7 +412,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return new GeneratorAdapter(defaultConstructor, ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
 
-    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object...argumentTypes
+    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object... argumentTypes
     ) {
         String descriptor = getConstructorDescriptor(argumentTypes);
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null), ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor);
@@ -420,26 +426,26 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         classWriter.visit(V1_8, ACC_PUBLIC, className, genericSignature, superType.getInternalName(), null);
     }
 
-    protected void invokeConstructor(MethodVisitor cv, Class superClass, Class... argumentTypes)  {
+    protected void invokeConstructor(MethodVisitor cv, Class superClass, Class... argumentTypes) {
         try {
             Type superType = Type.getType(superClass);
             Type superConstructor = Type.getType(superClass.getDeclaredConstructor(argumentTypes));
             cv.visitMethodInsn(INVOKESPECIAL,
-                    superType.getInternalName(),
-                    CONSTRUCTOR_NAME,
-                    superConstructor.getDescriptor(),
-                    false);
+                superType.getInternalName(),
+                CONSTRUCTOR_NAME,
+                superConstructor.getDescriptor(),
+                false);
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Micronaut version on compile classpath doesn't match", e);
         }
     }
 
-    protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class targetType, Method method)  {
+    protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class targetType, Method method) {
         Type type = Type.getType(targetType);
         String owner = type.getSort() == Type.ARRAY ? type.getDescriptor()
-                : type.getInternalName();
+            : type.getInternalName();
         visitor.visitMethodInsn(Opcodes.INVOKESTATIC, owner, method.getName(),
-                method.getDescriptor(), true);
+            method.getDescriptor(), true);
     }
 
     protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
@@ -450,31 +456,28 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     protected static String getInternalName(String className) {
         String newClassName = className.replace('.', '/');
-        if(newClassName.endsWith("[]")) {
-            return newClassName.substring(0, newClassName.length()-2);
+        if (newClassName.endsWith("[]")) {
+            return newClassName.substring(0, newClassName.length() - 2);
         }
         return newClassName;
     }
 
     protected static String getInternalNameForCast(Object type) {
-        if(type instanceof Class) {
+        if (type instanceof Class) {
             Class typeClass = (Class) type;
-            if(typeClass.isPrimitive()) {
+            if (typeClass.isPrimitive()) {
                 typeClass = ReflectionUtils.getWrapperType(typeClass);
             }
             return Type.getInternalName(typeClass);
-        }
-        else {
+        } else {
             String className = type.toString();
-            if(className.endsWith("[]")) {
+            if (className.endsWith("[]")) {
                 return getTypeDescriptor(type);
-            }
-            else {
+            } else {
                 return getInternalName(className);
             }
         }
     }
-
 
     protected String getClassFileName(String className) {
         return className.replace('.', File.separatorChar) + ".class";
@@ -495,14 +498,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             @Override
             public Optional<File> visitServiceDescriptor(String classname) {
                 return Optional.ofNullable(compilationDir).map(root ->
-                        new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
+                    new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
                 );
             }
 
             @Override
             public Optional<File> visitMetaInfFile(String path) throws IOException {
                 return Optional.ofNullable(compilationDir).map(root ->
-                        new File(root, "META-INF" + File.separator + path)
+                    new File(root, "META-INF" + File.separator + path)
                 );
             }
         };
@@ -518,18 +521,17 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return new GeneratorAdapter(mv, ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
 
-    protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String...argumentTypes) {
-        return new GeneratorAdapter( writer.visitMethod(
-                        ACC_PUBLIC,
-                        methodName,
-                        getMethodDescriptor(returnType, argumentTypes),
-                        null,
-                        null
-                ), ACC_PUBLIC,
-                        methodName,
-                        getMethodDescriptor(returnType, argumentTypes));
+    protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
+        return new GeneratorAdapter(writer.visitMethod(
+            ACC_PUBLIC,
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes),
+            null,
+            null
+        ), ACC_PUBLIC,
+            methodName,
+            getMethodDescriptor(returnType, argumentTypes));
     }
-
 
     /**
      * Write the class to the target directory
@@ -550,7 +552,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     /**
      * Represents a method {@link AnnotationSource} reference
      */
-    protected class MethodAnnotationSource extends TypeAnnotationSource{
+    protected class MethodAnnotationSource extends TypeAnnotationSource {
         final String methodName;
         final Map<String, Object> parameters;
 

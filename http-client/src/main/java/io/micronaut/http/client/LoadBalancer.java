@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,16 +31,14 @@ import java.net.URL;
  */
 @FunctionalInterface
 public interface LoadBalancer {
+
     /**
-     *
-     * @return The selected {@link ServiceInstance}
-     *
      * @param discriminator An object used to discriminate the server to select. Usually the service ID
+     * @return The selected {@link ServiceInstance}
      */
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
 
     /**
-     *
      * @return The selected {@link ServiceInstance}
      */
     default Publisher<ServiceInstance> select() {

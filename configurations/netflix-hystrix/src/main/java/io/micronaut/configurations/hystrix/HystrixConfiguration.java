@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,10 @@ import com.netflix.hystrix.strategy.eventnotifier.HystrixEventNotifier;
 import com.netflix.hystrix.strategy.executionhook.HystrixCommandExecutionHook;
 import com.netflix.hystrix.strategy.metrics.HystrixMetricsPublisher;
 import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.Factory;
 
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -40,7 +36,7 @@ import java.io.IOException;
  * @since 1.0
  */
 @Context
-public class HystrixConfiguration implements Closeable{
+public class HystrixConfiguration implements Closeable {
 
     /**
      * Whether the /hystrix.stream is enabled
@@ -49,11 +45,12 @@ public class HystrixConfiguration implements Closeable{
 
     /**
      * Allows defining the {@link HystrixCommandExecutionHook} as a bean
+     *
      * @param commandExecutionHook The command execution hook
      */
     @Inject
     void setCommandExecutationHook(@Nullable HystrixCommandExecutionHook commandExecutionHook) {
-        if(commandExecutionHook != null) {
+        if (commandExecutionHook != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerCommandExecutionHook(commandExecutionHook);
         }
@@ -61,11 +58,12 @@ public class HystrixConfiguration implements Closeable{
 
     /**
      * Allows defining the {@link HystrixEventNotifier} as a bean
+     *
      * @param eventNotifier The command execution hook
      */
     @Inject
     void setEventNotifiers(@Nullable HystrixEventNotifier eventNotifier) {
-        if(eventNotifier != null) {
+        if (eventNotifier != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerEventNotifier(eventNotifier);
         }
@@ -73,11 +71,12 @@ public class HystrixConfiguration implements Closeable{
 
     /**
      * Allows defining the {@link com.netflix.hystrix.strategy.concurrency.HystrixConcurrencyStrategy} as a bean
+     *
      * @param concurrencyStrategy The command execution hook
      */
     @Inject
     void setConcurrencyStrategy(@Nullable HystrixConcurrencyStrategy concurrencyStrategy) {
-        if(concurrencyStrategy != null) {
+        if (concurrencyStrategy != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerConcurrencyStrategy(concurrencyStrategy);
         }
@@ -85,11 +84,12 @@ public class HystrixConfiguration implements Closeable{
 
     /**
      * Allows defining the {@link HystrixMetricsPublisher} as a bean
+     *
      * @param metricsPublisher The command execution hook
      */
     @Inject
     void setMetricsPublisher(@Nullable HystrixMetricsPublisher metricsPublisher) {
-        if(metricsPublisher != null) {
+        if (metricsPublisher != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerMetricsPublisher(metricsPublisher);
         }

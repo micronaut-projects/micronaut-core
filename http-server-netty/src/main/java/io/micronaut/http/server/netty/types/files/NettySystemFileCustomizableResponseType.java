@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,20 +17,25 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.server.netty.NettyHttpResponse;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
+import io.micronaut.http.server.netty.async.DefaultCloseHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.DefaultFileRegion;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpChunkedInput;
+import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.micronaut.http.server.netty.NettyHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.server.netty.async.DefaultCloseHandler;
-import io.micronaut.http.server.types.CustomizableResponseTypeException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -93,16 +98,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     @Override
     public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
 
-        if(response instanceof NettyHttpResponse) {
+        if (response instanceof NettyHttpResponse) {
 
-            FullHttpResponse nettyResponse = ((NettyHttpResponse)response).getNativeResponse();
+            FullHttpResponse nettyResponse = ((NettyHttpResponse) response).getNativeResponse();
 
             //The streams codec prevents non full responses from being written
-            Optional.ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                    .ifPresent(handler ->
-                            context.pipeline()
-                                    .replace(handler, "chunked-handler", new ChunkedWriteHandler())
-                    );
+            Optional
+                .ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
+                .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
 
             // Write the request data
             HttpHeaders headers = nettyResponse.headers();
@@ -125,15 +128,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
                     flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), 8192)),
-                            context.newProgressivePromise());
+                        context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
 
             flushFuture.addListener(new DefaultCloseHandler(context, request, response.code()));
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }
     }

@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.async.subscriber;
 
@@ -44,13 +44,12 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
                     upstreamState = BackPressureState.BUFFERING;
                 }
                 break;
+
             case FLOWING:
             case IDLE:
                 doOnSubscribe(subscription);
                 break;
-
         }
-
     }
 
     @Override
@@ -58,9 +57,11 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         switch (upstreamState) {
             case DONE:
                 return;
+
             case NO_SUBSCRIBER:
             case BUFFERING:
                 upstreamState = BackPressureState.FLOWING;
+
             default:
                 doOnComplete();
                 upstreamState = BackPressureState.DONE;
@@ -74,10 +75,12 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
                 upstreamBuffer.add(message);
                 upstreamState = BackPressureState.BUFFERING;
                 break;
+
             case NO_SUBSCRIBER:
             case BUFFERING:
                 upstreamBuffer.add(message);
                 break;
+
             case DEMANDING:
                 try {
                     try {
@@ -104,7 +107,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
     public final void onError(Throwable t) {
         if (upstreamState != BackPressureState.DONE) {
             try {
-                if(upstreamSubscription != null) {
+                if (upstreamSubscription != null) {
                     upstreamSubscription.cancel();
                 }
             } finally {
@@ -135,66 +138,6 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
      */
     protected abstract void doOnComplete();
 
-    private void processDemand(long demand) {
-        switch (upstreamState) {
-            case BUFFERING:
-            case FLOWING:
-                if( registerDemand(demand) ) {
-                    flushBuffer();
-                }
-                break;
-
-            case DEMANDING:
-                registerDemand(demand);
-                break;
-
-            case IDLE:
-                if (registerDemand(demand)) {
-                    upstreamState = BackPressureState.DEMANDING;
-                    flushBuffer();
-                }
-                break;
-            default:
-
-        }
-    }
-
-    private boolean registerDemand(long demand) {
-
-        if (demand <= 0) {
-            illegalDemand();
-            return false;
-        } else {
-            if (upstreamDemand < Long.MAX_VALUE) {
-                upstreamDemand += demand;
-                if (upstreamDemand < 0) {
-                    upstreamDemand = Long.MAX_VALUE;
-                }
-            }
-            return true;
-        }
-    }
-
-    private void flushBuffer() {
-        while (!upstreamBuffer.isEmpty() && (upstreamDemand > 0 || upstreamDemand == Long.MAX_VALUE)) {
-            onNext(upstreamBuffer.remove());
-        }
-        if (upstreamBuffer.isEmpty()) {
-            if (upstreamDemand > 0) {
-                if (upstreamState == BackPressureState.BUFFERING) {
-                    upstreamState = BackPressureState.DEMANDING;
-                } // otherwise we're flowing
-                upstreamSubscription.request(upstreamDemand);
-            } else if (upstreamState == BackPressureState.BUFFERING) {
-                upstreamState = BackPressureState.IDLE;
-            }
-        }
-    }
-
-    private void illegalDemand() {
-        onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification"));
-    }
-
     protected void provideDownstreamSubscription(Subscriber subscriber) {
         subscriber.onSubscribe(newDownstreamSubscription());
     }
@@ -208,6 +151,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
          * There is no subscriber
          */
         NO_SUBSCRIBER,
+
         /**
          * There is no demand yet and no buffering has taken place
          */
@@ -245,5 +189,64 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         public synchronized void cancel() {
             upstreamSubscription.cancel();
         }
+    }
+
+    private void processDemand(long demand) {
+        switch (upstreamState) {
+            case BUFFERING:
+            case FLOWING:
+                if (registerDemand(demand)) {
+                    flushBuffer();
+                }
+                break;
+
+            case DEMANDING:
+                registerDemand(demand);
+                break;
+
+            case IDLE:
+                if (registerDemand(demand)) {
+                    upstreamState = BackPressureState.DEMANDING;
+                    flushBuffer();
+                }
+                break;
+            default:
+
+        }
+    }
+
+    private boolean registerDemand(long demand) {
+        if (demand <= 0) {
+            illegalDemand();
+            return false;
+        } else {
+            if (upstreamDemand < Long.MAX_VALUE) {
+                upstreamDemand += demand;
+                if (upstreamDemand < 0) {
+                    upstreamDemand = Long.MAX_VALUE;
+                }
+            }
+            return true;
+        }
+    }
+
+    private void flushBuffer() {
+        while (!upstreamBuffer.isEmpty() && (upstreamDemand > 0 || upstreamDemand == Long.MAX_VALUE)) {
+            onNext(upstreamBuffer.remove());
+        }
+        if (upstreamBuffer.isEmpty()) {
+            if (upstreamDemand > 0) {
+                if (upstreamState == BackPressureState.BUFFERING) {
+                    upstreamState = BackPressureState.DEMANDING;
+                } // otherwise we're flowing
+                upstreamSubscription.request(upstreamDemand);
+            } else if (upstreamState == BackPressureState.BUFFERING) {
+                upstreamState = BackPressureState.IDLE;
+            }
+        }
+    }
+
+    private void illegalDemand() {
+        onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification"));
     }
 }

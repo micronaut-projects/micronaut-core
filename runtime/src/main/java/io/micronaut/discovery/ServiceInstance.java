@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package io.micronaut.discovery;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 
 import java.net.URI;
@@ -34,6 +32,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface ServiceInstance {
+
     /**
      * Constant to represent the group of the service contained with {@link #getMetadata()}
      */
@@ -48,6 +47,7 @@ public interface ServiceInstance {
      * Constant to represent the region of the service contained with {@link #getMetadata()}
      */
     String REGION = "region";
+
     /**
      * @return The identifier of the service used for purposes of service discovery
      */
@@ -64,6 +64,7 @@ public interface ServiceInstance {
     default HealthStatus getHealthStatus() {
         return HealthStatus.UP;
     }
+
     /**
      * @return The ID of the instance
      */
@@ -88,6 +89,7 @@ public interface ServiceInstance {
     default Optional<String> getRegion() {
         return getMetadata().get(REGION, String.class);
     }
+
     /**
      * Returns the application group. For example, the AWS auto-scaling group
      *
@@ -96,6 +98,7 @@ public interface ServiceInstance {
     default Optional<String> getGroup() {
         return getMetadata().get(GROUP, String.class);
     }
+
     /**
      * @return The service metadata
      */
@@ -127,13 +130,14 @@ public interface ServiceInstance {
 
     /**
      * Resolve a URI relative to this service instance
+     *
      * @param relativeURI The relative URI
      * @return The relative URI
      */
     default URI resolve(URI relativeURI) {
         URI thisUri = getURI();
         // if the URI features credentials strip this out
-        if(StringUtils.isNotEmpty(thisUri.getUserInfo())) {
+        if (StringUtils.isNotEmpty(thisUri.getUserInfo())) {
             try {
                 thisUri = new URI(thisUri.getScheme(), null, thisUri.getHost(), thisUri.getPort(), thisUri.getPath(), thisUri.getQuery(), thisUri.getFragment());
             } catch (URISyntaxException e) {
@@ -141,17 +145,17 @@ public interface ServiceInstance {
             }
         }
         String rawQuery = thisUri.getRawQuery();
-        if(StringUtils.isNotEmpty(rawQuery)) {
+        if (StringUtils.isNotEmpty(rawQuery)) {
             return thisUri.resolve(relativeURI + "?" + rawQuery);
-        }
-        else {
+        } else {
             return thisUri.resolve(relativeURI);
         }
     }
 
     /**
      * Construct a new {@link ServiceInstance} for the given ID and URL
-     * @param id The ID
+     *
+     * @param id  The ID
      * @param url The URL
      * @return The instance
      */
@@ -166,7 +170,8 @@ public interface ServiceInstance {
 
     /**
      * Construct a new {@link ServiceInstance} for the given ID and URL
-     * @param id The ID
+     *
+     * @param id  The ID
      * @param uri The URI
      * @return The instance
      */
@@ -186,7 +191,8 @@ public interface ServiceInstance {
 
     /**
      * Construct a new {@link ServiceInstance} for the given ID, host and port using the HTTP scheme
-     * @param id The ID
+     *
+     * @param id   The ID
      * @param host The host
      * @param port The port
      * @return The instance
@@ -207,7 +213,8 @@ public interface ServiceInstance {
 
     /**
      * A builder to builder a {@link ServiceInstance}
-     * @param id The id
+     *
+     * @param id  The id
      * @param uri The URI
      * @return The builder
      */
@@ -221,6 +228,7 @@ public interface ServiceInstance {
     interface Builder {
         /**
          * Sets the instance id
+         *
          * @param id The instance id
          * @return This builder
          */
@@ -228,6 +236,7 @@ public interface ServiceInstance {
 
         /**
          * Sets the zone
+         *
          * @param zone The zone
          * @return This builder
          */
@@ -235,6 +244,7 @@ public interface ServiceInstance {
 
         /**
          * Sets the region
+         *
          * @param region The region
          * @return This builder
          */
@@ -242,6 +252,7 @@ public interface ServiceInstance {
 
         /**
          * Sets the application group
+         *
          * @param group The group
          * @return This builder
          */
@@ -249,14 +260,15 @@ public interface ServiceInstance {
 
         /**
          * Sets the application status
+         *
          * @param status The status
          * @return This builder
          */
         Builder status(HealthStatus status);
 
-
         /**
          * Sets the application metadata
+         *
          * @param metadata The metadata
          * @return This builder
          */

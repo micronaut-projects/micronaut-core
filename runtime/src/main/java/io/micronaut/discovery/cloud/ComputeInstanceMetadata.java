@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,9 +31,10 @@ public interface ComputeInstanceMetadata {
 
     /**
      * The metadata as a map
+     *
      * @return A map of metadata
      */
-    Map<String,String> getMetadata();
+    Map<String, String> getMetadata();
 
     /**
      * @return The {@link NetworkInterface} instances
@@ -47,12 +48,14 @@ public interface ComputeInstanceMetadata {
 
     /**
      * The tags attached to the instance
+     *
      * @return A map of tags
      */
-    Map<String,String> getTags();
+    Map<String, String> getTags();
 
     /**
      * The name of the instance. Usually the same as {@link #getInstanceId()}. Some cloud platforms assign unique IDs
+     *
      * @return The name of the instance
      */
     String getName();
@@ -62,6 +65,9 @@ public interface ComputeInstanceMetadata {
      */
     String getInstanceId();
 
+    /**
+     * @return The machine type
+     */
     String getMachineType();
 
     /**
@@ -128,7 +134,4 @@ public interface ComputeInstanceMetadata {
      * @return Is this cached instance metadata
      */
     boolean isCached();
-
-
-
 }

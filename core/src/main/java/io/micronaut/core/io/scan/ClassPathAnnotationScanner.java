@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.io.scan;
 
@@ -112,25 +112,24 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                         JarURLConnection jarCon = (JarURLConnection) con;
                         JarFile jarFile = jarCon.getJarFile();
                         jarFile.stream()
-                                .filter(entry -> {
-                                    String name = entry.getName();
-                                    return name.startsWith(packagePath) && name.endsWith(ClassUtils.CLASS_EXTENSION) && name.indexOf('$') == -1;
-                                })
-                                .forEach(entry -> {
-                                    try (InputStream inputStream = jarFile.getInputStream(entry)) {
-                                        scanInputStream(annotation, inputStream, classes);
-                                    } catch (IOException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Ignoring JAR entry [" + entry.getName() + "] due to I/O error: " + e.getMessage(), e);
-                                        }
-                                    } catch (ClassNotFoundException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Ignoring JAR entry [" + entry.getName() + "]. Class not found: " + e.getMessage(), e);
-                                        }
+                            .filter(entry -> {
+                                String name = entry.getName();
+                                return name.startsWith(packagePath) && name.endsWith(ClassUtils.CLASS_EXTENSION) && name.indexOf('$') == -1;
+                            })
+                            .forEach(entry -> {
+                                try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                                    scanInputStream(annotation, inputStream, classes);
+                                } catch (IOException e) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Ignoring JAR entry [" + entry.getName() + "] due to I/O error: " + e.getMessage(), e);
                                     }
-                                });
-                    }
-                    else {
+                                } catch (ClassNotFoundException e) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Ignoring JAR entry [" + entry.getName() + "]. Class not found: " + e.getMessage(), e);
+                                    }
+                                }
+                            });
+                    } else {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Ignoring JAR URI entry [" + url + "]. No JarURLConnection found.");
                         }
@@ -197,6 +196,4 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
             classes.add(classLoader.loadClass(classVisitor.getTypeName()));
         }
     }
-
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ abstract class PublicAbstractMethodVisitor extends PublicMethodVisitor {
         super(sourceUnit)
     }
 
-
     @Override
     void accept(ClassNode classNode) {
         this.current = classNode
@@ -44,13 +43,13 @@ abstract class PublicAbstractMethodVisitor extends PublicMethodVisitor {
 
     @Override
     protected boolean isAcceptable(MethodNode node) {
-        if(!node.isAbstract()) {
+        if (!node.isAbstract()) {
             return false
         }
-        if(current != null) {
+        if (current != null) {
             // ignore overridden methods
             def existing = current.getMethod(node.name, node.parameters)
-            if(existing != null && existing != node) {
+            if (existing != null && existing != node) {
                 return false
             }
         }

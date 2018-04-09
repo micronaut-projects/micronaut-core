@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,10 +48,10 @@ class MyBean  {
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
+        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
 
         when:
         def context = new DefaultBeanContext()

@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.configuration.hibernate.gorm
 
@@ -21,15 +21,10 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
-import org.grails.datastore.mapping.services.Service
+import io.micronaut.spring.core.env.PropertyResolverAdapter
 import org.grails.orm.hibernate.HibernateDatastore
 import org.grails.orm.hibernate.connections.HibernateConnectionSource
 import org.hibernate.SessionFactory
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Factory
-import io.micronaut.spring.core.env.PropertyResolverAdapter
 import org.springframework.transaction.PlatformTransactionManager
 
 import javax.inject.Singleton
@@ -58,13 +53,13 @@ class HibernateFactory {
         Stream<Class> entities = applicationContext.environment.scan(Entity)
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(
-                new PropertyResolverAdapter(applicationContext, applicationContext),
-                classes
+            new PropertyResolverAdapter(applicationContext, applicationContext),
+            classes
         )
-        for(o in datastore.getServices()) {
+        for (o in datastore.getServices()) {
             applicationContext.registerSingleton(o)
         }
-        for(o in datastore.getServices()) {
+        for (o in datastore.getServices()) {
             applicationContext.inject(o)
         }
 
@@ -80,7 +75,7 @@ class HibernateFactory {
     @Bean
     @Singleton
     DataSource dataSource(HibernateDatastore hibernateDatastore) {
-        ((HibernateConnectionSource)hibernateDatastore.getConnectionSources().defaultConnectionSource).getDataSource()
+        ((HibernateConnectionSource) hibernateDatastore.getConnectionSources().defaultConnectionSource).getDataSource()
     }
 
     @Bean
@@ -88,5 +83,4 @@ class HibernateFactory {
     PlatformTransactionManager transactionManager(HibernateDatastore hibernateDatastore) {
         hibernateDatastore.getTransactionManager()
     }
-
 }

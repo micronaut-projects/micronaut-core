@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.configuration.lettuce.test;
 
@@ -56,15 +56,15 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
     public AbstractRedisConfiguration onCreated(BeanCreatedEvent<AbstractRedisConfiguration> event) {
         AbstractRedisConfiguration configuration = event.getBean();
         Optional<RedisURI> uri = configuration.getUri();
-        int port  = configuration.getPort();
+        int port = configuration.getPort();
         String host = configuration.getHost();
-        if(uri.isPresent()) {
+        if (uri.isPresent()) {
             RedisURI redisURI = uri.get();
             port = redisURI.getPort();
             host = redisURI.getHost();
 
         }
-        if(StringUtils.isNotEmpty(host) && host.equals("localhost") && SocketUtils.isTcpPortAvailable(port)) {
+        if (StringUtils.isNotEmpty(host) && host.equals("localhost") && SocketUtils.isTcpPortAvailable(port)) {
             RedisServerBuilder builder = embeddedConfiguration.builder;
             builder.port(port);
             redisServer = builder.build();
@@ -77,7 +77,7 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
     @Override
     @PreDestroy
     public void close() throws IOException {
-        if(redisServer != null) {
+        if (redisServer != null) {
             redisServer.stop();
         }
     }
@@ -86,10 +86,10 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
      * Configuration properties for embedded Redis
      */
     @ConfigurationProperties(RedisSetting.REDIS_EMBEDDED)
-    @Requires(classes = RedisServerBuilder.class )
+    @Requires(classes = RedisServerBuilder.class)
     public static class Configuration {
         @ConfigurationBuilder(
-                prefixes = ""
+            prefixes = ""
         )
         RedisServerBuilder builder = new RedisServerBuilder().port(SocketUtils.findAvailableTcpPort());
     }
