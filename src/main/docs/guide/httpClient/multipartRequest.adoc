@@ -1,35 +1,27 @@
 :linkattrs:
-The Micronaut HTTP Client supports the ability to create a multipart request in very simple way. Basically, in order to build a multipart request you will need to specify following:
-
-* Add one or more different sets to the request.
-* Set the content type of the request to "multipart/form-data" and pass the multipart body in the request.
+The Micronaut HTTP Client supports the ability to create multipart requests. In order to build a multipart request you must set the content type to `multipart/form-data` and set the body to be an instance of api:io.micronaut.http.client.multipart.MultipartBody[]:
 
 For example:
 
-.Creating Multipart Body
+.Creating the body
 [source,groovy]
 ----
 include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=multipartBodyImports,indent=0]
-include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=file,indent=0]
+
+File file = ...
 include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=multipartBody,indent=0]
 ----
 
-<1> You need to create a MultipartBody builder for adding different parts to the body.
+<1> You need to create a MultipartBody builder for adding parts to the body.
 <2> Method to add a part to the body, in this case a file. There are different variations of this method which you can see in link:{api}/io/micronaut/http/client/multipart/MultipartBody.Builder.html[MultipartBody.Builder, window="_blank"].
-<3> Name of the parameter for file object to be passed in multipart request.
-<4> Name of the file.
-<5> Content type of the file. (text/plain)
-<6> File object itself
-<7> Once you are done adding the parts call the build method to assemble all parts from the builder to MultipartBody object.
+<3> Call the build method to assemble all parts from the builder into a MultipartBody. At least one part is required.
 
 
-.Passing Multipart Body to the Request
+.Creating a request
 [source,groovy]
 ----
-include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=multipartBodyImports,indent=0]
 include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=request,indent=0]
 ----
 
 <1> The multipart request body with different sets of data.
-<2> Always set the content-type header of multipart request to `multipart/form-data`.
-<3> `Accept` header could vary based on the response you are expecting.
+<2> Set the content-type header of the request to `multipart/form-data`.

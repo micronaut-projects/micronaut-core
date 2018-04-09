@@ -9,7 +9,6 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-
 // end::multipartBodyImports[]
 
 // tag::controllerImports[]
@@ -67,11 +66,11 @@ class MultipartFileUploadSpec extends Specification {
         // tag::multipartBody[]
         MultipartBody requestBody = MultipartBody.builder()     // <1>
                 .addPart(                                       // <2>
-                    "data",                               // <3>
-                    file.name,                                  // <4>
-                    MediaType.TEXT_PLAIN_TYPE,                  // <5>
-                    file                                        // <6>
-                ).build()                                       // <7>
+                    "data",
+                    file.name,
+                    MediaType.TEXT_PLAIN_TYPE,
+                    file
+                ).build()                                       // <3>
 
         // end::multipartBody[]
 
@@ -81,9 +80,8 @@ class MultipartFileUploadSpec extends Specification {
                 // tag::request[]
                 HttpRequest.POST("/multipart/upload", requestBody)       // <1>
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
-                        .accept(MediaType.TEXT_PLAIN_TYPE),              // <3>
-
                 // end::request[]
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
 
                 String
         ))
