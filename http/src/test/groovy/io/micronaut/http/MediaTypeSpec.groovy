@@ -51,7 +51,7 @@ class MediaTypeSpec extends Specification {
     @Unroll
     void "test #contentType is compressible = #expected"() {
         expect:
-        MediaType.isCompressible(contentType) == expected
+        MediaType.isTextBased(contentType) == expected
 
         where:
         contentType                  | expected

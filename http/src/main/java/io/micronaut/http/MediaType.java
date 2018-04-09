@@ -29,14 +29,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -55,16 +48,16 @@ public class MediaType implements CharSequence {
     private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
-    private static final List<Pattern> compressiblePatterns = new ArrayList<>(4);
+    private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
     static {
         ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
             new MediaType(charSequence.toString())
         );
-        compressiblePatterns.add(Pattern.compile("^text/.*$"));
-        compressiblePatterns.add(Pattern.compile("^.*\\+json$"));
-        compressiblePatterns.add(Pattern.compile("^.*\\+text$"));
-        compressiblePatterns.add(Pattern.compile("^.*\\+xml$"));
+        textTypePatterns.add(Pattern.compile("^text/.*$"));
+        textTypePatterns.add(Pattern.compile("^.*\\+json$"));
+        textTypePatterns.add(Pattern.compile("^.*\\+text$"));
+        textTypePatterns.add(Pattern.compile("^.*\\+xml$"));
     }
 
     /**
@@ -250,7 +243,18 @@ public class MediaType implements CharSequence {
     /**
      * JSON Stream: application/x-json-stream
      */
-    public final static MediaType APPLICATION_JSON_STREAM_TYPE = new MediaType("application/x-json-stream");
+    public final static MediaType APPLICATION_JSON_STREAM_TYPE = new MediaType(APPLICATION_JSON_STREAM);
+
+    /**
+     * BINARY: application/octet-stream
+     */
+    public final static String APPLICATION_OCTET_STREAM = "application/octet-stream";
+
+    /**
+     * BINARY: application/octet-stream
+     */
+    public final static MediaType APPLICATION_OCTET_STREAM_TYPE = new MediaType(APPLICATION_OCTET_STREAM);
+
 
     /**
      * Parameter {@code "charset"}
@@ -440,10 +444,10 @@ public class MediaType implements CharSequence {
     }
 
     /**
-     * @return Whether the media type can be compressed
+     * @return Whether the media type is text based
      */
-    public boolean isCompressible() {
-        boolean matches = compressiblePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
+    public boolean isTextBased() {
+        boolean matches = textTypePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
         if (!matches) {
             matches = subtype.equals("json") || subtype.equals("xml");
         }
@@ -452,11 +456,11 @@ public class MediaType implements CharSequence {
 
     /**
      * @param contentType The content type
-     * @return Whether the content type can be compressed
+     * @return Whether the content type is text based
      */
-    public static boolean isCompressible(String contentType) {
+    public static boolean isTextBased(String contentType) {
         MediaType mediaType = new MediaType(contentType);
-        return mediaType.isCompressible();
+        return mediaType.isTextBased();
     }
 
     public String toString() {

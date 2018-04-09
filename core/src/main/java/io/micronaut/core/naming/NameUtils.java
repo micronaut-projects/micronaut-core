@@ -205,6 +205,7 @@ public class NameUtils {
         return new String(chars);
     }
 
+
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
         if (!lowerCase) {
             StringBuilder newName = new StringBuilder();
@@ -250,6 +251,27 @@ public class NameUtils {
             }
 
             return newName.toString();
+        }
+    }
+
+    /**
+     * Retrieves the extension of a file name.
+     * Ex: index.html -> html
+     *
+     * @param filename The name of the file
+     * @return The file extension
+     */
+    public static String extension(String filename) {
+        int extensionPos = filename.lastIndexOf('.');
+        int lastUnixPos = filename.lastIndexOf('/');
+        int lastWindowsPos = filename.lastIndexOf('\\');
+        int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
+
+        int index = lastSeparator > extensionPos ? -1 : extensionPos;
+        if (index == -1) {
+            return "";
+        } else {
+            return filename.substring(index + 1);
         }
     }
 }
