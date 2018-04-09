@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configurations.aws;
-
-package io.micronaut.configurations.aws;
-
-import com.amazonaws.ClientConfiguration;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS client
+ * This package contains client APIs, service discovery and distributed configuration integration between Micronaut and Consul (https://www.consul.io)
  *
  * @author graemerocher
  * @since 1.0
  */
+@Configuration
+@Requires(classes = {AWSClientConfiguration.class, AWSServiceDiscovery.class})
+package io.micronaut.discovery.aws;
 
-@ConfigurationProperties("client")
-public class AWSClientConfiguration extends AWSConfiguration {
-
-    @ConfigurationBuilder
-    public ClientConfiguration clientConfiguration = new ClientConfiguration();
-}
+import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
+import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
