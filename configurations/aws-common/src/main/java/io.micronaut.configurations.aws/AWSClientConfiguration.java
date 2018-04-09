@@ -15,8 +15,6 @@
  */
 package io.micronaut.configurations.aws;
 
-package io.micronaut.configurations.aws;
-
 import com.amazonaws.ClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
