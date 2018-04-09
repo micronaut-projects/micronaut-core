@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,11 +54,12 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
 
     /**
      * Sets an optional {@link VipAddressResolver}
+     *
      * @param resolver The {@link VipAddressResolver}
      */
     @Inject
     public void setVipAddressResolver(Optional<VipAddressResolver> resolver) {
-        if(resolver.isPresent()) {
+        if (resolver.isPresent()) {
             this.resolver = resolver.get();
         }
     }
@@ -188,11 +189,10 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
      */
     @Override
     public <T> IClientConfig set(IClientConfigKey<T> key, T value) {
-        if(key != null) {
-            if(value == null) {
+        if (key != null) {
+            if (value == null) {
                 customSettings.remove(key);
-            }
-            else {
+            } else {
                 customSettings.put(key, value);
             }
         }
@@ -212,11 +212,10 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     }
 
     protected <T> T get(IClientConfigKey<T> key, Class<T> type, T defaultValue) {
-        if(key == null) return null;
-        if(customSettings.containsKey(key)) {
+        if (key == null) return null;
+        if (customSettings.containsKey(key)) {
             return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
-        }
-        else {
+        } else {
             return environment.getProperty(qualifyKey(key), type, defaultValue);
         }
     }

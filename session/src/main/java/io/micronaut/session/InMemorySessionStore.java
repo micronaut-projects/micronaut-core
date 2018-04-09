@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.session;
 
@@ -49,9 +49,10 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
     private final SessionIdGenerator sessionIdGenerator;
 
     public InMemorySessionStore(
-            SessionIdGenerator sessionIdGenerator,
-            SessionConfiguration sessionConfiguration,
-            ApplicationEventPublisher eventPublisher) {
+        SessionIdGenerator sessionIdGenerator,
+        SessionConfiguration sessionConfiguration,
+        ApplicationEventPublisher eventPublisher) {
+
         this.sessionIdGenerator = sessionIdGenerator;
         this.eventPublisher = eventPublisher;
         this.sessionConfiguration = sessionConfiguration;
@@ -67,7 +68,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
     public CompletableFuture<Optional<InMemorySession>> findSession(String id) {
         InMemorySession session = sessions.getIfPresent(id);
         return CompletableFuture.completedFuture(
-                Optional.ofNullable(session != null && !session.isExpired() ? session : null)
+            Optional.ofNullable(session != null && !session.isExpired() ? session : null)
         );
     }
 
@@ -79,15 +80,15 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
 
     @Override
     public CompletableFuture<InMemorySession> save(InMemorySession session) {
-        if(session == null) throw new IllegalArgumentException("Session cannot be null");
+        if (session == null) throw new IllegalArgumentException("Session cannot be null");
         String id = session.getId();
         session.setNew(false);
         InMemorySession existing = sessions.getIfPresent(id);
         // if the instance is the same then merely accessing it as above will
         // result in the expiry interval being reset so nothing else needs to be done
-        if(session != existing) {
+        if (session != existing) {
             sessions.put(id, session);
-            if(existing == null) {
+            if (existing == null) {
                 eventPublisher.publishEvent(new SessionCreatedEvent(session));
             }
         }
@@ -100,9 +101,10 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
     }
 
     protected Cache<String, InMemorySession> newSessionCache(SessionConfiguration configuration) {
-        Caffeine<String, InMemorySession> builder = Caffeine.newBuilder()
-                .removalListener(newRemovalListener())
-                .expireAfter(newExpiry());
+        Caffeine<String, InMemorySession> builder = Caffeine
+            .newBuilder()
+            .removalListener(newRemovalListener())
+            .expireAfter(newExpiry());
         configuration.getMaxActiveSessions().ifPresent(builder::maximumSize);
         return builder.build();
     }

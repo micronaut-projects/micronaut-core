@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,6 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
@@ -40,6 +36,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named {
+
     /**
      * Constant representing zero arguments
      */
@@ -81,19 +78,20 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @return The type hash code
      */
     int typeHashCode();
+
     /**
      * Creates a new argument for the given type, name and qualifier
      *
-     * @param type The type
-     * @param name The name
+     * @param type      The type
+     * @param name      The name
      * @param qualifier The qualifier
-     * @param <T> The generic type
+     * @param <T>       The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type,
-            String name,
-            Annotation qualifier) {
+        Class<T> type,
+        String name,
+        Annotation qualifier) {
         return new DefaultArgument<>(type, name, qualifier);
     }
 
@@ -102,28 +100,27 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      *
      * @param type The type
      * @param name The name
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type,
-            String name,
-            @Nullable Argument...typeParameters) {
+        Class<T> type,
+        String name,
+        @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, name, null, typeParameters);
     }
-
 
     /**
      * Creates a new argument for the given type and name
      *
      * @param type The type
      * @param name The name
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type,
-            String name) {
+        Class<T> type,
+        String name) {
         return new DefaultArgument<>(type, name, null, Argument.ZERO_ARGUMENTS);
     }
 
@@ -131,11 +128,11 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * Creates a new argument for the given type and name
      *
      * @param type The type
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type, @Nullable Argument...typeParameters) {
+        Class<T> type, @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, type.getSimpleName(), null, typeParameters);
     }
 
@@ -143,30 +140,30 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * Creates a new argument for the given type and name
      *
      * @param type The type
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type) {
+        Class<T> type) {
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), null, Argument.ZERO_ARGUMENTS);
     }
+
     /**
      * Creates a new argument for the given type and name
      *
      * @param type The type
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type, @Nullable Class<?>...typeParameters) {
-        if(typeParameters == null) {
+        Class<T> type, @Nullable Class<?>... typeParameters) {
+        if (typeParameters == null) {
             return of(type);
-        }
-        else {
+        } else {
 
             TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
             int len = typeParameters.length;
-            if(parameters.length != len) {
+            if (parameters.length != len) {
                 throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
             }
             Argument[] typeArguments = new Argument[len];
@@ -181,135 +178,134 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     /**
      * Create a new argument for the given method
      *
-     * @param method The method
-     * @param name The argument name
-     * @param index The argument index
-     * @param qualifierType The qualifier type
+     * @param method         The method
+     * @param name           The argument name
+     * @param index          The argument index
+     * @param qualifierType  The qualifier type
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
     @SuppressWarnings("unchecked")
     static Argument of(
-            Method method,
-            String name,
-            int index,
-            @Nullable Class qualifierType,
-            @Nullable Argument...typeParameters) {
+        Method method,
+        String name,
+        int index,
+        @Nullable Class qualifierType,
+        @Nullable Argument... typeParameters) {
         Class type = method.getParameterTypes()[index];
 
         Annotation[] annotations = method.getParameterAnnotations()[index];
         Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
-                type,
-                name,
-                annotation,
-                annotations,
-                typeParameters
+            type,
+            name,
+            annotation,
+            annotations,
+            typeParameters
         );
     }
-
 
     /**
      * Create a new argument for the given constructor
      *
-     * @param constructor The method
-     * @param name The argument name
-     * @param index The argument index
-     * @param qualifierType The qualifier type
+     * @param constructor    The method
+     * @param name           The argument name
+     * @param index          The argument index
+     * @param qualifierType  The qualifier type
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
     @SuppressWarnings("unchecked")
     static Argument of(
-            Constructor constructor,
-            String name,
-            int index,
-            @Nullable Class qualifierType,
-            @Nullable Argument...typeParameters) {
+        Constructor constructor,
+        String name,
+        int index,
+        @Nullable Class qualifierType,
+        @Nullable Argument... typeParameters) {
         Class type = constructor.getParameterTypes()[index];
 
         Annotation[] annotations = constructor.getParameterAnnotations()[index];
         Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
-                type,
-                name,
-                annotation,
-                annotations,
-                typeParameters
+            type,
+            name,
+            annotation,
+            annotations,
+            typeParameters
         );
     }
 
     /**
      * Create a new argument for the given field
      *
-     * @param field The field
-     * @param name The argument name
-     * @param qualifierType The qualifier type
+     * @param field          The field
+     * @param name           The argument name
+     * @param qualifierType  The qualifier type
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
     @SuppressWarnings("unchecked")
     static Argument of(
-            Field field,
-            String name,
-            @Nullable Class qualifierType,
-            @Nullable Argument...typeParameters) {
+        Field field,
+        String name,
+        @Nullable Class qualifierType,
+        @Nullable Argument... typeParameters) {
         Class type = field.getType();
         Annotation[] annotations = field.getAnnotations();
         Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
-                type,
-                name,
-                annotation,
-                annotations,
-                typeParameters
+            type,
+            name,
+            annotation,
+            annotations,
+            typeParameters
         );
     }
 
     /**
      * Create a new argument for the given field
      *
-     * @param field The field
-     * @param qualifierType The qualifier type
+     * @param field          The field
+     * @param qualifierType  The qualifier type
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
     @SuppressWarnings("unchecked")
     static Argument of(
-            Field field,
-            @Nullable Class qualifierType,
-            @Nullable Argument...typeParameters) {
+        Field field,
+        @Nullable Class qualifierType,
+        @Nullable Argument... typeParameters) {
         Class type = field.getType();
         Annotation[] annotations = field.getAnnotations();
         Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
-                type,
-                field.getName(),
-                annotation,
-                annotations,
-                typeParameters
+            type,
+            field.getName(),
+            annotation,
+            annotations,
+            typeParameters
         );
     }
 
     /**
      * Create a new argument for the given field
      *
-     * @param field The field
+     * @param field          The field
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
     @SuppressWarnings("unchecked")
     static Argument of(
-            Field field,
-            @Nullable Argument...typeParameters) {
+        Field field,
+        @Nullable Argument... typeParameters) {
         Class type = field.getType();
         Annotation[] annotations = field.getAnnotations();
         return new DefaultArgument(
-                type,
-                field.getName(),
-                null,
-                annotations,
-                typeParameters
+            type,
+            field.getName(),
+            null,
+            annotations,
+            typeParameters
         );
     }
 

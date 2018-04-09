@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,6 @@
  */
 package io.micronaut.http.server.netty.converters;
 
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;

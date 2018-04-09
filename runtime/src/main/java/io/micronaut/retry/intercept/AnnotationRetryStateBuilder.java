@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,6 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.type.Argument;
-import io.micronaut.retry.RetryState;
-import io.micronaut.retry.RetryStateBuilder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
@@ -60,18 +55,19 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         Set<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
 
         return new SimpleRetry(
-                attempts,
-                retry.get(MULTIPLIER, Double.class).orElse(0d),
-                delay,
-                retry.get(MAX_DELAY, Duration.class).orElse(null),
-                includes,
-                excludes
+            attempts,
+            retry.get(MULTIPLIER, Double.class).orElse(0d),
+            delay,
+            retry.get(MAX_DELAY, Duration.class).orElse(null),
+            includes,
+            excludes
         );
     }
 
     @SuppressWarnings("unchecked")
     private Set<Class<? extends Throwable>> resolveIncludes(ConvertibleValues<?> retry, String includes) {
-        return retry.get(includes, Argument.of(Set.class, Argument.of(Class.class, Throwable.class)))
-                .orElse(Collections.emptySet());
+        return retry
+            .get(includes, Argument.of(Set.class, Argument.of(Class.class, Throwable.class)))
+            .orElse(Collections.emptySet());
     }
 }

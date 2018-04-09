@@ -1,29 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
-import io.micronaut.http.server.binding.binders.BodyArgumentBinder;
-import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -39,7 +30,11 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * A class containing methods to aid in satisfying arguments of a {@link io.micronaut.web.router.Route}
@@ -49,6 +44,7 @@ import java.util.*;
  */
 @Internal
 class RequestArgumentSatisfier {
+
     private final RequestBinderRegistry binderRegistry;
 
     RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
@@ -58,7 +54,7 @@ class RequestArgumentSatisfier {
     /**
      * Attempt to satisfy the arguments of the given route with the data from the given request
      *
-     * @param route The route
+     * @param route   The route
      * @param request The request
      * @return The route
      */
@@ -74,20 +70,20 @@ class RequestArgumentSatisfier {
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
                 Optional<ArgumentBinder> registeredBinder =
-                        binderRegistry.findArgumentBinder(argument, request);
+                    binderRegistry.findArgumentBinder(argument, request);
                 if (registeredBinder.isPresent()) {
                     ArgumentBinder argumentBinder = registeredBinder.get();
                     String argumentName = argument.getName();
                     ArgumentConversionContext conversionContext = ConversionContext.of(
-                            argument,
-                            request.getLocale().orElse(null),
-                            request.getCharacterEncoding()
+                        argument,
+                        request.getLocale().orElse(null),
+                        request.getCharacterEncoding()
                     );
 
                     if (argumentBinder instanceof BodyArgumentBinder) {
                         if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
                             ArgumentBinder.BindingResult bindingResult = argumentBinder
-                                    .bind(conversionContext, request);
+                                .bind(conversionContext, request);
 
                             if (bindingResult.isPresentAndSatisfied()) {
                                 argumentValues.put(argumentName, bindingResult.get());
@@ -95,21 +91,20 @@ class RequestArgumentSatisfier {
 
                         } else {
                             argumentValues.put(argumentName, (UnresolvedArgument) () ->
-                                    argumentBinder.bind(conversionContext, request)
+                                argumentBinder.bind(conversionContext, request)
                             );
-                            ((NettyHttpRequest)request).setBodyRequired(true);
+                            ((NettyHttpRequest) request).setBodyRequired(true);
                         }
                     } else {
 
                         ArgumentBinder.BindingResult bindingResult = argumentBinder
-                                .bind(conversionContext, request);
+                            .bind(conversionContext, request);
                         if (argument.getType() == Optional.class) {
-                            if(bindingResult.isSatisfied() || satisfyOptionals) {
+                            if (bindingResult.isSatisfied() || satisfyOptionals) {
                                 Optional value = bindingResult.getValue();
-                                if(value.isPresent()) {
+                                if (value.isPresent()) {
                                     argumentValues.put(argumentName, value.get());
-                                }
-                                else {
+                                } else {
                                     argumentValues.put(argumentName, value);
                                 }
                             }

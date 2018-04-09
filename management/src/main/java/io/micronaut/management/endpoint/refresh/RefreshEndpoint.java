@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class RefreshEndpoint {
     /**
      * Refresh application state only if environment has changed (unless <code>force</code> is set to true)
      *
-     * @param force optional body property to indicate whether to force all {@link io.micronaut.runtime.context.scope.Refreshable} beans to be refreshed
+     * @param force {@link Nullable} body property to indicate whether to force all {@link io.micronaut.runtime.context.scope.Refreshable} beans to be refreshed
      * @return array of change keys if applicable
      */
     @Write

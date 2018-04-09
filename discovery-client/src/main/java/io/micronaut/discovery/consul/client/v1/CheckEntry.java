@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Locale;
@@ -47,6 +46,13 @@ public class CheckEntry implements Check {
         return name;
     }
 
+    /**
+     * @param name The name of the check
+     */
+    void setName(String name) {
+        this.name = name;
+    }
+
     @Override
     public String getID() {
         return id;
@@ -58,29 +64,32 @@ public class CheckEntry implements Check {
     }
 
     /**
+     * @param notes The human readable notes
+     */
+    void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    /**
      * @return The status
      */
     public String getStatus() {
         return status;
     }
 
+    /**
+     * @param status The status
+     */
+    void setStatus(String status) {
+        this.status = status;
+    }
+
     @Override
     public Status status() {
-        if(StringUtils.isNotEmpty(status)) {
+        if (StringUtils.isNotEmpty(status)) {
             return Status.valueOf(status.toUpperCase(Locale.ENGLISH));
         }
         return Status.PASSING;
     }
-
-    void setNotes(String notes) {
-        this.notes = notes;
-    }
-
-    void setName(String name) {
-        this.name = name;
-    }
-
-    void setStatus(String status) {
-        this.status = status;
-    }
 }
+

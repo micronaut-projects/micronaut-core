@@ -1,21 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.spring.core.env;
 
-import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.reflect.ClassUtils;
 import org.springframework.core.env.PropertyResolver;
@@ -33,11 +32,7 @@ public class PropertyResolverAdapter implements PropertyResolver {
     private final io.micronaut.core.value.PropertyResolver propertyResolver;
     private final PropertyPlaceholderResolver placeholderResolver;
 
-    public PropertyResolverAdapter(
-            io.micronaut.core.value.PropertyResolver propertyResolver,
-            PropertyPlaceholderResolver placeholderResolver
-    )
-    {
+    public PropertyResolverAdapter(io.micronaut.core.value.PropertyResolver propertyResolver, PropertyPlaceholderResolver placeholderResolver) {
         this.propertyResolver = propertyResolver;
         this.placeholderResolver = placeholderResolver;
     }
@@ -54,7 +49,7 @@ public class PropertyResolverAdapter implements PropertyResolver {
 
     @Override
     public String getProperty(String key, String defaultValue) {
-        return getProperty(key ,String.class, null);
+        return getProperty(key, String.class, null);
     }
 
     @Override
@@ -70,9 +65,9 @@ public class PropertyResolverAdapter implements PropertyResolver {
     @Override
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
         Optional<String> property = propertyResolver.getProperty(key, String.class);
-        if(property.isPresent()) {
+        if (property.isPresent()) {
             Optional<Class> aClass = ClassUtils.forName(key, Thread.currentThread().getContextClassLoader());
-            if(aClass.isPresent()) {
+            if (aClass.isPresent()) {
                 return aClass.get();
             }
         }
@@ -87,8 +82,8 @@ public class PropertyResolverAdapter implements PropertyResolver {
     @Override
     public <T> T getRequiredProperty(String key, Class<T> targetType) throws IllegalStateException {
         T v = getProperty(key, targetType, null);
-        if(v == null) {
-            throw new IllegalStateException("Property ["+key+"] not found");
+        if (v == null) {
+            throw new IllegalStateException("Property [" + key + "] not found");
         }
         return v;
     }
@@ -100,6 +95,6 @@ public class PropertyResolverAdapter implements PropertyResolver {
 
     @Override
     public String resolveRequiredPlaceholders(String text) throws IllegalArgumentException {
-        return placeholderResolver.resolvePlaceholders(text).orElseThrow(()-> new IllegalArgumentException("Unable to resolve placeholders for property: " + text));
+        return placeholderResolver.resolvePlaceholders(text).orElseThrow(() -> new IllegalArgumentException("Unable to resolve placeholders for property: " + text));
     }
 }

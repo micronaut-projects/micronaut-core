@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,9 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-
-import static io.micronaut.discovery.CompositeDiscoveryClient.SETTINGS_CACHE_ENABLED;
 
 /**
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled
@@ -32,7 +28,8 @@ import static io.micronaut.discovery.CompositeDiscoveryClient.SETTINGS_CACHE_ENA
  */
 @Primary
 @Singleton
-public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient{
+public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
+
     @Inject
     public DefaultCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);

@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.jackson.serialize;
 
@@ -46,20 +46,18 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
 
         for (CharSequence key : value) {
             Optional<?> opt = value.get(key);
-            if(opt.isPresent()) {
+            if (opt.isPresent()) {
                 String fieldName = key.toString();
                 gen.writeFieldName(fieldName);
                 Object v = opt.get();
-                if(value instanceof OptionalMultiValues) {
+                if (value instanceof OptionalMultiValues) {
                     List list = (List) v;
-                    if(list.size() == 1) {
+                    if (list.size() == 1) {
                         gen.writeObject(list.get(0));
-                    }
-                    else {
+                    } else {
                         gen.writeObject(list);
                     }
-                }
-                else {
+                } else {
                     gen.writeObject(v);
                 }
             }

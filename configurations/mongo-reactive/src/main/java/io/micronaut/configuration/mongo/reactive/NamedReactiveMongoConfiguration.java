@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,14 @@
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.async.client.MongoClientSettings;
-import com.mongodb.connection.*;
-import io.micronaut.context.annotation.Parameter;
+import com.mongodb.connection.ClusterSettings;
+import com.mongodb.connection.ConnectionPoolSettings;
+import com.mongodb.connection.ServerSettings;
+import com.mongodb.connection.SocketSettings;
+import com.mongodb.connection.SslSettings;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.env.Environment;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
@@ -32,7 +35,6 @@ import io.micronaut.runtime.ApplicationConfiguration;
 @EachProperty(value = MongoSettings.MONGODB_SERVERS)
 public class NamedReactiveMongoConfiguration extends AbstractReactiveMongoConfiguration {
 
-    private final String serverName;
     @ConfigurationBuilder(prefixes = "")
     protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();
 
@@ -51,6 +53,7 @@ public class NamedReactiveMongoConfiguration extends AbstractReactiveMongoConfig
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "ssl")
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
+    private final String serverName;
 
     public NamedReactiveMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);

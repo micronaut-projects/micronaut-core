@@ -1,33 +1,21 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
-import io.micronaut.context.BeanLocator;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
-import io.netty.buffer.ByteBufHolder;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -37,6 +25,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
@@ -46,6 +35,7 @@ import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
+import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
@@ -82,13 +72,12 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
                 Optional<MediaType> contentType = source.getContentType();
-                HttpContentProcessor<?> processor = contentType.flatMap(type ->
-                        beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                new ConsumesMediaTypeQualifier<>(type))
-                ).map(factory ->
-                        factory.build(nettyHttpRequest)
-                ).orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
-                return ()-> Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
+                HttpContentProcessor<?> processor = contentType
+                    .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
+                    .map(factory -> factory.build(nettyHttpRequest))
+                    .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+
+                return () -> Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
@@ -98,19 +87,17 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                     @Override
                     protected void doOnNext(Object message) {
                         ArgumentConversionContext<?> conversionContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                        if(message instanceof ByteBufHolder) {
-                            message = ((ByteBufHolder)message).content();
+                        if (message instanceof ByteBufHolder) {
+                            message = ((ByteBufHolder) message).content();
                         }
                         Optional<?> converted = conversionService.convert(message, conversionContext);
-                        if(converted.isPresent()) {
+                        if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
-                        }
-                        else {
+                        } else {
                             Optional<ConversionError> lastError = conversionContext.getLastError();
-                            if(lastError.isPresent()) {
+                            if (lastError.isPresent()) {
                                 subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
-                            }
-                            else {
+                            } else {
                                 subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
                             }
                         }

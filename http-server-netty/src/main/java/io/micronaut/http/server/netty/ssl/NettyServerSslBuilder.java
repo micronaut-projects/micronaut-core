@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,6 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.SslBuilder;
-import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
@@ -53,6 +49,7 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
         return ssl;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build() {
         if (!ssl.isEnabled()) {
@@ -67,8 +64,8 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
             }
         }
         SslContextBuilder sslBuilder = SslContextBuilder
-                .forServer(getKeyManagerFactory())
-                .trustManager(getTrustManagerFactory());
+            .forServer(getKeyManagerFactory())
+            .trustManager(getTrustManagerFactory());
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
