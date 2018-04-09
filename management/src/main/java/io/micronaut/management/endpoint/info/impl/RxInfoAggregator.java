@@ -50,6 +50,13 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
         }).toFlowable();
     }
 
+    /**
+     * Create a {@link Flowable} of ordered {@link PropertySource} from an array of {@link InfoSource}
+     *
+     * @param sources Array of {@link InfoSource}
+     * @return An {@link Flowable} of {@link Map.Entry}, where the key is an {@link Integer}
+     * and value is the {@link PropertySource} returned by the {@link InfoSource}
+     */
     protected Flowable<Map.Entry<Integer, PropertySource>> aggregateResults(InfoSource[] sources) {
         List<Publisher<Map.Entry<Integer, PropertySource>>> publishers = new ArrayList<>(sources.length);
         for (int i = 0; i < sources.length; i++) {

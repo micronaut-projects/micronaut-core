@@ -41,6 +41,11 @@ public class InfoEndpoint {
         this.infoSources = infoSources;
     }
 
+    /**
+     * Returns the info response
+     *
+     * @return A {@link Publisher} of the info response
+     */
     @Read
     Publisher getInfo() {
         return infoAggregator.aggregate(infoSources);
