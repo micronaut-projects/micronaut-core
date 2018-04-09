@@ -57,7 +57,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/index.html'), String
         ).blockingFirst()
-        File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
+        File file = new File(this.getClass().getClassLoader().getResource("/index.html").path)
 
         then:
         file.exists()
@@ -83,7 +83,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET("/static/index.html"), String
         ).blockingFirst()
-        File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
+        File file = new File(this.getClass().getClassLoader().getResource("/index.html").path)
 
         then:
         file.exists()
