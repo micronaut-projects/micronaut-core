@@ -263,6 +263,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
             processPropertySource(propertySource, propertySource.getConvention());
         }
+
+        for (Map<String, Object> map : catalog) {
+            System.out.println("map = " + map);
+        }
+
     }
 
     protected List<PropertySource> readPropertySourceList(String name) {
