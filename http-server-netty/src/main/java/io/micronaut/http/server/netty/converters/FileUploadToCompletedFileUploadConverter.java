@@ -17,7 +17,8 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
 import javax.inject.Singleton;
@@ -39,7 +40,7 @@ public class FileUploadToCompletedFileUploadConverter implements TypeConverter<F
                 return Optional.empty();
             }
 
-            return Optional.of(new CompletedFileUpload(upload));
+            return Optional.of(new NettyCompletedFileUpload(upload));
         } catch (Exception e) {
             context.reject(e);
             return Optional.empty();
