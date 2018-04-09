@@ -196,12 +196,12 @@ public final class MultipartBody {
         }
 
         /**
-         * Assemble all parts from {@link MultipartBody.Builder} to {@link MultipartBody} object and should
-         * be called after adding all the parts to the {@link MultipartBody.Builder}
+         * Creates {@link MultipartBody} from the provided parts
          *
-         * @return {@link MultipartBody} to build Netty multipart request body
+         * @return The {@link MultipartBody}
+         * @throws MultipartException If there are no parts
          */
-        public MultipartBody build() {
+        public MultipartBody build() throws MultipartException {
             if (parts.isEmpty()) {
                 throw new MultipartException("Cannot create a MultipartBody with no parts");
             }
