@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ public interface NettyCustomizableResponseTypeHandlerRegistry {
     /**
      * Finds the first type handler that supports the given type.
      *
-     * @see NettyCustomizableResponseTypeHandler#supports(Class)
      * @param type The type to search for
      * @return An optional {@link NettyCustomizableResponseTypeHandler}
+     * @see NettyCustomizableResponseTypeHandler#supports(Class)
      */
     Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type);
 }

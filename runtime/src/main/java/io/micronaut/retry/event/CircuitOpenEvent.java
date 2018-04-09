@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,6 @@ package io.micronaut.retry.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
-import io.micronaut.context.event.ApplicationEvent;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.retry.RetryState;
 
 /**
  * An event fired when the Circuit is {@link io.micronaut.retry.CircuitState#OPEN} and
@@ -30,13 +27,15 @@ import io.micronaut.retry.RetryState;
  * @since 1.0
  */
 public class CircuitOpenEvent extends ApplicationEvent {
+
     private final RetryState retryState;
     private final Throwable throwable;
 
     public CircuitOpenEvent(
-            ExecutableMethod<?,?> source,
-            RetryState retryState,
-            Throwable throwable) {
+        ExecutableMethod<?, ?> source,
+        RetryState retryState,
+        Throwable throwable) {
+
         super(source);
         this.retryState = retryState;
         this.throwable = throwable;
@@ -60,7 +59,7 @@ public class CircuitOpenEvent extends ApplicationEvent {
      * @return The method that represents the circuit
      */
     @Override
-    public ExecutableMethod<?,?> getSource() {
+    public ExecutableMethod<?, ?> getSource() {
         return (ExecutableMethod<?, ?>) super.getSource();
     }
 }

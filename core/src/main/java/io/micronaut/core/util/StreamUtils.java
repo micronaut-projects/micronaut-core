@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,9 +36,9 @@ public class StreamUtils {
      *
      * @param comparator The comparator to order the items in the stream
      * @param downstream Which collector to use to combine the results
-     * @param <T> The type of objects being streamed
-     * @param <A> The mutable accumulation type of the reduction operation
-     * @param <D> The result type of the reduction operation
+     * @param <T>        The type of objects being streamed
+     * @param <A>        The mutable accumulation type of the reduction operation
+     * @param <D>        The result type of the reduction operation
      * @return A new collector to provide the desired result
      */
     public static <T, A, D> Collector<T, ?, D> maxAll(Comparator<? super T> comparator,
@@ -57,7 +57,7 @@ public class StreamUtils {
         }
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
-            if(!acc.hasAny) {
+            if (!acc.hasAny) {
                 downstreamAccumulator.accept(acc.acc, t);
                 acc.obj = t;
                 acc.hasAny = true;
@@ -98,9 +98,9 @@ public class StreamUtils {
      *
      * @param comparator The comparator to order the items in the stream
      * @param downstream Which collector to use to combine the results
-     * @param <T> The type of objects being streamed
-     * @param <A> The mutable accumulation type of the reduction operation
-     * @param <D> The result type of the reduction operation
+     * @param <T>        The type of objects being streamed
+     * @param <A>        The mutable accumulation type of the reduction operation
+     * @param <D>        The result type of the reduction operation
      * @return A new collector to provide the desired result
      */
     public static <T, A, D> Collector<T, ?, D> minAll(Comparator<? super T> comparator,
@@ -119,7 +119,7 @@ public class StreamUtils {
         }
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
-            if(!acc.hasAny) {
+            if (!acc.hasAny) {
                 downstreamAccumulator.accept(acc.acc, t);
                 acc.obj = t;
                 acc.hasAny = true;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanContext;
 
 /**
  * Interface for other types that are conditional within a context
@@ -31,7 +30,6 @@ public interface BeanContextConditional {
      * Return whether this component is enabled for the given context
      *
      * @param context The context
-     *
      * @return True if it is
      */
     boolean isEnabled(BeanContext context);

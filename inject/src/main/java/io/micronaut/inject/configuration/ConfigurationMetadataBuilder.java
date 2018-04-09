@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ import java.util.List;
 /**
  * <p>A builder for producing metadata for the available {@link ConfigurationProperties}</p>
  * <p>
- * <p>This data can then be subsequently written to a format readable by IDEs (like spring-configuration-metadata.json for example).</p>
+ * <p>This data can then be subsequently written to a format readable by IDEs
+ * (like spring-configuration-metadata.json for example).</p>
  *
  * @param <T> The
  * @author Graeme Rocher
@@ -102,10 +103,10 @@ public abstract class ConfigurationMetadataBuilder<T> {
     /**
      * Visit a configuration property on the last declared properties instance
      *
-     * @param propertyType  The property type
-     * @param name          The property name
-     * @param description   A description for the property
-     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
+     * @param propertyType The property type
+     * @param name         The property name
+     * @param description  A description for the property
+     * @param defaultValue The default value of the property (only used for constant values such as strings, numbers, enums etc.)
      * @return This property metadata or null if no existing configuration is active
      */
     public PropertyMetadata visitProperty(String propertyType,
@@ -113,7 +114,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
 
-        if(!configurations.isEmpty()) {
+        if (!configurations.isEmpty()) {
             ConfigurationMetadata last = configurations.get(configurations.size() - 1);
             PropertyMetadata metadata = new PropertyMetadata();
             metadata.declaringType = last.type;
@@ -233,6 +234,6 @@ public abstract class ConfigurationMetadataBuilder<T> {
         out.write('"');
         out.write(name);
         out.write("\":");
-        out.write( quote(value) );
+        out.write(quote(value));
     }
 }

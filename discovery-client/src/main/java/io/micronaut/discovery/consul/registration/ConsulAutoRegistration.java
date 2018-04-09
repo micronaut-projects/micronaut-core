@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,20 +20,17 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.consul.condition.RequiresConsul;
-import io.micronaut.http.HttpStatus;
-import io.reactivex.Observable;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
-import io.micronaut.discovery.consul.ConsulConfiguration;
-import io.micronaut.discovery.consul.client.v1.*;
-import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
+import io.micronaut.discovery.consul.ConsulConfiguration;
+import io.micronaut.discovery.consul.client.v1.Check;
+import io.micronaut.discovery.consul.client.v1.ConsulClient;
+import io.micronaut.discovery.consul.client.v1.HTTPCheck;
+import io.micronaut.discovery.consul.client.v1.NewCheck;
+import io.micronaut.discovery.consul.client.v1.NewServiceEntry;
+import io.micronaut.discovery.consul.client.v1.TTLCheck;
+import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
@@ -60,6 +57,7 @@ import java.util.Map;
 @Singleton
 @Requires(beans = {ConsulClient.class, ConsulConfiguration.class})
 public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
+
     private final ConsulClient consulClient;
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ConsulConfiguration consulConfiguration;
@@ -67,11 +65,12 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     private final Environment environment;
 
     protected ConsulAutoRegistration(
-            Environment environment,
-            ConsulClient consulClient,
-            HeartbeatConfiguration heartbeatConfiguration,
-            ConsulConfiguration consulConfiguration,
-            ServiceInstanceIdGenerator idGenerator) {
+        Environment environment,
+        ConsulClient consulClient,
+        HeartbeatConfiguration heartbeatConfiguration,
+        ConsulConfiguration consulConfiguration,
+        ServiceInstanceIdGenerator idGenerator) {
+
         super(consulConfiguration.getRegistration());
         this.environment = environment;
         this.consulClient = consulClient;
@@ -83,7 +82,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        if(registration != null && !registration.getCheck().isHttp()) {
+        if (registration != null && !registration.getCheck().isHttp()) {
 
             String checkId = "service:" + idGenerator.generateId(environment, instance);
 
@@ -97,7 +96,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                     @Override
                     public void onNext(HttpStatus httpStatus) {
-                        if(LOG.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             LOG.debug("Successfully reported passing state to Consul");
                         }
                     }
@@ -105,7 +104,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                     @Override
                     public void onError(Throwable throwable) {
                         String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Consul: ");
-                        if(LOG.isErrorEnabled()) {
+                        if (LOG.isErrorEnabled()) {
                             LOG.error(errorMessage, throwable);
                         }
 
@@ -113,7 +112,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                     @Override
                     public void onComplete() {
-
+                        // no-op
                     }
                 });
             } else {
@@ -126,7 +125,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                     @Override
                     public void onNext(HttpStatus httpStatus) {
-                        if(LOG.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             LOG.debug("Successfully reported failure state to Consul");
                         }
                     }
@@ -134,14 +133,14 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                     @Override
                     public void onError(Throwable throwable) {
                         String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Consul: ");
-                        if(LOG.isErrorEnabled()) {
+                        if (LOG.isErrorEnabled()) {
                             LOG.error(errorMessage, throwable);
                         }
                     }
 
                     @Override
                     public void onComplete() {
-
+                        // no-op
                     }
                 });
             }
@@ -151,7 +150,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void deregister(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        if(registration != null) {
+        if (registration != null) {
             String applicationName = instance.getId();
             String serviceId = idGenerator.generateId(environment, instance);
             Publisher<HttpStatus> deregisterPublisher = consulClient.deregister(serviceId);
@@ -163,15 +162,15 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void register(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        if(registration != null) {
+        if (registration != null) {
             String applicationName = instance.getId();
             validateApplicationName(applicationName);
             if (StringUtils.isNotEmpty(applicationName)) {
                 NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
                 List<String> tags = new ArrayList<>(registration.getTags());
                 serviceEntry.address(instance.getHost())
-                        .port(instance.getPort())
-                        .tags(tags);
+                    .port(instance.getPort())
+                    .tags(tags);
 
                 String serviceId = idGenerator.generateId(environment, instance);
                 serviceEntry.id(serviceId);
@@ -182,15 +181,15 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                     ApplicationConfiguration applicationConfiguration = embeddedServerInstance.getEmbeddedServer().getApplicationConfiguration();
                     ApplicationConfiguration.InstanceConfiguration instanceConfiguration = applicationConfiguration.getInstance();
                     instanceConfiguration.getGroup().ifPresent(g -> {
-                                validateName(g, "Instance Group");
-                                tags.add(ServiceInstance.GROUP + "=" + g);
-                            }
+                            validateName(g, "Instance Group");
+                            tags.add(ServiceInstance.GROUP + "=" + g);
+                        }
 
                     );
                     instanceConfiguration.getZone().ifPresent(z -> {
-                                validateName(z, "Instance Zone");
-                                tags.add(ServiceInstance.ZONE + "=" + z);
-                            }
+                            validateName(z, "Instance Zone");
+                            tags.add(ServiceInstance.ZONE + "=" + z);
+                        }
                     );
 
                     // include metadata as tags
@@ -212,7 +211,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                             HTTPCheck httpCheck;
                             try {
                                 httpCheck = new HTTPCheck(
-                                        new URL(serverURL, registration.getHealthPath().orElse("/health"))
+                                    new URL(serverURL, registration.getHealthPath().orElse("/health"))
                                 );
                             } catch (MalformedURLException e) {
                                 throw new DiscoveryException("Invalid health path configured: " + registration.getHealthPath());
@@ -220,13 +219,12 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                             httpCheck.interval(checkConfig.getInterval());
                             httpCheck.method(checkConfig.getMethod())
-                                    .headers(ConvertibleMultiValues.of(checkConfig.getHeaders()));
+                                .headers(ConvertibleMultiValues.of(checkConfig.getHeaders()));
 
                             checkConfig.getTlsSkipVerify().ifPresent(httpCheck::setTLSSkipVerify);
                             check = httpCheck;
                         }
                     }
-
 
                     if (check != null) {
                         check.status(Check.Status.PASSING);
@@ -254,5 +252,4 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     protected void customizeServiceEntry(ServiceInstance instance, NewServiceEntry serviceEntry) {
         // no-op
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.grails.datastore.gorm.events.ConfigurableApplicationEventPublisher;
 import io.micronaut.spring.core.event.ApplicationEventPublisherAdapter;
+import org.grails.datastore.gorm.events.ConfigurableApplicationEventPublisher;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.SmartApplicationListener;
@@ -41,37 +41,37 @@ public class ConfigurableEventPublisherAdapter extends ApplicationEventPublisher
 
     @Override
     public void addApplicationListener(ApplicationListener<?> listener) {
-        if(listener instanceof SmartApplicationListener) {
+        if (listener instanceof SmartApplicationListener) {
             SmartApplicationListener smartApplicationListener = (SmartApplicationListener) listener;
             Qualifier<ApplicationEventListener> qualifier = resolveQualifier(smartApplicationListener);
             this.applicationContext.registerSingleton(
-                    ApplicationEventListener.class,
-                    new ApplicationEventListener() {
-                        @Override
-                        public void onApplicationEvent(Object event) {
-                            if(event instanceof ApplicationEvent) {
-                                smartApplicationListener.onApplicationEvent((ApplicationEvent) event);
-                            }
+                ApplicationEventListener.class,
+                new ApplicationEventListener() {
+                    @Override
+                    public void onApplicationEvent(Object event) {
+                        if (event instanceof ApplicationEvent) {
+                            smartApplicationListener.onApplicationEvent((ApplicationEvent) event);
                         }
+                    }
 
-                        @Override
-                        public boolean supports(Object event) {
-                            if(event instanceof ApplicationEvent) {
-                                ApplicationEvent applicationEvent = (ApplicationEvent) event;
+                    @Override
+                    public boolean supports(Object event) {
+                        if (event instanceof ApplicationEvent) {
+                            ApplicationEvent applicationEvent = (ApplicationEvent) event;
 
-                                Object source = applicationEvent.getSource();
-                                return smartApplicationListener.supportsEventType(applicationEvent.getClass())
-                                        && (source == null || smartApplicationListener.supportsSourceType(source.getClass()));
-                            }
-                            return false;
+                            Object source = applicationEvent.getSource();
+                            return smartApplicationListener.supportsEventType(applicationEvent.getClass())
+                                && (source == null || smartApplicationListener.supportsSourceType(source.getClass()));
                         }
+                        return false;
+                    }
 
-                        @Override
-                        public String toString() {
-                            return "Adapted: " + smartApplicationListener;
-                        }
-                    },
-                    qualifier
+                    @Override
+                    public String toString() {
+                        return "Adapted: " + smartApplicationListener;
+                    }
+                },
+                qualifier
             );
 
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.client.reactor;
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
@@ -36,9 +33,10 @@ import javax.inject.Singleton;
 @Singleton
 @Requires(classes = Mono.class)
 public class ReactorReactiveClientResultTransformer implements ReactiveClientResultTransformer {
+
     @Override
     public Object transform(
-            Object publisherResult) {
+        Object publisherResult) {
         if (publisherResult instanceof Mono) {
             Mono<?> maybe = (Mono) publisherResult;
             // add 404 handling for maybe
@@ -55,14 +53,14 @@ public class ReactorReactiveClientResultTransformer implements ReactiveClientRes
             Flux<?> flux = (Flux) publisherResult;
 
             return flux.onErrorResume(throwable -> {
-                        if (throwable instanceof HttpClientResponseException) {
-                            HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                            if (responseException.getStatus() == HttpStatus.NOT_FOUND) {
-                                return Flux.empty();
-                            }
+                    if (throwable instanceof HttpClientResponseException) {
+                        HttpClientResponseException responseException = (HttpClientResponseException) throwable;
+                        if (responseException.getStatus() == HttpStatus.NOT_FOUND) {
+                            return Flux.empty();
                         }
-                        return Flux.error(throwable);
                     }
+                    return Flux.error(throwable);
+                }
             );
         } else {
             return publisherResult;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ package io.micronaut.inject;
  * @author graemerocher
  * @since 1.0
  */
-public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T,R> {
+public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T, R> {
 
     /**
      * @return The {@link BeanDefinition} associated with this method
@@ -32,7 +32,7 @@ public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T,
      * Create a {@link BeanDefinitionMethodReference} for the given {@link BeanDefinition} and {@link ExecutableMethod}
      *
      * @param definition The definition
-     * @param method The method
+     * @param method     The method
      * @param <T1>
      * @param <R1>
      * @return The {@link BeanDefinitionMethodReference}

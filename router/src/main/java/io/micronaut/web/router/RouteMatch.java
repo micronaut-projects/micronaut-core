@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.web.router;
 
@@ -19,14 +19,13 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.MediaType;
-import io.micronaut.inject.MethodExecutionHandle;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -38,6 +37,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
+
     /**
      * @return The variable values following a successful match
      */
@@ -70,6 +70,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
 
     /**
      * Return whether the given named input is required by this route
+     *
      * @param name The name of the input
      * @return True if it is
      */
@@ -82,10 +83,10 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
 
     /**
      * The media types able to produced by this route
+     *
      * @return A list of {@link MediaType} that this route can produce
      */
     List<MediaType> getProduces();
-
 
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
@@ -127,13 +128,13 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
 
     /**
      * Return whether the given named input is required by this route
+     *
      * @param name The name of the input
      * @return True if it is
      */
     default boolean isRequiredInput(String name) {
         return getRequiredInput(name).isPresent();
     }
-
 
     /**
      * Whether the specified content type is an accepted type

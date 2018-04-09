@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,8 @@ public class CatalogEntry extends NodeEntry {
 
     /**
      * Create a new catalog entry
-     * @param nodeId The node ID
+     *
+     * @param nodeId  The node ID
      * @param address The node address
      */
     @JsonCreator
@@ -60,7 +61,7 @@ public class CatalogEntry extends NodeEntry {
     }
 
     /**
-     * https://www.consul.io/api/catalog.html#service
+     * See https://www.consul.io/api/catalog.html#service
      *
      * @return The service
      */
@@ -68,12 +69,21 @@ public class CatalogEntry extends NodeEntry {
         return Optional.ofNullable(service);
     }
 
+    /**
+     * See https://www.consul.io/api/catalog.html#service
+     *
+     * @param service The service
+     */
+    public void setService(NewServiceEntry service) {
+        this.service = service;
+    }
+
+    /**
+     * @param service The service
+     * @return The {@link CatalogEntry} instance
+     */
     public CatalogEntry service(NewServiceEntry service) {
         this.service = service;
         return this;
-    }
-
-    public void setService(NewServiceEntry service) {
-        this.service = service;
     }
 }

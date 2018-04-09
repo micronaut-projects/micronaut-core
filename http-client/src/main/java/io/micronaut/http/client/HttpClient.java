@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,33 +16,18 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.context.LifeCycle;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A non-blocking HTTP client interface designed around the Micronaut API and Reactive Streams.
@@ -51,7 +36,6 @@ import java.util.function.Function;
  * @since 1.0
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
-
 
     /**
      * @return A blocking HTTP client suitable for testing and non-production scenarios.
@@ -132,20 +116,18 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      */
     default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         return Publishers.map(exchange(request, bodyType), response -> {
-            if(bodyType.getType() == HttpStatus.class) {
+            if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
-            }
-            else {
+            } else {
                 Optional<O> body = response.getBody();
                 return body
-                        .orElseThrow(() -> new HttpClientResponseException(
-                                "Empty body",
-                                response
-                        ));
+                    .orElseThrow(() -> new HttpClientResponseException(
+                        "Empty body",
+                        response
+                    ));
             }
         });
     }
-
 
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
@@ -200,6 +182,4 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     static HttpClient create(URL url) {
         return new DefaultHttpClient(url);
     }
-
-
 }

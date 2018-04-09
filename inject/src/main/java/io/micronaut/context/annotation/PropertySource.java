@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 /**
  * <p>An annotation that can be used on either the main class or a test to provide additional hard coded
  * property values to the {@link Environment}</p>
- *
+ * <p>
  * <p>These properties are added at a high priority level and override all properties except CLI properties</p>
  *
  * @author graemerocher

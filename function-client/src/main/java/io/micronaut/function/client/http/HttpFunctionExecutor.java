@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package io.micronaut.function.client.http;
 
-import io.micronaut.function.client.FunctionDefinition;
-import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -50,44 +48,41 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class HttpFunctionExecutor<I,O>  implements FunctionInvoker<I,O>, Closeable, FunctionInvokerChooser {
+public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
     private final DefaultHttpClient httpClient;
 
     public HttpFunctionExecutor(HttpClientConfiguration configuration, NettyClientSslBuilder nettyClientSslBuilder, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         super();
         this.httpClient = new DefaultHttpClient(
-                LoadBalancer.empty(),
-                configuration,
-                nettyClientSslBuilder,
-                codecRegistry,
-                filters
+            LoadBalancer.empty(),
+            configuration,
+            nettyClientSslBuilder,
+            codecRegistry,
+            filters
         );
     }
 
     @Override
     public O invoke(FunctionDefinition definition, I input, Argument<O> outputType) {
         Optional<URI> opt = definition.getURI();
-        if(!opt.isPresent()) {
+        if (!opt.isPresent()) {
             throw new FunctionNotFoundException(definition.getName());
-        }
-        else {
+        } else {
             URI uri = opt.get();
             HttpRequest request;
-            if(input == null) {
+            if (input == null) {
                 request = HttpRequest.GET(uri.toString());
-            }
-            else {
+            } else {
                 request = HttpRequest.POST(uri.toString(), input);
             }
-            if(Publishers.isConvertibleToPublisher(outputType.getType())) {
+            if (Publishers.isConvertibleToPublisher(outputType.getType())) {
                 Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(()->
-                        new FunctionExecutionException("Unsupported Reactive type: " + outputType.getType())
+                return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(() ->
+                    new FunctionExecutionException("Unsupported Reactive type: " + outputType.getType())
                 );
-            }
-            else {
-                return (O)httpClient.toBlocking().retrieve(request, outputType);
+            } else {
+                return (O) httpClient.toBlocking().retrieve(request, outputType);
             }
         }
     }
@@ -95,8 +90,8 @@ public class HttpFunctionExecutor<I,O>  implements FunctionInvoker<I,O>, Closeab
     @SuppressWarnings("unchecked")
     @Override
     public <I1, O2> Optional<FunctionInvoker<I1, O2>> choose(FunctionDefinition definition) {
-        if(definition.getURI().isPresent()) {
-            return Optional.of( (FunctionInvoker)this);
+        if (definition.getURI().isPresent()) {
+            return Optional.of((FunctionInvoker) this);
         }
 
         return Optional.empty();

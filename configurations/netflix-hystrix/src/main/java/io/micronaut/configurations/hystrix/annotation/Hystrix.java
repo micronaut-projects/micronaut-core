@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
  */
 package io.micronaut.configurations.hystrix.annotation;
 
-import io.micronaut.context.annotation.Property;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.Property;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Used to configure default Hystrix settings at type level

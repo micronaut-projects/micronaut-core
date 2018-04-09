@@ -13,8 +13,14 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-
 package io.micronaut.discovery.eureka.client.v2;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.discovery.eureka.EurekaConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,23 +35,14 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.micronaut.discovery.eureka.EurekaConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * An AWS specific {@link DataCenterInfo} implementation.
- *
  * <p>
  * Gets AWS specific information for registration with eureka by making a HTTP
  * call to an AWS service as recommended by AWS.
  * </p>
  *
  * @author Karthik Ranganathan, Greg Kim
- *
  */
 public class AmazonInfo implements DataCenterInfo {
 
@@ -135,13 +132,11 @@ public class AmazonInfo implements DataCenterInfo {
         }
     }
 
-
     public static final class Builder {
         private static final Logger logger = LoggerFactory.getLogger(AmazonInfo.Builder.class);
         private static final int SLEEP_TIME_MS = 100;
 
         private AmazonInfo result;
-
 
         private Builder() {
             result = new AmazonInfo();
@@ -184,7 +179,7 @@ public class AmazonInfo implements DataCenterInfo {
                         }
                         URL url = key.getURL(null, mac);
                         Duration readTimeout = config.getReadTimeout().orElse(Duration.ofSeconds(10));
-                        String value = readEc2MetadataUrl(key, url, (int)readTimeout.toMillis(), (int)readTimeout.toMillis());
+                        String value = readEc2MetadataUrl(key, url, (int) readTimeout.toMillis(), (int) readTimeout.toMillis());
                         if (value != null) {
                             result.metadata.put(key.getName(), value);
                         }
@@ -206,12 +201,12 @@ public class AmazonInfo implements DataCenterInfo {
                 }
 
                 if (key == AmazonInfo.MetaDataKey.instanceId
-                        && config.getRegistration().isFailFast()
-                        && !result.metadata.containsKey(AmazonInfo.MetaDataKey.instanceId.getName())) {
+                    && config.getRegistration().isFailFast()
+                    && !result.metadata.containsKey(AmazonInfo.MetaDataKey.instanceId.getName())) {
 
                     logger.warn("Skipping the rest of AmazonInfo init as we were not able to load instanceId after " +
-                                    "the configured number of retries: {}, per fail fast configuration: {}",
-                            config.getRegistration().getRetryCount(), config.getRegistration().isFailFast());
+                            "the configured number of retries: {}, per fail fast configuration: {}",
+                        config.getRegistration().getRetryCount(), config.getRegistration().isFailFast());
                     break;  // break out of loop and return whatever we have thus far
                 }
             }
@@ -233,14 +228,14 @@ public class AmazonInfo implements DataCenterInfo {
      */
     @JsonCreator
     AmazonInfo(
-            @JsonProperty("name") String name,
-            @JsonProperty("metadata") HashMap<String, String> metadata) {
+        @JsonProperty("name") String name,
+        @JsonProperty("metadata") HashMap<String, String> metadata) {
         this.metadata = metadata;
     }
 
     AmazonInfo(
-            @JsonProperty("name") String name,
-            @JsonProperty("metadata") Map<String, String> metadata) {
+        @JsonProperty("name") String name,
+        @JsonProperty("metadata") Map<String, String> metadata) {
         this.metadata = metadata;
     }
 
@@ -262,8 +257,7 @@ public class AmazonInfo implements DataCenterInfo {
     /**
      * Set AWS metadata.
      *
-     * @param metadataMap
-     *            the map containing AWS metadata.
+     * @param metadataMap the map containing AWS metadata.
      */
     public void setMetadata(Map<String, String> metadataMap) {
         this.metadata = metadataMap;
@@ -272,8 +266,7 @@ public class AmazonInfo implements DataCenterInfo {
     /**
      * Gets the AWS metadata specified in {@link AmazonInfo.MetaDataKey}.
      *
-     * @param key
-     *            the metadata key.
+     * @param key the metadata key.
      * @return String returning the value.
      */
     public String get(AmazonInfo.MetaDataKey key) {
@@ -305,8 +298,8 @@ public class AmazonInfo implements DataCenterInfo {
     @Override
     public String toString() {
         return "AmazonInfo{" +
-                "metadata=" + metadata +
-                '}';
+            "metadata=" + metadata +
+            '}';
     }
 
     static String readEc2MetadataUrl(AmazonInfo.MetaDataKey metaDataKey, URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {

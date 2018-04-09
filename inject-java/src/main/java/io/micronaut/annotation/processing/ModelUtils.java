@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,47 @@
  */
 package io.micronaut.annotation.processing;
 
+import static javax.lang.model.element.Modifier.ABSTRACT;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.type.TypeKind.ARRAY;
+import static javax.lang.model.type.TypeKind.ERROR;
+import static javax.lang.model.type.TypeKind.NONE;
+import static javax.lang.model.type.TypeKind.VOID;
+
 import javax.inject.Inject;
-import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.NestingKind;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static javax.lang.model.element.Modifier.*;
-import static javax.lang.model.type.TypeKind.*;
-
 class ModelUtils {
+
     private final Elements elementUtils;
     private final Types typeUtils;
 
-    ModelUtils(Elements elementUtils,Types typeUtils) {
+    ModelUtils(Elements elementUtils, Types typeUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
     }
@@ -49,7 +72,7 @@ class ModelUtils {
         PackageElement packageElement = elementUtils.getPackageOf(typeElement);
 
         String packageName = packageElement.getQualifiedName().toString();
-        return elementBinaryName.toString().replaceFirst(packageName + "\\.","");
+        return elementBinaryName.toString().replaceFirst(packageName + "\\.", "");
     }
 
     Optional<ExecutableElement> findSetterMethodFor(Element field) {
@@ -68,9 +91,9 @@ class ModelUtils {
                     return
                         // it's not static
                         !modifiers.contains(STATIC)
-                        // it's either public or package visibility
-                        && modifiers.contains(PUBLIC)
-                        || !(modifiers.contains(PRIVATE) || modifiers.contains(PROTECTED));
+                            // it's either public or package visibility
+                            && modifiers.contains(PUBLIC)
+                            || !(modifiers.contains(PRIVATE) || modifiers.contains(PROTECTED));
                 }
                 return false;
             })
@@ -109,7 +132,6 @@ class ModelUtils {
         }
         return element.orElse(null);
     }
-
 
     List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
         List<ExecutableElement> ctors =
@@ -192,10 +214,9 @@ class ModelUtils {
 
     Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
-        if(type != null) {
+        if (type != null) {
             return resolveTypeReference(type);
-        }
-        else {
+        } else {
             return typeElement.getQualifiedName().toString();
         }
     }
@@ -218,11 +239,10 @@ class ModelUtils {
             }
         } else if (type.getKind() != VOID && type.getKind() != ERROR) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
-            if(typeElement != null) {
+            if (typeElement != null) {
                 result = resolveTypeReferenceForTypeElement(typeElement);
-            }
-            else if(type instanceof DeclaredType){
-                result = resolveTypeReferenceForTypeElement((TypeElement) ((DeclaredType)type).asElement());
+            } else if (type instanceof DeclaredType) {
+                result = resolveTypeReferenceForTypeElement((TypeElement) ((DeclaredType) type).asElement());
             }
         }
         return result;
@@ -234,7 +254,6 @@ class ModelUtils {
             || modifiers.contains(PROTECTED)
             || modifiers.contains(PRIVATE));
     }
-
 
     // FIXME review/test this
     boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, Element methodOrField) {
@@ -249,13 +268,13 @@ class ModelUtils {
     /**
      * Tests if candidate method is overriden from a given class or subclass
      *
-     * @param overridden the candidate overridden method
+     * @param overridden   the candidate overridden method
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
      * @return the overriding method
      */
     Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
-        for (ExecutableElement method: methods) {
+        for (ExecutableElement method : methods) {
             if (!method.equals(overridden) && method.getSimpleName().equals(overridden.getSimpleName())) {
                 return Optional.ofNullable(method);
             }
@@ -298,13 +317,13 @@ class ModelUtils {
 
     protected Object[] resolveTypeReferences(Stream<AnnotationMirror> mirrorStream) {
         return mirrorStream
-              .map(mirror ->
+            .map(mirror ->
                 resolveTypeReference(mirror.getAnnotationType())
-              ).toArray(Object[]::new);
+            ).toArray(Object[]::new);
     }
 
     public Object resolveTypeReference(Element element) {
-        if(element instanceof TypeElement) {
+        if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             return resolveTypeReferenceForTypeElement(typeElement);
         }
@@ -314,22 +333,20 @@ class ModelUtils {
     Object resolveTypeReferenceForTypeElement(TypeElement typeElement) {
         Name qualifiedName = typeElement.getQualifiedName();
         NestingKind nestingKind = typeElement.getNestingKind();
-        if( nestingKind == NestingKind.MEMBER) {
+        if (nestingKind == NestingKind.MEMBER) {
             TypeElement enclosingElement = typeElement;
             StringBuilder builder = new StringBuilder();
-            while(nestingKind == NestingKind.MEMBER) {
-                builder.insert(0,'$').insert(1,enclosingElement.getSimpleName());
+            while (nestingKind == NestingKind.MEMBER) {
+                builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
                 enclosingElement = (TypeElement) enclosingElement.getEnclosingElement();
                 nestingKind = enclosingElement.getNestingKind();
             }
             Name enclosingName = enclosingElement.getQualifiedName();
             return enclosingName.toString() + builder;
-        }
-        else {
+        } else {
             return qualifiedName.toString();
         }
     }
-
 
     public boolean isFinal(Element element) {
         return element.getModifiers().contains(FINAL);
@@ -337,6 +354,7 @@ class ModelUtils {
 
     /**
      * Is the given type mirror an optional
+     *
      * @param mirror The mirror
      * @return True if it is
      */

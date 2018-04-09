@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ public class ApplicationEventPublisherAdapter implements ApplicationEventPublish
     private final io.micronaut.context.event.ApplicationEventPublisher eventPublisher;
 
     public ApplicationEventPublisherAdapter(io.micronaut.context.event.ApplicationEventPublisher eventPublisher) {
-        if(eventPublisher == null) {
+        if (eventPublisher == null) {
             throw new IllegalArgumentException("Event publisher must be specified");
         }
         this.eventPublisher = eventPublisher;
