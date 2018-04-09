@@ -236,6 +236,18 @@ public class Publishers {
     }
 
     /**
+     * Is the given object a Publisher or convertible to a publisher
+     * @param object The object
+     * @return True if it is
+     */
+    public static boolean isConvertibleToPublisher(Object object) {
+        if(object == null) return false;
+        if(object instanceof Publisher) return true;
+        else {
+            return isConvertibleToPublisher(object.getClass());
+        }
+    }
+    /**
      * Does the given reactive type emit a single result
      *
      * @param type The type
