@@ -1,21 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.BeanType;
@@ -40,12 +39,11 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate ->{
-            if(beanType.isInterface()) {
+        return candidates.filter(candidate -> {
+            if (beanType.isInterface()) {
                 Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType);
                 return areTypesCompatible(classes);
-            }
-            else {
+            } else {
                 Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType);
                 return areTypesCompatible(classes);
             }
@@ -53,19 +51,17 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     }
 
     protected boolean areTypesCompatible(Class[] classes) {
-        if(classes.length == 0) {
+        if (classes.length == 0) {
             // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
-        }
-        else if(classes.length != typeArguments.length) {
+        } else if (classes.length != typeArguments.length) {
             return false;
-        }
-        else {
+        } else {
             for (int i = 0; i < classes.length; i++) {
                 Class left = classes[i];
                 Class right = typeArguments[i];
-                if(right == Object.class) continue;
-                if(left != right && !left.isAssignableFrom(right)) {
+                if (right == Object.class) continue;
+                if (left != right && !left.isAssignableFrom(right)) {
                     return false;
                 }
             }

@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.async.publisher;
 
@@ -24,7 +24,7 @@ import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
- * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to omit a single result
+ * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -53,6 +53,7 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
         private final Supplier<S> supplier;
         private Future<?> future; // to allow cancellation
         private boolean completed;
+
         ExecutorServiceSubscription(Subscriber<? super S> subscriber,
                                     Supplier<S> supplier,
                                     ExecutorService executor) {
@@ -60,6 +61,7 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
             this.supplier = supplier;
             this.executor = executor;
         }
+
         public synchronized void request(long n) {
             if (n != 0 && !completed) {
                 completed = true;
@@ -79,6 +81,7 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
                 }
             }
         }
+
         public synchronized void cancel() {
             completed = true;
             if (future != null) future.cancel(false);

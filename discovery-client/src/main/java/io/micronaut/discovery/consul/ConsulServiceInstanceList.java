@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package io.micronaut.discovery.consul;
 
-import io.micronaut.discovery.consul.client.v1.ConsulClient;
-import io.micronaut.discovery.consul.condition.RequiresConsul;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
@@ -24,13 +22,10 @@ import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
 
 import javax.inject.Singleton;
-import java.net.URI;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * <p>A {@link ServiceInstanceList} for Consul which reads from the {@link ConsulConfiguration}</p>
- *
+ * <p>
  * <p>The reason this is useful is if a {@link io.micronaut.runtime.context.scope.refresh.RefreshEvent} occurs then the
  * {@link ConsulConfiguration} will be updated and the backing list of {@link ServiceInstance} changed at runtime.</p>
  *

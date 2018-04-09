@@ -1,22 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.scheduling.executor;
 
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.util.ArgumentUtils;
 
@@ -33,8 +31,11 @@ import java.util.concurrent.ThreadFactory;
  * @since 1.0
  */
 @EachProperty(value = ExecutorConfiguration.PREFIX)
-public class UserExecutorConfiguration implements ExecutorConfiguration{
+public class UserExecutorConfiguration implements ExecutorConfiguration {
 
+    /**
+     * Number of available processors
+     */
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
     protected Optional<ExecutorType> type = Optional.of(ExecutorType.SCHEDULED);
@@ -76,6 +77,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration{
 
     /**
      * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
+     *
      * @param type The type
      * @return The configuration
      */
@@ -88,8 +90,10 @@ public class UserExecutorConfiguration implements ExecutorConfiguration{
 
     /**
      * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
+     *
      * @param type The type
-     * @param num The number of threads for {@link ExecutorType#FIXED} or the parallelism for {@link ExecutorType#WORK_STEALING} or the core pool size for {@link ExecutorType#SCHEDULED}
+     * @param num  The number of threads for {@link ExecutorType#FIXED} or the parallelism for
+     *             {@link ExecutorType#WORK_STEALING} or the core pool size for {@link ExecutorType#SCHEDULED}
      * @return The configuration
      */
     public static UserExecutorConfiguration of(ExecutorType type, int num) {
@@ -111,13 +115,16 @@ public class UserExecutorConfiguration implements ExecutorConfiguration{
 
     /**
      * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
-     * @param type The type
-     * @param num The number of threads for {@link ExecutorType#FIXED} or the parallelism for {@link ExecutorType#WORK_STEALING} or the core pool size for {@link ExecutorType#SCHEDULED}       * @param threadFactoryClass The thread factory class
+     *
+     * @param type               The type
+     * @param num                The number of threads for {@link ExecutorType#FIXED} or the parallelism for
+     *                           {@link ExecutorType#WORK_STEALING} or the core pool size for {@link ExecutorType#SCHEDULED}
+     * @param threadFactoryClass The thread factory class
      * @return The configuration
      */
     public static UserExecutorConfiguration of(ExecutorType type, int num, @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
         UserExecutorConfiguration configuration = of(type, num);
-        if(threadFactoryClass != null) {
+        if (threadFactoryClass != null) {
             configuration.threadFactoryClass = Optional.of(threadFactoryClass);
         }
         return configuration;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,15 @@
 package io.micronaut.runtime.server.event;
 
 import io.micronaut.context.event.ApplicationEvent;
-import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
  * An abstract event for events specific to server applications
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class AbstractServerApplicationEvent extends ApplicationEvent {
-
 
     /**
      * Constructs a prototypical Event.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,6 @@ package io.micronaut.health;
 
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.event.AbstractServerApplicationEvent;
-
-import java.util.Optional;
 
 /**
  * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration} that

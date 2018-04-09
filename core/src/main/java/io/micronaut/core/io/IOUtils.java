@@ -1,21 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.io;
 
-import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Blocking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +32,7 @@ import java.io.Reader;
 public class IOUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
+
     /**
      * Read the content of the BufferedReader and return it as a String in a blocking manner.
      * The BufferedReader is closed afterwards.
@@ -45,7 +45,7 @@ public class IOUtils {
     @Blocking
     public static String readText(BufferedReader reader) throws IOException {
         StringBuilder answer = new StringBuilder();
-        if(reader == null) {
+        if (reader == null) {
             return answer.toString();
         }
         // reading the content of the file within a char buffer
@@ -62,11 +62,11 @@ public class IOUtils {
             temp.close();
         } finally {
             try {
-                if(reader != null) {
+                if (reader != null) {
                     reader.close();
                 }
             } catch (IOException e) {
-                if(LOG.isWarnEnabled()) {
+                if (LOG.isWarnEnabled()) {
                     LOG.warn("Failed to close reader: " + e.getMessage(), e);
                 }
             }

@@ -1,21 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.hateos;
 
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
@@ -69,6 +68,7 @@ public class VndError extends AbstractResource<VndError> {
 
     /**
      * Sets the path
+     *
      * @param path The path
      * @return This error object
      */
@@ -79,6 +79,7 @@ public class VndError extends AbstractResource<VndError> {
 
     /**
      * Sets the logref
+     *
      * @param logref The logref
      * @return This error object
      */
@@ -90,10 +91,10 @@ public class VndError extends AbstractResource<VndError> {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        if(logref != null) {
+        if (logref != null) {
             builder.append('[').append(logref).append("] ");
         }
-        if(path != null) {
+        if (path != null) {
             builder.append(' ').append(path).append(" - ");
         }
         builder.append(message);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,6 @@
 package io.micronaut.management.health.monitor;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.health.indicator.HealthIndicator;
-import io.micronaut.management.health.indicator.HealthResult;
-import io.reactivex.Flowable;
-import io.reactivex.MaybeObserver;
-import io.reactivex.disposables.Disposable;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.health.CurrentHealthStatus;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
@@ -29,6 +23,9 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.annotation.Scheduled;
+import io.reactivex.Flowable;
+import io.reactivex.MaybeObserver;
+import io.reactivex.disposables.Disposable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,16 +57,17 @@ public class HealthMonitorTask {
         this.healthIndicators = healthIndicators;
     }
 
-    @Scheduled(fixedDelay = "${micronaut.health.monitor.interval:1m}",
-               initialDelay = "${micronaut.health.monitor.initialDelay:1m}")
+    @Scheduled(
+        fixedDelay = "${micronaut.health.monitor.interval:1m}",
+        initialDelay = "${micronaut.health.monitor.initialDelay:1m}")
     void monitor() {
 
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");
         }
         List<Publisher<HealthResult>> healthResults = Arrays.stream(healthIndicators)
-                .map(HealthIndicator::getResult)
-                .collect(Collectors.toList());
+            .map(HealthIndicator::getResult)
+            .collect(Collectors.toList());
 
         Flowable<HealthResult> resultFlowable = Flowable.merge(healthResults).filter(healthResult -> {
             HealthStatus status = healthResult.getStatus();
@@ -85,7 +83,7 @@ public class HealthMonitorTask {
             @Override
             public void onSuccess(HealthResult healthResult) {
                 HealthStatus status = healthResult.getStatus();
-                if(LOG.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     LOG.debug("Health monitor check failed with status {}", status);
                 }
                 currentHealthStatus.update(status);
@@ -93,7 +91,7 @@ public class HealthMonitorTask {
 
             @Override
             public void onError(Throwable e) {
-                if(LOG.isErrorEnabled()) {
+                if (LOG.isErrorEnabled()) {
                     LOG.error("Health monitor check failed with exception: " + e.getMessage(), e);
                 }
 
@@ -102,7 +100,7 @@ public class HealthMonitorTask {
 
             @Override
             public void onComplete() {
-                if(LOG.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     LOG.debug("Health monitor check passed.");
                 }
 

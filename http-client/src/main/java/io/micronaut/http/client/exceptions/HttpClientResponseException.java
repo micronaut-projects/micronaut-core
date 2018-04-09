@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.hateos.VndError;
 
 import java.util.Optional;
 
@@ -32,7 +28,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class HttpClientResponseException extends HttpClientException{
+public class HttpClientResponseException extends HttpClientException {
     private final HttpResponse<?> response;
 
     public HttpClientResponseException(String message, HttpResponse<?> response) {
@@ -50,10 +46,9 @@ public class HttpClientResponseException extends HttpClientException{
     @Override
     public String getMessage() {
         Optional<VndError> body = getResponse().getBody(VndError.class);
-        if(body.isPresent()) {
+        if (body.isPresent()) {
             return body.get().getMessage();
-        }
-        else {
+        } else {
             return super.getMessage();
         }
     }
@@ -74,7 +69,7 @@ public class HttpClientResponseException extends HttpClientException{
 
     private void initResponse(HttpResponse<?> response) {
         Optional<MediaType> contentType = response.getContentType();
-        if(contentType.isPresent() && contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
+        if (contentType.isPresent() && contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
             // initialize the body so it is available
             response.getBody(VndError.class);
         }

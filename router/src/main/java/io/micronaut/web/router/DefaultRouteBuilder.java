@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.web.router;
 
@@ -33,28 +33,18 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.RoutingException;
-import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.web.router.exceptions.RoutingException;
-import io.micronaut.core.naming.conventions.TypeConvention;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.uri.UriMatchInfo;
-import io.micronaut.http.uri.UriMatchTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -67,12 +57,13 @@ import java.util.stream.Collectors;
  */
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
-    protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
     /**
      * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used
      */
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
+
+    protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
     /**
      * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used
@@ -85,8 +76,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public String resolveUri(String property) {
-            if( StringUtils.isEmpty(property) ) return "/";
-            if(property.charAt(0) != '/') {
+            if (StringUtils.isEmpty(property)) return "/";
+            if (property.charAt(0) != '/') {
                 return '/' + NameUtils.hyphenate(property, true);
             }
             return property;
@@ -117,12 +108,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
-        if(executionHandleLocator instanceof ApplicationContext) {
+        if (executionHandleLocator instanceof ApplicationContext) {
             ApplicationContext applicationContext = (ApplicationContext) executionHandleLocator;
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.defaultCharset", Charset.class, StandardCharsets.UTF_8);
-        }
-        else {
+        } else {
             defaultCharset = StandardCharsets.UTF_8;
         }
     }
@@ -179,7 +169,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
-                new RoutingException("No such route: " + type.getName() + "." + method)
+            new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
         DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, executableHandle, conversionService);
@@ -187,13 +177,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return statusRoute;
     }
 
-
     @Override
     public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
-                new RoutingException("No such route: " + type.getName() + "." + method)
+            new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
         DefaultErrorRoute errorRoute = new DefaultErrorRoute(originatingClass, error, executableHandle, conversionService);
@@ -206,7 +195,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
-                new RoutingException("No such route: " + type.getName() + "." + method)
+            new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
         DefaultErrorRoute errorRoute = new DefaultErrorRoute(error, executableHandle, conversionService);
@@ -298,7 +287,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
-                new RoutingException("No such route: " + type.getName() + "." + method)
+            new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
         DefaultUriRoute route;
@@ -313,7 +302,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     abstract class AbstractRoute implements MethodBasedRoute {
-
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle targetMethod;
         protected final ConversionService<?> conversionService;
@@ -328,14 +316,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             Produces produces = targetMethod.getAnnotation(Produces.class);
             if (produces != null) {
                 this.producesMediaTypes = Arrays.stream(produces.value())
-                        .map(MediaType::new)
-                        .collect(Collectors.toList());
+                    .map(MediaType::new)
+                    .collect(Collectors.toList());
             }
         }
 
         @Override
         public Route consumes(MediaType... mediaTypes) {
-            if(mediaTypes != null) {
+            if (mediaTypes != null) {
                 this.acceptedMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
             }
             return this;
@@ -368,7 +356,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public Route produces(MediaType... mediaType) {
-            if(mediaType != null) {
+            if (mediaType != null) {
                 this.producesMediaTypes = Arrays.asList(mediaType);
             }
             return this;
@@ -474,14 +462,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             return builder.append(' ')
-                    .append(error.getName())
-                    .append(" -> ")
-                    .append(targetMethod.getDeclaringType().getSimpleName())
-                    .append('#')
-                    .append(targetMethod)
-                    .toString();
-
+                .append(error.getName())
+                .append(" -> ")
+                .append(targetMethod.getDeclaringType().getSimpleName())
+                .append('#')
+                .append(targetMethod)
+                .toString();
         }
+
         @Override
         public int compareTo(ErrorRoute o) {
             if (o == this) {
@@ -526,7 +514,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             }
             return Optional.empty();
         }
-
 
         @Override
         public StatusRoute consumes(MediaType... mediaType) {
@@ -595,21 +582,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.uriMatchTemplate = uriTemplate;
         }
 
-
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder(httpMethod);
             return builder.append(' ')
-                    .append(uriMatchTemplate)
-                    .append(" -> ")
-                    .append(targetMethod.getDeclaringType().getSimpleName())
-                    .append('#')
-                    .append(targetMethod)
-                    .append(" (")
-                    .append(acceptedMediaTypes.stream().collect(Collectors.joining(",")))
-                    .append(" )")
-                    .toString();
-
+                .append(uriMatchTemplate)
+                .append(" -> ")
+                .append(targetMethod.getDeclaringType().getSimpleName())
+                .append('#')
+                .append(targetMethod)
+                .append(" (")
+                .append(acceptedMediaTypes.stream().collect(Collectors.joining(",")))
+                .append(" )")
+                .toString();
         }
 
         @Override
@@ -692,7 +677,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type);
             routeMap.put(
-                    HttpMethod.GET, getRoute
+                HttpMethod.GET, getRoute
             );
             return getRoute;
         }
@@ -701,19 +686,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
             // POST /foo
             routeMap.put(
-                    HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
+                HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
             );
             // DELETE /foo
             routeMap.put(
-                    HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type)
+                HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type)
             );
             // PATCH /foo
             routeMap.put(
-                    HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type)
+                HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type)
             );
             // PUT /foo
             routeMap.put(
-                    HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type)
+                HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type)
             );
         }
     }
@@ -738,7 +723,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ResourceRoute consumes(MediaType... mediaTypes) {
-            if(mediaTypes != null) {
+            if (mediaTypes != null) {
                 for (Route route : resourceRoutes.values()) {
                     route.produces(mediaTypes);
                 }
@@ -773,7 +758,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ResourceRoute produces(MediaType... mediaType) {
-            if(mediaType != null) {
+            if (mediaType != null) {
                 for (Route route : resourceRoutes.values()) {
                     route.produces(mediaType);
                 }
@@ -792,7 +777,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return handleExclude(excluded);
         }
 
-
         @Override
         public ResourceRoute exclude(HttpMethod... methods) {
             return handleExclude(Arrays.asList(methods));
@@ -805,7 +789,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type, ID);
             routeMap.put(
-                    HttpMethod.GET, getRoute
+                HttpMethod.GET, getRoute
             );
             return getRoute;
         }
@@ -813,23 +797,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
             // GET /foo
             routeMap.put(
-                    HttpMethod.GET, DefaultRouteBuilder.this.GET(type)
+                HttpMethod.GET, DefaultRouteBuilder.this.GET(type)
             );
             // POST /foo
             routeMap.put(
-                    HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
+                HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
             );
             // DELETE /foo/1
             routeMap.put(
-                    HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type, ID)
+                HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type, ID)
             );
             // PATCH /foo/1
             routeMap.put(
-                    HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type, ID)
+                HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type, ID)
             );
             // PUT /foo/1
             routeMap.put(
-                    HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type, ID)
+                HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type, ID)
             );
         }
 

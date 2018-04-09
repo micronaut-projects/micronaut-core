@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty;
 
@@ -21,30 +21,25 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.cookies.NettyCookie;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.*;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.netty.cookies.NettyCookie;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,6 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
+
     private static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
     protected FullHttpResponse nettyResponse;
@@ -85,12 +81,11 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public Optional<MediaType> getContentType() {
         Optional<MediaType> contentType = MutableHttpResponse.super.getContentType();
-        if(contentType.isPresent()) {
+        if (contentType.isPresent()) {
             return contentType;
-        }
-        else {
+        } else {
             Optional<B> body = getBody();
-            if(body.isPresent()) {
+            if (body.isPresent()) {
                 return MediaType.fromType(body.get().getClass());
             }
         }
@@ -140,8 +135,8 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     public <T> Optional<T> getBody(Argument<T> type) {
         return convertedBodies.computeIfAbsent(type.getType(), aClass -> getBody().flatMap(b -> {
             ArgumentConversionContext<T> context = ConversionContext.of(type);
-            if(b instanceof ByteBuffer) {
-                return conversionService.convert(((ByteBuffer)b).asNativeBuffer(), context);
+            if (b instanceof ByteBuffer) {
+                return conversionService.convert(((ByteBuffer) b).asNativeBuffer(), context);
             }
             return conversionService.convert(b, context);
         }));
@@ -190,12 +185,13 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     public static NettyHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
         Attribute<NettyHttpResponse> attr = request.attr(KEY);
         NettyHttpResponse nettyHttpResponse = attr.get();
-        if(nettyHttpResponse == null) {
-            nettyHttpResponse = (NettyHttpResponse)alternative;
+        if (nettyHttpResponse == null) {
+            nettyHttpResponse = (NettyHttpResponse) alternative;
             attr.set(nettyHttpResponse);
         }
         return nettyHttpResponse;
     }
+
     /**
      * Lookup the response from the request
      *

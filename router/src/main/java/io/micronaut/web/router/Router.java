@@ -1,25 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.*;
 import io.micronaut.http.filter.HttpFilter;
 import org.reactivestreams.Publisher;
 
@@ -36,8 +34,6 @@ import java.util.stream.Stream;
  */
 public interface Router {
 
-
-
     /**
      * Find any {@link RouteMatch} regardless of HTTP method
      *
@@ -50,13 +46,14 @@ public interface Router {
      * Finds all of the possible routes for the given HTTP method and URI
      *
      * @param httpMethod The HTTP method
-     * @param uri The URI
+     * @param uri        The URI
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri);
 
     /**
      * Returns all UriRoutes
+     *
      * @return A {@link Stream} of all registered {@link UriRoute} instances.
      */
     Stream<UriRoute> uriRoutes();
@@ -65,7 +62,7 @@ public interface Router {
      * Finds the first possible route for the given HTTP method and URI
      *
      * @param httpMethod The HTTP method
-     * @param uri The URI
+     * @param uri        The URI
      * @return The route match
      */
     <T> Optional<UriRouteMatch<T>> route(HttpMethod httpMethod, CharSequence uri);
@@ -82,7 +79,7 @@ public interface Router {
      * Match a route to an error
      *
      * @param error The error
-     * @param <T> The matched route
+     * @param <T>   The matched route
      * @return The {@link RouteMatch}
      */
     <T> Optional<RouteMatch<T>> route(Throwable error);
@@ -91,8 +88,8 @@ public interface Router {
      * Match a route to an error
      *
      * @param originatingClass The class the error originates from
-     * @param error The error
-     * @param <T> The matched route
+     * @param error            The error
+     * @param <T>              The matched route
      * @return The {@link RouteMatch}
      */
     <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error);
@@ -104,8 +101,9 @@ public interface Router {
      * @return A new filtered publisher
      */
     List<HttpFilter> findFilters(
-            HttpRequest<?> request
+        HttpRequest<?> request
     );
+
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
      *
@@ -135,6 +133,7 @@ public interface Router {
     default <T> Optional<UriRouteMatch<T>> PUT(CharSequence uri) {
         return route(HttpMethod.PUT, uri);
     }
+
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#PATCH} method and the given URI
      *
@@ -144,13 +143,14 @@ public interface Router {
     default <T> Optional<UriRouteMatch<T>> PATCH(CharSequence uri) {
         return route(HttpMethod.PATCH, uri);
     }
+
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#DELETE} method and the given URI
      *
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T> Optional<UriRouteMatch<T>> DELETE(CharSequence uri){
+    default <T> Optional<UriRouteMatch<T>> DELETE(CharSequence uri) {
         return route(HttpMethod.DELETE, uri);
     }
 
@@ -170,21 +170,18 @@ public interface Router {
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T> Optional<UriRouteMatch<T>> HEAD(CharSequence uri){
+    default <T> Optional<UriRouteMatch<T>> HEAD(CharSequence uri) {
         return route(HttpMethod.HEAD, uri);
     }
-
-
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI
      *
      * @param httpMethod The HTTP method
-     * @param uri The URI
+     * @param uri        The URI
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     default <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, URI uri) {
         return find(httpMethod, uri.toString());
     }
-
 }

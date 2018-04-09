@@ -1,15 +1,30 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.ast.groovy.utils
 
+import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse
+
 import groovy.transform.CompileStatic
+import io.micronaut.core.annotation.Internal
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.Parameter
-import io.micronaut.core.annotation.Internal
 
 import javax.inject.Inject
-
-import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse
 
 /**
  * General utility methods for AST transforms
@@ -19,11 +34,26 @@ import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecR
  */
 @CompileStatic
 class AstUtils {
-    public static final Parameter[] ZERO_PARAMETERS = new Parameter[0]
-    public static final ClassNode[] EMPTY_CLASS_ARRAY = new ClassNode[0]
-    public static final ClassNode INTERNAL_ANNOTATION = ClassHelper.make(Internal)
-    public static final ClassNode INJECT_ANNOTATION = ClassHelper.make(Inject)
 
+    /**
+     * Zero parameter
+     */
+    public static final Parameter[] ZERO_PARAMETERS = new Parameter[0]
+
+    /**
+     * Empty class node array
+     */
+    public static final ClassNode[] EMPTY_CLASS_ARRAY = new ClassNode[0]
+
+    /**
+     * Internal annotation
+     */
+    public static final ClassNode INTERNAL_ANNOTATION = ClassHelper.make(Internal)
+
+    /**
+     * Inject annotation
+     */
+    public static final ClassNode INJECT_ANNOTATION = ClassHelper.make(Inject)
 
     static Parameter[] copyParameters(Parameter[] parameterTypes) {
         return copyParameters(parameterTypes, null)
@@ -52,7 +82,6 @@ class AstUtils {
         return newParameterTypes
     }
 
-
     static ClassNode replaceGenericsPlaceholders(ClassNode type, Map<String, ClassNode> genericsPlaceholders) {
         return replaceGenericsPlaceholders(type, genericsPlaceholders, null)
     }
@@ -66,14 +95,14 @@ class AstUtils {
             return type.getPlainNodeReference()
         }
 
-        if(type.isGenericsPlaceHolder() && genericsPlaceholders != null) {
+        if (type.isGenericsPlaceHolder() && genericsPlaceholders != null) {
             final ClassNode placeHolderType
-            if(genericsPlaceholders.containsKey(type.getUnresolvedName())) {
+            if (genericsPlaceholders.containsKey(type.getUnresolvedName())) {
                 placeHolderType = genericsPlaceholders.get(type.getUnresolvedName())
             } else {
                 placeHolderType = defaultPlaceholder
             }
-            if(placeHolderType != null) {
+            if (placeHolderType != null) {
                 return placeHolderType.getPlainNodeReference()
             } else {
                 return ClassHelper.make(Object.class).getPlainNodeReference()
@@ -82,12 +111,12 @@ class AstUtils {
 
         final ClassNode nonGen = type.getPlainNodeReference()
 
-        if("java.lang.Object".equals(type.getName())) {
+        if ("java.lang.Object".equals(type.getName())) {
             nonGen.setGenericsPlaceHolder(false)
             nonGen.setGenericsTypes(null)
             nonGen.setUsingGenerics(false)
         } else {
-            if(type.isUsingGenerics()) {
+            if (type.isUsingGenerics()) {
                 GenericsType[] parameterized = type.getGenericsTypes()
                 if (parameterized != null && parameterized.length > 0) {
                     GenericsType[] copiedGenericsTypes = new GenericsType[parameterized.length]
@@ -96,7 +125,7 @@ class AstUtils {
                         GenericsType copiedGenericsType = null
                         if (parameterizedType.isPlaceholder() && genericsPlaceholders != null) {
                             ClassNode placeHolderType = genericsPlaceholders.get(parameterizedType.getName())
-                            if(placeHolderType != null) {
+                            if (placeHolderType != null) {
                                 copiedGenericsType = new GenericsType(placeHolderType.getPlainNodeReference())
                             } else {
                                 copiedGenericsType = new GenericsType(ClassHelper.make(Object.class).getPlainNodeReference())

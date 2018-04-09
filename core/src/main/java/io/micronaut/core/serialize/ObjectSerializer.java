@@ -1,25 +1,28 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.serialize;
 
 import io.micronaut.core.serialize.exceptions.SerializationException;
-import io.micronaut.core.serialize.exceptions.SerializationException;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Optional;
 
 /**
@@ -38,19 +41,20 @@ public interface ObjectSerializer {
     /**
      * Serialize the given object to a byte[]
      *
-     * @param object The object to serialize
+     * @param object       The object to serialize
      * @param outputStream The output stream
      */
     void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException;
 
     /**
      * Deserialize the given object to bytes
-     * @param inputStream The input stream
+     *
+     * @param inputStream  The input stream
      * @param requiredType The required type
-     * @param <T> The required generic type
+     * @param <T>          The required generic type
      * @return An {@link Optional} of the object
      */
-    <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException ;
+    <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException;
 
     /**
      * Serialize the given object to a byte[]
@@ -58,8 +62,8 @@ public interface ObjectSerializer {
      * @param object The object to serialize
      * @return An optional of the bytes of the object
      */
-    default Optional<byte[]> serialize(@Nullable Object object) throws SerializationException  {
-        if(object == null) return Optional.empty();
+    default Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
+        if (object == null) return Optional.empty();
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         serialize(object, outputStream);
@@ -68,28 +72,31 @@ public interface ObjectSerializer {
 
     /**
      * Deserialize the given object to bytes
-     * @param bytes The byte array
+     *
+     * @param bytes        The byte array
      * @param requiredType The required type
-     * @param <T> The required generic type
+     * @param <T>          The required generic type
      * @return An {@link Optional} of the object
      */
     default <T> Optional<T> deserialize(@Nullable byte[] bytes, Class<T> requiredType) throws SerializationException {
-        if(bytes == null) return Optional.empty();
+        if (bytes == null) return Optional.empty();
         try {
-            try(ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
+            try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
                 return deserialize(input, requiredType);
             }
         } catch (IOException e) {
             throw new SerializationException("I/O error occurred during deserialization: " + e.getMessage(), e);
         }
     }
+
     /**
      * Deserialize the given object to bytes
+     *
      * @param bytes The byte array
      * @return An {@link Optional} of the object
      */
     default Optional<Object> deserialize(@Nullable byte[] bytes) throws SerializationException {
-        if(bytes == null) return Optional.empty();
+        if (bytes == null) return Optional.empty();
         return deserialize(bytes, Object.class);
     }
 }

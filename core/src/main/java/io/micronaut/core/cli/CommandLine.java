@@ -1,26 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.cli;
 
-/**
- * Utility class for parsing command line arguments
- *
- * @author Graeme Rocher
- * @since 1.0
- */
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -46,7 +40,6 @@ public interface CommandLine {
      */
     List<String> getRemainingArgs();
 
-
     /**
      * @return The system properties specified
      */
@@ -65,6 +58,7 @@ public interface CommandLine {
 
     /**
      * The value of an option
+     *
      * @param name The option
      * @return The value
      */
@@ -92,6 +86,7 @@ public interface CommandLine {
 
     /**
      * Parses a new {@link CommandLine} instance that combines this instance with the given arguments
+     *
      * @param args The arguments
      * @return A new {@link CommandLine} instance
      */
@@ -111,7 +106,7 @@ public interface CommandLine {
         /**
          * Add an option
          *
-         * @param name The name
+         * @param name        The name
          * @param description The description
          * @return This builder
          */
@@ -151,8 +146,8 @@ public interface CommandLine {
      * @param args The arguments
      * @return The command line
      */
-    static CommandLine parse(String...args) {
-        if(args == null || args.length == 0) {
+    static CommandLine parse(String... args) {
+        if (args == null || args.length == 0) {
             return new DefaultCommandLine();
         }
         return new CommandLineParser().parse(args);

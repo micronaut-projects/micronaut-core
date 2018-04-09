@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,12 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface DelegatingExecutableMethod<T,R> extends ExecutableMethod<T,R> {
+public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R> {
 
     /**
      * @return The target
      */
-    ExecutableMethod<T,R> getTarget();
+    ExecutableMethod<T, R> getTarget();
 
     @Override
     default Method getTargetMethod() {

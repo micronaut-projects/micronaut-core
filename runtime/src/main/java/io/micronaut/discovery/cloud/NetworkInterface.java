@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,9 @@ import java.io.Serializable;
  *
  * @author rvanderwerf
  * @author Graeme Rocher
- *
  * @since 1.0
  */
-public class NetworkInterface implements Serializable
-{
+public class NetworkInterface implements Serializable {
     private String ipv4;
     private String ipv6;
     private String name;

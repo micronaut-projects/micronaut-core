@@ -1,6 +1,5 @@
-package io.micronaut.web.router.exceptions;
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +13,8 @@ package io.micronaut.web.router.exceptions;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.web.router.exceptions;
+
 import io.micronaut.web.router.UriRouteMatch;
 
 import java.util.List;
@@ -41,10 +42,10 @@ public class DuplicateRouteException extends RoutingException {
     private static String buildMessage(String uri, List<UriRouteMatch<Object>> uriRoutes) {
         StringBuilder message = new StringBuilder("More than 1 route matched the incoming request. The following routes matched ");
         message.append(uri).append(": ");
-        message.append(uriRoutes.stream()
-                .map((uriRouteMatch -> uriRouteMatch.getTargetMethod().toString()))
-                .collect(Collectors.joining(", ")));
+        message.append(uriRoutes
+            .stream()
+            .map((uriRouteMatch -> uriRouteMatch.getTargetMethod().toString()))
+            .collect(Collectors.joining(", ")));
         return message.toString();
     }
-
 }
