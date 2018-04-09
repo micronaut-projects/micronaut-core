@@ -23,7 +23,7 @@ import java.util.Optional;
 
 /**
  * Converts String's to readable bytes
- *ƒ
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

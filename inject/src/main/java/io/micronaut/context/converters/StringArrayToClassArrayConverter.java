@@ -24,7 +24,7 @@ import java.util.Optional;
 
 /**
  * Converts a String[] to a Class[]
- * ƒ
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
