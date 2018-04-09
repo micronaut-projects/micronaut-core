@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- *
  * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}
  *
  * @author Graeme Rocher
@@ -64,10 +63,10 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private final B body;
 
     FullNettyClientHttpResponse(
-            FullHttpResponse fullHttpResponse,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
-            Argument<B> bodyType, boolean errorStatus) {
+        FullHttpResponse fullHttpResponse,
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
+        Argument<B> bodyType, boolean errorStatus) {
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
@@ -75,14 +74,12 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
-        if(rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
+        if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
-        }
-        else {
+        } else {
             this.body = null;
         }
     }
-
 
     @Override
     public String reason() {
@@ -131,23 +128,23 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-                    Optional<B> existing = getBody();
-                    if (existing.isPresent()) {
-                        return getBody().flatMap(b -> {
-                            if (b instanceof ByteBuffer) {
-                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
-                                return convertByteBuf(bytebuf, argument);
-                            }
-                            return ConversionService.SHARED.convert(b, ConversionContext.of(type));
-                        });
-                    } else {
-                        ByteBuf content = fullResponse.content();
-                        return convertByteBuf(content, type);
-                    }
+                Optional<B> existing = getBody();
+                if (existing.isPresent()) {
+                    return getBody().flatMap(b -> {
+                        if (b instanceof ByteBuffer) {
+                            ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                            return convertByteBuf(bytebuf, argument);
+                        }
+                        return ConversionService.SHARED.convert(b, ConversionContext.of(type));
+                    });
+                } else {
+                    ByteBuf content = fullResponse.content();
+                    return convertByteBuf(content, type);
                 }
+            }
 
         );
-        if(LOG.isTraceEnabled() && !result.isPresent()) {
+        if (LOG.isTraceEnabled() && !result.isPresent()) {
             LOG.trace("Unable to convert response body to target type {}", type.getType());
         }
         return result;
@@ -156,7 +153,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
-            if(LOG.isTraceEnabled()) {
+            if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
             }
             return Optional.empty();
@@ -173,8 +170,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                     return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
                 }
             }
-        }
-        else if(!hasContentType && LOG.isTraceEnabled()) {
+        } else if (!hasContentType && LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion

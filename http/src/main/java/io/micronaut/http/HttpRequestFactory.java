@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.CookieFactory;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.http.cookie.CookieFactory;
@@ -29,14 +28,13 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface HttpRequestFactory {
+
     /**
      * The default {@link CookieFactory} instance
      */
     Optional<HttpRequestFactory> INSTANCE = SoftServiceLoader.load(HttpRequestFactory.class)
-            .firstOr("io.micronaut.http.client.NettyClientHttpRequestFactory",
-                    HttpRequestFactory.class.getClassLoader()
-            )
-            .map(ServiceDefinition::load);
+        .firstOr("io.micronaut.http.client.NettyClientHttpRequestFactory", HttpRequestFactory.class.getClassLoader())
+        .map(ServiceDefinition::load);
 
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#GET} request for the given URI
@@ -89,15 +87,17 @@ public interface HttpRequestFactory {
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
      *
-     * @param uri The URI
+     * @param uri  The URI
      * @param body an optional body
      * @return The {@link MutableHttpRequest} instance
      */
     <T> MutableHttpRequest<T> delete(String uri, T body);
+
     /**
      * Create a new {@link MutableHttpRequest} for the given method and URI
+     *
      * @param httpMethod The method
-     * @param uri The URI
+     * @param uri        The URI
      * @param <T>
      * @return The request
      */

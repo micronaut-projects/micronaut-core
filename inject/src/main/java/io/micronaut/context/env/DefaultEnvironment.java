@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,13 +35,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -56,15 +69,16 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
+    protected final ClassPathResourceLoader resourceLoader;
+
     private static EnvironmentsAndPackage environmentsAndPackage;
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
-    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ClassPathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
@@ -93,16 +107,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
         specifiedNames.addAll(environmentsAndPackage.enviroments);
         Package aPackage = environmentsAndPackage.aPackage;
-        if(aPackage != null) {
+        if (aPackage != null) {
             packages.add(aPackage.getName());
         }
         this.classLoader = resourceLoader.getClassLoader();
         this.names = specifiedNames;
         conversionService.addConverter(
-                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-                Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -131,8 +145,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(),propertySource);
-        if(isRunning() && !reading.get()) {
+        propertySources.put(propertySource.getName(), propertySource);
+        if (isRunning() && !reading.get()) {
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
@@ -145,7 +159,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addPackage(String pkg) {
-        if(!this.packages.contains(pkg)) {
+        if (!this.packages.contains(pkg)) {
             this.packages.add(pkg);
         }
         return this;
@@ -153,7 +167,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addConfigurationExcludes(@Nullable String... names) {
-        if(names != null) {
+        if (names != null) {
             configurationExcludes.addAll(Arrays.asList(names));
         }
         return this;
@@ -161,7 +175,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addConfigurationIncludes(String... names) {
-        if(names != null) {
+        if (names != null) {
             configurationIncludes.addAll(Arrays.asList(names));
         }
         return this;
@@ -184,8 +198,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment start() {
-        if(running.compareAndSet(false, true)) {
-            if(reading.compareAndSet(false, true)) {
+        if (running.compareAndSet(false, true)) {
+            if (reading.compareAndSet(false, true)) {
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
             }
@@ -211,11 +225,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String,Object>[] copiedCatalog = copyCatalog();
+        Map<String, Object>[] copiedCatalog = copyCatalog();
         refresh();
         return diffCatalog(copiedCatalog, catalog);
     }
-
 
 
     @Override
@@ -238,6 +251,31 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;
+    }
+
+    @Override
+    public Optional<InputStream> getResourceAsStream(String path) {
+        return resourceLoader.getResourceAsStream(path);
+    }
+
+    @Override
+    public Optional<URL> getResource(String path) {
+        return resourceLoader.getResource(path);
+    }
+
+    @Override
+    public Stream<URL> getResources(String path) {
+        return resourceLoader.getResources(path);
+    }
+
+    @Override
+    public boolean supportsPrefix(String path) {
+        return resourceLoader.supportsPrefix(path);
+    }
+
+    @Override
+    public ResourceLoader forBase(String basePath) {
+        return resourceLoader.forBase(basePath);
     }
 
     /**
@@ -269,10 +307,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected List<PropertySource> readPropertySourceList(String name) {
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
-        if(propertySourceLoaders.isEmpty()) {
+        if (propertySourceLoaders.isEmpty()) {
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
-        }
-        else {
+        } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
                 if(LOG.isDebugEnabled()) {
                     LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
@@ -280,10 +317,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
             }
         }
-        if(!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
+        if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
         }
-        if(!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
+        if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
             propertySources.add(new EnvironmentPropertySource());
         }
         return propertySources;
@@ -295,6 +332,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     /**
      * Obtains the {@link PropertySourceLoader} instances
+     *
      * @return A collection of {@link PropertySourceLoader}
      */
     @Override
@@ -315,7 +353,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
         Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
         for (ServiceDefinition<PropertySourceLoader> definition : definitions) {
-            if(definition.isPresent()) {
+            if (definition.isPresent()) {
                 PropertySourceLoader loader = definition.load();
                 allLoaders.add(loader);
             }
@@ -352,24 +390,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> enviroments = environmentsAndPackage.enviroments;
         for (StackTraceElement stackTraceElement : stackTrace) {
             String methodName = stackTraceElement.getMethodName();
-            if(methodName.contains("$spock_")) {
+            if (methodName.contains("$spock_")) {
                 String className = stackTraceElement.getClassName();
                 String packageName = NameUtils.getPackageName(className);
                 environmentsAndPackage.aPackage = Package.getPackage(packageName);
                 enviroments.add(TEST);
-            }
-            else if("main".equals(methodName)) {
+            } else if ("main".equals(methodName)) {
                 String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
-                if(environmentsAndPackage.aPackage == null) {
+                if (environmentsAndPackage.aPackage == null) {
                     environmentsAndPackage.aPackage = Package.getPackage(packageName);
                 }
-            }
-            else {
+            } else {
                 String className = stackTraceElement.getClassName();
-                if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
+                if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
                     enviroments.add(TEST);
-                }
-                else if(className.startsWith("com.android")) {
+                } else if (className.startsWith("com.android")) {
                     enviroments.add(ANDROID);
                 }
             }
@@ -399,14 +434,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
 
         }
-        if(LOG.isInfoEnabled() && !enviroments.isEmpty()) {
+        if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
             LOG.info("Established active environments: {}", enviroments);
         }
 
         return environmentsAndPackage;
     }
-
-
 
     private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
@@ -415,14 +448,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             Map<String, Object> newMap = newCatalog[i];
             boolean hasNew = newMap != null;
             boolean hasOld = map != null;
-            if(!hasOld && hasNew) {
+            if (!hasOld && hasNew) {
                 changes.putAll(newMap);
-            }
-            else {
-                if(!hasNew && hasOld) {
+            } else {
+                if (!hasNew && hasOld) {
                     changes.putAll(map);
-                }
-                else if(hasOld && hasNew) {
+                } else if (hasOld && hasNew) {
                     diffMap(map, newMap, changes);
                 }
             }
@@ -434,20 +465,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         for (Map.Entry<String, Object> entry : newMap.entrySet()) {
             String key = entry.getKey();
             Object newValue = entry.getValue();
-            if(!map.containsKey(key)) {
+            if (!map.containsKey(key)) {
                 changes.put(key, newValue);
-            }
-            else {
+            } else {
                 Object oldValue = map.get(key);
                 boolean hasNew = newValue != null;
                 boolean hasOld = oldValue != null;
-                if(hasNew && !hasOld) {
+                if (hasNew && !hasOld) {
                     changes.put(key, null);
-                }
-                else if(hasOld && !hasNew) {
+                } else if (hasOld && !hasNew) {
                     changes.put(key, oldValue);
-                }
-                else if(hasNew && hasOld && !newValue.equals(oldValue)) {
+                } else if (hasNew && hasOld && !newValue.equals(oldValue)) {
                     changes.put(key, oldValue);
                 }
             }
@@ -458,52 +486,26 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Map<String, Object>[] newCatalog = new Map[catalog.length];
         for (int i = 0; i < catalog.length; i++) {
             Map<String, Object> entry = catalog[i];
-            if(entry != null) {
+            if (entry != null) {
                 newCatalog[i] = new LinkedHashMap<>(entry);
             }
         }
         return newCatalog;
     }
 
-    @Override
-    public Optional<InputStream> getResourceAsStream(String path) {
-        return resourceLoader.getResourceAsStream(path);
-    }
-
-    @Override
-    public Optional<URL> getResource(String path) {
-        return resourceLoader.getResource(path);
-    }
-
-    @Override
-    public Stream<URL> getResources(String path) {
-        return resourceLoader.getResources(path);
-    }
-
-    @Override
-    public boolean supportsPrefix(String path) {
-        return resourceLoader.supportsPrefix(path);
-    }
-
-    @Override
-    public ResourceLoader forBase(String basePath) {
-        return resourceLoader.forBase(basePath);
-    }
-
     private static ComputePlatform determineCloudProvider() {
-
         String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
-        if (computePlatform!=null) {
+        if (computePlatform != null) {
 
             try {
                 return ComputePlatform.valueOf(computePlatform);
             } catch (IllegalArgumentException e) {
-                throw new ConfigurationException("Illegal value specified for ["+ CLOUD_PLATFORM_PROPERTY +"]: " + computePlatform);
+                throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
             }
 
         }
         boolean isWindows = System.getProperty("os.name")
-                .toLowerCase().startsWith("windows");
+            .toLowerCase().startsWith("windows");
 
         if (isWindows) {
             if (isEC2Windows()) {
@@ -530,19 +532,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return ComputePlatform.BARE_METAL;
     }
 
-
-
     private static boolean isGoogleCompute() {
         try {
             URL url = new URL("http://metadata.google.internal");
-            HttpURLConnection con = (HttpURLConnection)url.openConnection();
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setReadTimeout(500);
             con.setConnectTimeout(500);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
             BufferedReader in = new BufferedReader(
-                    new InputStreamReader(con.getInputStream()));
+                new InputStreamReader(con.getInputStream()));
             String inputLine;
             StringBuffer response = new StringBuffer();
 
@@ -550,8 +550,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 response.append(inputLine);
             }
             in.close();
-            if (con.getHeaderField("Metadata-Flavor")!=null &&
-                    con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
+            if (con.getHeaderField("Metadata-Flavor") != null &&
+                con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
                 return true;
             }
 
@@ -562,7 +562,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isEC2Linux() {
-
         try {
             String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
             if (contents.startsWith("ec2")) {
@@ -612,8 +611,4 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Package aPackage;
         Set<String> enviroments = new HashSet<>(1);
     }
-
 }
-
-
-

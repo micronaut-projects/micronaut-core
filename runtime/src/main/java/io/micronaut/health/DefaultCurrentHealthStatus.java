@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Singleton
 class DefaultCurrentHealthStatus implements CurrentHealthStatus {
+
     private final AtomicReference<HealthStatus> current = new AtomicReference<>(HealthStatus.UP);
 
     @Override
@@ -35,7 +36,7 @@ class DefaultCurrentHealthStatus implements CurrentHealthStatus {
 
     @Override
     public HealthStatus update(HealthStatus newStatus) {
-        if(newStatus != null) {
+        if (newStatus != null) {
             return current.getAndSet(newStatus);
         }
         return current.get();

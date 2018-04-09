@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,17 +32,19 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
     private NettyCustomizableResponseTypeHandler[] handlers;
     private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
 
-    public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler...typeHandlers) {
+    public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler... typeHandlers) {
         this.handlers = typeHandlers;
     }
 
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
-        return Optional.ofNullable(handlerCache.computeIfAbsent(type,  (clazz) -> {
-            return Arrays.stream(handlers)
+        return Optional
+            .ofNullable(handlerCache.computeIfAbsent(type, (clazz) ->
+                Arrays
+                    .stream(handlers)
                     .filter(handler -> handler.supports(clazz))
                     .findFirst()
-                    .orElse(null);
-        }));
+                    .orElse(null))
+            );
     }
 }

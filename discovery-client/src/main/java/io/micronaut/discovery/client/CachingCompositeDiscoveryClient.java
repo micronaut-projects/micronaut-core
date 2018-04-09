@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,6 @@
  */
 package io.micronaut.discovery.client;
 
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.reactivex.Flowable;
 import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
@@ -27,6 +23,7 @@ import io.micronaut.discovery.CompositeDiscoveryClient;
 import io.micronaut.discovery.DefaultCompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.reactivex.Flowable;
 
 import java.util.List;
 

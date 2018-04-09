@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface DiscoveryClient extends Closeable, AutoCloseable, Described{
+public interface DiscoveryClient extends Closeable, AutoCloseable, Described {
 
     /**
      * Obtain a list of {@link ServiceInstance} for the given service id
+     *
      * @param serviceId The service id
      * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
      */
