@@ -15,84 +15,78 @@
  */
 package io.micronaut.docs.server.upload
 
-import okhttp3.MediaType
-import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
-import okhttp3.Response
-import io.micronaut.context.ApplicationContext
+import io.micronaut.AbstractMicronautSpec
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
-import spock.lang.Specification
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.multipart.MultipartBody
+import io.reactivex.Flowable
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class UploadSpec extends Specification {
-
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
+class UploadSpec extends AbstractMicronautSpec {
 
     void "test file upload"() {
         given:
-        OkHttpClient client = new OkHttpClient()
-        RequestBody body = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", "file.json",
-                    RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"}')
-                )
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
                 .build()
 
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/upload"))
-                .post(body)// <2>
-        Response response = client.newCall(request.build()).execute()
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload", body)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
-        expect:
+        then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == "Uploaded" // <2>
+        response.getBody().get() == "Uploaded"
     }
 
     void "test completed file upload"() {
         given:
-        OkHttpClient client = new OkHttpClient()
-        RequestBody body = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", "file.json",
-                RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"}')
-        )
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
                 .build()
 
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/upload/completed"))
-                .post(body)
-        Response response = client.newCall(request.build()).execute()
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/completed", body)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
-        expect:
+        then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == "Uploaded"
+        response.getBody().get() == "Uploaded"
     }
 
     void "test file bytes upload"() {
         given:
-        OkHttpClient client = new OkHttpClient()
-        RequestBody body = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", "file.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
-                .addFormDataPart("fileName", "bar")
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("fileName", "bar")
                 .build()
 
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/upload/bytes"))
-                .post(body)// <2>
-        Response response = client.newCall(request.build()).execute()
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/bytes", body)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
-        expect:
+        then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == "Uploaded"
+        response.getBody().get() == "Uploaded"
     }
 }
