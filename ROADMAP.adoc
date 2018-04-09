@@ -27,9 +27,9 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 
 We still need auto-configurations for the following:
 
-* Apache Kafka
-* Cassandra
-* RabbitMQ
+* Apache Kafka (ivan)
+* Cassandra (nero)
+* RabbitMQ (ben)
 
 ### Security / JWT Token Solution
 
