@@ -28,11 +28,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * Represents a completed part of a multipart request.
- *
- * When used as an argument to an {@link io.micronaut.http.annotation.Controller} instance method, the route
- * is not executed until the part has been fully received. Provides access to metadata about the file as
- * well as the contents.
+ * A Netty implementation of {@link CompletedFileUpload}
  *
  * @author Zachary Klein
  * @since 1.0
