@@ -49,6 +49,7 @@ class ConsulMockHealthStatusSpec extends Specification {
         )
         PollingConditions conditions = new PollingConditions()
         ConsulClient consulClient = application.getApplicationContext().getBean(ConsulClient)
+
         then:
         conditions.eventually {
             Flowable.fromPublisher(consulClient.getInstances(serviceId)).blockingFirst().size() == 1
