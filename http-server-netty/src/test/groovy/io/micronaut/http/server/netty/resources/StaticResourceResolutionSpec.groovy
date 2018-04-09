@@ -60,6 +60,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
 
         then:
+        file.exists()
         response.status == HttpStatus.OK
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
@@ -85,6 +86,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
 
         then:
+        file.exists()
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
