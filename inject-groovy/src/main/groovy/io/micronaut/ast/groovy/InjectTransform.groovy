@@ -266,11 +266,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
-                println "interfaceTypes = ${interfaceTypes.inspect()}"
                 if(ArrayUtils.isNotEmpty(interfaceTypes)) {
                     List<AnnotationNode> annotationNodes = node.annotations
                     Set<ClassNode> interfacesToVisit = []
-                    println "interfacesToVisit = ${interfacesToVisit.inspect()}"
 
                     populateIntroducedInterfaces(annotationNodes, interfacesToVisit)
 
