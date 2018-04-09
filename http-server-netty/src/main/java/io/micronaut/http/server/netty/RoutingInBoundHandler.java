@@ -770,6 +770,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     publisher.subscribe(new ContextCompletionAwareSubscriber<Object>(context) {
 
                         @Override
+                        protected void doOnError(Throwable t) {
+                            super.doOnError(t);
+                        }
+
+                        @Override
                         protected void onComplete(Object message) {
                             try {
                                 boolean isOpen = context.channel().isOpen();

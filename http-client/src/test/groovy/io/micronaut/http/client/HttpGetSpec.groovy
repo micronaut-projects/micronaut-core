@@ -61,6 +61,9 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get() == 'success'
+
+        cleanup:
+        client.stop()
     }
 
 
@@ -79,6 +82,9 @@ class HttpGetSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        client.stop()
     }
 
     void "test simple 404 request as VndError"() {
@@ -102,11 +108,17 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get().message == "Page Not Found"
+
+        cleanup:
+        client.stop()
+
     }
 
     void "test simple blocking get request"() {
+
         given:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        def asyncClient = HttpClient.create(embeddedServer.getURL())
+        BlockingHttpClient client = asyncClient.toBlocking()
 
         when:
         HttpResponse<String> response = client.exchange(
@@ -120,6 +132,8 @@ class HttpGetSpec extends Specification {
         body.isPresent()
         body.get() == 'success'
 
+        cleanup:
+        asyncClient.stop()
     }
 
     void "test simple get request with type"() {
@@ -137,6 +151,9 @@ class HttpGetSpec extends Specification {
         response.status == HttpStatus.OK
         body.isPresent()
         body.get() == 'success'
+
+        cleanup:
+        client.stop()
     }
 
     void "test simple exchange request with POJO"() {
@@ -159,6 +176,10 @@ class HttpGetSpec extends Specification {
         body.isPresent()
         body.get().title == 'The Stand'
 
+
+        cleanup:
+        client.stop()
+
     }
 
     void "test simple retrieve request with POJO"() {
@@ -176,6 +197,10 @@ class HttpGetSpec extends Specification {
         then:
         book != null
         book.title == "The Stand"
+
+
+        cleanup:
+        client.stop()
     }
 
     void "test simple get request with POJO list"() {
@@ -205,6 +230,10 @@ class HttpGetSpec extends Specification {
         list.size() == 1
         list.get(0) instanceof Book
         list.get(0).title == 'The Stand'
+
+
+        cleanup:
+        client.stop()
 
     }
 
