@@ -307,8 +307,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                         Map entries = resolveEntriesForKey(resolvedProperty, true);
                         if(entries != null) {
-                            System.out.println("resolvedProperty = " + resolvedProperty);
-                            System.out.println("value = " + value);
                             entries.put(resolvedProperty, value);
                         }
                     }
