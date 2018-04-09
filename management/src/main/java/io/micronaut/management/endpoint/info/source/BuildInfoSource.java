@@ -33,7 +33,6 @@ import java.util.function.Supplier;
  * @author Zachary Klein
  * @since 1.0
  */
-
 @Refreshable
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.build.enabled", notEquals = "false")

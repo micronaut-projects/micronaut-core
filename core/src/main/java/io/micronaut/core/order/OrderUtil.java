@@ -34,10 +34,10 @@ public class OrderUtil {
      *
      * @return the comparator
      */
-    public static final Comparator<Object> comparator = (o1, o2) -> {
+    public static final Comparator<Object> COMPARATOR = (o1, o2) -> {
         int order1 = getOrder(o1);
         int order2 = getOrder(o2);
-        return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
+        return Integer.compare(order1, order2);
     };
 
     /**
@@ -45,7 +45,7 @@ public class OrderUtil {
      *
      * @return the comparator
      */
-    public static final Comparator<Object> reverseComparator = Collections.reverseOrder(comparator);
+    public static final Comparator<Object> REVERSE_COMPARATOR = Collections.reverseOrder(COMPARATOR);
 
     /**
      * Sort the given list
@@ -53,7 +53,7 @@ public class OrderUtil {
      * @param list The list to sort
      */
     public static void sort(List<?> list) {
-        list.sort(comparator);
+        list.sort(COMPARATOR);
     }
 
     /**
@@ -64,7 +64,7 @@ public class OrderUtil {
      * @return The sorted stream
      */
     public static <T> Stream<T> sort(Stream<T> list) {
-        return list.sorted(comparator);
+        return list.sorted(COMPARATOR);
     }
 
     /**
@@ -73,7 +73,7 @@ public class OrderUtil {
      * @param list The list to sort
      */
     public static void reverseSort(List<?> list) {
-        list.sort(reverseComparator);
+        list.sort(REVERSE_COMPARATOR);
     }
 
     /**
@@ -82,7 +82,7 @@ public class OrderUtil {
      * @param array The array to sort
      */
     public static void reverseSort(Object[] array) {
-        Arrays.sort(array, reverseComparator);
+        Arrays.sort(array, REVERSE_COMPARATOR);
     }
     /**
      * Sort the given array
@@ -90,7 +90,7 @@ public class OrderUtil {
      * @param objects The array to sort
      */
     public static void sort(Ordered...objects) {
-        Arrays.sort(objects, comparator);
+        Arrays.sort(objects, COMPARATOR);
     }
 
     /**
@@ -99,7 +99,7 @@ public class OrderUtil {
      * @param objects The array to sort
      */
     public static void sort(Object[] objects) {
-        Arrays.sort(objects,comparator);
+        Arrays.sort(objects,COMPARATOR);
     }
 
     private static int getOrder(Object o) {

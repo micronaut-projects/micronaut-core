@@ -77,9 +77,6 @@ import java.util.stream.Stream;
  */
 public class DefaultBeanContext implements BeanContext {
 
-
-
-
     private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
 
@@ -1648,7 +1645,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (Ordered.class.isAssignableFrom(beanType)) {
-            beans = beans.stream().sorted(OrderUtil.comparator).collect(StreamUtils.toImmutableCollection());
+            beans = beans.stream().sorted(OrderUtil.COMPARATOR).collect(StreamUtils.toImmutableCollection());
         } else {
             beans = Collections.unmodifiableCollection(beans);
         }
