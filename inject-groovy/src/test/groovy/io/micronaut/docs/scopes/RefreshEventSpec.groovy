@@ -27,6 +27,7 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
@@ -40,7 +41,7 @@ import static io.micronaut.http.HttpResponse.ok
  * @author Sergio del Amo
  * @since 1.0
  */
-@IgnoreIf({ os.windows })
+@Ignore
 class RefreshEventSpec extends Specification {
     @Shared int port = SocketUtils.findAvailableTcpPort()
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
