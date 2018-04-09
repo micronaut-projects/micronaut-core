@@ -44,7 +44,7 @@ class RoutesEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; io.micronaut.management.endpoint.refresh.RefreshEndpoint.refresh()"
+        result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; io.micronaut.management.endpoint.refresh.RefreshEndpoint.refresh(java.lang.Boolean force)"
         result['{[/test],method=[GET],produces=[application/json]}']['method'] == "java.lang.String io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.index()"
         result['{[/test/generics],method=[PUT],produces=[application/json]}']['method'] == "java.util.Map<java.lang.String, java.lang.Integer> io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.generics()"
         result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "org.reactivestreams.Publisher io.micronaut.management.endpoint.routes.RoutesEndpoint.getRoutes()"
