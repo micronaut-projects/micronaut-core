@@ -59,7 +59,9 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
 
     @Override
     protected void doOnError(Throwable t) {
-        currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onError(t));
+        currentDownstreamSubscriber().ifPresent(subscriber ->
+                subscriber.onError(t)
+        );
     }
 
     @Override

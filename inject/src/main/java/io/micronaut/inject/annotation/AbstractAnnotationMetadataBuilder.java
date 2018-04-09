@@ -45,7 +45,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public AnnotationMetadata build(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        return buildInternal(null, element, annotationMetadata, true);
+        AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
+        System.out.println("element = " + element);
+        annotationMetadata.dump();
+        return metadata;
     }
 
     /**

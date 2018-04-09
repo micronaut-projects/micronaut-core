@@ -15,8 +15,11 @@
  */
 package io.micronaut.http.server.netty.async;
 
+import com.typesafe.netty.HandlerPublisher;
+import com.typesafe.netty.HandlerSubscriber;
 import io.netty.channel.ChannelHandlerContext;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.netty.channel.ChannelPipeline;
 import org.reactivestreams.Subscription;
 
 /**
@@ -51,7 +54,16 @@ public abstract class ContextCompletionAwareSubscriber<T> extends CompletionAwar
 
     @Override
     protected void doOnError(Throwable t) {
-        context.pipeline().fireExceptionCaught(t);
+        s.cancel();
+
+        ChannelPipeline pipeline = context.pipeline();
+        // remove the subscriber
+        HandlerPublisher handlerPublisher = pipeline.get(HandlerPublisher.class);
+        if(handlerPublisher != null) {
+            pipeline.remove(handlerPublisher);
+        }
+        // fire the exception
+        pipeline.fireExceptionCaught(t);
     }
 
     @Override

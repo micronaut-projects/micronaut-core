@@ -7,6 +7,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 
+import java.nio.file.Paths
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -57,9 +58,11 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/index.html'), String
         ).blockingFirst()
-        File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
+
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
 
         then:
+        file.exists()
         response.status == HttpStatus.OK
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
@@ -82,9 +85,10 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET("/static/index.html"), String
         ).blockingFirst()
-        File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
 
         then:
+        file.exists()
         response.code() == HttpStatus.OK.code
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0

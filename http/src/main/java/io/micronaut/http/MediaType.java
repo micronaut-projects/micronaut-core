@@ -62,6 +62,14 @@ public class MediaType implements CharSequence {
         mediaTypeFileExtensions = new HashMap<>(4);
     }
 
+    /**
+     * Default file extension used for JSON
+     */
+    public static final String EXTENSION_JSON = "json";
+    /**
+     * Default file extension used for XML
+     */
+    public static final String EXTENSION_XML = "xml";
     public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
 
     /**

@@ -21,9 +21,7 @@ import java.io.File;
 /**
  * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
  *
- * <p>The <tt>StreamingFileUpload</tt> may be incomplete when first received, in which case the consumer can subscribe to the file upload to obtain the final completed upload.</p>
- *
- * <p>Note that if {@link #isComplete()} is false and this is a partial file upload then the various methods to obtain the data within the upload return only the data for the current chunk.</p>
+ * <p>The <tt>StreamingFileUpload</tt> may be incomplete when first received, in which case the consumer can subscribe to the file upload to process the data a chunk at a time.</p>
  *
  * <p>The {@link #transferTo(String)} method can be used whether the upload is complete or not. If it is not complete the framework will automatically subscribe to the
  * upload and transfer the data chunk by chunk in a non-blocking manner</p>
@@ -33,7 +31,7 @@ import java.io.File;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface StreamingFileUpload extends FileUpload, Publisher<StreamingFileUpload> {
+public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
 
     /**
      * <p>A convenience method to write this uploaded item to disk.</p>
