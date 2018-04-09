@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.io.scan;
 
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +49,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * Use when resources should have a standard base path
      *
      * @param classLoader The class loader for loading resources
-     * @param basePath The path to look for resources under
+     * @param basePath    The path to look for resources under
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
         this.classLoader = classLoader;

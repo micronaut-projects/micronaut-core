@@ -1,31 +1,35 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Produces;
 
 import javax.annotation.Nullable;
 import java.net.URI;
-import java.util.*;
-import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * An abstract implementation of {@link Resource}
@@ -41,12 +45,12 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     /**
      * Add a link with the given reference
      *
-     * @param ref The reference
+     * @param ref  The reference
      * @param link The link
      * @return This VndError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable Link link) {
-        if(StringUtils.isNotEmpty(ref) && link != null) {
+        if (StringUtils.isNotEmpty(ref) && link != null) {
             List<Link> links = this.linkMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             links.add(link);
         }
@@ -56,12 +60,12 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     /**
      * Add a link with the given reference
      *
-     * @param ref The reference
+     * @param ref  The reference
      * @param link The link
      * @return This VndError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable String link) {
-        if(StringUtils.isNotEmpty(ref) && link != null) {
+        if (StringUtils.isNotEmpty(ref) && link != null) {
             List<Link> links = this.linkMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             links.add(Link.of(link));
         }
@@ -71,28 +75,27 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     /**
      * Add an embedded resource with the given reference
      *
-     * @param ref The reference
+     * @param ref      The reference
      * @param resource The resource
      * @return This VndError
      */
     public Impl embedded(CharSequence ref, Resource resource) {
-        if(StringUtils.isNotEmpty(ref) && resource != null) {
+        if (StringUtils.isNotEmpty(ref) && resource != null) {
             List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.add(resource);
         }
         return (Impl) this;
     }
 
-
     /**
      * Add an embedded resource with the given reference
      *
-     * @param ref The reference
+     * @param ref      The reference
      * @param resource The resource
      * @return This VndError
      */
     public Impl embedded(CharSequence ref, Resource... resource) {
-        if(StringUtils.isNotEmpty(ref) && resource != null) {
+        if (StringUtils.isNotEmpty(ref) && resource != null) {
             List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.addAll(Arrays.asList(resource));
         }
@@ -102,12 +105,12 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     /**
      * Add an embedded resource with the given reference
      *
-     * @param ref The reference
+     * @param ref          The reference
      * @param resourceList The resources
      * @return This VndError
      */
     public Impl embedded(CharSequence ref, List<Resource> resourceList) {
-        if(StringUtils.isNotEmpty(ref) && resourceList != null) {
+        if (StringUtils.isNotEmpty(ref) && resourceList != null) {
             List<Resource> resources = this.embeddedMap.computeIfAbsent(ref, charSequence -> new ArrayList<>());
             resources.addAll(resourceList);
         }
@@ -133,7 +136,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
         for (Map.Entry<String, Object> entry : links.entrySet()) {
             String name = entry.getKey();
             Object value = entry.getValue();
-            if(value instanceof Map) {
+            if (value instanceof Map) {
                 Map<String, Object> linkMap = (Map<String, Object>) value;
                 link(name, linkMap);
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
  * @since 1.0
  */
 public interface CallableInjectionPoint extends InjectionPoint {
+
     /**
      * The required argument types
      */

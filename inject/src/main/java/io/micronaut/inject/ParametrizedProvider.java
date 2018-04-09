@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,11 +36,10 @@ public interface ParametrizedProvider<T> extends Provider<T> {
      * @param argumentValues The argument values to use
      * @return The bean
      */
-    T get(Object...argumentValues);
+    T get(Object... argumentValues);
 
     @Override
     default T get() {
         return get((Map<String, Object>) null);
     }
-
 }

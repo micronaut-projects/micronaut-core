@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.http.annotation.Produces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +29,14 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -52,7 +59,7 @@ public class MediaType implements CharSequence {
 
     static {
         ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
-                new MediaType(charSequence.toString())
+            new MediaType(charSequence.toString())
         );
         compressiblePatterns.add(Pattern.compile("^text/.*$"));
         compressiblePatterns.add(Pattern.compile("^.*\\+json$"));
@@ -84,18 +91,22 @@ public class MediaType implements CharSequence {
      * Form encoded data: application/x-www-form-urlencoded
      */
     public static final String APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded";
+
     /**
      * Form encoded data: application/x-www-form-urlencoded
      */
     public static final MediaType APPLICATION_FORM_URLENCODED_TYPE = new MediaType(APPLICATION_FORM_URLENCODED);
+
     /**
      * Short cut for {@link #APPLICATION_FORM_URLENCODED_TYPE}
      */
     public static final MediaType FORM = APPLICATION_FORM_URLENCODED_TYPE;
+
     /**
      * Multi part form data: multipart/form-data
      */
     public static final String MULTIPART_FORM_DATA = "multipart/form-data";
+
     /**
      * Multi part form data: multipart/form-data
      */
@@ -105,30 +116,37 @@ public class MediaType implements CharSequence {
      * HTML: text/html
      */
     public static final String TEXT_HTML = "text/html";
+
     /**
      * HTML: text/html
      */
     public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
+
     /**
      * XHTML: application/xhtml+xml
      */
     public static final String APPLICATION_XHTML = "application/xhtml+xml";
+
     /**
      * XHTML: application/xhtml+xml
      */
     public static final MediaType APPLICATION_XHTML_TYPE = new MediaType(APPLICATION_XHTML, "html");
+
     /**
      * XML: application/xml
      */
     public static final String APPLICATION_XML = "application/xml";
+
     /**
      * XML: application/xml
      */
     public static final MediaType APPLICATION_XML_TYPE = new MediaType(APPLICATION_XML);
+
     /**
      * JSON: application/json
      */
     public static final String APPLICATION_JSON = "application/json";
+
     /**
      * JSON: application/json
      */
@@ -138,22 +156,27 @@ public class MediaType implements CharSequence {
      * YAML: application/x-yaml
      */
     public static final String APPLICATION_YAML = "application/x-yaml";
+
     /**
      * YAML: application/x-yaml
      */
     public static final MediaType APPLICATION_YAML_TYPE = new MediaType(MediaType.APPLICATION_YAML);
+
     /**
      * XML: text/xml
      */
     public static final String TEXT_XML = "text/xml";
+
     /**
      * XML: text/xml
      */
     public static final MediaType TEXT_XML_TYPE = new MediaType(TEXT_XML);
+
     /**
      * JSON: text/json
      */
     public static final String TEXT_JSON = "text/json";
+
     /**
      * JSON: text/json
      */
@@ -163,6 +186,7 @@ public class MediaType implements CharSequence {
      * Plain Text: text/plain
      */
     public static final String TEXT_PLAIN = "text/plain";
+
     /**
      * Plain Text: text/plain
      */
@@ -172,30 +196,37 @@ public class MediaType implements CharSequence {
      * HAL JSON: application/hal+json
      */
     public static final String APPLICATION_HAL_JSON = "application/hal+json";
+
     /**
      * HAL JSON: application/hal+json
      */
     public static final MediaType APPLICATION_HAL_JSON_TYPE = new MediaType(APPLICATION_HAL_JSON);
+
     /**
      * HAL XML: application/hal+xml
      */
     public static final String APPLICATION_HAL_XML = "application/hal+xml";
+
     /**
      * HAL XML: application/hal+xml
      */
     public static final MediaType APPLICATION_HAL_XML_TYPE = new MediaType(APPLICATION_HAL_XML);
+
     /**
      * Atom: application/atom+xml
      */
     public static final String APPLICATION_ATOM_XML = "application/atom+xml";
+
     /**
      * Atom: application/atom+xml
      */
     public static final MediaType APPLICATION_ATOM_XML_TYPE = new MediaType(APPLICATION_ATOM_XML);
+
     /**
      * VND Error: application/vnd.error+json
      */
     public static final String APPLICATION_VND_ERROR = "application/vnd.error+json";
+
     /**
      * VND Error: application/vnd.error+json
      */
@@ -221,8 +252,19 @@ public class MediaType implements CharSequence {
      */
     public final static MediaType APPLICATION_JSON_STREAM_TYPE = new MediaType("application/x-json-stream");
 
+    /**
+     * Parameter {@code "charset"}
+     */
     public static final String CHARSET_PARAMETER = "charset";
+
+    /**
+     * Parameter {@code "q"}
+     */
     public static final String Q_PARAMETER = "q";
+
+    /**
+     * Parameter {@code "v"}
+     */
     public static final String V_PARAMETER = "v";
 
     private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
@@ -249,7 +291,7 @@ public class MediaType implements CharSequence {
     /**
      * Constructs a new media type for the given string and parameters
      *
-     * @param name The name of the media type. For example application/json
+     * @param name   The name of the media type. For example application/json
      * @param params The parameters
      */
     public MediaType(String name, Map<String, String> params) {
@@ -259,7 +301,7 @@ public class MediaType implements CharSequence {
     /**
      * Constructs a new media type for the given string and extension
      *
-     * @param name The name of the media type. For example application/json
+     * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
     public MediaType(String name, String extension) {
@@ -269,54 +311,49 @@ public class MediaType implements CharSequence {
     /**
      * Constructs a new media type for the given string and extension
      *
-     * @param name The name of the media type. For example application/json
+     * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
     public MediaType(String name, String extension, Map<String, String> params) {
-
-        if(name == null) {
+        if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
         String withoutArgs;
-        if(name.contains(SEMICOLON)) {
+        if (name.contains(SEMICOLON)) {
             this.parameters = new LinkedHashMap<>();
             String[] tokenWithArgs = name.split(SEMICOLON);
             withoutArgs = tokenWithArgs[0];
             String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length);
-            for(String param : paramsList) {
+            for (String param : paramsList) {
                 int i = param.indexOf('=');
                 if (i > -1) {
-                    parameters.put(param.substring(0, i).trim(), param.substring(i+1).trim() );
+                    parameters.put(param.substring(0, i).trim(), param.substring(i + 1).trim());
                 }
             }
-        }
-        else {
+        } else {
             this.parameters = Collections.emptyMap();
             withoutArgs = name;
         }
         this.name = withoutArgs;
         int i = withoutArgs.indexOf('/');
-        if(i > -1) {
+        if (i > -1) {
             this.type = withoutArgs.substring(0, i);
             this.subtype = withoutArgs.substring(i + 1, withoutArgs.length());
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
 
-        if(extension != null) {
+        if (extension != null) {
             this.extension = extension;
-        }
-        else {
+        } else {
             int j = subtype.indexOf('+');
-            if(j > -1) {
+            if (j > -1) {
                 this.extension = subtype.substring(j + 1);
-            }
-            else {
+            } else {
                 this.extension = subtype;
             }
         }
-        if(params != null) {
+        if (params != null) {
             parameters.putAll(params);
         }
     }
@@ -367,7 +404,7 @@ public class MediaType implements CharSequence {
      * @return The quality in BigDecimal form
      */
     public BigDecimal getQualityAsNumber() {
-        if(this.qualityNumberField == null) {
+        if (this.qualityNumberField == null) {
             this.qualityNumberField = getOrConvertQualityParameterToBigDecimal(this);
         }
         return this.qualityNumberField;
@@ -402,6 +439,9 @@ public class MediaType implements CharSequence {
         return toString().subSequence(start, end);
     }
 
+    /**
+     * @return Whether the media type can be compressed
+     */
     public boolean isCompressible() {
         boolean matches = compressiblePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
         if (!matches) {
@@ -410,18 +450,21 @@ public class MediaType implements CharSequence {
         return matches;
     }
 
+    /**
+     * @param contentType The content type
+     * @return Whether the content type can be compressed
+     */
     public static boolean isCompressible(String contentType) {
         MediaType mediaType = new MediaType(contentType);
         return mediaType.isCompressible();
     }
 
     public String toString() {
-        if(parameters.isEmpty()) {
+        if (parameters.isEmpty()) {
             return name;
-        }
-        else {
+        } else {
             return name + ";" + parameters.entrySet().stream().map(Object::toString)
-                    .collect(Collectors.joining(";"));
+                .collect(Collectors.joining(";"));
         }
     }
 
@@ -462,12 +505,13 @@ public class MediaType implements CharSequence {
 
     /**
      * Resolve the {@link MediaType} produced by the given type based on the {@link Produces} annotation
+     *
      * @param type The type
      * @return An {@link Optional} {@link MediaType}
      */
     public static Optional<MediaType> fromType(Class<?> type) {
         Produces producesAnn = type.getAnnotation(Produces.class);
-        if(producesAnn != null) {
+        if (producesAnn != null) {
             return Arrays.stream(producesAnn.value()).findFirst().map(MediaType::new);
         }
         return Optional.empty();
@@ -480,16 +524,16 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static Optional<MediaType> forExtension(String extension) {
-        if(StringUtils.isNotEmpty(extension)) {
+        if (StringUtils.isNotEmpty(extension)) {
             String type = getMediaTypeFileExtensions().get(extension);
-            if(type != null) {
+            if (type != null) {
                 return Optional.of(new MediaType(type, extension));
             }
         }
         return Optional.empty();
     }
 
-    private static Map<String,String> getMediaTypeFileExtensions() {
+    private static Map<String, String> getMediaTypeFileExtensions() {
         Map<String, String> extensions = mediaTypeFileExtensions;
         if (extensions == null) {
             synchronized (MediaType.class) { // double check
@@ -505,11 +549,12 @@ public class MediaType implements CharSequence {
         }
         return extensions;
     }
+
     private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {
         BigDecimal bd;
         try {
             String q = mt.parameters.getOrDefault(Q_PARAMETER, null);
-            if(q == null) return QUALITY_RATING_NUMBER;
+            if (q == null) return QUALITY_RATING_NUMBER;
             else {
                 bd = new BigDecimal(q);
             }
@@ -539,25 +584,20 @@ public class MediaType implements CharSequence {
                 }
             }
             return result;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             System.out.println(ex.getMessage());
             if (LOG.isWarnEnabled()) {
                 LOG.warn("Failed to load mime types for file extension detection!");
             }
-        }
-        finally {
+        } finally {
             if (is != null) {
                 try {
                     is.close();
-                }
-                catch (IOException ignore) {
+                } catch (IOException ignore) {
                 }
             }
         }
 
         return Collections.emptyMap();
     }
-
-
 }

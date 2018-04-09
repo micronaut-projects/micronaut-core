@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
  */
 package io.micronaut.management.endpoint;
 
-import io.micronaut.context.annotation.Executable;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.Executable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A method designed to annotate an {@link Endpoint} delete operation
@@ -36,6 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target(ElementType.METHOD)
 @Executable
 public @interface Delete {
+
     /**
      * @return Description of the operation
      */
@@ -45,5 +45,4 @@ public @interface Delete {
      * @return The produced MediaType values. Defaults to application/json
      */
     String[] produces() default {"application/json"};
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.inject.writer.BeanConfigurationWriter;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.core.io.service.ServiceDescriptorGenerator;
-import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.writer.BeanConfigurationWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -33,11 +28,7 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.SimpleElementVisitor8;
-import javax.tools.JavaFileObject;
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Optional;
 import java.util.Set;
 
 @SupportedAnnotationTypes({
@@ -45,7 +36,6 @@ import java.util.Set;
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
-
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {

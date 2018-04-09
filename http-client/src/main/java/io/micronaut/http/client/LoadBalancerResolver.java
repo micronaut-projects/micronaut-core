@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@ public interface LoadBalancerResolver {
 
     /**
      * Resolve a {@link LoadBalancer} for the given references
-     * @param serviceReferences The references. These could be service IDs or fully HTTP URLs
      *
+     * @param serviceReferences The references. These could be service IDs or fully HTTP URLs
      * @return A {@link LoadBalancer} or empty of non can be resolved
      */
     Optional<? extends LoadBalancer> resolve(String... serviceReferences);

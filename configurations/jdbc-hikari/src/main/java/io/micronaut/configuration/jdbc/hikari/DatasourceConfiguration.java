@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariConfig;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 
@@ -48,9 +48,9 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
     }
 
     /**
-     *  Hikari validates against the fields instead of using getters so
-     *  the following is required to populate the calculated values into
-     *  the fields.
+     * Hikari validates against the fields instead of using getters so
+     * the following is required to populate the calculated values into
+     * the fields.
      */
     @PostConstruct
     void postConstruct() {
@@ -76,10 +76,6 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
         return name;
     }
 
-    public void setUrl(String url) {
-        setJdbcUrl(url);
-    }
-
     @Override
     public String getConfiguredUrl() {
         return getJdbcUrl();
@@ -88,6 +84,10 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
     @Override
     public String getUrl() {
         return calculatedSettings.getUrl();
+    }
+
+    public void setUrl(String url) {
+        setJdbcUrl(url);
     }
 
     @Override
@@ -120,10 +120,6 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
         return calculatedSettings.getPassword();
     }
 
-    public void setValidationQuery(String validationQuery) {
-        setConnectionTestQuery(validationQuery);
-    }
-
     @Override
     public String getConfiguredValidationQuery() {
         return getConnectionTestQuery();
@@ -132,6 +128,10 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
     @Override
     public String getValidationQuery() {
         return calculatedSettings.getValidationQuery();
+    }
+
+    public void setValidationQuery(String validationQuery) {
+        setConnectionTestQuery(validationQuery);
     }
 
     public String getJndiName() {

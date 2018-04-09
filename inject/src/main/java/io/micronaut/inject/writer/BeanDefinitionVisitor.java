@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.inject.writer;
 
@@ -24,11 +24,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +36,7 @@ import java.util.Map;
  * @since 1.0
  */
 public interface BeanDefinitionVisitor {
+
     /**
      * The suffix use for generated AOP intercepted types
      */
@@ -60,7 +56,6 @@ public interface BeanDefinitionVisitor {
      * @return Is the bean singleton
      */
     boolean isSingleton();
-
 
     /**
      * Visit a marker interface on the generated bean definition
@@ -124,7 +119,6 @@ public interface BeanDefinitionVisitor {
                                         Map<String, Object> qualifierTypes,
                                         Map<String, Map<String, Object>> genericTypes);
 
-
     /**
      * Visits the constructor of the parent class used in the case a proxied bean definition
      *
@@ -132,12 +126,13 @@ public interface BeanDefinitionVisitor {
      * @param qualifierTypes The qualifier type names for each parameter
      * @param genericTypes   The generic types for each parameter
      */
-    void visitProxiedBeanDefinitionConstructor (
-            Object declaringType,
-            Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes
+    void visitProxiedBeanDefinitionConstructor(
+        Object declaringType,
+        Map<String, Object> argumentTypes,
+        Map<String, Object> qualifierTypes,
+        Map<String, Map<String, Object>> genericTypes
     );
+
     /**
      * Finalize the bean definition to the given output stream
      */
@@ -218,6 +213,7 @@ public interface BeanDefinitionVisitor {
                           String setterName,
                           Map<String, Object> genericTypes,
                           boolean isOptional);
+
     /**
      * Visits a method injection point
      *
@@ -278,24 +274,24 @@ public interface BeanDefinitionVisitor {
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection
      *
-     * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType     The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName     The method name
-     * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes The qualifier types of each argument. Can be null.
-     * @param genericTypes   The generic types of each argument. Can be null.
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
      * @param annotationMetadata The annotation metadata for the method
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
-                               Object returnType,
-                               Object genericReturnType,
-                               Map<String, Object> returnTypeGenericTypes,
-                               String methodName,
-                               Map<String, Object> argumentTypes,
-                               Map<String, Object> qualifierTypes,
-                               Map<String, Map<String, Object>> genericTypes,
-                               AnnotationMetadata annotationMetadata);
+                                                 Object returnType,
+                                                 Object genericReturnType,
+                                                 Map<String, Object> returnTypeGenericTypes,
+                                                 String methodName,
+                                                 Map<String, Object> argumentTypes,
+                                                 Map<String, Object> qualifierTypes,
+                                                 Map<String, Map<String, Object>> genericTypes,
+                                                 AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a field injection point
@@ -346,66 +342,67 @@ public interface BeanDefinitionVisitor {
     /**
      * Begin defining a configuration builder
      *
-     * @param type The type of the builder
-     * @param field The name of the field that represents the builder
+     * @param type               The type of the builder
+     * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
+     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @see ConfigurationBuilder
      */
     void visitConfigBuilderField(
-            Object type,
-            String field,
-            AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+        Object type,
+        String field,
+        AnnotationMetadata annotationMetadata,
+        ConfigurationMetadataBuilder metadataBuilder);
 
     /**
      * Begin defining a configuration builder
-
-     * @param type The type of the builder
-     * @param methodName The name of the method that returns the builder
+     *
+     * @param type               The type of the builder
+     * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
-
+     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @see ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-            Object type,
-            String methodName,
-            AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder);
+        Object type,
+        String methodName,
+        AnnotationMetadata annotationMetadata,
+        ConfigurationMetadataBuilder metadataBuilder);
 
     /**
      * Visit a configuration builder method
      *
-     * @param prefix The prefix used for the method
+     * @param prefix              The prefix used for the method
      * @param configurationPrefix The prefix used to retrieve the configuration value
-     * @param returnType The return type
-     * @param methodName The method name
-     * @param paramType The method type
-     * @param generics The generic types of the method
+     * @param returnType          The return type
+     * @param methodName          The method name
+     * @param paramType           The method type
+     * @param generics            The generic types of the method
      * @see ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-            String prefix,
-            String configurationPrefix,
-            Object returnType,
-            String methodName,
-            Object paramType,
-            Map<String, Object> generics);
+        String prefix,
+        String configurationPrefix,
+        Object returnType,
+        String methodName,
+        Object paramType,
+        Map<String, Object> generics);
+
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit
      *
-     * @param prefix The prefix used for the method
+     * @param prefix              The prefix used for the method
      * @param configurationPrefix The prefix used to retrieve the configuration value
-     * @param returnType The return type
-     * @param methodName The method name
+     * @param returnType          The return type
+     * @param methodName          The method name
      * @see ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(
-            String prefix,
-            String configurationPrefix,
-            Object returnType,
-            String methodName);
+        String prefix,
+        String configurationPrefix,
+        Object returnType,
+        String methodName);
+
     /**
      * Finalize a configuration builder field
      *
@@ -417,12 +414,13 @@ public interface BeanDefinitionVisitor {
      * By default, when the {@link BeanContext} is started, the {@link BeanDefinition#getExecutableMethods()} are not processed by registered {@link ExecutableMethodProcessor}
      * instances unless this method returns true.
      *
-     * @see Executable#preprocess()
      * @return Whether the bean definition requires method processing
+     * @see Executable#preprocess()
      */
     default boolean requiresMethodProcessing() {
         return false;
     }
+
     /**
      * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true
      *

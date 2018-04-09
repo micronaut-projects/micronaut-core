@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 
 /**
- * A bean definition that is provides initialization hooks normally in the form of methods annotated with {@link javax.annotation.PostConstruct}
- *
- * @see javax.annotation.PostConstruct
+ * A bean definition that is provides initialization hooks normally in the form of methods annotated with
+ * {@link javax.annotation.PostConstruct}
  *
  * @author Graeme Rocher
+ * @see javax.annotation.PostConstruct
  * @since 1.0
  */
 public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
@@ -33,7 +33,7 @@ public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
      * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks
      *
      * @param context The bean context
-     * @param bean The bean
+     * @param bean    The bean
      */
     default T initialize(BeanContext context, T bean) {
         return initialize(new DefaultBeanResolutionContext(context, this), context, bean);
@@ -43,8 +43,8 @@ public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
      * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks
      *
      * @param resolutionContext The resolution context
-     * @param context The bean context
-     * @param bean The bean
+     * @param context           The bean context
+     * @param bean              The bean
      */
     T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean);
 }

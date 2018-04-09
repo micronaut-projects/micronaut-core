@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
  */
 package io.micronaut.discovery.eureka.client.v2;
 
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.*;
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
@@ -39,28 +41,28 @@ public interface EurekaOperations {
     /**
      * Registers a new {@link InstanceInfo} with the Eureka server
      *
-     * @param appId The application id
+     * @param appId    The application id
      * @param instance The instance
      * @return A status of {@link HttpStatus#NO_CONTENT} on success
      */
     @Post("/apps/{appId}")
     @Retryable(
-            attempts = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
+        delay = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
     )
     Publisher<HttpStatus> register(@NotBlank String appId, @Valid @NotNull @Body InstanceInfo instance);
 
     /**
      * De-registers a {@link InstanceInfo} with the Eureka server
      *
-     * @param appId The application id
+     * @param appId      The application id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
      * @return A status of {@link HttpStatus#OK} on success
      */
     @Delete("/apps/{appId}/{instanceId}")
     @Retryable(
-            attempts = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
+        delay = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
     )
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId);
 
@@ -76,13 +78,12 @@ public interface EurekaOperations {
     /**
      * Obtain a {@link InstanceInfo} for the given app id
      *
-     * @param appId The app id
+     * @param appId      The app id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
      * @return The {@link InstanceInfo} instance
      */
     @Get("/apps/{appId}/{instanceId}")
     Publisher<InstanceInfo> getInstanceInfo(@NotBlank String appId, @NotBlank String instanceId);
-
 
     /**
      * Obtain all of the {@link ApplicationInfo} registered with Eureka
@@ -94,15 +95,16 @@ public interface EurekaOperations {
     /**
      * Obtain all of the {@link ApplicationInfo} registered with Eureka under the given VIP address
      *
-     * @see InstanceInfo#vipAddress
      * @param vipAddress The {@link InstanceInfo#vipAddress}
      * @return The {@link ApplicationInfo} instances
+     * @see InstanceInfo#vipAddress
      */
     Publisher<List<ApplicationInfo>> getApplicationVips(String vipAddress);
+
     /**
      * Send an application heartbeat to Eureka
      *
-     * @param appId The application id
+     * @param appId      The application id
      * @param instanceId The instance id
      * @return A status of {@link HttpStatus#OK} on success
      */
@@ -112,10 +114,9 @@ public interface EurekaOperations {
     /**
      * Update the application's status
      *
-     *
-     * @param appId The application id
+     * @param appId      The application id
      * @param instanceId The instance id
-     * @param status The status to use
+     * @param status     The status to use
      * @return A status of {@link HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}/status?value={status}")
@@ -124,11 +125,10 @@ public interface EurekaOperations {
     /**
      * Update application metadata value
      *
-     *
-     * @param appId The application id
+     * @param appId      The application id
      * @param instanceId The instance id
-     * @param key The key to update
-     * @param value The value to update
+     * @param key        The key to update
+     * @param value      The value to update
      * @return A status of {@link HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}/metadata?{key}={value}")

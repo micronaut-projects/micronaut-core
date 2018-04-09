@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import java.util.Optional;
 
 /**
  * A {@link HttpClientFilter} that adds the {@link #HEADER_CONSUL_TOKEN} header
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,6 +37,9 @@ import java.util.Optional;
 @Requires(beans = ConsulConfiguration.class)
 public class ConsulAslTokenFilter implements HttpClientFilter, Toggleable {
 
+    /**
+     * Consult header token
+     */
     public static final String HEADER_CONSUL_TOKEN = "X-Consul-Token";
 
     private final ConsulConfiguration configuration;

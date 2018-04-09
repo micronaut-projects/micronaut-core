@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ package io.micronaut.function.executor;
 public interface FunctionExitHandler {
     /**
      * Exit the function with an error
+     *
      * @param error The error
      * @param debug Whether to output debug information before exiting
      */

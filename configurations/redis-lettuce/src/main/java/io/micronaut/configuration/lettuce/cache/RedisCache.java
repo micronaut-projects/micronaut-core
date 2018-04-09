@@ -1,25 +1,22 @@
 /*
  * Copyright 2017 original authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.configuration.lettuce.cache;
 
-import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisFuture;
-import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulConnection;
-import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import io.micronaut.cache.AsyncCache;
 import io.micronaut.cache.SyncCache;
@@ -27,17 +24,11 @@ import io.micronaut.cache.serialize.DefaultStringKeySerializer;
 import io.micronaut.configuration.lettuce.RedisConnectionUtil;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.serialize.JdkSerializer;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.type.Argument;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.annotation.PreDestroy;
-import java.io.Closeable;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -52,7 +43,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @EachBean(RedisCacheConfiguration.class)
-public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
+public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
     private final RedisCacheConfiguration redisCacheConfiguration;
     private final ObjectSerializer keySerializer;
     private final ObjectSerializer valueSerializer;
@@ -66,14 +57,14 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
      * Creates a new redis cache for the given arguments
      *
      * @param redisCacheConfiguration The configuration
-     * @param conversionService The conversion service
-     * @param beanLocator The bean locator used to discover the redis connection from the configuration
+     * @param conversionService       The conversion service
+     * @param beanLocator             The bean locator used to discover the redis connection from the configuration
      */
     @SuppressWarnings("unchecked")
     public RedisCache(
-            RedisCacheConfiguration redisCacheConfiguration,
-            ConversionService<?> conversionService,
-            BeanLocator beanLocator) {
+        RedisCacheConfiguration redisCacheConfiguration,
+        ConversionService<?> conversionService,
+        BeanLocator beanLocator) {
         if (redisCacheConfiguration == null) {
             throw new IllegalArgumentException("Redis cache configuration cannot be null");
         }
@@ -81,17 +72,17 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
         this.expireAfterWrite = redisCacheConfiguration.getExpireAfterWrite().map(Duration::toMillis).orElse(null);
         this.expireAfterAccess = redisCacheConfiguration.getExpireAfterAccess().map(Duration::toMillis).orElse(null);
         this.keySerializer = redisCacheConfiguration
-                                    .getKeySerializer()
-                                    .flatMap(beanLocator::findOrInstantiateBean)
-                                    .orElse(newDefaultKeySerializer(redisCacheConfiguration, conversionService));
+            .getKeySerializer()
+            .flatMap(beanLocator::findOrInstantiateBean)
+            .orElse(newDefaultKeySerializer(redisCacheConfiguration, conversionService));
 
         this.valueSerializer = redisCacheConfiguration
-                                    .getValueSerializer()
-                                    .flatMap(beanLocator::findOrInstantiateBean)
-                                    .orElse(new JdkSerializer(conversionService));
+            .getValueSerializer()
+            .flatMap(beanLocator::findOrInstantiateBean)
+            .orElse(new JdkSerializer(conversionService));
 
         Optional<String> server = redisCacheConfiguration.getServer();
-        this.connection = RedisConnectionUtil.findRedisConnection(beanLocator, server,"No Redis server configured to allow caching");
+        this.connection = RedisConnectionUtil.findRedisConnection(beanLocator, server, "No Redis server configured to allow caching");
         this.commands = syncCommands(this.connection);
         this.asyncCache = new RedisAsyncCache();
     }
@@ -102,7 +93,7 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
     }
 
     @Override
-    public StatefulConnection<?,?> getNativeCache() {
+    public StatefulConnection<?, ?> getNativeCache() {
         return connection;
     }
 
@@ -155,6 +146,17 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
         commands.remove(serializedKey);
     }
 
+    @Override
+    public void invalidateAll() {
+        List<byte[]> keys = commands.keys(getKeysPattern().getBytes(redisCacheConfiguration.getCharset()));
+        commands.del(keys.toArray(new byte[keys.size()][]));
+    }
+
+    @Override
+    public AsyncCache<StatefulConnection<?, ?>> async() {
+        return asyncCache;
+    }
+
     protected <T> Optional<T> getValue(Argument<T> requiredType, SyncCacheCommands commands, byte[] serializedKey) {
         byte[] data = commands.get(serializedKey);
         if (expireAfterAccess != null) {
@@ -166,17 +168,6 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
 
             return Optional.empty();
         }
-    }
-
-    @Override
-    public void invalidateAll() {
-        List<byte[]> keys = commands.keys(getKeysPattern().getBytes(redisCacheConfiguration.getCharset()));
-        commands.del(keys.toArray(new byte[keys.size()][]));
-    }
-
-    @Override
-    public AsyncCache<StatefulConnection<?,?>> async() {
-        return asyncCache;
     }
 
     /**
@@ -204,7 +195,6 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
         return keySerializer.serialize(key).orElseThrow(() -> new IllegalArgumentException("Key cannot be null"));
     }
 
-
     protected SyncCacheCommands syncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
         return redisCommandFactory.getCommands(SyncCacheCommands.class);
@@ -215,11 +205,7 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
         return redisCommandFactory.getCommands(AsyncCacheCommands.class);
     }
 
-    private DefaultStringKeySerializer newDefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
-        return new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService);
-    }
-
-    protected class RedisAsyncCache implements AsyncCache<StatefulConnection<?,?>> {
+    protected class RedisAsyncCache implements AsyncCache<StatefulConnection<?, ?>> {
 
         private final AsyncCacheCommands async = asyncCommands(connection);
 
@@ -368,7 +354,7 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
         }
 
         @Override
-        public StatefulConnection<?,?> getNativeCache() {
+        public StatefulConnection<?, ?> getNativeCache() {
             return RedisCache.this.getNativeCache();
         }
 
@@ -427,4 +413,7 @@ public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
 
     }
 
+    private DefaultStringKeySerializer newDefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
+        return new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService);
+    }
 }

@@ -1,23 +1,30 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.util;
 
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 
 /**
@@ -42,7 +49,6 @@ public class StringUtils {
     public static boolean isEmpty(@Nullable CharSequence str) {
         return str == null || str.length() == 0;
     }
-
 
     /**
      * Return whether the given string is not empty
@@ -80,8 +86,8 @@ public class StringUtils {
      * @param objects The objects
      * @return An set of strings
      */
-    public static Set<String> internSetOf(Object...objects) {
-        if(objects == null || objects.length == 0) {
+    public static Set<String> internSetOf(Object... objects) {
+        if (objects == null || objects.length == 0) {
             return Collections.emptySet();
         }
         Set<String> strings = new HashSet<>(objects.length);
@@ -98,14 +104,15 @@ public class StringUtils {
      * @return An unmodifiable set of strings
      * @see CollectionUtils#mapOf(Object...)
      */
-    public static Map<String, Object> internMapOf(Object...values) {
-        if(values == null) {
+    public static Map<String, Object> internMapOf(Object... values) {
+        if (values == null) {
             return Collections.emptyMap();
         }
         int len = values.length;
-        if(len % 2 != 0) throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        if (len % 2 != 0)
+            throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
 
-        Map<String,Object> answer = new HashMap<>(len / 2);
+        Map<String, Object> answer = new HashMap<>(len / 2);
         int i = 0;
         while (i < values.length - 1) {
             answer.put(values[i++].toString().intern(), values[i++]);
@@ -161,13 +168,13 @@ public class StringUtils {
      *                          (only applies to tokens that are empty after trimming; StringTokenizer
      *                          will not consider subsequent delimiters as token in the first place).
      * @return an array of the tokens (<code>null</code> if the input String
-     *         was <code>null</code>)
+     * was <code>null</code>)
      * @see java.util.StringTokenizer
      * @see java.lang.String#trim()
      */
     @SuppressWarnings({"unchecked"})
     public static String[] tokenizeToStringArray(
-            String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
+        String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
         if (str == null) {
             return null;

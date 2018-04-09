@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
-import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.Option;
-import com.sun.tools.javac.processing.JavacFiler;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
 
@@ -31,7 +29,6 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.util.Optional;
 
@@ -53,10 +50,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.filer = processingEnv.getFiler();
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
-        this.modelUtils = new ModelUtils(elementUtils,typeUtils);
+        this.modelUtils = new ModelUtils(elementUtils, typeUtils);
         this.annotationUtils = new AnnotationUtils(elementUtils);
-        this.genericUtils = new GenericUtils(elementUtils,typeUtils, modelUtils);
-
+        this.genericUtils = new GenericUtils(elementUtils, typeUtils, modelUtils);
 
         URI baseDir = null;
         try {
@@ -64,14 +60,14 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         } catch (Exception e) {
             // ignore
         }
-        if(baseDir == null) {
+        if (baseDir == null) {
             // OpenJDK doesn't like resolving root so we have to use a dummy sub-directory. Very hacky this.
             try {
                 URI uri = filer.getResource(StandardLocation.CLASS_OUTPUT, "", "-root").toUri();
-                if(uri != null) {
+                if (uri != null) {
                     File parentFile = new File(uri).getParentFile();
                     File canonicalFile = parentFile.getCanonicalFile();
-                    if(canonicalFile.exists()) {
+                    if (canonicalFile.exists()) {
                         baseDir = canonicalFile.toURI();
                     }
                 }
@@ -79,18 +75,18 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 // ignore
             }
         }
-        if(baseDir != null) {
+        if (baseDir != null) {
             try {
                 this.targetDirectory = new File(baseDir);
             } catch (Exception e) {
                 // ignore
             }
         }
-        if(targetDirectory == null) {
+        if (targetDirectory == null) {
             try {
-                Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
+                Options javacOptions = Options.instance(((JavacProcessingEnvironment) processingEnv).getContext());
                 String javacDirectoryOption = javacOptions.get(Option.D);
-                if(javacDirectoryOption != null) {
+                if (javacDirectoryOption != null) {
 
                     this.targetDirectory = new File(javacDirectoryOption);
                 }

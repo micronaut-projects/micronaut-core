@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,11 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -70,9 +74,9 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
     @Override
     public Object get(Object key) {
         PropertyDescriptor propertyDescriptor = propertyDescriptors.get(key);
-        if(propertyDescriptor != null) {
+        if (propertyDescriptor != null) {
             Method readMethod = propertyDescriptor.getReadMethod();
-            if(readMethod != null)
+            if (readMethod != null)
                 return ReflectionUtils.invokeMethod(bean, readMethod);
         }
         return null;
@@ -81,12 +85,12 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
     @Override
     public Object put(String key, Object value) {
         PropertyDescriptor propertyDescriptor = propertyDescriptors.get(key);
-        if(propertyDescriptor != null) {
+        if (propertyDescriptor != null) {
             Method writeMethod = propertyDescriptor.getWriteMethod();
-            if(writeMethod != null) {
+            if (writeMethod != null) {
                 Class<?> targetType = writeMethod.getParameterTypes()[0];
                 Optional<?> converted = ConversionService.SHARED.convert(value, targetType);
-                if(converted.isPresent()) {
+                if (converted.isPresent()) {
                     return ReflectionUtils.invokeMethod(bean, writeMethod, converted.get());
                 }
             }
@@ -123,7 +127,7 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
 
     @Override
     public Set<Entry<String, Object>> entrySet() {
-        return keySet().stream().map( key -> new Entry<String, Object>() {
+        return keySet().stream().map(key -> new Entry<String, Object>() {
             @Override
             public String getKey() {
                 return key;
