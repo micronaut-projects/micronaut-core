@@ -41,10 +41,8 @@ public class EnvironmentTest {
         ApplicationContext applicationContext = ApplicationContext.run("test", "android");
         Environment environment = applicationContext.getEnvironment();
 
-        assertEquals(
-                environment.getActiveNames(),
-                CollectionUtils.setOf("test", "android")
-        );
+        assertTrue(environment.getActiveNames().contains("test"));
+        assertTrue(environment.getActiveNames().contains("android"));
         // end::env[]
 
     }
