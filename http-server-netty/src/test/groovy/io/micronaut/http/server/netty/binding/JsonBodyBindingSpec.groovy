@@ -245,7 +245,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         ).blockingFirst()
 
         then:
-        response.body() == "Foo(Fred, 10)".toString()
+        response.body() == "[Foo(Fred, 10)]".toString()
     }
 
     @Controller(produces = io.micronaut.http.MediaType.APPLICATION_JSON)

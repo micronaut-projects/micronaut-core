@@ -49,6 +49,7 @@ import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
+import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -806,12 +807,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 @Override
                                 public HttpContent apply(HttpContent httpContent) throws Exception {
                                     if(!first) {
-                                        CompositeByteBuf compositeByteBuf = Unpooled.compositeBuffer(2);
-                                        compositeByteBuf.addComponent(true, Unpooled.copiedBuffer(",", StandardCharsets.UTF_8));
-                                        compositeByteBuf.addComponent(true, httpContent.content());
-                                        return httpContent.replace(
-                                                compositeByteBuf
-                                        );
+                                        return HttpContentUtil.prefixComma(httpContent);
                                     }
                                     else {
                                         first = false;
@@ -820,9 +816,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 }
                             });
                             requestBodyPublisher = Flowable.concat(
-                                    Flowable.fromCallable(() -> new DefaultHttpContent(Unpooled.copiedBuffer(new char[]{'['}, StandardCharsets.UTF_8))),
+                                    Flowable.fromCallable(HttpContentUtil::openBracket),
                                     requestBodyPublisher,
-                                    Flowable.fromCallable(() -> new DefaultHttpContent(Unpooled.copiedBuffer(new char[]{']'}, StandardCharsets.UTF_8)))
+                                    Flowable.fromCallable(HttpContentUtil::closeBracket)
                             );
                         }
 
