@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,9 @@
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Property;
+import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Put;
-import io.micronaut.discovery.consul.ConsulConfiguration;
-import io.micronaut.discovery.registration.RegistrationConfiguration;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Put;
@@ -48,7 +42,7 @@ public interface ConsulOperations {
     /**
      * Writes a value for the given key to Consul
      *
-     * @param key The key
+     * @param key   The key
      * @param value The value as a String
      * @return A {@link Publisher} that emits a boolean if the operation succeeded
      */
@@ -67,26 +61,28 @@ public interface ConsulOperations {
     /**
      * Reads a Key from Consul. See https://www.consul.io/api/kv.html
      *
-     * @param key The key
+     * @param key        The key
      * @param datacenter The data center
-     * @param raw Whether the value should be raw without encoding or metadata
-     * @param seperator The separator to use
+     * @param raw        Whether the value should be raw without encoding or metadata
+     * @param seperator  The separator to use
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
     @Get("/kv/{key}?recurse=true{&dc}{&raw}{&seperator}")
     @Retryable(
-            attempts = "${"+ ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${"+ ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
+        delay = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
     )
     Publisher<List<KeyValue>> readValues(
-            String key,
-            @Nullable @Parameter("dc") String datacenter,
-            @Nullable Boolean raw,
-            @Nullable String seperator);
+        String key,
+        @Nullable @Parameter("dc") String datacenter,
+        @Nullable Boolean raw,
+        @Nullable String seperator);
+
     /**
      * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
-     * @param note An optional note
+     * @param note    An optional note
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/pass/{checkId}{?note}")
@@ -94,8 +90,9 @@ public interface ConsulOperations {
 
     /**
      * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
-     * @param note An optional note
+     * @param note    An optional note
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/warn/{checkId}{?note}")
@@ -103,12 +100,14 @@ public interface ConsulOperations {
 
     /**
      * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
-     * @param note An optional note
+     * @param note    An optional note
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
     @Put("/agent/check/fail/{checkId}{?note}")
     Publisher<HttpStatus> fail(String checkId, @Nullable String note);
+
     /**
      * @return The current leader address
      */
@@ -117,8 +116,8 @@ public interface ConsulOperations {
 
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
-     * @param entry The entry to register
      *
+     * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/catalog/register")
@@ -126,8 +125,8 @@ public interface ConsulOperations {
 
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
-     * @param entry The entry to register
      *
+     * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/catalog/deregister")
@@ -135,27 +134,27 @@ public interface ConsulOperations {
 
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
-     * @param entry The entry to register
      *
+     * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/agent/service/register")
     @Retryable(
-            attempts = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
+        delay = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
     )
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
 
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
-     * @param service The service to register
      *
+     * @param service The service to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/agent/service/deregister/{service}")
     @Retryable(
-            attempts = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
+        delay = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
     )
     Publisher<HttpStatus> deregister(@NotNull String service);
 
@@ -165,7 +164,7 @@ public interface ConsulOperations {
      * @return The {@link NewServiceEntry} instances
      */
     @Get("/agent/services")
-    Publisher<Map<String,ServiceEntry>> getServices();
+    Publisher<Map<String, ServiceEntry>> getServices();
 
     /**
      * Gets the healthy services that are passing health checks
@@ -174,10 +173,10 @@ public interface ConsulOperations {
      */
     @Get("/health/service/{service}{?passing,tag,dc}")
     Publisher<List<HealthEntry>> getHealthyServices(
-            @NotNull String service,
-            Optional<Boolean> passing,
-            Optional<String> tag,
-            Optional<String> dc);
+        @NotNull String service,
+        Optional<Boolean> passing,
+        Optional<String> tag,
+        Optional<String> dc);
 
     /**
      * Gets all of the registered nodes
@@ -204,9 +203,9 @@ public interface ConsulOperations {
     @Get("/catalog/services")
     Publisher<Map<String, List<String>>> getServiceNames();
 
-
     /**
      * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
@@ -216,6 +215,7 @@ public interface ConsulOperations {
 
     /**
      * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */
@@ -225,6 +225,7 @@ public interface ConsulOperations {
 
     /**
      * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
      */

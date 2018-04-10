@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,12 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 public interface MutableHttpMessage<B> extends HttpMessage<B> {
+
     /**
      * @return The {@link MutableHttpHeaders} object
      */
     @Override
     MutableHttpHeaders getHeaders();
-
 
     /**
      * Sets the body
@@ -61,7 +61,6 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         getHeaders().add(name, value);
         return this;
     }
-
 
     /**
      * Set multiple headers

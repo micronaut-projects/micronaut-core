@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package io.micronaut.jackson.env;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.ByteArrayInputStream;
@@ -34,7 +32,12 @@ import java.util.Optional;
  * @since 1.0
  */
 public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
+
+    /**
+     * Position for the system property source loader in the chain
+     */
     public static final int POSITION = SystemPropertiesPropertySource.POSITION + 50;
+
     private static final String SPRING_APPLICATION_JSON = "SPRING_APPLICATION_JSON";
     private static final String MICRONAUT_APPLICATION_JSON = "MICRONAUT_APPLICATION_JSON";
 

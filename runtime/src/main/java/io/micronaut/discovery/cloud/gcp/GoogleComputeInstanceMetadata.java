@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,6 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String account;
     String imageId;
 
-
     // should we keep these broken out or require people to look in the interfaces?
     String publicIpV4;
     String publicIpV6;
@@ -73,7 +72,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public Map<String,String> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
@@ -114,8 +113,8 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
 
     @Override
     public String getRegion() {
-        if (availabilityZone !=null) {
-            return availabilityZone.substring(0,availabilityZone.length()-2);
+        if (availabilityZone != null) {
+            return availabilityZone.substring(0, availabilityZone.length() - 2);
         }
         return region;
     }

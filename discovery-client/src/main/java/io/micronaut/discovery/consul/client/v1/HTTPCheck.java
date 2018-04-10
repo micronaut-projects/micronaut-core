@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,6 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
-import io.micronaut.http.HttpMethod;
 
 import java.net.URL;
 import java.time.Duration;
@@ -35,7 +32,6 @@ import java.util.Optional;
 
 /**
  * A class representing an HTTP check. See https://www.consul.io/api/agent/check.html
- *
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -67,18 +63,26 @@ public class HTTPCheck extends NewCheck {
     }
 
     void setInterval(String interval) {
-        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid Duration Specified"));
+        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(() -> new IllegalArgumentException("Invalid Duration Specified"));
     }
 
+    /**
+     * @param interval The interval as a {@link Duration}
+     * @return The {@link HTTPCheck} instance
+     */
     public HTTPCheck interval(Duration interval) {
-        if(interval != null) {
+        if (interval != null) {
             this.interval = interval;
         }
         return this;
     }
 
+    /**
+     * @param interval The interval as a string
+     * @return The {@link HTTPCheck} instance
+     */
     public HTTPCheck interval(String interval) {
-        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid Duration Specified"));
+        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(() -> new IllegalArgumentException("Invalid Duration Specified"));
         return this;
     }
 
@@ -86,7 +90,7 @@ public class HTTPCheck extends NewCheck {
      * @return The check interval
      */
     public Optional<String> getInterval() {
-        if(interval != null) {
+        if (interval != null) {
             return Optional.of(interval.getSeconds() + "s");
         }
         return Optional.empty();
@@ -94,6 +98,7 @@ public class HTTPCheck extends NewCheck {
 
     /**
      * See https://www.consul.io/api/agent/service.html#http
+     *
      * @return The HTTP URL to check
      */
     @JsonProperty("HTTP")
@@ -103,6 +108,7 @@ public class HTTPCheck extends NewCheck {
 
     /**
      * See https://www.consul.io/api/agent/service.html#method
+     *
      * @return The HTTP method to use for the check
      */
     public Optional<HttpMethod> getMethod() {
@@ -118,42 +124,65 @@ public class HTTPCheck extends NewCheck {
         return headers;
     }
 
+    /**
+     * @param headers The headers
+     */
     @JsonProperty("Header")
     public void setHeaders(Map<CharSequence, List<String>> headers) {
         if (headers == null) {
             this.headers = ConvertibleMultiValues.empty();
-        }
-        else {
+        } else {
             this.headers = ConvertibleMultiValues.of(headers);
         }
     }
 
+    /**
+     * @return Whether skip TLS verification
+     */
     @JsonProperty("TLSSkipVerify")
     public boolean isTLSSkipVerify() {
         return TLSSkipVerify;
     }
 
+    /**
+     * @param TLSSkipVerify Skip the TLS verification
+     */
     @JsonProperty("TLSSkipVerify")
     public void setTLSSkipVerify(boolean TLSSkipVerify) {
         this.TLSSkipVerify = TLSSkipVerify;
     }
 
+    /**
+     * @param method The {@link HttpMethod}
+     */
     public void setMethod(HttpMethod method) {
         this.method = method;
     }
 
+    /**
+     * @param headers The headers
+     * @return The {@link HTTPCheck} instance
+     */
     public HTTPCheck headers(ConvertibleMultiValues<String> headers) {
-        if(headers != null) {
+        if (headers != null) {
             this.headers = headers;
         }
         return this;
     }
 
+    /**
+     * @param TLSSkipVerify Skip the TLS verification
+     * @return The {@link HTTPCheck} instance
+     */
     public HTTPCheck tlsSkipVerify(boolean TLSSkipVerify) {
         this.TLSSkipVerify = TLSSkipVerify;
         return this;
     }
 
+    /**
+     * @param method The {@link HttpMethod}
+     * @return The {@link HTTPCheck} instance
+     */
     public HTTPCheck method(HttpMethod method) {
         this.method = method;
         return this;
@@ -181,15 +210,14 @@ public class HTTPCheck extends NewCheck {
         if (!super.equals(o)) return false;
         HTTPCheck httpCheck = (HTTPCheck) o;
         return TLSSkipVerify == httpCheck.TLSSkipVerify &&
-                Objects.equals(interval, httpCheck.interval) &&
-                Objects.equals(url, httpCheck.url) &&
-                method == httpCheck.method &&
-                Objects.equals(headers, httpCheck.headers);
+            Objects.equals(interval, httpCheck.interval) &&
+            Objects.equals(url, httpCheck.url) &&
+            method == httpCheck.method &&
+            Objects.equals(headers, httpCheck.headers);
     }
 
     @Override
     public int hashCode() {
-
         return Objects.hash(super.hashCode(), interval, url, method, TLSSkipVerify, headers);
     }
 }

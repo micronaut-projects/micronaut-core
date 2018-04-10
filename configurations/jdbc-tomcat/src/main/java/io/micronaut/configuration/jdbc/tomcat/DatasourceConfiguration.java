@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 package io.micronaut.configuration.jdbc.tomcat;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
-import org.apache.tomcat.jdbc.pool.PoolProperties;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
+import org.apache.tomcat.jdbc.pool.PoolProperties;
 
 import javax.annotation.PostConstruct;
 
@@ -55,60 +55,96 @@ public class DatasourceConfiguration extends PoolProperties implements BasicJdbc
         getValidationQuery();
     }
 
+    /**
+     * @return The calculated driver class name
+     */
     @Override
     public String getDriverClassName() {
         return calculatedSettings.getDriverClassName();
     }
 
+    /**
+     * @return The configured driver class name
+     */
     @Override
     public String getConfiguredDriverClassName() {
         return super.getDriverClassName();
     }
 
+    /**
+     * @return The calculated URL
+     */
     @Override
     public String getUrl() {
         return calculatedSettings.getUrl();
     }
 
+    /**
+     * @return The configured URL
+     */
     @Override
     public String getConfiguredUrl() {
         return super.getUrl();
     }
 
+    /**
+     * @return The calculated username
+     */
     @Override
     public String getUsername() {
         return calculatedSettings.getUsername();
     }
 
+    /**
+     * @return The configured username
+     */
     @Override
     public String getConfiguredUsername() {
         return super.getUsername();
     }
 
+    /**
+     * @return The calculated password
+     */
     @Override
     public String getPassword() {
         return calculatedSettings.getPassword();
     }
 
+    /**
+     * @return The configured password
+     */
     @Override
     public String getConfiguredPassword() {
         return super.getPassword();
     }
 
+    /**
+     * @return The calculated validation query
+     */
     @Override
     public String getValidationQuery() {
         return calculatedSettings.getValidationQuery();
     }
 
+    /**
+     * @return The configured validation query
+     */
     @Override
     public String getConfiguredValidationQuery() {
         return super.getValidationQuery();
     }
 
+    /**
+     * @return The JNDI name
+     */
     public String getJndiName() {
         return getDataSourceJNDI();
     }
 
+    /**
+     * @param jndiName Set the JDNI name
+     */
     public void setJndiName(String jndiName) {
         setDataSourceJNDI(jndiName);
     }

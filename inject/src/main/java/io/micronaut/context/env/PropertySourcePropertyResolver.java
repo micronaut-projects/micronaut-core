@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,15 @@ import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -34,6 +42,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
+
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -331,8 +340,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
                     }
                 }
-
-
             }
         }
     }
@@ -346,7 +353,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 StringBuilder path = new StringBuilder();
                 int len = tokens.length;
                 if (len > 1) {
-
                     for (int i = 0; i < len; i++) {
                         String token = tokens[i];
                         if (i < (len - 1)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,13 @@ import com.amazonaws.handlers.RequestHandler2;
 import com.amazonaws.metrics.RequestMetricCollector;
 import com.amazonaws.services.lambda.AWSLambdaAsyncClient;
 import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
+import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.configurations.aws.AWSConfiguration;
+import io.micronaut.configurations.aws.EnvironmentAWSCredentialsProvider;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.configurations.aws.*;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -57,12 +59,11 @@ public class AWSLambdaConfiguration {
         this.clientConfiguration = clientConfiguration;
 
         this.builder.setCredentials(new AWSCredentialsProviderChain(
-                new EnvironmentAWSCredentialsProvider(environment),
-                new EnvironmentVariableCredentialsProvider(),
-                new SystemPropertiesCredentialsProvider(),
-                new ProfileCredentialsProvider(),
-                new EC2ContainerCredentialsProviderWrapper()
-
+            new EnvironmentAWSCredentialsProvider(environment),
+            new EnvironmentVariableCredentialsProvider(),
+            new SystemPropertiesCredentialsProvider(),
+            new ProfileCredentialsProvider(),
+            new EC2ContainerCredentialsProviderWrapper()
         ));
     }
 
@@ -79,17 +80,17 @@ public class AWSLambdaConfiguration {
      */
     @Inject
     public void setMetricsCollector(@Nullable RequestMetricCollector metricsCollector) {
-        if(metricsCollector != null) {
+        if (metricsCollector != null) {
             builder.setMetricsCollector(metricsCollector);
         }
     }
 
     /**
-     * @param endpointConfiguration The {@link AwsClientBuilder.EndpointConfiguration}
+     * @param endpointConfiguration The {@link AwsClientBuilder#getEndpoint()}
      */
     @Inject
     public void setEndpointConfiguration(@Nullable AwsClientBuilder.EndpointConfiguration endpointConfiguration) {
-        if(endpointConfiguration != null) {
+        if (endpointConfiguration != null) {
             builder.setEndpointConfiguration(endpointConfiguration);
         }
     }
@@ -98,8 +99,8 @@ public class AWSLambdaConfiguration {
      * @param handlers The {@link RequestHandler2}
      */
     @Inject
-    public void setRequestHandlers(@Nullable RequestHandler2...handlers) {
-        if(ArrayUtils.isNotEmpty(handlers)) {
+    public void setRequestHandlers(@Nullable RequestHandler2... handlers) {
+        if (ArrayUtils.isNotEmpty(handlers)) {
             builder.setRequestHandlers(handlers);
         }
     }

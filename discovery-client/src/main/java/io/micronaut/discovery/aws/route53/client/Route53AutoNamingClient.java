@@ -1,8 +1,29 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.discovery.aws.route53.client;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
-import com.amazonaws.services.servicediscovery.model.*;
+import com.amazonaws.services.servicediscovery.model.InstanceSummary;
+import com.amazonaws.services.servicediscovery.model.ListInstancesRequest;
+import com.amazonaws.services.servicediscovery.model.ListInstancesResult;
+import com.amazonaws.services.servicediscovery.model.ListServicesRequest;
+import com.amazonaws.services.servicediscovery.model.ListServicesResult;
+import com.amazonaws.services.servicediscovery.model.ServiceFilter;
+import com.amazonaws.services.servicediscovery.model.ServiceSummary;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
@@ -23,14 +44,13 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
-
 /**
  * @author Rvanderwerf
  * @since 1.0
  */
 @Singleton
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
-@Requires(env= Environment.AMAZON_EC2)
+@Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
@@ -45,22 +65,19 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Inject
     Route53DiscoveryConfiguration route53DiscoveryConfiguration;
 
-
     AWSServiceDiscovery discoveryClient;
-
 
     @Override
     public String getDescription() {
         return null;
     }
 
-
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        if (discoveryClient==null) {
+        if (discoveryClient == null) {
             discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
         }
-        if (serviceId==null) {
+        if (serviceId == null) {
             serviceId = route53ClientDiscoveryConfiguration.getAwsServiceId();  // we can default to the config file
         }
 
@@ -69,8 +86,8 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         List<ServiceInstance> serviceInstances = new ArrayList<ServiceInstance>();
         for (InstanceSummary instanceSummary : instanceResult.getInstances()) {
             try {
-                String uri = "http://"+instanceSummary.getAttributes().get("URI");
-                ServiceInstance serviceInstance = new EC2ServiceInstance(instanceSummary.getId(),new URI(uri)).metadata(instanceSummary.getAttributes()).build();
+                String uri = "http://" + instanceSummary.getAttributes().get("URI");
+                ServiceInstance serviceInstance = new EC2ServiceInstance(instanceSummary.getId(), new URI(uri)).metadata(instanceSummary.getAttributes()).build();
                 serviceInstances.add(serviceInstance);
             } catch (URISyntaxException e) {
                 e.printStackTrace();
@@ -78,15 +95,13 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         }
 
         return Publishers.just(
-                serviceInstances
+            serviceInstances
         );
-
     }
 
     @Override
     public Publisher<List<String>> getServiceIds() {
-
-        if (discoveryClient==null) {
+        if (discoveryClient == null) {
             discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
         }
 
@@ -99,7 +114,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
             serviceIds.add(service.getId());
         }
         return Publishers.just(
-                serviceIds
+            serviceIds
         );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,11 +46,12 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
 
     /**
      * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header
+     *
      * @param mediaTypes The media types
      * @return This request
      */
-    default MutableHttpRequest<B> accept(MediaType...mediaTypes) {
-        if(ArrayUtils.isNotEmpty(mediaTypes)) {
+    default MutableHttpRequest<B> accept(MediaType... mediaTypes) {
+        if (ArrayUtils.isNotEmpty(mediaTypes)) {
             String acceptString = Arrays.stream(mediaTypes).collect(Collectors.joining(","));
             header(HttpHeaders.ACCEPT, acceptString);
         }

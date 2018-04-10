@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Blocking;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -37,6 +32,7 @@ import org.reactivestreams.Publisher;
  */
 @Blocking
 public interface BlockingHttpClient {
+
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type</p>
@@ -93,19 +89,17 @@ public interface BlockingHttpClient {
     @SuppressWarnings("unchecked")
     default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         HttpResponse<O> response = exchange(request, bodyType);
-        if(HttpStatus.class.isAssignableFrom(bodyType.getType())) {
+        if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
             return (O) response.getStatus();
-        }
-        else {
+        } else {
             return response
-                    .getBody()
-                    .orElseThrow(() -> new HttpClientResponseException(
-                            "Empty body",
-                            response
-                    ));
+                .getBody()
+                .orElseThrow(() -> new HttpClientResponseException(
+                    "Empty body",
+                    response
+                ));
         }
     }
-
 
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
@@ -126,8 +120,8 @@ public interface BlockingHttpClient {
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type
      *
-     * @param request  The {@link HttpRequest} to execute
-     * @param <I>      The request body type
+     * @param request The {@link HttpRequest} to execute
+     * @param <I>     The request body type
      * @return A string result or null if a 404 is returned
      * @throws HttpClientResponseException if an error status is returned
      */
@@ -146,11 +140,12 @@ public interface BlockingHttpClient {
     default String retrieve(String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
     }
+
     /**
      * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
      *
      * @param uri The URI of the GET request
-     * @param <O>     The response body type
+     * @param <O> The response body type
      * @return The full {@link HttpResponse} object
      */
     default <O> HttpResponse<O> exchange(String uri) {
@@ -161,11 +156,10 @@ public interface BlockingHttpClient {
      * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
      *
      * @param uri The URI of the GET request
-     * @param <O>     The response body type
+     * @param <O> The response body type
      * @return The full {@link HttpResponse} object
      */
     default <O> HttpResponse<O> exchange(String uri, Class<O> bodyType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
     }
-
 }

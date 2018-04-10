@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,6 @@
  */
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.eureka.client.v2.AmazonInfo;
-import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
@@ -47,20 +42,6 @@ public class EurekaServiceInstance implements ServiceInstance {
         this.uri = createURI(instanceInfo);
     }
 
-    private URI createURI(InstanceInfo instanceInfo) {
-        int securePort = instanceInfo.getSecurePort();
-        if(securePort > 0) {
-            int port = instanceInfo.getPort();
-            String portStr = port > 0 ? ":" + port : "";
-            return URI.create("https://" + instanceInfo.getHostName() + portStr);
-        }
-        else {
-            int port = instanceInfo.getPort();
-            String portStr = port > 0 ? ":" + port : "";
-            return URI.create("http://" + instanceInfo.getHostName() + portStr);
-        }
-    }
-
     @Override
     public Optional<String> getInstanceId() {
         return Optional.ofNullable(instanceInfo.getInstanceId());
@@ -82,7 +63,7 @@ public class EurekaServiceInstance implements ServiceInstance {
     @Override
     public Optional<String> getZone() {
         @NotNull DataCenterInfo dataCenterInfo = instanceInfo.getDataCenterInfo();
-        if(dataCenterInfo instanceof AmazonInfo) {
+        if (dataCenterInfo instanceof AmazonInfo) {
             String availabilityZone = ((AmazonInfo) dataCenterInfo).get(AmazonInfo.MetaDataKey.availabilityZone);
             return Optional.ofNullable(availabilityZone);
         }
@@ -92,7 +73,7 @@ public class EurekaServiceInstance implements ServiceInstance {
     @Override
     public Optional<String> getRegion() {
         @NotNull DataCenterInfo dataCenterInfo = instanceInfo.getDataCenterInfo();
-        if(dataCenterInfo instanceof AmazonInfo) {
+        if (dataCenterInfo instanceof AmazonInfo) {
             String availabilityZone = ((AmazonInfo) dataCenterInfo).get(AmazonInfo.MetaDataKey.availabilityZone);
             return Optional.ofNullable(availabilityZone);
         }
@@ -102,7 +83,7 @@ public class EurekaServiceInstance implements ServiceInstance {
     @Override
     public Optional<String> getGroup() {
         String asgName = instanceInfo.getAsgName();
-        if(StringUtils.isNotEmpty(asgName)) {
+        if (StringUtils.isNotEmpty(asgName)) {
             return Optional.of(asgName);
         }
         return ServiceInstance.super.getZone();
@@ -130,4 +111,16 @@ public class EurekaServiceInstance implements ServiceInstance {
         return ConvertibleValues.of(instanceInfo.getMetadata());
     }
 
+    private URI createURI(InstanceInfo instanceInfo) {
+        int securePort = instanceInfo.getSecurePort();
+        if (securePort > 0) {
+            int port = instanceInfo.getPort();
+            String portStr = port > 0 ? ":" + port : "";
+            return URI.create("https://" + instanceInfo.getHostName() + portStr);
+        } else {
+            int port = instanceInfo.getPort();
+            String portStr = port > 0 ? ":" + port : "";
+            return URI.create("http://" + instanceInfo.getHostName() + portStr);
+        }
+    }
 }

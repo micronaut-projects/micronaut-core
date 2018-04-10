@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,10 +44,10 @@ import java.util.Optional;
 @ConfigurationProperties(Neo4jBoltSettings.PREFIX)
 public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
 
-    private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
-
     @ConfigurationBuilder(prefixes = "with", allowZeroArgs = true)
     protected Config.ConfigBuilder config = Config.build();
+
+    private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
 
     private AuthToken authToken;
     private String username;
@@ -103,6 +103,13 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
+     * @return The Neo4j URIs
+     */
+    public List<URI> getUris() {
+        return uris;
+    }
+
+    /**
      * Set a {@link List} of Neo4J {@link URI}
      *
      * @param uris The list of URIs
@@ -154,13 +161,6 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * @return The Neo4j URIs
-     */
-    public List<URI> getUris() {
-        return uris;
-    }
-
-    /**
      * @return The configuration
      */
     public Config getConfig() {
@@ -188,6 +188,14 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
+     * @param authToken The {@link AuthToken}
+     */
+    @Inject
+    public void setAuthToken(@Nullable AuthToken authToken) {
+        this.authToken = authToken;
+    }
+
+    /**
      * @param username The username
      */
     public void setUsername(String username) {
@@ -212,11 +220,10 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * @param authToken The {@link AuthToken}
+     * @return The settings for the embedded Neo4j server
      */
-    @Inject
-    public void setAuthToken(@Nullable AuthToken authToken) {
-        this.authToken = authToken;
+    public Neo4jEmbeddedSettings getEmbeddedSettings() {
+        return embeddedSettings;
     }
 
     /**
@@ -225,13 +232,6 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     @Inject
     public void setEmbeddedSettings(Neo4jEmbeddedSettings embeddedSettings) {
         this.embeddedSettings = embeddedSettings;
-    }
-
-    /**
-     * @return The settings for the embedded Neo4j server
-     */
-    public Neo4jEmbeddedSettings getEmbeddedSettings() {
-        return embeddedSettings;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
-import io.micronaut.context.annotation.Requirements;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.condition.Condition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.inject.BeanContextConditional;
@@ -36,13 +33,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
-    private final Map<Integer,Boolean> enabled = new ConcurrentHashMap<>(2);
+    private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
 
     @Override
     public boolean isEnabled(BeanContext context) {
         int contextId = context.hashCode();
         Boolean enabled = this.enabled.get(contextId);
-        if(enabled == null) {
+        if (enabled == null) {
             AnnotationMetadata annotationMetadata = getAnnotationMetadata();
             Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
             enabled = condition == null || condition.matches(new DefaultConditionContext<>(context, this));
