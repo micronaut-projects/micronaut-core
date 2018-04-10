@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -25,6 +26,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -51,6 +53,34 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+    }
+
+    void "test run Micronaut server on same port as another server"() {
+        when:
+        int port = SocketUtils.findAvailableTcpPort()
+        EmbeddedServer embeddedServer = ApplicationContext.run(
+                EmbeddedServer,
+                PropertySource.of('micronaut.server.port':port)
+        )
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+        def response = client.exchange('/person/Fred', String).blockingFirst()
+        then:
+        response.body() == "Person Named Fred"
+
+        when:"Run another server with same port"
+        ApplicationContext.run(
+                EmbeddedServer,
+                PropertySource.of('micronaut.server.port':port)
+        )
+
+        then:"An error is thrown"
+        def e = thrown(ServerStartupException)
+        e.cause instanceof BindException
+
+        cleanup:
+        embeddedServer?.stop()
     }
 
     void "test Micronaut server running again"() {

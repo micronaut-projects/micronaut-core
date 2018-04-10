@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
+import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
@@ -64,6 +65,7 @@ import java.net.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
@@ -98,6 +100,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final Optional<SslContext> sslContext;
+    private final AtomicBoolean running = new AtomicBoolean(false);
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
@@ -149,11 +152,11 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public boolean isRunning() {
-        return !SocketUtils.isTcpPortAvailable(serverPort);
+        return running.get() && !SocketUtils.isTcpPortAvailable(serverPort);
     }
 
     @Override
-    public EmbeddedServer start() {
+    public synchronized EmbeddedServer start() {
         if(!isRunning()) {
 
             workerGroup = createWorkerEventLoopGroup();
@@ -203,13 +206,17 @@ public class NettyHttpServer implements EmbeddedServer {
             Optional<String> host = serverConfiguration.getHost();
 
             bindServerToHost(serverBootstrap, host, new AtomicInteger(0));
-
+            running.set(true);
         }
 
         return this;
     }
 
     private void bindServerToHost(ServerBootstrap serverBootstrap, Optional<String> host, AtomicInteger attempts) {
+        boolean isRandomPort = serverConfiguration.getPort() == -1;
+        if(!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
+            throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
+        }
         if(LOG.isDebugEnabled()) {
             LOG.debug("Binding server to port: {}", serverPort);
         }
@@ -237,7 +244,8 @@ public class NettyHttpServer implements EmbeddedServer {
                 }
             }
             int attemptCount = attempts.getAndIncrement();
-            if(serverConfiguration.getPort() == -1 && attemptCount < 3) {
+
+            if(isRandomPort && attemptCount < 3) {
                 serverPort = SocketUtils.findAvailableTcpPort();
                 bindServerToHost(serverBootstrap, host, attempts);
             }
@@ -249,23 +257,26 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     @Override
-    public EmbeddedServer stop() {
+    public synchronized EmbeddedServer stop() {
         if (isRunning() && workerGroup != null) {
-            try {
-                workerGroup.shutdownGracefully()
-                           .addListener(this::logShutdownErrorIfNecessary);
-                parentGroup.shutdownGracefully()
-                           .addListener(this::logShutdownErrorIfNecessary);
-                applicationContext.publishEvent(new ServerShutdownEvent(this));
-                if(serviceInstance != null) {
-                    applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
-                }
-                if(applicationContext.isRunning()) {
-                    applicationContext.stop();
-                }
-            } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
+            if(running.compareAndSet(true,false)) {
+
+                try {
+                    workerGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                    applicationContext.publishEvent(new ServerShutdownEvent(this));
+                    if(serviceInstance != null) {
+                        applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
+                    }
+                    if(applicationContext.isRunning()) {
+                        applicationContext.stop();
+                    }
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
+                    }
                 }
             }
         }

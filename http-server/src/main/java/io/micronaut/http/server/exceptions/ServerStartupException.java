@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.exceptions;
+package io.micronaut.http.server.exceptions;
 
 /**
- * Thrown for an unrecoverable server exceptions
+ * An exception thrown on server startup
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public class InternalServerException extends HttpException {
-    public InternalServerException(String message) {
+public class ServerStartupException extends HttpServerException {
+    public ServerStartupException(String message) {
         super(message);
     }
 
-    public InternalServerException(String message, Throwable cause) {
+    public ServerStartupException(String message, Throwable cause) {
         super(message, cause);
     }
 }
