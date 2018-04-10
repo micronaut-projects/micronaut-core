@@ -23,6 +23,8 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 
@@ -36,9 +38,13 @@ import javax.inject.Singleton;
 @Primary
 @Produces
 public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRouteException, HttpResponse> {
+    private static final Logger LOG = LoggerFactory.getLogger(UnsatisfiedRouteHandler.class);
 
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
+        if(LOG.isErrorEnabled()) {
+            LOG.error("{} (Bad Request): {}",request, exception.getMessage());
+        }
         VndError error = new VndError(exception.getMessage());
         error.path('/' + exception.getArgument().getName());
         error.link(Link.SELF, Link.of(request.getUri()));

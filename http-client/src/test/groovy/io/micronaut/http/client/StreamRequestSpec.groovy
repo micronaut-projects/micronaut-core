@@ -75,6 +75,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+
+        cleanup:
+        client.close()
     }
 
     void "test stream post request with byte chunks"() {
@@ -100,6 +103,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+
+        cleanup:
+        client.close()
     }
 
     void "test stream post request with POJOs"() {
@@ -125,11 +131,13 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
+
+        cleanup:
+        client.close()
     }
 
 
 
-    @NotYetImplemented
     void "test stream post request with POJOs flowable"() {
         given:
         RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
@@ -144,7 +152,6 @@ class StreamRequestSpec extends Specification {
                 }
                 emitter.onComplete()
 
-
             }
         }, BackpressureStrategy.BUFFER
 
@@ -152,7 +159,7 @@ class StreamRequestSpec extends Specification {
 
         then:
         result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        result.body() == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
     }
 
     @Controller('/stream/request')
