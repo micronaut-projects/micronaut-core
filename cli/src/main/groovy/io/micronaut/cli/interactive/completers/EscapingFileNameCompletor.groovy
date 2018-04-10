@@ -33,7 +33,7 @@ class EscapingFileNameCompletor extends FileNameCompleter {
      * If a candidate ends in a whitespace character, then that is <em>not</em>
      * escaped.</p>
      */
-    int complete(String buffer, int cursor, List candidates) {
+    int complete(String buffer, int cursor, List<CharSequence> candidates) {
         int retval = super.complete(buffer, cursor, candidates)
 
         int count = candidates.size()

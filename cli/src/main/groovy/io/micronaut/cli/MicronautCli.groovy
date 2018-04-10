@@ -569,13 +569,9 @@ class MicronautCli {
 
     private CodeGenConfig loadApplicationConfig() {
         CodeGenConfig config = new CodeGenConfig()
-        File applicationYml = new File("grails-app/conf/application.yml")
-        File applicationGroovy = new File("grails-app/conf/application.groovy")
-        if(applicationYml.exists()) {
-            config.loadYml(applicationYml)
-        }
-        if(applicationGroovy.exists()) {
-            config.loadGroovy(applicationGroovy)
+        File cliYml = new File("micronaut-cli.yml")
+        if(cliYml.exists()) {
+            config.loadYml(cliYml)
         }
         config
     }

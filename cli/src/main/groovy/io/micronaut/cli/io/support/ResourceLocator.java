@@ -64,23 +64,9 @@ public class ResourceLocator {
 
     private void initializeForSearchLocation(String searchLocation) {
         String searchLocationPlusSlash = searchLocation.endsWith("/") ? searchLocation : searchLocation + FILE_SEPARATOR;
-        try {
-            File[] directories = new File(searchLocationPlusSlash + ResourceUtils.GRAILS_APP_DIR).listFiles(new FileFilter() {
-                public boolean accept(File file) {
-                    return file.isDirectory() && !file.isHidden();
-                }
-            });
-            if (directories != null) {
-                for (File directory : directories) {
-                    classSearchDirectories.add(directory.getCanonicalPath());
-                }
-            }
-        } catch (IOException e) {
-            // ignore
-        }
-
         classSearchDirectories.add(searchLocationPlusSlash + "src/main/java");
         classSearchDirectories.add(searchLocationPlusSlash + "src/main/groovy");
+        classSearchDirectories.add(searchLocationPlusSlash + "src/main/kotlin");
         resourceSearchDirectories.add(searchLocationPlusSlash);
     }
 
@@ -148,20 +134,11 @@ public class ResourceLocator {
         Resource resource = classNameToResourceCache.get(className);
         if (resource == null) {
             String classNameWithPathSeparator = className.replace(".", FILE_SEPARATOR);
-            for (String pathPattern : getSearchPatternForExtension(classNameWithPathSeparator, ".groovy", ".java")) {
+            for (String pathPattern : getSearchPatternForExtension(classNameWithPathSeparator, ".groovy", ".java", ".kt")) {
                 resource = resolveExceptionSafe(pathPattern);
                 if (resource != null && resource.exists()) {
                     classNameToResourceCache.put(className, resource);
                     break;
-                }
-            }
-            if (resource == null || !resource.exists()) {
-                for(String ext : new String[]{".groovy", ".java"}) {
-                    resource = resolveExceptionSafe(ResourceUtils.DOMAIN_DIR_PATH + "**/" + className + ext);
-                    if (resource != null && resource.exists()) {
-                        classNameToResourceCache.put(className, resource);
-                        break;
-                    }
                 }
             }
         }
