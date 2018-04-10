@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.Toggleable;
 
 import javax.annotation.Nullable;
@@ -42,10 +43,10 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
     /**
      * Load a {@link PropertySource} for the given {@link Environment}
      *
-     * @param resourceName    The resourceName of the resource to load
-     * @param environment     The environment
+     * @param resourceName The resourceName of the resource to load
+     * @param resourceLoader The {@link ResourceLoader} to retrieve the resource
      * @param environmentName The environment name to load. Null if the default environment is to be used
      * @return An optional of {@link PropertySource}
      */
-    Optional<PropertySource> load(String resourceName, Environment environment, @Nullable String environmentName);
+    Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName);
 }
