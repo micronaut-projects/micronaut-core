@@ -30,7 +30,7 @@ class SystemStreamsRedirector {
     }
     
     static <T> T withOriginalIO(Closure<T> closure) {
-        original().withRedirectedIO(closure)
+        original.withRedirectedIO(closure)
     }
     
     public <T> T withRedirectedIO(Closure<T> closure) {

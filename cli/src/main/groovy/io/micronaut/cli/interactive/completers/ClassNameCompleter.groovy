@@ -32,68 +32,65 @@ import java.util.concurrent.ConcurrentSkipListSet
 @CompileStatic
 class ClassNameCompleter extends StringsCompleter {
 
-        private static Map<String, SortedSet<String>> RESOURCE_SCAN_CACHE = [:]
-        private static Collection<ClassNameCompleter> allCompeters = new ConcurrentLinkedQueue<>()
-        PathMatchingResourcePatternResolver resourcePatternResolver = new PathMatchingResourcePatternResolver()
+    private static Map<String, SortedSet<String>> RESOURCE_SCAN_CACHE = [:]
+    private static Collection<ClassNameCompleter> allCompleters = new ConcurrentLinkedQueue<>()
+    PathMatchingResourcePatternResolver resourcePatternResolver = new PathMatchingResourcePatternResolver()
 
-        private File[] baseDirs
+    private Map<File, String> baseDirs
 
-        ClassNameCompleter(File baseDir) {
-                initialize(baseDir)
+
+    ClassNameCompleter(Map<File, String> baseDirs) {
+        initialize(baseDirs)
+    }
+
+    static void refreshAll() {
+        Thread.start {
+            RESOURCE_SCAN_CACHE.clear()
+            Collection<ClassNameCompleter> competers = new ArrayList<>(allCompleters)
+            for (ClassNameCompleter completer : competers) {
+                completer.refresh()
+            }
         }
+    }
 
-        ClassNameCompleter(File... baseDirs) {
-                initialize(baseDirs)
-        }
+    private void refresh() {
+        if (!baseDirs) return
+        initialize(baseDirs)
+    }
 
-        static void refreshAll() {
-                Thread.start {
-                        RESOURCE_SCAN_CACHE.clear()
-                        Collection<ClassNameCompleter> competers = new ArrayList<>(allCompeters)
-                        for (ClassNameCompleter completer : competers) {
-                                completer.refresh()
+    private void initialize(Map<File, String> baseDirs) {
+        try {
+            if (!baseDirs) return
+            this.baseDirs = baseDirs
+            if (!allCompleters.contains(this))
+                allCompleters << this
+            SortedSet<String> allStrings = new ConcurrentSkipListSet<>()
+            for (Map.Entry<File, String> baseDir in baseDirs.entrySet()) {
+                def pattern = "file:${baseDir.key}/${baseDir.value}".toString()
+                SortedSet<String> strings = RESOURCE_SCAN_CACHE[pattern]
+                if (strings == null) {
+                    strings = new TreeSet<>()
+                    RESOURCE_SCAN_CACHE[pattern] = strings
+                    def resources = resourcePatternResolver.getResources(pattern)
+                    for (res in resources) {
+                        if (isValidResource(res)) {
+                            def path = res.file.canonicalPath
+                            def basePath = baseDir.key.canonicalPath
+                            path = (path - basePath)[1..-8]
+                            path = path.replace(File.separatorChar, '.' as char)
+                            strings << path
                         }
+                    }
                 }
+                allStrings.addAll(strings)
+            }
+            setStrings(allStrings)
+        } catch (Throwable e) {
+            // ignore
         }
+    }
 
-        private void refresh() {
-                if(!baseDirs) return
-                initialize(baseDirs)
-        }
-
-        private void initialize(File... baseDirs) {
-                try {
-                        if(!baseDirs) return
-                        this.baseDirs = baseDirs
-                        if(!allCompeters.contains(this))
-                                allCompeters << this
-                        SortedSet<String> allStrings = new ConcurrentSkipListSet<>()
-                        for(File baseDir in baseDirs) {
-                                def pattern = "file:${baseDir}/**/*.groovy".toString()
-                                SortedSet<String> strings = RESOURCE_SCAN_CACHE[pattern]
-                                if(strings == null) {
-                                        strings = new TreeSet<>()
-                                        RESOURCE_SCAN_CACHE[pattern] = strings
-                                        def resources = resourcePatternResolver.getResources(pattern)
-                                        for (res in resources) {
-                                                if(isValidResource(res)) {
-                                                        def path = res.file.canonicalPath
-                                                        def basePath = baseDir.canonicalPath
-                                                        path = (path - basePath)[1..-8]
-                                                        path = path.replace(File.separatorChar, '.' as char)
-                                                        strings << path
-                                                }
-                                        }
-                                }
-                                allStrings.addAll(strings)
-                        }
-                        setStrings(allStrings)
-                } catch (Throwable e) {
-                        // ignore
-                }
-        }
-
-        boolean isValidResource(Resource resource) {
-                true
-        }
+    boolean isValidResource(Resource resource) {
+        true
+    }
 }

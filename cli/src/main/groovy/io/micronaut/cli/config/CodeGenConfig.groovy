@@ -36,8 +36,6 @@ import org.yaml.snakeyaml.Yaml
 class CodeGenConfig implements Cloneable, ConfigMap {
     final NavigableMap configMap
 
-    GroovyClassLoader groovyClassLoader = new GroovyClassLoader(CodeGenConfig.getClassLoader())
-
     CodeGenConfig() {
         configMap = new NavigableMap()
     }
@@ -127,15 +125,6 @@ class CodeGenConfig implements Cloneable, ConfigMap {
     void loadYml(File ymlFile) {
         ymlFile.withInputStream { InputStream input ->
             loadYml(input)
-        }
-    }
-
-    void loadGroovy(File groovyConfig) {
-        if(groovyConfig.exists()) {
-            def configSlurper = new ConfigSlurper()
-            configSlurper.classLoader = groovyClassLoader
-            def configObject = configSlurper.parse(groovyConfig.toURI().toURL())
-            mergeMap(configObject, false)
         }
     }
 

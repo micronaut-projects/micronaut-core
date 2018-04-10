@@ -19,6 +19,8 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.util.CliSettings
 
+import java.util.regex.Pattern
+
 
 /**
  * A completer that completes the names of the tests in the project
@@ -28,13 +30,20 @@ import io.micronaut.cli.util.CliSettings
  */
 @CompileStatic
 class TestsCompleter  extends ClassNameCompleter {
+
+    private static final Pattern TEST_PATTERN = Pattern.compile('^.*?(Spec|Test|Tests)\\.(groovy|java|kt)$')
+
     TestsCompleter() {
-        super(new File(CliSettings.BASE_DIR, "src/test/groovy"), new File(CliSettings.BASE_DIR, "src/integration-test/groovy"))
+        super([
+                (new File(CliSettings.BASE_DIR, "src/test/groovy")): "**/*.groovy",
+                (new File(CliSettings.BASE_DIR, "src/test/java")): "**/*.java",
+                (new File(CliSettings.BASE_DIR, "src/test/kotlin")): "**/*.kt"
+        ])
     }
 
     @Override
     boolean isValidResource(Resource resource) {
         def fn = resource.filename
-        fn.endsWith('Spec.groovy') || fn.endsWith('Tests.groovy')
+        TEST_PATTERN.matcher(fn).matches()
     }
 }

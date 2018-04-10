@@ -26,8 +26,8 @@ import io.micronaut.cli.util.CliSettings
  */
 class AllClassCompleter extends ClassNameCompleter {
     AllClassCompleter() {
-        super(new File(CliSettings.BASE_DIR, "grails-app")
-                        ?.listFiles()
-                        ?.findAll() { File f -> f.isDirectory() && !f.isHidden() && !f.name.startsWith('.') } as File[])
+        super([(new File(CliSettings.BASE_DIR, "src/main/java")): "**/*.java",
+               (new File(CliSettings.BASE_DIR, "src/main/groovy")): "**/*.groovy",
+               (new File(CliSettings.BASE_DIR, "src/main/kotlin")): "**/*.kt"])
     }
 }
