@@ -17,6 +17,9 @@ package io.micronaut.configurations.kafka;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 
@@ -39,5 +42,17 @@ public class KafkaFactory {
     @Singleton
     Producer kafkaProducer(KafkaProducerConfiguration configuration) {
         return new KafkaProducer<String, String>(configuration.getConfig());
+    }
+
+    /**
+     * Creates the Kafka Consumer bean
+     *
+     * @param consumerConfiguration The configuration for the consumer
+     * @return The {@link Consumer} instance
+     */
+    @Bean
+    @Prototype
+    Consumer kafkaConsumer(KafkaConsumerConfiguration consumerConfiguration) {
+        return new KafkaConsumer(consumerConfiguration.getConfig());
     }
 }
