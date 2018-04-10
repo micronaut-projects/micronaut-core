@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http;
 
@@ -39,7 +39,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * Add a header for the given name and value
      *
      * @param header The head name
-     * @param value The value
+     * @param value  The value
      * @return This headers object
      */
     MutableHttpHeaders add(CharSequence header, CharSequence value);
@@ -50,17 +50,18 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * @param methods The methods to specify in the Allowed HTTP header
      * @return This HTTP headers
      */
-    default MutableHttpHeaders allow(HttpMethod...methods) {
+    default MutableHttpHeaders allow(HttpMethod... methods) {
         return allow(Arrays.asList(methods));
     }
 
     /**
      * Adds the date header for the given {@link ZonedDateTime}
+     *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders date(LocalDateTime date) {
-        if(date != null) {
+        if (date != null) {
             add(DATE, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
@@ -68,11 +69,12 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the EXPIRES header for the given {@link ZonedDateTime}
+     *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders expires(LocalDateTime date) {
-        if(date != null) {
+        if (date != null) {
             add(EXPIRES, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
@@ -80,11 +82,12 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}
+     *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders lastModified(LocalDateTime date) {
-        if(date != null) {
+        if (date != null) {
             add(LAST_MODIFIED, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
@@ -92,11 +95,12 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}
+     *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders ifModifiedSince(LocalDateTime date) {
-        if(date != null) {
+        if (date != null) {
             add(IF_MODIFIED_SINCE, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
@@ -104,6 +108,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the DATE header for the given {@link ZonedDateTime}
+     *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
      */
@@ -115,6 +120,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the EXPIRES header for the given {@link ZonedDateTime}
+     *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
      */
@@ -126,6 +132,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}
+     *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
      */
@@ -137,6 +144,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
      * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}
+     *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
      */
@@ -170,6 +178,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
         add(AUTHORIZATION, token);
         return this;
     }
+
     /**
      * Set the allowed HTTP methods
      *
@@ -190,6 +199,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     default MutableHttpHeaders location(URI uri) {
         return add(LOCATION, uri.toString());
     }
+
     /**
      * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type
      *
@@ -200,16 +210,15 @@ public interface MutableHttpHeaders extends HttpHeaders {
         return add(CONTENT_TYPE, mediaType);
     }
 
-
     /**
      * Add a header for the given name and value
      *
      * @param header The head name
-     * @param value The value
+     * @param value  The value
      * @return This headers object
      */
     default MutableHttpHeaders add(CharSequence header, ZonedDateTime value) {
-        if(header != null && value != null) {
+        if (header != null && value != null) {
             add(header, value.format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
@@ -219,11 +228,11 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * Add a header for the given name and value
      *
      * @param header The head name
-     * @param value The value
+     * @param value  The value
      * @return This headers object
      */
     default MutableHttpHeaders add(CharSequence header, Integer value) {
-        if(header != null && value != null) {
+        if (header != null && value != null) {
             return add(header, value.toString());
         }
         return this;

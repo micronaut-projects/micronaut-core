@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,10 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
@@ -58,7 +61,7 @@ public class JdbcIndicator implements HealthIndicator {
     }
 
     private Publisher<HealthResult> getResult(DataSource dataSource) {
-        if(executorService == null) {
+        if (executorService == null) {
             throw new IllegalStateException("I/O ExecutorService is null");
         }
         return new AsyncSingleResultPublisher<>(executorService, () -> {
@@ -98,7 +101,7 @@ public class JdbcIndicator implements HealthIndicator {
             if (throwable.isPresent()) {
                 builder.exception(throwable.get());
                 builder.status(HealthStatus.DOWN);
-            } else  {
+            } else {
                 builder.status(HealthStatus.UP);
                 builder.details(details);
             }
@@ -112,8 +115,7 @@ public class JdbcIndicator implements HealthIndicator {
             return Flowable.empty();
         }
         return healthAggregator.aggregate(NAME, Flowable.merge(
-                Arrays.stream(dataSources).map((ds) -> getResult(ds)).collect(Collectors.toList())
+            Arrays.stream(dataSources).map((ds) -> getResult(ds)).collect(Collectors.toList())
         ));
     }
-
 }

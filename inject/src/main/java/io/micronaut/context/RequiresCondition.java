@@ -1,14 +1,21 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
-import io.micronaut.context.annotation.Requirements;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
-import io.micronaut.context.condition.TrueCondition;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
@@ -32,7 +39,12 @@ import io.micronaut.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -72,9 +84,7 @@ public class RequiresCondition implements Condition {
                     return !isBeanConfiguration || !processRequirements(context);
                 } else {
                     return !processRequirements(context);
-
                 }
-
             }
         } else if (annotationMetadata.hasStereotype(Requires.class)) {
             ConvertibleValues<Object> values = annotationMetadata.getValues(Requires.class);
@@ -91,7 +101,6 @@ public class RequiresCondition implements Condition {
                     }
                 }
             } else {
-
                 Requires ann = annotationMetadata.getAnnotation(Requires.class);
                 if (ann != null) {
                     return !processRequires(context, ann);
@@ -100,6 +109,28 @@ public class RequiresCondition implements Condition {
 
         }
         return true;
+    }
+
+    protected boolean matchesConfiguration(ConditionContext context, Requires requires) {
+
+        String configurationName = requires.configuration();
+        if (configurationName.length() == 0) {
+            return true;
+        }
+
+        BeanContext beanContext = context.getBeanContext();
+        String minimumVersion = requires.version();
+        Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
+        if (!beanConfiguration.isPresent()) {
+            return false;
+        } else {
+            String version = beanConfiguration.get().getVersion();
+            if (version != null && minimumVersion.length() > 0) {
+                return SemanticVersion.isAtLeast(version, minimumVersion);
+            } else {
+                return true;
+            }
+        }
     }
 
     private boolean processRequirements(ConditionContext context) {
@@ -134,7 +165,7 @@ public class RequiresCondition implements Condition {
 
     private boolean processRequires(ConditionContext context, Requires annotation) {
         return
-                !matchesProperty(context, annotation) ||
+            !matchesProperty(context, annotation) ||
                 !matchesMissingProperty(context, annotation) ||
                 !matchesEnvironment(context, annotation) ||
                 !matchesPresenceOfBeans(context, annotation) ||
@@ -142,7 +173,6 @@ public class RequiresCondition implements Condition {
                 !matchesConfiguration(context, annotation) ||
                 !matchesSdk(annotation) ||
                 !matchesConditions(context, annotation);
-
     }
 
     private boolean matchesProperty(ConditionContext context, Requires annotation) {
@@ -164,8 +194,7 @@ public class RequiresCondition implements Condition {
                     String resolvedValue = resolved.orElse(null);
                     return resolvedValue == null || resolvedValue.equals(value);
                 }
-            }
-            else {
+            } else {
                 return false;
             }
         }
@@ -233,7 +262,7 @@ public class RequiresCondition implements Condition {
                 // maybe a Groovy closure
                 Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
                 return constructor.flatMap(ctor ->
-                        InstantiationUtils.tryInstantiate(ctor, null, null)
+                    InstantiationUtils.tryInstantiate(ctor, null, null)
                 ).flatMap(obj -> {
                     Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
                     if (method.isPresent()) {
@@ -267,7 +296,7 @@ public class RequiresCondition implements Condition {
                         char majorVersion = resolveJavaMajorVersion(javaVersion);
                         char requiredVersion = resolveJavaMajorVersion(version);
 
-                        if(majorVersion >= requiredVersion) {
+                        if (majorVersion >= requiredVersion) {
                             return true;
                         }
                     }
@@ -281,24 +310,22 @@ public class RequiresCondition implements Condition {
 
     private char resolveJavaMajorVersion(String javaVersion) {
         char majorVersion = 0;
-        if(javaVersion.indexOf('.') > -1) {
+        if (javaVersion.indexOf('.') > -1) {
             String[] tokens = javaVersion.split("\\.");
             majorVersion = tokens[0].charAt(0);
-            if(Character.isDigit(majorVersion)) {
-                if(majorVersion == '1' && tokens.length > 1) {
+            if (Character.isDigit(majorVersion)) {
+                if (majorVersion == '1' && tokens.length > 1) {
                     majorVersion = tokens[1].charAt(0);
                 }
             }
-        }
-        else {
+        } else {
             char ch = javaVersion.charAt(0);
-            if( Character.isDigit(ch) ) {
+            if (Character.isDigit(ch)) {
                 majorVersion = ch;
             }
         }
         return majorVersion;
     }
-
 
     private boolean matchesPresenceOfClasses(ConditionContext context, ConvertibleValues<Object> convertibleValues) {
         return matchesPresenceOfClasses(context, convertibleValues, "classes");
@@ -371,38 +398,14 @@ public class RequiresCondition implements Condition {
             for (Class<?> type : missingBeans) {
                 Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd));
                 // remove self
-                if(!beanDefinitions.isEmpty()) {
+                if (!beanDefinitions.isEmpty()) {
                     List<? extends BeanDefinition<?>> definitions = beanDefinitions.stream().filter(BeanDefinition::isAbstract).collect(Collectors.toList());
-                    if(definitions.isEmpty()) {
-                       return false;
+                    if (definitions.isEmpty()) {
+                        return false;
                     }
                 }
             }
         }
         return true;
     }
-
-    protected boolean matchesConfiguration(ConditionContext context, Requires requires) {
-
-        String configurationName = requires.configuration();
-        if (configurationName.length() == 0) {
-            return true;
-        }
-
-        BeanContext beanContext = context.getBeanContext();
-        String minimumVersion = requires.version();
-        Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
-        if (!beanConfiguration.isPresent()) {
-            return false;
-        } else {
-            String version = beanConfiguration.get().getVersion();
-            if (version != null && minimumVersion.length() > 0) {
-                return SemanticVersion.isAtLeast(version, minimumVersion);
-            } else {
-                return true;
-            }
-        }
-    }
-
-
 }

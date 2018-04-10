@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,5 @@ public interface BootstrapPropertySourceLocator {
      * @throws ConfigurationException If the resolve fails and fail fast is set to true
      */
     @Blocking
-    Iterable<PropertySource> findPropertySources(
-            Environment environment
-    ) throws ConfigurationException;
+    Iterable<PropertySource> findPropertySources(Environment environment) throws ConfigurationException;
 }

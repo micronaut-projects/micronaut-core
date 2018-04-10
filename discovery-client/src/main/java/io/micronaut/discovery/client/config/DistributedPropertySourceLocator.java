@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * <p>A {@link BootstrapPropertySourceLocator} implementation that uses the {@link ConfigurationClient} to find
  * available {@link PropertySource} instances from distributed configuration sources.</p>
- *
+ * <p>
  * <p>This implementation using a Blocking operation which is required during bootstrap which is configured to Timeout after
  * 10 seconds. The timeout can be configured with {@code micronaut.config.readTimeout} in configuration</p>
  *
@@ -52,10 +52,10 @@ public class DistributedPropertySourceLocator implements BootstrapPropertySource
 
 
     public DistributedPropertySourceLocator(
-            ConfigurationClient configurationClient,
-            @Value("${"+ConfigurationClient.READ_TIMEOUT+":10s}")
-            Duration readTimeout
-    ) {
+        ConfigurationClient configurationClient,
+        @Value("${" + ConfigurationClient.READ_TIMEOUT + ":10s}")
+            Duration readTimeout) {
+
         this.configurationClient = configurationClient;
         this.readTimeout = readTimeout;
     }
@@ -63,24 +63,23 @@ public class DistributedPropertySourceLocator implements BootstrapPropertySource
     @Override
     @Blocking
     public Iterable<PropertySource> findPropertySources(Environment environment) throws ConfigurationException {
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
             LOG.debug("Resolving configuration sources from client: {}", configurationClient);
         }
         try {
             Flowable<PropertySource> propertySourceFlowable = Flowable.fromPublisher(configurationClient.getPropertySources(environment));
             List<PropertySource> propertySources = propertySourceFlowable.timeout(
-                    readTimeout.toMillis(),
-                    TimeUnit.MILLISECONDS
+                readTimeout.toMillis(),
+                TimeUnit.MILLISECONDS
             ).toList().blockingGet();
-            if(LOG.isInfoEnabled()) {
+            if (LOG.isInfoEnabled()) {
                 LOG.info("Resolved {} configuration sources from client: {}", propertySources.size(), configurationClient);
             }
             return propertySources;
         } catch (RuntimeException e) {
-            if(e.getCause() instanceof TimeoutException) {
+            if (e.getCause() instanceof TimeoutException) {
                 throw new ConfigurationException("Read timeout occurred reading distributed configuration from client: " + configurationClient.getDescription(), e);
-            }
-            else {
+            } else {
                 throw e;
             }
         }

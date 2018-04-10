@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  */
 public interface ClassWriterOutputVisitor {
+
     /**
-     *
      * @param classname the fully qualified classname
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
@@ -35,7 +35,6 @@ public interface ClassWriterOutputVisitor {
     OutputStream visitClass(String classname) throws IOException;
 
     /**
-     *
      * @param classname the fully qualified classname
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
@@ -44,11 +43,13 @@ public interface ClassWriterOutputVisitor {
 
     /**
      * Visit a file within the META-INF directory
+     *
      * @param path The path to the file
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
      */
     Optional<File> visitMetaInfFile(String path) throws IOException;
+
     /**
      * @param type The service type
      * @return the output directory

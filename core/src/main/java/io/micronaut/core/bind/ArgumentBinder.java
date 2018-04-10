@@ -1,27 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.bind;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 
@@ -31,22 +27,21 @@ import java.util.Optional;
 
 /**
  * <p>An interface capable of binding the value of an {@link Argument} from a source</p>
- *
+ * <p>
  * <p>The selection of an {@link ArgumentBinder} is done by the {@link ArgumentBinderRegistry}. Selection could
  * be based on type, annotation or other factors such as the request media type</p>
- *
+ * <p>
  * <p>Unlike {@link TypeConverter} instances binders can potentially handle complex
- *  objects and typically work on conjunction with a {@link ConvertibleValues} instance</p>
- *
+ * objects and typically work on conjunction with a {@link ConvertibleValues} instance</p>
+ * <p>
  * <p>An {@link ArgumentBinder} can either be registered as a bean or by META-INF/services. In the case of the latter
  * it will be globally available at all times, whilst the former is only present when a {@code io.micronaut.context.BeanContext} is initialized</p>
- *
- * @see TypeConverter
- * @see ConvertibleValues
  *
  * @param <T> The argument type
  * @param <S> The source type
  * @author Graeme Rocher
+ * @see TypeConverter
+ * @see ConvertibleValues
  * @since 1.0
  */
 @FunctionalInterface
@@ -56,7 +51,7 @@ public interface ArgumentBinder<T, S> {
      * Bind the given argument from the given source
      *
      * @param context The {@link ArgumentConversionContext}
-     * @param source The source
+     * @param source  The source
      * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
      */
     BindingResult<T> bind(ArgumentConversionContext<T> context, S source);
@@ -103,7 +98,9 @@ public interface ArgumentBinder<T, S> {
         /**
          * @return Was the binding requirement satisfied
          */
-        default boolean isSatisfied() { return getConversionErrors() == Collections.EMPTY_LIST; }
+        default boolean isSatisfied() {
+            return getConversionErrors() == Collections.EMPTY_LIST;
+        }
 
         /**
          * @return Is the value present and satisfied

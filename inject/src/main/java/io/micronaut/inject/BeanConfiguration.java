@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,6 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * Check whether the specified bean definition class is within this bean configuration
      *
      * @param beanDefinitionReference The bean definition class
-     *
      * @return True if it is
      */
     boolean isWithin(BeanDefinitionReference beanDefinitionReference);
@@ -55,7 +54,6 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * Check whether the specified class is within this bean configuration
      *
      * @param className The class name
-     *
      * @return True if it is
      */
     boolean isWithin(String className);
@@ -64,7 +62,6 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * Check whether the specified class is within this bean configuration
      *
      * @param cls The class
-     *
      * @return True if it is
      */
     default boolean isWithin(Class cls) {

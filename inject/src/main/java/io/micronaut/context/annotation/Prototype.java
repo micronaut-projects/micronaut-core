@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 package io.micronaut.context.annotation;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import javax.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Prototype scope is a non-singleton scope that creates a new bean for every injection point

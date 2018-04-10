@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,8 @@ package io.micronaut.configuration.neo4j.bolt;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
-import org.neo4j.driver.v1.Driver;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
 import io.micronaut.runtime.context.scope.Refreshable;
-
+import org.neo4j.driver.v1.Driver;
 
 /**
  * Default factory for creating the Neo4j {@link Driver}
@@ -38,6 +35,9 @@ public class Neo4jDriverFactory {
         this.driverBuilder = driverBuilder;
     }
 
+    /**
+     * @return The Neo4j Bolt {@link Driver}
+     */
     @Bean(preDestroy = "close")
     @Refreshable(Neo4jBoltConfiguration.PREFIX)
     public Driver boltDriver() {
