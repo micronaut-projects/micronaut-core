@@ -276,10 +276,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
-
         return Flowable.fromPublisher(resolveRequestURI(request))
                 .flatMap(buildJsonStreamPublisher(request, type));
-
     }
 
     @SuppressWarnings("unchecked")
@@ -336,7 +334,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                 NettyStreamedHttpResponse<?> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                JacksonProcessor jacksonProcessor = new JacksonProcessor() {
+                boolean streamArray = !Iterable.class.isAssignableFrom(type.getType());
+                JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(),streamArray) {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                         httpContentFlowable.map(content -> {
@@ -354,7 +353,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                         super.subscribe(downstreamSubscriber);
                     }
                 };
-                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode ->
+                        mediaTypeCodec.decode(type, jsonNode)
+                );
             });
         };
     }
