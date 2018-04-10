@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import org.reactivestreams.Publisher;
 
 import java.net.URI;
 
-
 /**
  * An interface for discovery functions, either remote or local
  *
@@ -28,7 +27,6 @@ import java.net.URI;
  * @since 1.0
  */
 public interface FunctionDiscoveryClient {
-
 
     /**
      * Finds a function for the given function name

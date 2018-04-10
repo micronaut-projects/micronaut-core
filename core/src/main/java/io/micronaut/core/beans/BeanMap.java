@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.beans;
 
-import java.util.*;
+import java.util.Map;
 
 /**
  * Simple class that provides a map interface over a bean
@@ -29,6 +29,7 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @return The bean type
      */
     Class<T> getBeanType();
+
     /**
      * Creates a {@link BeanMap} for the given bean
      *

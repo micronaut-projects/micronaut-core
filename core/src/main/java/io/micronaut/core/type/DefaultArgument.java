@@ -1,13 +1,30 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents an argument to a constructor or method
@@ -41,7 +58,7 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public Optional<Argument<?>> getFirstTypeVariable() {
-        if(!typeParameters.isEmpty()) {
+        if (!typeParameters.isEmpty()) {
             return typeParameters.values().stream().findFirst();
         }
         return Optional.empty();
@@ -64,7 +81,7 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[] { annotatedElement };
+        return new AnnotatedElement[]{annotatedElement};
     }
 
     @Override
@@ -82,7 +99,7 @@ class DefaultArgument<T> implements Argument<T> {
         if (this == o) return true;
         if (o == null) return false;
         return Objects.equals(type, o.getType()) &&
-                Objects.equals(typeParameters, o.getTypeVariables());
+            Objects.equals(typeParameters, o.getTypeVariables());
     }
 
     @Override
@@ -91,8 +108,8 @@ class DefaultArgument<T> implements Argument<T> {
         if (o == null || getClass() != o.getClass()) return false;
         DefaultArgument<?> that = (DefaultArgument<?>) o;
         return Objects.equals(type, that.type) &&
-                Objects.equals(name, that.name) &&
-                Objects.equals(typeParameters, that.typeParameters);
+            Objects.equals(name, that.name) &&
+            Objects.equals(typeParameters, that.typeParameters);
     }
 
     @Override
@@ -102,24 +119,21 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public int hashCode() {
-
         return Objects.hash(type, name, typeParameters);
     }
 
     private Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
-        if(genericTypes != null && genericTypes.length > 0) {
+        if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = new LinkedHashMap<>(genericTypes.length);
             for (Argument genericType : genericTypes) {
                 typeParameters.put(genericType.getName(), genericType);
             }
-        }
-        else {
+        } else {
             typeParameters = Collections.emptyMap();
         }
         return typeParameters;
     }
-
 
     private AnnotatedElement createInternalElement(Annotation[] annotations) {
         return new AnnotatedElement() {
@@ -139,6 +153,4 @@ class DefaultArgument<T> implements Argument<T> {
             }
         };
     }
-
-
 }

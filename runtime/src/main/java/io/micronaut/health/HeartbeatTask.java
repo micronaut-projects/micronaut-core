@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceStartedEvent;
-import io.micronaut.scheduling.annotation.Scheduled;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.annotation.Scheduled;
@@ -35,7 +29,6 @@ import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- *
  * A scheduled task that sends a periodic heartbeat whilst the server is active
  *
  * @author graemerocher
@@ -62,7 +55,7 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initialDelay:5s}")
     public void pulsate() {
         ServiceInstance instance = eventReference.get();
-        if(instance != null) {
+        if (instance != null) {
             eventPublisher.publishEvent(new HeartbeatEvent(instance, currentHealthStatus.current()));
         }
     }

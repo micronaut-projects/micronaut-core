@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,13 +39,12 @@ public abstract class DiscoveryServerInstanceList implements ServiceInstanceList
     @Override
     public List<ServiceInstance> getInstances() {
         List<ServiceInstance> allZones = configuration.getAllZones();
-        if(!allZones.isEmpty()) {
+        if (!allZones.isEmpty()) {
             return allZones;
-        }
-        else {
+        } else {
             String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
             return Collections.singletonList(
-                    ServiceInstance.builder(getID(), URI.create(spec)).build()
+                ServiceInstance.builder(getID(), URI.create(spec)).build()
             );
         }
     }

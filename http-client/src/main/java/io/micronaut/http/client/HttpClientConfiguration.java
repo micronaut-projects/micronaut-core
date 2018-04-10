@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,19 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelOption;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.convert.format.ReadableBytes;
-import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.inject.Inject;
-import javax.net.ssl.TrustManagerFactory;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -43,6 +39,9 @@ import java.util.concurrent.ThreadFactory;
  */
 public abstract class HttpClientConfiguration {
 
+    /**
+     * Constant for localhost
+     */
     public static final String LOCALHOST = "localhost";
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
@@ -70,12 +69,11 @@ public abstract class HttpClientConfiguration {
 
     private boolean followRedirects = true;
 
-
     public HttpClientConfiguration() {
     }
 
     public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
-        if(applicationConfiguration != null)
+        if (applicationConfiguration != null)
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
     }
 
@@ -88,6 +86,7 @@ public abstract class HttpClientConfiguration {
 
     /**
      * Sets whether redirects should be followed (defaults to true)
+     *
      * @param followRedirects Whether redirects should be followed
      */
     public void setFollowRedirects(boolean followRedirects) {
@@ -101,6 +100,11 @@ public abstract class HttpClientConfiguration {
         return defaultCharset;
     }
 
+    /**
+     * Sets the default charset to use
+     *
+     * @param defaultCharset The charset to use
+     */
     public void setDefaultCharset(Charset defaultCharset) {
         this.defaultCharset = defaultCharset;
     }
@@ -114,47 +118,109 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * The default read timeout. Defaults to 10 seconds.
+     * @param channelOptions The Netty channel options
+     * @see Bootstrap#options()
+     */
+    public void setChannelOptions(Map<ChannelOption, Object> channelOptions) {
+        this.channelOptions = channelOptions;
+    }
+
+    /**
+     * @return The default read timeout. Defaults to 10 seconds.
      */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
     }
 
+    /**
+     * Sets the read timeout
+     *
+     * @param readTimeout The read timeout
+     */
+    public void setReadTimeout(Duration readTimeout) {
+        this.readTimeout = readTimeout;
+    }
 
     /**
-     * The number of threads the client should use for requests
+     * @return The number of threads the client should use for requests
      */
     public OptionalInt getNumOfThreads() {
         return numOfThreads != null ? OptionalInt.of(numOfThreads) : OptionalInt.empty();
     }
 
+    /**
+     * Sets the number of threads the client should use for requests
+     * @param numOfThreads The number of threads the client should use for requests
+     */
+    public void setNumOfThreads(Integer numOfThreads) {
+        this.numOfThreads = numOfThreads;
+    }
+
+    /**
+     * @return An {@link Optional} {@code ThreadFactory}
+     */
     public Optional<Class<? extends ThreadFactory>> getThreadFactory() {
         return Optional.ofNullable(threadFactory);
     }
 
     /**
-     * The maximum content length the client can consume
+     * Sets a thread factory
+     *
+     * @param threadFactory The thread factory
+     */
+    public void setThreadFactory(Class<? extends ThreadFactory> threadFactory) {
+        this.threadFactory = threadFactory;
+    }
+
+    /**
+     * @return The maximum content length the client can consume
      */
     public int getMaxContentLength() {
         return maxContentLength;
     }
 
     /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     * Sets the maximum content length the client can consume
      *
-     * Alternatively configure a java.net.ProxySelector
+     * @param maxContentLength The maximum content length the client can consume
+     */
+    public void setMaxContentLength(@ReadableBytes int maxContentLength) {
+        this.maxContentLength = maxContentLength;
+    }
+
+    /**
+     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     * <p>
+     * Alternatively configure a {@code java.net.ProxySelector}
+     *
+     * @return The proxy type
      */
     public Proxy.Type getProxyType() {
         return proxyType;
     }
 
+    public void setProxyType(Proxy.Type proxyType) {
+        this.proxyType = proxyType;
+    }
+
     /**
      * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     * <p>
+     * Alternatively configure a {@code java.net.ProxySelector}
      *
-     * Alternatively configure a java.net.ProxySelector
+     * @return The optional proxy address
      */
     public Optional<SocketAddress> getProxyAddress() {
         return Optional.ofNullable(proxyAddress);
+    }
+
+    /**
+     * Sets a proxy address
+     *
+     * @param proxyAddress The proxy address
+     */
+    public void setProxyAddress(SocketAddress proxyAddress) {
+        this.proxyAddress = proxyAddress;
     }
 
     /**
@@ -165,6 +231,10 @@ public abstract class HttpClientConfiguration {
         return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(System.getProperty(type + ".proxyUser"));
     }
 
+    /**
+     * Sets the proxy user name to use
+     * @param proxyUsername The proxy user name to use
+     */
     public void setProxyUsername(String proxyUsername) {
         this.proxyUsername = proxyUsername;
     }
@@ -175,44 +245,14 @@ public abstract class HttpClientConfiguration {
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
         return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));
-
     }
 
+    /**
+     * Sets the proxy password
+     *
+     * @param proxyPassword The proxy password
+     */
     public void setProxyPassword(String proxyPassword) {
         this.proxyPassword = proxyPassword;
-    }
-
-    public void setChannelOptions(Map<ChannelOption, Object> channelOptions) {
-        this.channelOptions = channelOptions;
-    }
-
-    /**
-     * The number of threads the client should use for requests
-     */
-    public void setNumOfThreads(Integer numOfThreads) {
-        this.numOfThreads = numOfThreads;
-    }
-
-    public void setThreadFactory(Class<? extends ThreadFactory> threadFactory) {
-        this.threadFactory = threadFactory;
-    }
-
-    public void setReadTimeout(Duration readTimeout) {
-        this.readTimeout = readTimeout;
-    }
-
-    /**
-     * The maximum content length the client can consume
-     */
-    public void setMaxContentLength(@ReadableBytes int maxContentLength) {
-        this.maxContentLength = maxContentLength;
-    }
-
-    public void setProxyType(Proxy.Type proxyType) {
-        this.proxyType = proxyType;
-    }
-
-    public void setProxyAddress(SocketAddress proxyAddress) {
-        this.proxyAddress = proxyAddress;
     }
 }

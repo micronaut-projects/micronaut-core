@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,11 @@
 package io.micronaut.discovery.eureka.health;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.health.indicator.HealthIndicator;
-import io.micronaut.management.health.indicator.HealthResult;
-import io.reactivex.Flowable;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import io.reactivex.Flowable;
 
 import javax.inject.Singleton;
 import java.util.Collections;
@@ -50,8 +47,7 @@ public class EurekaHealthIndicator implements HealthIndicator {
         Flowable<List<String>> serviceIds = Flowable.fromPublisher(eurekaClient.getServiceIds());
         return serviceIds.map(ids -> {
             HealthResult.Builder builder = HealthResult.builder(EurekaClient.SERVICE_ID, HealthStatus.UP);
-            return builder.details(Collections.singletonMap("available-services", ids))
-                    .build();
+            return builder.details(Collections.singletonMap("available-services", ids)).build();
         }).onErrorReturn(throwable -> {
             HealthResult.Builder builder = HealthResult.builder(EurekaClient.SERVICE_ID, HealthStatus.DOWN);
             builder.exception(throwable);

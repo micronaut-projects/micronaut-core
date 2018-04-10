@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Primary;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -41,11 +38,12 @@ public abstract class AbstractRedisClientFactory {
     public RedisClient redisClient(AbstractRedisConfiguration config) {
         Optional<RedisURI> uri = config.getUri();
         return uri.map(RedisClient::create)
-                  .orElseGet(() -> RedisClient.create(config));
+            .orElseGet(() -> RedisClient.create(config));
     }
 
     /**
      * Creates the {@link StatefulRedisConnection} from the {@link RedisClient}
+     *
      * @param redisClient The {@link RedisClient}
      * @return The {@link StatefulRedisConnection}
      */
@@ -55,6 +53,7 @@ public abstract class AbstractRedisClientFactory {
 
     /**
      * Creates the {@link StatefulRedisPubSubConnection} from the {@link RedisClient}
+     *
      * @param redisClient The {@link RedisClient}
      * @return The {@link StatefulRedisPubSubConnection}
      */

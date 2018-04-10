@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.AbstractServerList;
 import com.netflix.loadbalancer.Server;
 import com.netflix.loadbalancer.ServerList;
-import io.reactivex.Flowable;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.reactivex.Flowable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +47,24 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
     @Override
     public List<Server> getInitialListOfServers() {
         List<Server> serverList = resolveServerList();
-        if(LOG.isDebugEnabled()) {
-            LOG.debug("Resolved initial list of servers from DiscoveryClient [{}]: {}",discoveryClient.getDescription(), serverList );
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Resolved initial list of servers from DiscoveryClient [{}]: {}", discoveryClient.getDescription(), serverList);
         }
         return serverList;
+    }
+
+    @Override
+    public List<Server> getUpdatedListOfServers() {
+        List<Server> serverList = resolveServerList();
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Resolved updated list of servers from DiscoveryClient [{}]: {}", discoveryClient.getDescription(), serverList);
+        }
+        return serverList;
+    }
+
+    @Override
+    public void initWithNiwsConfig(IClientConfig clientConfig) {
+        // ignore
     }
 
     protected List<Server> resolveServerList() {
@@ -61,19 +75,5 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
             servers.add(server);
         }
         return servers;
-    }
-
-    @Override
-    public List<Server> getUpdatedListOfServers() {
-        List<Server> serverList = resolveServerList();
-        if(LOG.isDebugEnabled()) {
-            LOG.debug("Resolved updated list of servers from DiscoveryClient [{}]: {}",discoveryClient.getDescription(), serverList );
-        }
-        return serverList;
-    }
-
-    @Override
-    public void initWithNiwsConfig(IClientConfig clientConfig) {
-        // ignore
     }
 }
