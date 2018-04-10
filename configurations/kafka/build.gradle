@@ -1,0 +1,6 @@
+dependencies {
+    compile project(":inject")
+    compile 'org.apache.kafka:kafka-clients:1.1.0'
+
+    compileOnly project(":inject-java")
+}
