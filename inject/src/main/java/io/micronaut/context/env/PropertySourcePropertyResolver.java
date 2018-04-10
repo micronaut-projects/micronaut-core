@@ -23,15 +23,7 @@ import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -206,6 +198,43 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return Optional.empty();
     }
 
+    /**
+     * Returns a combined Map of all properties in the catalog
+     *
+     * @return Map of all properties
+     */
+    public Map<String,Object> getAllProperties(){
+        Map<String, Object> map = new HashMap<>();
+
+        Arrays.stream(catalog)
+                .filter(Objects::nonNull)
+                .map(Map::entrySet)
+                .flatMap(Collection::stream)
+                .forEach((Map.Entry<String, Object> entry) -> {
+                    String k = entry.getKey();
+                    Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
+                    Map finalMap = map;
+                    int index = k.indexOf('.');
+                    if (index != -1) {
+                        String[] keys = k.split("\\.");
+                        for (int i = 0; i < keys.length -1; i++) {
+                            if (!finalMap.containsKey(keys[i])) {
+                                finalMap.put(keys[i], new HashMap<>());
+                            }
+                            Object next = finalMap.get(keys[i]);
+                            if (next instanceof Map) {
+                                finalMap = ((Map) next);
+                            }
+                        }
+                        finalMap.put(keys[keys.length -1], value);
+                    } else {
+                        finalMap.put(k, value);
+                    }
+                });
+
+        return map;
+    }
+
     private String normalizeName(String name) {
         return name.toLowerCase(Locale.ENGLISH).replace('-', '.');
     }
@@ -217,19 +246,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return value;
     }
 
+
     protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         String prefix = name + '.';
         entries.entrySet().stream()
-            .filter(map -> map.getKey().startsWith(prefix))
-            .forEach(entry -> {
-                Object value = entry.getValue();
-                if (value != null) {
-                    String key = entry.getKey().substring(prefix.length());
-                    properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
-                }
-            });
+                .filter(map -> map.getKey().startsWith(prefix))
+                .forEach(entry -> {
+                    Object value = entry.getValue();
+                    if (value != null) {
+                        String key = entry.getKey().substring(prefix.length());
+                        properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
+                    }
+                });
 
         return properties;
     }
@@ -331,6 +361,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 return Arrays.asList(property, property.toLowerCase(Locale.ENGLISH));
         }
     }
+
 
     protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate) {
         Map<String, Object> entries = null;

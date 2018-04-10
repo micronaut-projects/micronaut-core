@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util;
 
-import java.util.Comparator;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -152,5 +152,16 @@ public class StreamUtils {
         };
         Function<Container, D> finisher = acc -> downstream.finisher().apply(acc.acc);
         return Collector.of(supplier, accumulator, combiner, finisher);
+    }
+
+    public static <T, A extends Collection<T>> Collector<T, A, Collection<T>> toImmutableCollection(Supplier<A> collectionFactory) {
+        return Collector.of(collectionFactory, Collection::add, (left, right) -> {
+            left.addAll(right);
+            return left;
+        }, Collections::unmodifiableCollection);
+    }
+
+    public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
+        return toImmutableCollection(ArrayList::new);
     }
 }
