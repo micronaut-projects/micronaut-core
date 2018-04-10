@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.info;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 /**
@@ -47,7 +48,7 @@ public class InfoEndpoint {
      * @return A {@link Publisher} of the info response
      */
     @Read
-    Publisher getInfo() {
-        return infoAggregator.aggregate(infoSources);
+    Single getInfo() {
+        return Single.fromPublisher(infoAggregator.aggregate(infoSources));
     }
 }
