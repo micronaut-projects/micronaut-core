@@ -15,13 +15,18 @@
  */
 package io.micronaut.configuration.cassandra;
 
-import com.datastax.driver.core.Cluster.Builder;
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.Cluster.Builder;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 
+/**
+ * Creates cassandra cluster for each configuration bean
+ *
+ * @author Nirav Assar
+ * @since 1.0
+ */
 @Factory
 public class ClusterFactory {
 
@@ -35,9 +40,6 @@ public class ClusterFactory {
         }
 
         Cluster cluster = b.build();
-
-        Metadata metadata = cluster.getMetadata();
-
         return cluster;
     }
 

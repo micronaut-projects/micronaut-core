@@ -18,6 +18,14 @@ package io.micronaut.configuration.cassandra;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 
+/**
+ * Allows the configuration of a Cassandra Cluster connection using the datastax driver.
+ *
+ * The client is able to be configured to multiple clusters.
+ *
+ * @author Nirav Assar
+ * @since 1.0
+ */
 @EachProperty(value = "cassandra")
 public class CassandraConfiguration {
 
