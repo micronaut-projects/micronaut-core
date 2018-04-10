@@ -162,6 +162,32 @@ class StreamRequestSpec extends Specification {
         result.body() == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
     }
 
+
+
+    void "test json stream post request with POJOs flowable"() {
+        given:
+        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+
+        when:
+        int i = 0
+        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojoFlowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+            @Override
+            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+                while(i < 5) {
+                    emitter.onNext(new Book(title:"Number ${i++}"))
+                }
+                emitter.onComplete()
+
+            }
+        }, BackpressureStrategy.BUFFER
+
+        )), Book).toList().blockingGet()
+
+        then:
+        result.size() == 5
+        result == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
+    }
+
     @Controller('/stream/request')
     static class StreamController {
 
