@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.model.InvokeRequest;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.function.client.FunctionDefinition;
 
@@ -32,7 +32,6 @@ import io.micronaut.function.client.FunctionDefinition;
 @Requires(classes = InvokeRequest.class)
 public class AWSInvokeRequestDefinition implements FunctionDefinition {
     public static final String AWS_LAMBDA_FUNCTIONS = AWSLambdaConfiguration.PREFIX + ".functions";
-
 
     @ConfigurationBuilder
     protected InvokeRequest invokeRequest;

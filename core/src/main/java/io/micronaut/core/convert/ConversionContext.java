@@ -1,22 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.convert;
 
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.type.Argument;
@@ -41,11 +39,11 @@ import java.util.Map;
  */
 public interface ConversionContext extends AnnotationSource, TypeVariableResolver, ErrorsContext {
 
-
     /**
      * The default conversion context
      */
-    ConversionContext DEFAULT  = new ConversionContext() {};
+    ConversionContext DEFAULT = new ConversionContext() {};
+
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
      * the concrete types of those arguments. For example for the {@link Map} type two keys will be present
@@ -87,12 +85,12 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     default <T> ArgumentConversionContext<T> with(Argument<T> argument) {
 
         ConversionContext childContext = ConversionContext.of(argument);
-        ConversionContext thisContext =  this;
+        ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
             public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
                 T annotation = childContext.getAnnotation(annotationClass);
-                if(annotation == null) {
+                if (annotation == null) {
                     return thisContext.getAnnotation(annotationClass);
                 }
                 return annotation;
@@ -142,7 +140,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      * @return The conversion context
      */
     static <T> ArgumentConversionContext<T> of(Argument<T> argument) {
-        return of(argument, null,null);
+        return of(argument, null, null);
     }
 
     /**
@@ -152,25 +150,26 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      * @return The conversion context
      */
     static <T> ArgumentConversionContext<T> of(Class<T> argument) {
-        return of(Argument.of(argument), null,null);
-    }
-    /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
-     *
-     * @param argument The argument
-     * @param locale The locale
-     * @return The conversion context
-     */
-    static <T> ArgumentConversionContext of(Argument<T> argument, @Nullable Locale locale) {
-        return of(argument, locale,null);
+        return of(Argument.of(argument), null, null);
     }
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables
      *
      * @param argument The argument
-     * @param locale The locale
-     * @param charset The charset
+     * @param locale   The locale
+     * @return The conversion context
+     */
+    static <T> ArgumentConversionContext of(Argument<T> argument, @Nullable Locale locale) {
+        return of(argument, locale, null);
+    }
+
+    /**
+     * Create a simple {@link ConversionContext} for the given generic type variables
+     *
+     * @param argument The argument
+     * @param locale   The locale
+     * @param charset  The charset
      * @return The conversion context
      */
     static <T> ArgumentConversionContext<T> of(Argument<T> argument, @Nullable Locale locale, @Nullable Charset charset) {
@@ -178,5 +177,4 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
         Locale finalLocale = locale != null ? locale : Locale.getDefault();
         return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);
     }
-
 }

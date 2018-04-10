@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +19,18 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.core.convert.ConversionService;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and runtimes.
+ * An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and
+ * runtimes.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,6 +54,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     @Override
     ApplicationContext start();
+
     /**
      * Stops the application context
      *
@@ -108,7 +109,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param properties Additional properties
+     * @param properties   Additional properties
      * @param environments The environment names
      * @return The running {@link ApplicationContext}
      */
@@ -117,25 +118,25 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         return run(propertySource, environments);
     }
 
-
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param properties Additional properties
+     * @param properties   Additional properties
      * @param environments The environment names
      * @return The running {@link ApplicationContext}
      */
     static ApplicationContext run(PropertySource properties, String... environments) {
         return build(environments)
-                .environment(env -> env.addPropertySource(properties))
-                .start();
+            .environment(env -> env.addPropertySource(properties))
+            .start();
     }
+
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param type The type of the bean to run
+     * @param type         The type of the bean to run
      * @param environments The environments to use
      * @return The running bean
      */
@@ -147,8 +148,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param type The type of the bean to run
-     * @param properties Additional properties
+     * @param type         The type of the bean to run
+     * @param properties   Additional properties
      * @param environments The environment names
      * @return The running bean
      */
@@ -157,25 +158,25 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         return run(type, propertySource, environments);
     }
 
-
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param type The environment to use
+     * @param type           The environment to use
      * @param propertySource Additional properties
-     * @param environments The environment names
+     * @param environments   The environment names
      * @return The running {@link BeanContext}
      */
     static <T> T run(Class<T> type, PropertySource propertySource, String... environments) {
         T bean = build(type.getClassLoader(), environments)
-                .environment(env -> env.addPropertySource(propertySource)
-                                       .addPackage(type.getPackage()))
-                .start()
-                .getBean(type);
-        if(bean instanceof LifeCycle) {
+            .environment(env -> env
+                .addPropertySource(propertySource)
+                .addPackage(type.getPackage()))
+            .start()
+            .getBean(type);
+        if (bean instanceof LifeCycle) {
             LifeCycle lifeCycle = (LifeCycle) bean;
-            if(!lifeCycle.isRunning()) {
+            if (!lifeCycle.isRunning()) {
                 lifeCycle.start();
             }
         }
@@ -189,7 +190,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(String... environments) {
-        if(environments == null) environments = StringUtils.EMPTY_STRING_ARRAY;
+        if (environments == null) environments = StringUtils.EMPTY_STRING_ARRAY;
         return new DefaultApplicationContext(environments);
     }
 
@@ -201,21 +202,22 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     static ApplicationContext build() {
         return new DefaultApplicationContext();
     }
+
     /**
      * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
      *
-     * @param classLoader The classloader to use
+     * @param classLoader  The classloader to use
      * @param environments The environments to use
      * @return The running {@link ApplicationContext}
      */
-    static ApplicationContext run(ClassLoader classLoader,String... environments) {
+    static ApplicationContext run(ClassLoader classLoader, String... environments) {
         return build(classLoader, environments).start();
     }
 
     /**
      * Build a {@link ApplicationContext}
      *
-     * @param classLoader The classloader to use
+     * @param classLoader  The classloader to use
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
@@ -226,7 +228,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     /**
      * Build a {@link ApplicationContext}
      *
-     * @param mainClass The main class of the application
+     * @param mainClass    The main class of the application
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */

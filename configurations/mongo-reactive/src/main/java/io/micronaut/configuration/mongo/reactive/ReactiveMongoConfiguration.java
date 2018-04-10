@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,11 @@
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.async.client.MongoClientSettings;
-import com.mongodb.connection.*;
+import com.mongodb.connection.ClusterSettings;
+import com.mongodb.connection.ConnectionPoolSettings;
+import com.mongodb.connection.ServerSettings;
+import com.mongodb.connection.SocketSettings;
+import com.mongodb.connection.SslSettings;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
@@ -50,7 +54,6 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
 
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "ssl")
     protected SslSettings.Builder sslSettings = SslSettings.builder();
-
 
     public ReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
@@ -112,9 +115,9 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
     @Override
     public String toString() {
         return "ReactiveMongoConfiguration{" +
-                "uri='" + getUri() + '\'' +
-                ", clientSettings=" + clientSettings +
-                ", clusterSettings=" + clusterSettings +
-                '}';
+            "uri='" + getUri() + '\'' +
+            ", clientSettings=" + clientSettings +
+            ", clusterSettings=" + clusterSettings +
+            '}';
     }
 }

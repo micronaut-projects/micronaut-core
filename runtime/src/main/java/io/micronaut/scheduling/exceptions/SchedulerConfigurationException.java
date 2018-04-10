@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,14 @@ package io.micronaut.scheduling.exceptions;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.inject.ExecutableMethod;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 public class SchedulerConfigurationException extends ConfigurationException {
+
     public SchedulerConfigurationException(ExecutableMethod<?, ?> method, String message) {
-        super("Invalid @Scheduled definition for method: " + method +" - Reason: " +  message);
+        super("Invalid @Scheduled definition for method: " + method + " - Reason: " + message);
     }
 }

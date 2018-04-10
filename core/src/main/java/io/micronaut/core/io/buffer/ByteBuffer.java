@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.io.buffer;
 
@@ -26,7 +26,7 @@ import java.nio.charset.Charset;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ByteBuffer<T>  {
+public interface ByteBuffer<T> {
 
     /**
      * @return The native buffer type
@@ -68,10 +68,9 @@ public interface ByteBuffer<T>  {
     /**
      * Sets the {@code readerIndex} of this buffer.
      *
-     * @throws IndexOutOfBoundsException
-     *         if the specified {@code readerIndex} is
-     *            less than {@code 0} or
-     *            greater than {@code this.writerIndex}
+     * @throws IndexOutOfBoundsException if the specified {@code readerIndex} is
+     *                                   less than {@code 0} or
+     *                                   greater than {@code this.writerIndex}
      */
     ByteBuffer readerIndex(int readPosition);
 
@@ -84,10 +83,9 @@ public interface ByteBuffer<T>  {
      * Sets the {@code writerIndex} of this buffer.
      *
      * @param position The position
-     * @throws IndexOutOfBoundsException
-     *         if the specified {@code writerIndex} is
-     *            less than {@code this.readerIndex} or
-     *            greater than {@code this.capacity}
+     * @throws IndexOutOfBoundsException if the specified {@code writerIndex} is
+     *                                   less than {@code this.readerIndex} or
+     *                                   greater than {@code this.capacity}
      */
     ByteBuffer writerIndex(int position);
 
@@ -95,8 +93,7 @@ public interface ByteBuffer<T>  {
      * Gets a byte at the current {@code readerIndex} and increases
      * the {@code readerIndex} by {@code 1} in this buffer.
      *
-     * @throws IndexOutOfBoundsException
-     *         if {@code this.readableBytes} is less than {@code 1}
+     * @throws IndexOutOfBoundsException if {@code this.readableBytes} is less than {@code 1}
      */
     byte read();
 
@@ -104,20 +101,19 @@ public interface ByteBuffer<T>  {
      * Gets a {@link CharSequence} with the given length at the current {@code readerIndex}
      * and increases the {@code readerIndex} by the given length.
      *
-     * @param length the length to read
+     * @param length  the length to read
      * @param charset that should be used
      * @return the sequence
-     * @throws IndexOutOfBoundsException
-     *         if {@code length} is greater than {@code this.readableBytes}
+     * @throws IndexOutOfBoundsException if {@code length} is greater than {@code this.readableBytes}
      */
     CharSequence readCharSequence(int length, Charset charset);
+
     /**
      * Transfers this buffer's data to the specified destination starting at
      * the current {@code readerIndex} and increases the {@code readerIndex}
      * by the number of the transferred bytes (= {@code dst.length}).
      *
-     * @throws IndexOutOfBoundsException
-     *         if {@code dst.length} is greater than {@code this.readableBytes}
+     * @throws IndexOutOfBoundsException if {@code dst.length} is greater than {@code this.readableBytes}
      */
     ByteBuffer read(byte[] destination);
 
@@ -127,13 +123,11 @@ public interface ByteBuffer<T>  {
      * by the number of the transferred bytes (= {@code length}).
      *
      * @param destination The destination byte array
-     * @param offset the first index of the destination
-     * @param length   the number of bytes to transfer
-     *
-     * @throws IndexOutOfBoundsException
-     *         if the specified {@code dstIndex} is less than {@code 0},
-     *         if {@code length} is greater than {@code this.readableBytes}, or
-     *         if {@code dstIndex + length} is greater than {@code dst.length}
+     * @param offset      the first index of the destination
+     * @param length      the number of bytes to transfer
+     * @throws IndexOutOfBoundsException if the specified {@code dstIndex} is less than {@code 0},
+     *                                   if {@code length} is greater than {@code this.readableBytes}, or
+     *                                   if {@code dstIndex + length} is greater than {@code dst.length}
      */
     ByteBuffer read(byte[] destination, int offset, int length);
 
@@ -143,8 +137,7 @@ public interface ByteBuffer<T>  {
      * The 24 high-order bits of the specified value are ignored.
      *
      * @param b The byte to write
-     * @throws IndexOutOfBoundsException
-     *         if {@code this.writableBytes} is less than {@code 1}
+     * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 1}
      */
     ByteBuffer write(byte b);
 
@@ -154,23 +147,21 @@ public interface ByteBuffer<T>  {
      * by the number of the transferred bytes (= {@code src.length}).
      *
      * @param source The source bytes
-     * @throws IndexOutOfBoundsException
-     *         if {@code src.length} is greater than {@code this.writableBytes}
+     * @throws IndexOutOfBoundsException if {@code src.length} is greater than {@code this.writableBytes}
      */
     ByteBuffer write(byte[] source);
 
     /**
-     *
      * Transfers the specified source CharSequence's data to this buffer starting at
      * the current {@code writerIndex} and increases the {@code writerIndex}
      * by the number of the transferred bytes (= {@code src.length}).
      *
-     *
-     * @param source The char sequence
+     * @param source  The char sequence
      * @param charset The charset
      * @return This buffer
      */
     ByteBuffer write(CharSequence source, Charset charset);
+
     /**
      * Transfers the specified source array's data to this buffer starting at
      * the current {@code writerIndex} and increases the {@code writerIndex}
@@ -178,13 +169,11 @@ public interface ByteBuffer<T>  {
      *
      * @param source The source byte array
      * @param offset the first index of the source
-     * @param length   the number of bytes to transfer
-     *
-     * @throws IndexOutOfBoundsException
-     *         if the specified {@code srcIndex} is less than {@code 0},
-     *         if {@code srcIndex + length} is greater than
-     *            {@code src.length}, or
-     *         if {@code length} is greater than {@code this.writableBytes}
+     * @param length the number of bytes to transfer
+     * @throws IndexOutOfBoundsException if the specified {@code srcIndex} is less than {@code 0},
+     *                                   if {@code srcIndex + length} is greater than
+     *                                   {@code src.length}, or
+     *                                   if {@code length} is greater than {@code this.writableBytes}
      */
     ByteBuffer write(byte[] source, int offset, int length);
 
@@ -209,7 +198,8 @@ public interface ByteBuffer<T>  {
      * data buffer's content.  Data between this data buffer and the returned buffer is
      * shared; though changes in the returned buffer's position will not be reflected
      * in the reading nor writing position of this data buffer.
-     * @param index the index at which to start the slice
+     *
+     * @param index  the index at which to start the slice
      * @param length the length of the slice
      * @return the specified slice of this data buffer
      */
@@ -224,9 +214,8 @@ public interface ByteBuffer<T>  {
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer and it adjusted its capacity.
      *
-     * @throws UnsupportedOperationException
-     *         if this buffer cannot create a {@link java.nio.ByteBuffer} that shares the content with itself
-     *
+     * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
+     *                                       that shares the content with itself
      */
     java.nio.ByteBuffer asNioBuffer();
 
@@ -238,11 +227,10 @@ public interface ByteBuffer<T>  {
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer and it adjusted its capacity.
      *
-     * @param index The index
+     * @param index  The index
      * @param length The length
-     * @throws UnsupportedOperationException
-     *         if this buffer cannot create a {@link java.nio.ByteBuffer} that shares the content with itself
-     *
+     * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
+     *                                       that shares the content with itself
      */
     java.nio.ByteBuffer asNioBuffer(int index, int length);
 

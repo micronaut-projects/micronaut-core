@@ -1,8 +1,25 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.context.env.groovy
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.*
-import org.codehaus.groovy.ast.expr.*
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.SourceUnit
@@ -10,10 +27,9 @@ import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
-import static org.codehaus.groovy.ast.tools.GeneralUtils.*
-
 /**
- * Evaluates type safe configurations converting property paths to calls to setProperty(..) and returning a map of all assigned configuration values
+ * Evaluates type safe configurations converting property paths to calls to setProperty(..) and returning a map of
+ * all assigned configuration values
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,8 +65,8 @@ class ConfigurationEvaluator {
     Map<String, Object> evaluate(Reader reader) {
         CompilerConfiguration configuration = new CompilerConfiguration()
         configuration.addCompilationCustomizers(
-                new ASTTransformationCustomizer(CompileStatic.class),
-                new ASTTransformationCustomizer(new ConfigTransform())
+            new ASTTransformationCustomizer(CompileStatic.class),
+            new ASTTransformationCustomizer(new ConfigTransform())
         )
 
         GroovyShell shell = new GroovyShell(configuration)

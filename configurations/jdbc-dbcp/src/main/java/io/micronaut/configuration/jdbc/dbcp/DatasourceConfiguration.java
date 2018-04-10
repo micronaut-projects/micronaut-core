@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package io.micronaut.configuration.jdbc.dbcp;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -50,9 +50,9 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     }
 
     /**
-     *  Apache DBCP uses the fields instead of using getters to create a
-     *  connection, so the following is required to populate the calculated
-     *  values into the fields.
+     * Apache DBCP uses the fields instead of using getters to create a
+     * connection, so the following is required to populate the calculated
+     * values into the fields.
      */
     @PostConstruct
     void postConstruct() {
@@ -131,5 +131,4 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     public String getConfiguredValidationQuery() {
         return super.getValidationQuery();
     }
-
 }

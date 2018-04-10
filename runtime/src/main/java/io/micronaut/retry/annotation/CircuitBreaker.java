@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package io.micronaut.retry.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
@@ -27,8 +27,6 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Variation of {@link Retryable} that implements the Circuit Breaker pattern. Has higher overhead than
@@ -77,7 +75,8 @@ public @interface CircuitBreaker {
     String multiplier() default "0";
 
     /**
-     * The maximum overall delay for an operation to complete until the Circuit state is set to {@link io.micronaut.retry.CircuitState#OPEN}
+     * The maximum overall delay for an operation to complete until the Circuit state is set to
+     * {@link io.micronaut.retry.CircuitState#OPEN}
      *
      * @return The maximum overall delay
      */
@@ -85,7 +84,8 @@ public @interface CircuitBreaker {
     String maxDelay() default "5s";
 
     /**
-     * Sets the {@link java.time.Duration} of time before resetting the circuit to {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry
+     * Sets the {@link java.time.Duration} of time before resetting the circuit to
+     * {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry
      *
      * @return The {@link java.time.Duration} of time before reset
      */

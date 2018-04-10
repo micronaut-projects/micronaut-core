@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.runtime;
 
@@ -28,7 +28,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -38,6 +45,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut {
+
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
 
     private Collection<Class> classes = new ArrayList<>();
@@ -47,7 +55,7 @@ public class Micronaut {
     private String[] args = new String[0];
     private Set<String> environments = new HashSet<>();
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
-    private Collection<Map<String,Object>> propertyMaps = new ArrayList<>();
+    private Collection<Map<String, Object>> propertyMaps = new ArrayList<>();
 
     protected Micronaut() {
     }
@@ -60,10 +68,9 @@ public class Micronaut {
 
         String[] envArray = this.environments.toArray(new String[this.environments.size()]);
         ApplicationContext applicationContext;
-        if(applicationClass != null) {
+        if (applicationClass != null) {
             applicationContext = ApplicationContext.build(applicationClass, envArray);
-        }
-        else {
+        } else {
             applicationContext = ApplicationContext.build(ApplicationContext.class.getClassLoader(), envArray);
         }
         applicationContext.registerSingleton(commandLine);
@@ -80,7 +87,6 @@ public class Micronaut {
         // Add the system properties passed via the command line
         environment.addPropertySource(new CommandLinePropertySource(commandLine));
 
-
         for (Map<String, Object> propertyMap : propertyMaps) {
             environment.addPropertySource(PropertySource.of(Environment.DEFAULT_NAME, propertyMap));
         }
@@ -94,7 +100,7 @@ public class Micronaut {
             embeddedContainerBean.ifPresent((embeddedServer -> {
                 try {
                     embeddedServer.start();
-                    if(LOG.isInfoEnabled()) {
+                    if (LOG.isInfoEnabled()) {
                         long end = System.currentTimeMillis();
                         long took = end - start;
                         LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
@@ -106,7 +112,7 @@ public class Micronaut {
                 }
             }));
 
-            if(LOG.isInfoEnabled() && !embeddedContainerBean.isPresent()) {
+            if (LOG.isInfoEnabled() && !embeddedContainerBean.isPresent()) {
                 LOG.info("No embedded container found. Running as CLI application");
             }
             return applicationContext;
@@ -116,8 +122,6 @@ public class Micronaut {
         }
     }
 
-
-
     /**
      * Add classes to be included in the initialization of the application
      *
@@ -125,7 +129,7 @@ public class Micronaut {
      * @return The classes
      */
     public Micronaut classes(@Nullable Class... classes) {
-        if(classes != null) {
+        if (classes != null) {
             this.classes.addAll(Arrays.asList(classes));
         }
         return this;
@@ -137,12 +141,13 @@ public class Micronaut {
      * @param properties The properties
      * @return The properties
      */
-    public Micronaut properties(@Nullable Map<String,Object> properties) {
-        if(properties != null) {
+    public Micronaut properties(@Nullable Map<String, Object> properties) {
+        if (properties != null) {
             this.propertyMaps.add(properties);
         }
         return this;
     }
+
     /**
      * Set the command line arguments
      *
@@ -206,8 +211,8 @@ public class Micronaut {
      * @param configurations The configurations to include
      * @return This application
      */
-    public Micronaut include(@Nullable  String... configurations) {
-        if(configurations != null) {
+    public Micronaut include(@Nullable String... configurations) {
+        if (configurations != null) {
             this.configurationIncludes.addAll(Arrays.asList(configurations));
         }
         return this;
@@ -220,27 +225,24 @@ public class Micronaut {
      * @return This application
      */
     public Micronaut exclude(@Nullable String... configurations) {
-        if(configurations != null) {
+        if (configurations != null) {
             this.configurationExcludes.addAll(Arrays.asList(configurations));
         }
         return this;
-
     }
-
 
     /**
      * Maps an exception to the given error code
      *
      * @param exception The exception
-     * @param mapper The mapper
-     * @param <T> The exception type
+     * @param mapper    The mapper
+     * @param <T>       The exception type
      * @return This application
      */
     public <T extends Throwable> Micronaut mapError(Class<T> exception, Function<T, Integer> mapper) {
         this.exitHandlers.put(exception, (Function<Throwable, Integer>) mapper);
         return this;
     }
-
 
     /**
      * Run the application for the given arguments. Classes for the application will be discovered automatically
@@ -265,7 +267,7 @@ public class Micronaut {
     /**
      * Run the application for the given arguments.
      *
-     * @param cls The application class
+     * @param cls  The application class
      * @param args The arguments
      * @return The {@link ApplicationContext}
      */
@@ -277,28 +279,29 @@ public class Micronaut {
      * Run the application for the given arguments.
      *
      * @param classes The application classes
-     * @param args The arguments
+     * @param args    The arguments
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(Class[] classes, String... args) {
         return new Micronaut()
-                .classes(classes)
-                .args(args)
-                .start(ArrayUtils.isNotEmpty(classes) ? classes[0] : Micronaut.class);
+            .classes(classes)
+            .args(args)
+            .start(ArrayUtils.isNotEmpty(classes) ? classes[0] : Micronaut.class);
     }
 
     /**
      * Default handling of startup exceptions.
+     *
      * @param environment The environment
-     * @param exception The exception
+     * @param exception   The exception
      * @throws ApplicationStartupException If the server cannot be shutdown with an appropriate exist code
      */
-    protected void handleStartupException(Environment environment, Throwable exception)  {
+    protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         Integer code = exitCodeMapper.apply(exception);
-        if(code > 0) {
-            if(!environment.getActiveNames().contains( Environment.TEST)) {
-                if(LOG.isErrorEnabled()) {
+        if (code > 0) {
+            if (!environment.getActiveNames().contains(Environment.TEST)) {
+                if (LOG.isErrorEnabled()) {
                     LOG.error("Error starting Micronaut server: " + exception.getMessage(), exception);
                 }
                 System.exit(code);
@@ -306,6 +309,4 @@ public class Micronaut {
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
     }
-
-
 }

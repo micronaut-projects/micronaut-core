@@ -1,23 +1,34 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.ast.groovy.utils
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.Internal
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.core.annotation.Internal
 
 import java.lang.annotation.Annotation
-import java.lang.annotation.Documented
-import java.lang.annotation.Retention
-import java.lang.annotation.Target
 
 /**
  * Utility methods for dealing with annotations within the context of AST
@@ -28,10 +39,13 @@ import java.lang.annotation.Target
 @CompileStatic
 class AstAnnotationUtils {
 
-    private static final Cache<AnnotatedNode, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(100).build();
+    private static final Cache<AnnotatedNode, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder()
+                                                                                                    .maximumSize(100)
+                                                                                                    .build();
 
-     /**
+    /**
      * Get the {@link AnnotationMetadata} for the given annotated node
+     *
      * @param annotatedNode The node
      * @return The metadata
      */
@@ -43,6 +57,7 @@ class AstAnnotationUtils {
 
     /**
      * Get the {@link AnnotationMetadata} for the given annotated node
+     *
      * @param parent the parent
      * @param annotatedNode The node
      * @return The metadata
@@ -61,6 +76,7 @@ class AstAnnotationUtils {
 
     /**
      * Return whether the given annotated node has the given stereotype
+     *
      * @param annotatedNode The annotated node
      * @param stereotype The stereotype
      * @return True if it does
@@ -70,6 +86,7 @@ class AstAnnotationUtils {
     }
     /**
      * Return whether the given annotated node has the given stereotype
+     *
      * @param annotatedNode The annotated node
      * @param stereotype The stereotype
      * @return True if it does
@@ -80,12 +97,13 @@ class AstAnnotationUtils {
 
     /**
      * Whether the node is annotated with any non internal annotations
+     *
      * @param annotatedNode The annotated node
      * @return True if it is
      */
     static boolean isAnnotated(AnnotatedNode annotatedNode) {
-        for(ann in annotatedNode.annotations) {
-            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
+        for (ann in annotatedNode.annotations) {
+            if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
                 return true
             }
         }
@@ -111,17 +129,16 @@ class AstAnnotationUtils {
      * @return The annotation or null
      */
     static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, String annotationName) {
-        if(annotatedNode != null) {
+        if (annotatedNode != null) {
             List<AnnotationNode> annotations = annotatedNode.getAnnotations()
-            for(ann in annotations) {
+            for (ann in annotations) {
                 ClassNode annotationClassNode = ann.classNode
-                if(annotationClassNode.name == annotationName) {
+                if (annotationClassNode.name == annotationName) {
                     return ann
-                }
-                else if (!(annotationClassNode.name in AnnotationUtil.INTERNAL_ANNOTATION_NAMES)) {
+                } else if (!(annotationClassNode.name in AnnotationUtil.INTERNAL_ANNOTATION_NAMES)) {
 
                     ann = findAnnotation(annotationClassNode, annotationName)
-                    if(ann != null) {
+                    if (ann != null) {
                         return ann
                     }
                 }
@@ -132,6 +149,7 @@ class AstAnnotationUtils {
 
     /**
      * Returns true if MethodNode is marked with annotationClass
+     *
      * @param methodNode A MethodNode to inspect
      * @param annotationClass an annotation to look for
      * @return true if classNode is marked with annotationClass, otherwise false
@@ -141,6 +159,13 @@ class AstAnnotationUtils {
         return hasAnnotation(methodNode, classNode)
     }
 
+    /**
+     * Returns true if MethodNode is marked with annotationClassNode
+     *
+     * @param methodNode A MethodNode to inspect
+     * @param annotationClassNode An annotation class to look for
+     * @return true if classNode is marked with annotationClass, otherwise false
+     */
     static boolean hasAnnotation(MethodNode methodNode, ClassNode annotationClassNode) {
         return !methodNode.getAnnotations(annotationClassNode).isEmpty()
     }
@@ -162,12 +187,13 @@ class AstAnnotationUtils {
      * @param included The includes annotations
      * @param excluded The excluded annotations
      */
-    static void copyAnnotations(final AnnotatedNode from, final AnnotatedNode to, final Set<String> included, final Set<String> excluded) {
+    static void copyAnnotations(
+        final AnnotatedNode from, final AnnotatedNode to, final Set<String> included, final Set<String> excluded) {
         final List<AnnotationNode> annotationsToCopy = from.getAnnotations()
-        for(final AnnotationNode node : annotationsToCopy) {
+        for (final AnnotationNode node : annotationsToCopy) {
             String annotationClassName = node.getClassNode().getName()
-            if((excluded==null || !excluded.contains(annotationClassName)) &&
-                    (included==null || included.contains(annotationClassName))) {
+            if ((excluded == null || !excluded.contains(annotationClassName)) &&
+                (included == null || included.contains(annotationClassName))) {
                 final AnnotationNode copyOfAnnotationNode = cloneAnnotation(node)
                 to.addAnnotation(copyOfAnnotationNode)
             }
@@ -183,7 +209,7 @@ class AstAnnotationUtils {
     static AnnotationNode cloneAnnotation(final AnnotationNode node) {
         final AnnotationNode copyOfAnnotationNode = new AnnotationNode(node.getClassNode())
         final Map<String, Expression> members = node.getMembers()
-        for(final Map.Entry<String, Expression> entry : members.entrySet()) {
+        for (final Map.Entry<String, Expression> entry : members.entrySet()) {
             copyOfAnnotationNode.addMember(entry.getKey(), entry.getValue())
         }
         return copyOfAnnotationNode

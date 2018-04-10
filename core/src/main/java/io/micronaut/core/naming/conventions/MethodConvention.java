@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.core.naming.conventions;
 
@@ -29,22 +29,22 @@ public enum MethodConvention {
     /**
      * The index method of controllers
      */
-    INDEX("","GET"),
+    INDEX("", "GET"),
 
     /**
      * The show method of controllers
      */
-    SHOW(MethodConvention.ID_PATH,"GET"),
+    SHOW(MethodConvention.ID_PATH, "GET"),
 
     /**
      * The show method of controllers
      */
-    SAVE("","POST"),
+    SAVE("", "POST"),
 
     /**
      * The default update method of controllers
      */
-    UPDATE(MethodConvention.ID_PATH,"PUT"),
+    UPDATE(MethodConvention.ID_PATH, "PUT"),
 
     /**
      * The default delete method of controllers
@@ -66,7 +66,11 @@ public enum MethodConvention {
      */
     TRACE("");
 
+    /**
+     * Path for the id
+     */
     public static final String ID_PATH = "{/id}";
+
     private final String lowerCase;
     private final String httpMethod;
     private final String uri;
@@ -89,6 +93,7 @@ public enum MethodConvention {
     public String uri() {
         return this.uri;
     }
+
     /**
      * The HTTP method name for this convention
      */
@@ -116,5 +121,4 @@ public enum MethodConvention {
             return Optional.empty();
         }
     }
-
 }

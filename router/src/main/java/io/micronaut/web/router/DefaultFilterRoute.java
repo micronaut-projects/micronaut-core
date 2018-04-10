@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.web.router;
 
@@ -21,17 +21,15 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.PathMatcher;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.filter.HttpFilter;
 
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -47,7 +45,6 @@ class DefaultFilterRoute implements FilterRoute {
     Set<HttpMethod> httpMethods;
     private HttpFilter filter;
 
-
     DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter) {
         Objects.requireNonNull(pattern, "Pattern argument is required");
         Objects.requireNonNull(pattern, "HttpFilter argument is required");
@@ -62,7 +59,7 @@ class DefaultFilterRoute implements FilterRoute {
             synchronized (this) { // double check
                 filter = this.filter;
                 if (filter == null) {
-                    this.filter = filter =filterSupplier.get();
+                    this.filter = filter = filterSupplier.get();
                 }
             }
         }
@@ -73,9 +70,9 @@ class DefaultFilterRoute implements FilterRoute {
     public Optional<HttpFilter> match(HttpMethod method, URI uri) {
         String uriStr = uri.toString();
         for (String pattern : patterns) {
-            if( PathMatcher.ANT.matches(pattern, uriStr) ) {
+            if (PathMatcher.ANT.matches(pattern, uriStr)) {
                 HttpFilter filter = getFilter();
-                if(filter instanceof Toggleable && !((Toggleable)filter).isEnabled()) {
+                if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                     return Optional.empty();
                 }
                 return Optional.of(filter);
@@ -86,7 +83,7 @@ class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public FilterRoute pattern(String pattern) {
-        if(StringUtils.isNotEmpty(pattern)) {
+        if (StringUtils.isNotEmpty(pattern)) {
             this.patterns.add(pattern);
         }
         return this;
@@ -94,8 +91,8 @@ class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public FilterRoute methods(HttpMethod... methods) {
-        if(ArrayUtils.isNotEmpty(methods)) {
-            if(httpMethods == null) httpMethods = new HashSet<>();
+        if (ArrayUtils.isNotEmpty(methods)) {
+            if (httpMethods == null) httpMethods = new HashSet<>();
             httpMethods.addAll(Arrays.asList(methods));
         }
         return this;

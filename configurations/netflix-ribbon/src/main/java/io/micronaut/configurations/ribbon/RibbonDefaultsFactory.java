@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,16 @@
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.config.IClientConfig;
-import com.netflix.loadbalancer.*;
+import com.netflix.loadbalancer.DummyPing;
+import com.netflix.loadbalancer.IPing;
+import com.netflix.loadbalancer.IRule;
+import com.netflix.loadbalancer.ServerListFilter;
+import com.netflix.loadbalancer.ZoneAffinityServerListFilter;
+import com.netflix.loadbalancer.ZoneAvoidanceRule;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Requires;
-
-import javax.inject.Singleton;
 
 /**
  * @author graemerocher
@@ -35,7 +34,6 @@ import javax.inject.Singleton;
 @Factory
 @Requires(classes = IClientConfig.class)
 public class RibbonDefaultsFactory {
-
 
     /**
      * The default {@link ServerListFilter} to use
@@ -51,7 +49,6 @@ public class RibbonDefaultsFactory {
     }
 
     /**
-     *
      * @return The default {@link IPing} to use
      */
     @Prototype
@@ -62,7 +59,6 @@ public class RibbonDefaultsFactory {
     }
 
     /**
-     *
      * @return The default {@link IRule} to use
      */
     @Prototype

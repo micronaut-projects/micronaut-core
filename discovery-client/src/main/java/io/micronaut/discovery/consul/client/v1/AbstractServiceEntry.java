@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientException;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * @author graemerocher
@@ -53,6 +56,16 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
+     * See https://www.consul.io/api/agent/service.html#id
+     *
+     * @param id The ID of the service
+     */
+    @JsonProperty("ID")
+    public void setID(String id) {
+        this.ID = id;
+    }
+
+    /**
      * See https://www.consul.io/api/agent/service.html#address
      *
      * @return The address of the service
@@ -63,41 +76,54 @@ public abstract class AbstractServiceEntry {
 
     /**
      * See https://www.consul.io/api/agent/service.html#address
+     *
+     * @param address The address of the service
+     */
+    public void setAddress(InetAddress address) {
+        this.address = address;
+    }
+
+    /**
+     * See https://www.consul.io/api/agent/service.html#address
+     *
      * @return The port of the service
      */
     public OptionalInt getPort() {
-        if(port != null)
+        if (port != null) {
             return OptionalInt.of(port);
-        else
+        } else {
             return OptionalInt.empty();
+        }
+    }
+
+    /**
+     * See https://www.consul.io/api/agent/service.html#address
+     *
+     * @param port The port of the service
+     */
+    public void setPort(Integer port) {
+        this.port = port;
     }
 
     /**
      * See https://www.consul.io/api/agent/service.html#tags
+     *
      * @return The service tags
      */
     public List<String> getTags() {
-        if(tags == null) {
+        if (tags == null) {
             return Collections.emptyList();
         }
         return tags;
     }
 
-    public void setAddress(InetAddress address) {
-        this.address = address;
-    }
-
-    public void setPort(Integer port) {
-        this.port = port;
-    }
-
+    /**
+     * See https://www.consul.io/api/agent/service.html#tags
+     *
+     * @param tags The service tags
+     */
     public void setTags(List<String> tags) {
         this.tags = tags;
-    }
-
-    @JsonProperty("ID")
-    public void setID(String id) {
-        this.ID = id;
     }
 
     /**
@@ -109,16 +135,28 @@ public abstract class AbstractServiceEntry {
         return name;
     }
 
+    /**
+     * @param id The id of the service
+     * @return The {@link AbstractServiceEntry} instance
+     */
     public AbstractServiceEntry id(String id) {
         this.ID = id;
         return this;
     }
 
+    /**
+     * @param address The {@link InetAddress } of the service
+     * @return The {@link AbstractServiceEntry} instance
+     */
     public AbstractServiceEntry address(InetAddress address) {
         this.address = address;
         return this;
     }
 
+    /**
+     * @param address The address of the service
+     * @return The {@link AbstractServiceEntry} instance
+     */
     public AbstractServiceEntry address(String address) {
         try {
             this.address = InetAddress.getByName(address);
@@ -128,11 +166,19 @@ public abstract class AbstractServiceEntry {
         return this;
     }
 
+    /**
+     * @param port The port of the service
+     * @return The {@link AbstractServiceEntry} instance
+     */
     public AbstractServiceEntry port(Integer port) {
         this.port = port;
         return this;
     }
 
+    /**
+     * @param tags The service tags
+     * @return The {@link AbstractServiceEntry} instance
+     */
     public AbstractServiceEntry tags(List<String> tags) {
         this.tags = tags;
         return this;
@@ -144,15 +190,14 @@ public abstract class AbstractServiceEntry {
         if (o == null || getClass() != o.getClass()) return false;
         AbstractServiceEntry that = (AbstractServiceEntry) o;
         return Objects.equals(name, that.name) &&
-                Objects.equals(address, that.address) &&
-                Objects.equals(port, that.port) &&
-                Objects.equals(tags, that.tags) &&
-                Objects.equals(ID, that.ID);
+            Objects.equals(address, that.address) &&
+            Objects.equals(port, that.port) &&
+            Objects.equals(tags, that.tags) &&
+            Objects.equals(ID, that.ID);
     }
 
     @Override
     public int hashCode() {
-
         return Objects.hash(name, address, port, tags, ID);
     }
 }

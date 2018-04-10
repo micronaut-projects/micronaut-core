@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,8 @@ package io.micronaut.configuration.neo4j.gorm.configuration;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.value.PropertyResolver;
-import org.grails.datastore.mapping.config.Settings;
-import io.micronaut.context.env.PropertyPlaceholderResolver;
-import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.spring.core.env.PropertyResolverAdapter;
+import org.grails.datastore.mapping.config.Settings;
 
 /**
  * Resolves default settings for GORM
@@ -28,7 +26,7 @@ import io.micronaut.spring.core.env.PropertyResolverAdapter;
  * @author graemerocher
  * @since 1.0
  */
-public class GormPropertyResolverAdapter extends PropertyResolverAdapter{
+public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
     public GormPropertyResolverAdapter(PropertyResolver propertyResolver, PropertyPlaceholderResolver placeholderResolver) {
         super(propertyResolver, placeholderResolver);
     }
@@ -37,7 +35,7 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter{
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
         T v = super.getProperty(key, targetType, defaultValue);
-        if(v == null && isKeyFailedOnError(key) && boolean.class.isAssignableFrom(targetType)) {
+        if (v == null && isKeyFailedOnError(key) && boolean.class.isAssignableFrom(targetType)) {
             return (T) Boolean.TRUE;
         }
         return v;

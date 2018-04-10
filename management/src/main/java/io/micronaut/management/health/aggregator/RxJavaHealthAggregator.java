@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,20 @@
 package io.micronaut.management.health.aggregator;
 
 import io.micronaut.context.annotation.Requires;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -37,7 +40,7 @@ import java.util.stream.Collectors;
  * have their own {status: , description: (optional , details: } object, keyed by the
  * name of the {@link HealthResult} defined inside of the details of the top
  * level object.
- *
+ * <p>
  * Example:
  * [status: "UP, details: [diskSpace: [status: UP, details: [:]], cpuUsage: ...]]</p>
  *
@@ -71,24 +74,24 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
 
     protected HealthStatus calculateOverallStatus(List<HealthResult> results) {
         return results.stream()
-                .map(HealthResult::getStatus)
-                .distinct()
-                .sorted()
-                .reduce((a, b) -> b)
-                .orElse(HealthStatus.UNKNOWN);
+            .map(HealthResult::getStatus)
+            .distinct()
+            .sorted()
+            .reduce((a, b) -> b)
+            .orElse(HealthStatus.UNKNOWN);
     }
 
     protected Flowable<HealthResult> aggregateResults(HealthIndicator[] indicators) {
         return Flowable.merge(
-                Arrays.stream(indicators)
-                        .map(HealthIndicator::getResult)
-                        .collect(Collectors.toList())
+            Arrays.stream(indicators)
+                .map(HealthIndicator::getResult)
+                .collect(Collectors.toList())
         );
     }
 
     protected Object aggregateDetails(List<HealthResult> results) {
         Map<String, Object> details = new HashMap<>(results.size());
-        results.forEach( r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails())));
+        results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails())));
         return details;
     }
 
@@ -96,7 +99,7 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
         healthStatus.put("status", status.getName());
         status.getDescription().ifPresent(description -> healthStatus.put("description", description));
-        if(details != null) {
+        if (details != null) {
             healthStatus.put("details", details);
         }
         return healthStatus;

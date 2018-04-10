@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,11 @@ import grails.gorm.annotation.Entity;
 import grails.mongodb.MongoEntity;
 import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.spring.core.env.PropertyResolverAdapter;
 import org.grails.datastore.mapping.mongo.MongoDatastore;
@@ -38,20 +42,19 @@ import javax.inject.Singleton;
 @Factory
 public class MongoDatastoreFactory {
 
-
     @Context
     @Bean
     @Primary
     MongoDatastore mongoDatastore(ApplicationContext applicationContext, MongoClient mongoClient) {
         Environment environment = applicationContext.getEnvironment();
         Class[] entities = environment.scan(Entity.class)
-                .filter(MongoEntity.class::isAssignableFrom)
-                .toArray(Class[]::new);
+            .filter(MongoEntity.class::isAssignableFrom)
+            .toArray(Class[]::new);
 
         PropertyResolverAdapter propertyResolver = new PropertyResolverAdapter(applicationContext, applicationContext);
         MongoDatastore datastore = new MongoDatastore(mongoClient, propertyResolver,
-                new ConfigurableEventPublisherAdapter(applicationContext),
-                entities);
+            new ConfigurableEventPublisherAdapter(applicationContext),
+            entities);
         Iterable services = datastore.getServices();
         for (Object service : services) {
             applicationContext.registerSingleton(service);

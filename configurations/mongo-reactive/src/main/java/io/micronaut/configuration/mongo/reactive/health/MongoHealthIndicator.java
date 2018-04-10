@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,21 +47,21 @@ class MongoHealthIndicator implements HealthIndicator {
         return mongoClients.flatMap((Function<MongoClient, Publisher<HealthResult>>) mongoClient -> {
             String name = "mongodb (" + mongoClient.getSettings().getApplicationName() + ")";
             return Flowable.fromPublisher(mongoClient.listDatabaseNames())
-                           .toList()
-                           .map(strings -> {
-                               HealthResult.Builder builder = HealthResult.builder(name);
-                               builder.status(HealthStatus.UP);
-                               builder.details(Collections.singletonMap(
-                                       "databases", strings
-                               ));
-                               return builder.build();
-                           }).onErrorReturn(throwable -> {
-                               HealthResult.Builder builder = HealthResult.builder(name);
-                               builder.status(HealthStatus.DOWN);
-                               builder.exception(throwable);
-                               return builder.build();
+                .toList()
+                .map(strings -> {
+                    HealthResult.Builder builder = HealthResult.builder(name);
+                    builder.status(HealthStatus.UP);
+                    builder.details(Collections.singletonMap(
+                        "databases", strings
+                    ));
+                    return builder.build();
+                }).onErrorReturn(throwable -> {
+                    HealthResult.Builder builder = HealthResult.builder(name);
+                    builder.status(HealthStatus.DOWN);
+                    builder.exception(throwable);
+                    return builder.build();
 
-                           }).toFlowable();
+                }).toFlowable();
         });
     }
 }

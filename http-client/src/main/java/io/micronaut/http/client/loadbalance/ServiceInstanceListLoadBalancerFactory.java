@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ public class ServiceInstanceListLoadBalancerFactory {
 
     /**
      * Creates a {@link LoadBalancer} from the given {@link ServiceInstanceList}
+     *
      * @param serviceInstanceList The {@link ServiceInstanceList}
      * @return The {@link LoadBalancer}
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,9 @@
  */
 package io.micronaut.http.server.netty.async;
 
-import com.typesafe.netty.HandlerPublisher;
-import com.typesafe.netty.HandlerSubscriber;
-import io.netty.channel.ChannelHandlerContext;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.netty.channel.ChannelHandlerContext;
+import com.typesafe.netty.HandlerPublisher;
 import io.netty.channel.ChannelPipeline;
 import org.reactivestreams.Subscription;
 
@@ -27,7 +26,6 @@ import org.reactivestreams.Subscription;
  * for the {@link ChannelHandlerContext}
  *
  * @param <T> The type of data being published
- *
  * @author James Kleeh
  * @since 1.0
  */
@@ -68,7 +66,7 @@ public abstract class ContextCompletionAwareSubscriber<T> extends CompletionAwar
 
     @Override
     protected void doOnComplete() {
-        onComplete((T)message);
+        onComplete((T) message);
     }
 
     abstract protected void onComplete(T message);
