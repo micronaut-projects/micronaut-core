@@ -29,6 +29,7 @@ include "runtime-groovy"
 
 // configurations
 include "configurations:gorm"
+include "configurations:cassandra"
 include "configurations:hibernate-validator"
 include "configurations:hibernate-gorm"
 include "configurations:redis-lettuce"
