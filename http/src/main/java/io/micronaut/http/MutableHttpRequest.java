@@ -87,4 +87,9 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     default MutableHttpRequest<B> contentType(MediaType mediaType) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.contentType(mediaType);
     }
+
+    @Override
+    default MutableHttpRequest<B> contentEncoding(String encoding) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.contentEncoding(encoding);
+    }
 }

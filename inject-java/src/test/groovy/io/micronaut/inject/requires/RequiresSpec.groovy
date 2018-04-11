@@ -21,6 +21,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.BeanFactory
 
 /**
@@ -196,6 +197,28 @@ class MyBean {
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+
+        then:
+        beanDefinition.isEnabled(context)
+    }
+
+
+    void "test requires class with inner class"() {
+        when:
+        BeanDefinitionReference beanDefinition = buildBeanDefinitionReference('test.MyBean', '''
+package test;
+
+import io.micronaut.inject.requires.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(beans=Outer.Inner.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = new DefaultBeanContext()
+        context.registerSingleton(new Outer.Inner())
 
         then:
         beanDefinition.isEnabled(context)

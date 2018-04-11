@@ -73,6 +73,14 @@ abstract class AbstractTypeElementSpec extends Specification {
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'DefinitionClass'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
+    }
     protected BeanConfiguration buildBeanConfiguration(String packageName, String cls) {
         ClassLoader classLoader = buildClassLoader("${packageName}.package-info", cls)
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
