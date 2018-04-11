@@ -19,6 +19,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -316,8 +317,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitType(TypeMirror t, Object o) {
-            String className = t.toString();
-            annotationValues.put(memberName, className);
+            if(t instanceof DeclaredType) {
+                Element typeElement = ((DeclaredType) t).asElement();
+                if(typeElement instanceof TypeElement) {
+                    String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+                    annotationValues.put(memberName, className);
+                }
+            }
             return null;
         }
 
@@ -426,7 +432,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             @Override
             public Object visitType(TypeMirror t, Object o) {
                 arrayType = String.class;
-                values.add(t.toString());
+                if(t instanceof DeclaredType) {
+                    Element typeElement = ((DeclaredType) t).asElement();
+                    if(typeElement instanceof TypeElement) {
+                        values.add(JavaModelUtils.getClassName((TypeElement) typeElement));
+                    }
+                }
                 return null;
             }
 

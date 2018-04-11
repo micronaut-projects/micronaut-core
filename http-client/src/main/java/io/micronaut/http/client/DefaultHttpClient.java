@@ -118,7 +118,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
-    private final Optional<SslContext> sslContext;
+    private final SslContext sslContext;
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
@@ -144,7 +144,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build();
+        this.sslContext = nettyClientSslBuilder.build().orElse(null);
         this.group = createEventLoopGroup(configuration);
         this.bootstrap.group(group)
                 .channel(NioSocketChannel.class)
@@ -650,7 +650,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
-            sslCtx = sslContext.orElse(null);
+            sslCtx = sslContext;
         } else {
             sslCtx = null;
         }
@@ -786,7 +786,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 return new DefaultHttpContent(textChunk);
                             }
                             else if(o instanceof byte[]) {
-                                return new DefaultHttpContent(Unpooled.copiedBuffer((byte[])o));
+                                return new DefaultHttpContent(Unpooled.wrappedBuffer((byte[])o));
                             }
                             else if(mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);

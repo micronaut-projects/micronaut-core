@@ -359,12 +359,14 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, qualifier, false, true).orElse(null);
+            BeanDefinition<T> beanDefinition = findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null);
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
-                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, new NoInjectionBeanDefinition<>(beanType), singleton));
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(beanType);
+                beanDefinitionsClasses.add(dynamicRegistration);
+                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
             }
         }
         return this;
@@ -1853,7 +1855,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T> {
+    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
 
         public NoInjectionBeanDefinition(Class singletonClass) {
@@ -2025,6 +2027,41 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public Annotation[] getDeclaredAnnotations() {
             return singletonClass.getDeclaredAnnotations();
+        }
+
+        @Override
+        public String getBeanDefinitionName() {
+            return singletonClass.getName();
+        }
+
+        @Override
+        public String getReplacesBeanTypeName() {
+            return null;
+        }
+
+        @Override
+        public String getReplacesBeanDefinitionName() {
+            return null;
+        }
+
+        @Override
+        public BeanDefinition<T> load() {
+            return this;
+        }
+
+        @Override
+        public BeanDefinition<T> load(BeanContext context) {
+            return this;
+        }
+
+        @Override
+        public boolean isContextScope() {
+            return false;
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
         }
     }
 }
