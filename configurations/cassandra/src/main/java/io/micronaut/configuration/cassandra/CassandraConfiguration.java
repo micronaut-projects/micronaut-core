@@ -15,8 +15,9 @@
  */
 package io.micronaut.configuration.cassandra;
 
+import com.datastax.driver.core.Cluster;
+import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Parameter;
 
 /**
  * Allows the configuration of a Cassandra Cluster connection using the datastax driver.
@@ -29,63 +30,6 @@ import io.micronaut.context.annotation.Parameter;
 @EachProperty(value = "cassandra")
 public class CassandraConfiguration {
 
-    private String beanName;
-
-    protected String node;
-    protected Integer port;
-    protected String clusterName;
-    protected String username;
-    protected String password;
-    protected Integer maxSchemaAgreementWaitSeconds;
-    protected Boolean withoutJmxReporting = Boolean.FALSE;
-    protected Boolean withoutMetrics = Boolean.FALSE;
-    protected Boolean sslEnabled = Boolean.FALSE;
-
-    public CassandraConfiguration(@Parameter String beanName) {
-        this.setBeanName(beanName);
-    }
-
-    public String getBeanName() {
-        return beanName;
-    }
-
-    public void setBeanName(String name) {
-        this.beanName = name;
-    }
-
-    public String getNode() {
-        return node;
-    }
-
-    public Integer getPort() {
-        return port;
-    }
-
-    public String getClusterName() {
-        return clusterName;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public Integer getMaxSchemaAgreementWaitSeconds() {
-        return maxSchemaAgreementWaitSeconds;
-    }
-
-    public Boolean getWithoutJmxReporting() {
-        return withoutJmxReporting;
-    }
-
-    public Boolean getWithoutMetrics() {
-        return withoutMetrics;
-    }
-
-    public Boolean getSslEnabled() {
-        return sslEnabled;
-    }
+    @ConfigurationBuilder(allowZeroArgs = true, prefixes = { "with", "add" })
+    Cluster.Builder builder = Cluster.builder();
 }

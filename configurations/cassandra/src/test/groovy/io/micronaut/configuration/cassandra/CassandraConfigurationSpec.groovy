@@ -27,7 +27,7 @@ class CassandraConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['cassandra.primary.node': "127.0.0.1",
+                ['cassandra.primary.contactPoint': "127.0.0.1",
                  'cassandra.primary.port': 9042,
                  'cassandra.primary.clusterName': "ociCluster",
                  'cassandra.primary.username': "ociUser",
@@ -65,9 +65,9 @@ class CassandraConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['cassandra.primary.node': "127.0.0.1",
+                ['cassandra.primary.contactPoint': "127.0.0.1",
                  'cassandra.primary.port': 9042,
-                 'cassandra.secondary.node': "127.0.0.2",
+                 'cassandra.secondary.contactPoint': "127.0.0.2",
                  'cassandra.secondary.port': 9043]
         ))
         applicationContext.start()

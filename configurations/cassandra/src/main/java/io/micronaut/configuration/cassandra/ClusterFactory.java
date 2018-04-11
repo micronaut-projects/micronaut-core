@@ -16,7 +16,6 @@
 package io.micronaut.configuration.cassandra;
 
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.Cluster.Builder;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
@@ -33,48 +32,7 @@ public class ClusterFactory {
     @EachBean(CassandraConfiguration.class)
     @Bean(preDestroy = "close")
     public Cluster cassandraCluster(CassandraConfiguration cassandraConfiguration) {
-        Builder b = Cluster.builder().addContactPoint(cassandraConfiguration.getNode());
 
-        buildCluster(cassandraConfiguration, b);
-
-        Cluster cluster = b.build();
-        return cluster;
+        return cassandraConfiguration.builder.build();
     }
-
-    /**
-     * Use the configured properties to build the cluster.
-     *
-     * @param cassandraConfiguration the read in properties
-     * @param b builder object to create the cluster
-     */
-    private void buildCluster(CassandraConfiguration cassandraConfiguration, Builder b) {
-        if (cassandraConfiguration.getPort() != null) {
-            b.withPort(cassandraConfiguration.getPort());
-        }
-
-        if (cassandraConfiguration.getClusterName() != null) {
-            b.withClusterName(cassandraConfiguration.getClusterName());
-        }
-
-        if (cassandraConfiguration.getUsername() != null && cassandraConfiguration.getPassword() != null) {
-            b.withCredentials(cassandraConfiguration.getUsername(), cassandraConfiguration.getPassword());
-        }
-
-        if (cassandraConfiguration.getMaxSchemaAgreementWaitSeconds() != null) {
-            b.withMaxSchemaAgreementWaitSeconds(cassandraConfiguration.getMaxSchemaAgreementWaitSeconds());
-        }
-
-        if (cassandraConfiguration.getWithoutJmxReporting()) {
-            b.withoutJMXReporting();
-        }
-
-        if (cassandraConfiguration.getWithoutMetrics()) {
-            b.withoutMetrics();
-        }
-
-        if (cassandraConfiguration.getSslEnabled()) {
-            b.withSSL();
-        }
-    }
-
 }
