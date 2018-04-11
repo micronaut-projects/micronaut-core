@@ -31,15 +31,15 @@ public class CassandraConfiguration {
 
     private String beanName;
 
-    private String node;
-    private Integer port;
-    private String clusterName;
-    private String username;
-    private String password;
-    private Integer maxSchemaAgreementWaitSeconds;
-    private Boolean withoutJmxReporting = Boolean.FALSE;
-    private Boolean withoutMetrics = Boolean.FALSE;
-    private Boolean sslEnabled = Boolean.FALSE;
+    protected String node;
+    protected Integer port;
+    protected String clusterName;
+    protected String username;
+    protected String password;
+    protected Integer maxSchemaAgreementWaitSeconds;
+    protected Boolean withoutJmxReporting = Boolean.FALSE;
+    protected Boolean withoutMetrics = Boolean.FALSE;
+    protected Boolean sslEnabled = Boolean.FALSE;
 
     public CassandraConfiguration(@Parameter String beanName) {
         this.setBeanName(beanName);
@@ -57,71 +57,35 @@ public class CassandraConfiguration {
         return node;
     }
 
-    public void setNode(String node) {
-        this.node = node;
-    }
-
     public Integer getPort() {
         return port;
-    }
-
-    public void setPort(Integer port) {
-        this.port = port;
     }
 
     public String getClusterName() {
         return clusterName;
     }
 
-    public void setClusterName(String clusterName) {
-        this.clusterName = clusterName;
-    }
-
     public String getUsername() {
         return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
     }
 
     public String getPassword() {
         return password;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     public Integer getMaxSchemaAgreementWaitSeconds() {
         return maxSchemaAgreementWaitSeconds;
-    }
-
-    public void setMaxSchemaAgreementWaitSeconds(Integer maxSchemaAgreementWaitSeconds) {
-        this.maxSchemaAgreementWaitSeconds = maxSchemaAgreementWaitSeconds;
     }
 
     public Boolean getWithoutJmxReporting() {
         return withoutJmxReporting;
     }
 
-    public void setWithoutJmxReporting(Boolean withoutJmxReporting) {
-        this.withoutJmxReporting = withoutJmxReporting;
-    }
-
     public Boolean getWithoutMetrics() {
         return withoutMetrics;
     }
 
-    public void setWithoutMetrics(Boolean withoutMetrics) {
-        this.withoutMetrics = withoutMetrics;
-    }
-
     public Boolean getSslEnabled() {
         return sslEnabled;
-    }
-
-    public void setSslEnabled(Boolean sslEnabled) {
-        this.sslEnabled = sslEnabled;
     }
 }
