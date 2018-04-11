@@ -21,6 +21,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.BeanFactory
 
 /**
@@ -28,6 +29,42 @@ import io.micronaut.inject.BeanFactory
  * @since 1.0
  */
 class RequiresSpec extends AbstractTypeElementSpec{
+
+    void "test requires property not equals"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(property="foo", notEquals="bar")
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        ApplicationContext applicationContext = ApplicationContext.build()
+        applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
+        applicationContext.environment.start()
+
+        then:
+        beanDefinition.isEnabled(applicationContext)
+
+        when:
+        applicationContext = ApplicationContext.build()
+        applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
+        applicationContext.environment.start()
+
+        then:
+        !beanDefinition.isEnabled(applicationContext)
+
+        when:
+        applicationContext = ApplicationContext.build()
+        applicationContext.environment.start()
+
+        then:
+        beanDefinition.isEnabled(applicationContext)
+    }
 
     void "test requires classes with classes present"() {
         when:
@@ -91,6 +128,43 @@ class MyBean {
         beanDefinition.isEnabled(context)
     }
 
+    void "test requires missing beans with no bean present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingBeans=String.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
+    void "test requires missing beans with bean present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingBeans=String.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = new DefaultBeanContext()
+        context.registerSingleton(String.class, "foo")
+
+        then:
+        !beanDefinition.isEnabled(context)
+    }
+
     void "test requires beans with no bean present"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
@@ -123,6 +197,28 @@ class MyBean {
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+
+        then:
+        beanDefinition.isEnabled(context)
+    }
+
+
+    void "test requires class with inner class"() {
+        when:
+        BeanDefinitionReference beanDefinition = buildBeanDefinitionReference('test.MyBean', '''
+package test;
+
+import io.micronaut.inject.requires.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(beans=Outer.Inner.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = new DefaultBeanContext()
+        context.registerSingleton(new Outer.Inner())
 
         then:
         beanDefinition.isEnabled(context)
