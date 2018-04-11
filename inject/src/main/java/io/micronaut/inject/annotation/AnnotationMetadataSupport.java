@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.inject.annotation;
 
@@ -42,7 +42,6 @@ import java.util.function.Function;
 @Internal
 class AnnotationMetadataSupport {
 
-
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
 
@@ -59,7 +58,7 @@ class AnnotationMetadataSupport {
             Method[] declaredMethods = annotation.getDeclaredMethods();
             for (Method declaredMethod : declaredMethods) {
                 Object defaultValue = declaredMethod.getDefaultValue();
-                if(defaultValue != null) {
+                if (defaultValue != null) {
                     defaultValues.put(declaredMethod.getName().intern(), defaultValue);
                 }
             }
@@ -77,27 +76,27 @@ class AnnotationMetadataSupport {
 
     static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, ConvertibleValues<Object> annotationValues) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
-        if(proxyClass.isPresent()) {
+        if (proxyClass.isPresent()) {
             Method[] declaredMethods = annotationClass.getDeclaredMethods();
             Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>(declaredMethods.length);
             for (Method declaredMethod : declaredMethods) {
                 String name = declaredMethod.getName();
-                if ( annotationValues.contains(name) ) {
+                if (annotationValues.contains(name)) {
                     Optional<?> converted = annotationValues.get(name, declaredMethod.getReturnType());
                     converted.ifPresent(o -> resolvedValues.put(name, o));
                 }
             }
             Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) (proxy, method, args) -> {
                 String name = method.getName();
-                if("annotationType".equals(name)) {
+                if ("annotationType".equals(name)) {
                     return annotationClass;
                 }
-                if(resolvedValues.containsKey(name)) {
+                if (resolvedValues.containsKey(name)) {
                     return resolvedValues.get(name);
                 }
                 return method.getDefaultValue();
             });
-            if(instantiated.isPresent()) {
+            if (instantiated.isPresent()) {
                 return (T) instantiated.get();
             }
         }

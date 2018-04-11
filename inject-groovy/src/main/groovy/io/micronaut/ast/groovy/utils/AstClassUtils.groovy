@@ -1,12 +1,26 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.ast.groovy.utils
+
+import static org.codehaus.groovy.ast.ClassHelper.make
+import static org.codehaus.groovy.ast.ClassHelper.makeCached
 
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
-
-import static org.codehaus.groovy.ast.ClassHelper.make
-import static org.codehaus.groovy.ast.ClassHelper.make
-import static org.codehaus.groovy.ast.ClassHelper.makeCached
 
 /**
  * Utility methods for working with classes
@@ -41,17 +55,16 @@ class AstClassUtils {
      * @return True if it is a subclass
      */
     static boolean isSubclassOf(ClassNode classNode, String parentClassName) {
-        if(classNode.name == parentClassName) return true
+        if (classNode.name == parentClassName) return true
         ClassNode currentSuper = classNode.getSuperClass()
-        while (currentSuper != null ) {
+        while (currentSuper != null) {
             if (currentSuper.getName() == parentClassName) {
                 return true
             }
 
-            if(currentSuper.getName() == ClassHelper.OBJECT_TYPE.getName()) {
+            if (currentSuper.getName() == ClassHelper.OBJECT_TYPE.getName()) {
                 break
-            }
-            else {
+            } else {
                 currentSuper = currentSuper.getSuperClass()
             }
 
@@ -70,6 +83,7 @@ class AstClassUtils {
         ClassNode interfaceNode = make(interfaceName)
         return implementsInterface(classNode, interfaceNode)
     }
+
     /**
      * Whether the given class node implements the given interface node
      *
@@ -80,6 +94,7 @@ class AstClassUtils {
     static boolean implementsInterface(ClassNode classNode, Class itfc) {
         return classNode.getAllInterfaces().contains(makeCached(itfc))
     }
+
     /**
      * Whether the given class node implements the given interface node
      *

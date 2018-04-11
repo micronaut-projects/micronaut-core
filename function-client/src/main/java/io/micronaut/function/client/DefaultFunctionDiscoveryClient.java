@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package io.micronaut.function.client;
 
-import io.reactivex.Flowable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
+import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -43,7 +43,7 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     private final DiscoveryClient discoveryClient;
     private final Map<String, FunctionDefinition> functionDefinitionMap;
 
-    public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition...definitions) {
+    public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
         this.discoveryClient = discoveryClient;
         this.functionDefinitionMap = new HashMap<>(definitions.length);
         for (FunctionDefinition definition : definitions) {
@@ -59,24 +59,23 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
 
     @Override
     public Publisher<FunctionDefinition> getFunction(String functionName) {
-        if(functionDefinitionMap.containsKey(functionName)) {
+        if (functionDefinitionMap.containsKey(functionName)) {
             return Publishers.just(functionDefinitionMap.get(functionName));
-        }
-        else {
+        } else {
             Flowable<ServiceInstance> serviceInstanceLocator = Flowable.fromPublisher(discoveryClient.getServiceIds())
-                    .flatMap(Flowable::fromIterable)
-                    .flatMap(discoveryClient::getInstances)
-                    .flatMap(Flowable::fromIterable)
-                    .filter(instance -> {
-                                boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
-                                return isAvailable && instance.getMetadata().names().stream()
-                                        .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
-                            }
+                .flatMap(Flowable::fromIterable)
+                .flatMap(discoveryClient::getInstances)
+                .flatMap(Flowable::fromIterable)
+                .filter(instance -> {
+                        boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
+                        return isAvailable && instance.getMetadata().names().stream()
+                            .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
+                    }
 
-                    ).switchIfEmpty(Flowable.error(new FunctionNotFoundException(functionName)));
+                ).switchIfEmpty(Flowable.error(new FunctionNotFoundException(functionName)));
             return serviceInstanceLocator.map(instance -> {
                 Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
-                if(uri.isPresent()) {
+                if (uri.isPresent()) {
                     URI resolvedURI = instance.getURI().resolve(uri.get());
                     return new FunctionDefinition() {
 
@@ -94,6 +93,5 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
                 throw new FunctionNotFoundException(functionName);
             });
         }
-
     }
 }

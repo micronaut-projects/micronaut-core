@@ -1,0 +1,56 @@
+.wiki-table th, #navigation {
+    background: #000000 !important;
+}
+
+#navigation a {
+    color: #FFFFFF !important;
+}
+#navigation .selected a {
+    background: #255AA8 !important;
+}
+#navigation a:hover {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+}
+
+#navigation .selected a:hover,
+#navigation .active .button {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+}
+
+a,
+a:hover,
+a:focus,
+a:active,
+a:hover,
+#table-of-content a:hover strong,
+#table-of-content a strong,
+.menu a:hover,
+.local .local-title .toggle a,
+#navigation #nav-summary-childs a:hover {
+    color: #255AA8 !important;
+}
+
+#table-of-content a:hover {
+    border-right: 2px solid #255AA8 !important;
+}
+.menu .menu-block h1,
+#main .project strong,
+#main h1,
+#main h2 {
+    font-weight: bold !important;
+    color: #000000 !important;
+}
+.navTitle {
+    background-image: none !important;
+}
+.navTitle #logo img {
+    margin: 8px 0;
+    height: 30px !important;
+}
+
+#navigation #nav-summary-childs {
+    background: #000000 !important;
+}
+

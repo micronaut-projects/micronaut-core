@@ -1,16 +1,35 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.async.subscriber.TypedSubscriber;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
+import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.jackson.parser.JacksonProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCountUtil;
-import io.micronaut.jackson.parser.JacksonProcessor;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.*;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -24,18 +43,40 @@ import java.util.Optional;
  */
 public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
 
-
-    private final JacksonProcessor jacksonProcessor;
+    private final JsonFactory jsonFactory;
+    private JacksonProcessor jacksonProcessor;
 
     public JsonContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration, Optional<JsonFactory> jsonFactory) {
         super(nettyHttpRequest, configuration);
-        this.jacksonProcessor = new JacksonProcessor(jsonFactory.orElse(new JsonFactory()));
+        this.jsonFactory = jsonFactory.orElse(new JsonFactory());
     }
 
     @Override
     protected void doOnSubscribe(Subscription subscription, Subscriber<? super JsonNode> subscriber) {
-        if(parentSubscription == null) {
+        if (parentSubscription == null) {
             return;
+        }
+
+        if(subscriber instanceof TypedSubscriber) {
+            TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
+            Argument typeArgument = typedSubscriber.getTypeArgument();
+
+            Class targetType = typeArgument.getType();
+            if(Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
+                Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
+                if(genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType())) {
+                    // if the generic argument is not a iterable type them stream the array into the publisher
+                    this.jacksonProcessor = new JacksonProcessor(jsonFactory, true);
+                }
+                else {
+                    this.jacksonProcessor = new JacksonProcessor(jsonFactory);
+                }
+
+            }
+        }
+        else {
+
+            this.jacksonProcessor = new JacksonProcessor(jsonFactory);
         }
 
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {

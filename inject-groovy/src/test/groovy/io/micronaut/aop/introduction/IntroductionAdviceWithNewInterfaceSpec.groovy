@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,8 +30,8 @@ class IntroductionAdviceWithNewInterfaceSpec extends AbstractBeanDefinitionSpec 
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on concrete classes"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -48,10 +48,10 @@ class MyBean  {
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
+        ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
 
         when:
         def context = new DefaultBeanContext()
@@ -69,8 +69,8 @@ class MyBean  {
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on abstract classes"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean2' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -78,7 +78,7 @@ import io.micronaut.context.annotation.*;
 @ListenerAdvice
 @Stub
 @javax.inject.Singleton
-abstract class MyBean  {
+abstract class MyBean2 {
 
     public String getFoo() { return "good"; }
 }
@@ -110,8 +110,8 @@ abstract class MyBean  {
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on interfaces"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean3' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -119,7 +119,7 @@ import io.micronaut.context.annotation.*;
 @ListenerAdvice
 @Stub
 @javax.inject.Singleton
-interface MyBean  {
+interface MyBean3  {
 
     String getBar(); 
     

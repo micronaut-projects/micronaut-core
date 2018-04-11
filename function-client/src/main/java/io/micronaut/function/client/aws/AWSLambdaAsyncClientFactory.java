@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,6 @@ import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.runtime.context.scope.Refreshable;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.runtime.context.scope.Refreshable;
-
-import javax.inject.Singleton;
 
 /**
  * @author graemerocher
@@ -45,5 +40,4 @@ public class AWSLambdaAsyncClientFactory {
         AWSLambdaAsyncClientBuilder builder = configuration.getBuilder();
         return builder.build();
     }
-
 }

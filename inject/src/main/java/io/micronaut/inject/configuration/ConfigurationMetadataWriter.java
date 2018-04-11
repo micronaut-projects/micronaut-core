@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ public interface ConfigurationMetadataWriter {
     /**
      * An interface for classes that can write metadata produced by a {@link ConfigurationMetadataBuilder}
      *
-     * @param metadataBuilder The metadata builder
+     * @param metadataBuilder          The metadata builder
      * @param classWriterOutputVisitor The class output visitor
      * @throws IOException If an error occurred writing outpu
      */

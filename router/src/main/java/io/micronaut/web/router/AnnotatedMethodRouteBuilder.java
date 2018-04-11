@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,19 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Error;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Head;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Options;
+import io.micronaut.http.annotation.Patch;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.Trace;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -44,18 +55,17 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     private final Map<Class, BiConsumer<BeanDefinition, ExecutableMethod>> httpMethodsHandlers = new LinkedHashMap<>();
 
-
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (BeanDefinition bean, ExecutableMethod method) -> {
             String uri = method.getValue(HttpMethodMapping.class, String.class).orElse("");
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = GET(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes()).produces(produces);
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes()).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
@@ -66,11 +76,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = POST(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -82,11 +92,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = PUT(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -98,11 +108,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = PATCH(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -114,11 +124,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = DELETE(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -129,11 +139,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         httpMethodsHandlers.put(Head.class, (BeanDefinition bean, ExecutableMethod method) -> {
             String uri = method.getValue(HttpMethodMapping.class, String.class).orElse("");
             Route route = HEAD(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
@@ -144,11 +154,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
             Route route = OPTIONS(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -158,48 +168,56 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         httpMethodsHandlers.put(Trace.class, (BeanDefinition bean, ExecutableMethod method) -> {
             String uri = method.getValue(HttpMethodMapping.class, String.class).orElse("");
             Route route = TRACE(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    method.getDeclaringType(),
-                    method.getMethodName(),
-                    method.getArgumentTypes());
+                method,
+                uriNamingStrategy),
+                method.getDeclaringType(),
+                method.getMethodName(),
+                method.getArgumentTypes());
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
         });
 
         httpMethodsHandlers.put(Error.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            boolean isGlobal = method.getValue(Error.class, "global", boolean.class).orElse(false);
-            Class declaringType = method.getDeclaringType();
-            if (method.isPresent(Error.class, "status")) {
-                        Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
-                        value.ifPresent(httpStatus -> status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes()));
-                    } else if (method.isPresent(Error.class, "value")) {
-                        Optional<Class> aClass = method.classValue(Error.class);
-                        aClass.ifPresent(exceptionType ->
-                                {
-                                    if (Throwable.class.isAssignableFrom(exceptionType)) {
-                                        if(isGlobal) {
-                                            //noinspection unchecked
-                                            error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                                        }
-                                        else {
-                                            error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                                        }
-                                    }
+                boolean isGlobal = method.getValue(Error.class, "global", boolean.class).orElse(false);
+                Class declaringType = method.getDeclaringType();
+                if (method.isPresent(Error.class, "status")) {
+                    Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
+                    value.ifPresent(httpStatus -> status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes()));
+                } else if (method.isPresent(Error.class, "value")) {
+                    Optional<Class> aClass = method.classValue(Error.class);
+                    aClass.ifPresent(exceptionType ->
+                        {
+                            if (Throwable.class.isAssignableFrom(exceptionType)) {
+                                if (isGlobal) {
+                                    //noinspection unchecked
+                                    error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                                } else {
+                                    error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                                 }
-                        );
+                            }
+                        }
+                    );
+                } else {
+                    if (isGlobal) {
+                        error(Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
                     } else {
-                        if(isGlobal) {
-                            error(Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
-                        }
-                        else {
-                            error(declaringType, Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
-                        }
+                        error(declaringType, Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
                     }
-
                 }
+            }
+        );
+    }
 
+    @Override
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
+        actionAnn.ifPresent(annotationClass -> {
+                BiConsumer<BeanDefinition, ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
+                if (handler != null) {
+                    handler.accept(beanDefinition, method);
+                }
+            }
         );
     }
 
@@ -213,19 +231,6 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             }
         } else {
             return rootUri + uriNamingStrategy.resolveUri(method.getMethodName());
-
         }
-    }
-
-    @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        actionAnn.ifPresent(annotationClass -> {
-                    BiConsumer<BeanDefinition, ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
-                    if (handler != null) {
-                        handler.accept(beanDefinition, method);
-                    }
-                }
-        );
     }
 }

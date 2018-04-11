@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.management.endpoint.beans.BeanDefinitionData;
+import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
+import io.micronaut.management.endpoint.beans.BeansEndpoint;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.management.endpoint.beans.BeanDefinitionData;
-import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
-import io.micronaut.management.endpoint.beans.BeansEndpoint;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Named;
@@ -67,9 +67,9 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
         Map<String, Object> beans = new ConcurrentHashMap<>(definitions.size());
 
         return Flowable.fromIterable(definitions)
-                .subscribeOn(Schedulers.from(executorService))
-                .collectInto(beans, (map, definition) ->
-                        map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))
-                );
+            .subscribeOn(Schedulers.from(executorService))
+            .collectInto(beans, (map, definition) ->
+                map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))
+            );
     }
 }

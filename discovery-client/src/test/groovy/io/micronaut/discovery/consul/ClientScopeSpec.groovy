@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Value
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.Client
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
@@ -36,18 +31,20 @@ import javax.inject.Inject
  * @author graemerocher
  * @since 1.0
  */
-class ClientScopeSpec extends Specification {
+class ClientScopeSpec extends Specification implements MockConsulSpec  {
 
 
     void "test that a client can be discovered using @Client scope"() {
         given:
         // a mock consul server
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer,[(MockConsulServer.ENABLED):true])
+        waitFor(consulServer)
 
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
                 'consul.client.port': consulServer.port,
                 'micronaut.application.name': 'messageService'
         ])
+        waitForService(consulServer, 'messageService')
 
         MessageService messageClient = ApplicationContext.run(MessageService, [
                 'consul.client.port': consulServer.port
@@ -56,13 +53,9 @@ class ClientScopeSpec extends Specification {
         expect:
         messageClient.getMessage() == "Server ${messageServer.port}"
 
-
-
         cleanup:
         messageServer?.stop()
         consulServer?.stop()
-
-
     }
 
     @IgnoreIf({ !System.getenv('CONSUL_PORT') })
@@ -114,6 +107,4 @@ class ClientScopeSpec extends Specification {
             return "Server ${embeddedServer.port}"
         }
     }
-
-
 }

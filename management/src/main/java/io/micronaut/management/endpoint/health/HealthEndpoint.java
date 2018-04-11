@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,12 @@
  */
 package io.micronaut.management.endpoint.health;
 
-import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.health.aggregator.HealthAggregator;
-import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 /**
@@ -33,8 +32,14 @@ import org.reactivestreams.Publisher;
 @Endpoint(HealthEndpoint.NAME)
 public class HealthEndpoint {
 
-
+    /**
+     * Constant for health
+     */
     public static final String NAME = "health";
+
+    /**
+     * Prefix for health endpoint
+     */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     private HealthAggregator healthAggregator;
@@ -46,7 +51,7 @@ public class HealthEndpoint {
     }
 
     @Read
-    Publisher getHealth() {
-        return healthAggregator.aggregate(healthIndicators);
+    Single getHealth() {
+        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators));
     }
 }

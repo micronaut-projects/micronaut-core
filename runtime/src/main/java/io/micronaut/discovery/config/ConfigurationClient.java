@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,8 @@ import org.reactivestreams.Publisher;
  * @author graemerocher
  * @since 1.0
  */
-public interface ConfigurationClient extends Described{
+public interface ConfigurationClient extends Described {
+
     /**
      * The prefix used to configure the config client
      */
@@ -34,11 +35,12 @@ public interface ConfigurationClient extends Described{
     /**
      * The read timeout used when reading distributed configuration
      */
-    String ENABLED = CONFIGURATION_PREFIX +  ".enabled";
+    String ENABLED = CONFIGURATION_PREFIX + ".enabled";
     /**
      * The read timeout used when reading distributed configuration
      */
     String READ_TIMEOUT = CONFIGURATION_PREFIX + ".readTimeout";
+
     /**
      * Retrieves all of the {@link PropertySource} registrations for the given environment
      *

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.retry.RetryState;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.Retryable;
@@ -36,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 class SimpleRetry implements RetryState, MutableRetryState {
+
     private final int maxAttempts;
     private final double multiplier;
     private final Duration delay;
@@ -48,12 +47,13 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final Set<Class<? extends Throwable>> excludes;
 
     SimpleRetry(
-            int maxAttempts,
-            double multiplier,
-            Duration delay,
-            Duration maxDelay,
-            Set<Class<? extends Throwable>> includes,
-            Set<Class<? extends Throwable>> excludes) {
+        int maxAttempts,
+        double multiplier,
+        Duration delay,
+        Duration maxDelay,
+        Set<Class<? extends Throwable>> includes,
+        Set<Class<? extends Throwable>> excludes) {
+
         this.maxAttempts = maxAttempts;
         this.multiplier = multiplier;
         this.delay = delay;
@@ -74,25 +74,25 @@ class SimpleRetry implements RetryState, MutableRetryState {
 
     /**
      * Should a retry attempt occur
+     *
      * @return True if it should
      */
     @Override
     public boolean canRetry(Throwable exception) {
-        if(exception == null) {
+        if (exception == null) {
             return false;
         }
 
         Class<? extends Throwable> exceptionClass = exception.getClass();
-        if(hasIncludes && !includes.contains(exceptionClass)) {
+        if (hasIncludes && !includes.contains(exceptionClass)) {
             return false;
-        }
-        else if(hasExcludes && excludes.contains(exceptionClass)) {
+        } else if (hasExcludes && excludes.contains(exceptionClass)) {
             return false;
-        }
-        else {
-            return this.attemptNumber.incrementAndGet() < (maxAttempts+1) && ((maxDelay == null) || overallDelay.get() < maxDelay.toMillis());
+        } else {
+            return this.attemptNumber.incrementAndGet() < (maxAttempts + 1) && ((maxDelay == null) || overallDelay.get() < maxDelay.toMillis());
         }
     }
+
     /**
      * @return The maximum number of attempts
      */
@@ -116,6 +116,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     public OptionalDouble getMultiplier() {
         return multiplier > 0 ? OptionalDouble.of(multiplier) : OptionalDouble.empty();
     }
+
     /**
      * @return The delay between attempts
      */
@@ -148,9 +149,8 @@ class SimpleRetry implements RetryState, MutableRetryState {
     public long nextDelay() {
         double multiplier = getMultiplier().orElse(1.0);
         int current = attemptNumber.get() + 1;
-        long delay = (long) (getDelay().toMillis() * multiplier)  * current;
+        long delay = (long) (getDelay().toMillis() * multiplier) * current;
         overallDelay.addAndGet(delay);
         return delay;
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.netflix.hystrix.HystrixCollapserMetrics;
 import com.netflix.hystrix.HystrixCommandMetrics;
 import com.netflix.hystrix.HystrixThreadPoolMetrics;
 import com.netflix.hystrix.serial.SerialHystrixDashboardData;
+import io.micronaut.configurations.hystrix.HystrixConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.http.MediaType;
@@ -28,13 +29,6 @@ import io.micronaut.http.sse.Event;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.configurations.hystrix.HystrixConfiguration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.sse.Event;
 
 import javax.inject.Inject;
 import java.time.Duration;
@@ -65,22 +59,22 @@ public class HystrixStreamController {
     @Get(uri = "/", produces = MediaType.TEXT_EVENT_STREAM)
     public Flowable<Event<String>> hystrixStream() {
         return Flowable.interval(interval.toMillis(), TimeUnit.MILLISECONDS)
-                       .subscribeOn(Schedulers.io())
-                       .flatMap( num -> Flowable.create(eventEmitter -> {
-                           try {
-                               for (HystrixCommandMetrics commandMetrics : HystrixCommandMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(commandMetrics)));
-                               }
-                               for (HystrixThreadPoolMetrics threadPoolMetrics : HystrixThreadPoolMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(threadPoolMetrics)));
-                               }
-                               for (HystrixCollapserMetrics collapserMetrics : HystrixCollapserMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(collapserMetrics)));
-                               }
-                           } catch (Exception e) {
-                               eventEmitter.onError(e);
-                           }
+            .subscribeOn(Schedulers.io())
+            .flatMap(num -> Flowable.create(eventEmitter -> {
+                try {
+                    for (HystrixCommandMetrics commandMetrics : HystrixCommandMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(commandMetrics)));
+                    }
+                    for (HystrixThreadPoolMetrics threadPoolMetrics : HystrixThreadPoolMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(threadPoolMetrics)));
+                    }
+                    for (HystrixCollapserMetrics collapserMetrics : HystrixCollapserMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(collapserMetrics)));
+                    }
+                } catch (Exception e) {
+                    eventEmitter.onError(e);
+                }
 
-                       }, BackpressureStrategy.BUFFER)) ;
+            }, BackpressureStrategy.BUFFER));
     }
 }

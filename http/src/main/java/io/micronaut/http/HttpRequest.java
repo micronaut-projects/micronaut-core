@@ -1,16 +1,27 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.util.HttpUtil;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.util.HttpUtil;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.charset.UnsupportedCharsetException;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,10 +38,12 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link Cookies} instance
      */
     Cookies getCookies();
+
     /**
      * @return The HTTP parameters contained with the URI query string
      */
     HttpParameters getParameters();
+
     /**
      * @return The request method
      */
@@ -55,6 +68,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return Obtain the server address
      */
     InetSocketAddress getServerAddress();
+
     /**
      * @return The server host name
      */
@@ -68,20 +82,20 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @Override
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-                .map((text)-> {
-                    int len = text.length();
-                    if(len == 0 || (len == 1 && text.charAt(0) == '*')) {
-                        return Locale.getDefault().toLanguageTag();
-                    }
-                    if(text.indexOf(';')>-1) {
-                        text = text.split(";")[0];
-                    }
-                    if(text.indexOf(',')>-1) {
-                        text = text.split(",")[0];
-                    }
-                    return text;
-                })
-                .map(Locale::forLanguageTag);
+            .map((text) -> {
+                int len = text.length();
+                if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
+                    return Locale.getDefault().toLanguageTag();
+                }
+                if (text.indexOf(';') > -1) {
+                    text = text.split(";")[0];
+                }
+                if (text.indexOf(',') > -1) {
+                    text = text.split(",")[0];
+                }
+                return text;
+            })
+            .map(Locale::forLanguageTag);
     }
 
     /**
@@ -90,7 +104,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     default Charset getCharacterEncoding() {
         return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
     }
-
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI
@@ -101,7 +114,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> GET(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.get(uri);
@@ -116,12 +129,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> OPTIONS(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.options(uri);
     }
-
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
@@ -132,7 +144,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static MutableHttpRequest<?> HEAD(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.head(uri);
@@ -141,7 +153,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI
      *
-     * @param uri The URI
+     * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
@@ -150,7 +162,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.post(uri, body);
@@ -159,7 +171,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI
      *
-     * @param uri The URI
+     * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
@@ -168,7 +180,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.put(uri, body);
@@ -177,7 +189,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI
      *
-     * @param uri The URI
+     * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
@@ -186,7 +198,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.patch(uri, body);
@@ -195,7 +207,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
      *
-     * @param uri The URI
+     * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
@@ -203,7 +215,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.delete(uri, body);
@@ -222,8 +234,9 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
      * Create a new {@link MutableHttpRequest} for the given method and URI
+     *
      * @param httpMethod The method
-     * @param uri The URI
+     * @param uri        The URI
      * @param <T>
      * @return The request
      */
@@ -231,7 +244,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
         Objects.requireNonNull(uri, "Argument [uri] is required");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No HTTP client implementation found on classpath")
+            new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.create(httpMethod, uri);

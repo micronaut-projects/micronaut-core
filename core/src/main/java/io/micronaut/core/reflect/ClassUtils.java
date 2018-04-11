@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -43,7 +58,7 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Integer.class.getName(), Integer.class);
         COMMON_CLASS_MAP.put(Long.class.getName(), Long.class);
         COMMON_CLASS_MAP.put(Short.class.getName(), Short.class);
-        COMMON_CLASS_MAP.put(Double.class.getName(),Double.class);
+        COMMON_CLASS_MAP.put(Double.class.getName(), Double.class);
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
@@ -51,23 +66,24 @@ public class ClassUtils {
 
     /**
      * <p>Converts a URI to a class file reference to the class name</p>
-     *
+     * <p>
      * <p>ie. ClassUtils.pathToClassName("foo/bar/MyClass.class") == "foo.bar.MyClass"</p>
      *
      * @param path The path name
      * @return The class name
      */
     public static String pathToClassName(String path) {
-        path = path.replace('/','.');
-        if(path.endsWith(CLASS_EXTENSION)) {
+        path = path.replace('/', '.');
+        if (path.endsWith(CLASS_EXTENSION)) {
             path = path.substring(0, path.length() - CLASS_EXTENSION.length());
         }
         return path;
     }
+
     /**
      * Check whether the given class is present in the given classloader
      *
-     * @param name The name of the class
+     * @param name        The name of the class
      * @param classLoader The classloader
      * @return True if it is
      */
@@ -77,26 +93,27 @@ public class ClassUtils {
 
     /**
      * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type
+     *
      * @param type The type
      * @return True if it is
      */
     public static boolean isJavaLangType(Class type) {
         return COMMON_CLASS_MAP.containsKey(type.getName());
     }
+
     /**
      * Attempt to load a class for the given name from the given class loader
      *
-     * @param name The name of the class
+     * @param name        The name of the class
      * @param classLoader The classloader
      * @return An optional of the class
      */
     public static Optional<Class> forName(String name, ClassLoader classLoader) {
         try {
             Optional<Class> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
-            if(commonType.isPresent()) {
+            if (commonType.isPresent()) {
                 return commonType;
-            }
-            else {
+            } else {
                 return Optional.of(Class.forName(name, true, classLoader));
             }
         } catch (ClassNotFoundException e) {
