@@ -145,4 +145,7 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
+    license {
+        exclude '**/*Spec.groovy'
+    }
 }
