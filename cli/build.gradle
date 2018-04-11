@@ -1,6 +1,4 @@
 apply plugin: 'application'
-apply plugin: 'com.github.johnrengelman.plugin-shadow'
-
 
 repositories {
     jcenter()
@@ -57,27 +55,20 @@ class MicronautCreateStartScripts extends org.gradle.api.tasks.application.Creat
     }
 }
 
-jar {
-    mainClassName = "io.micronaut.cli.GrailsCli"
+task fatJar(type: Jar) {
     manifest {
-        attributes 'Implementation-Version': project.version
+        attributes 'Main-Class': 'io.micronaut.cli.GrailsCli',
+                'Implementation-Version': project.version
     }
-}
-
-
-shadowJar {
-    baseName = 'cli'
-    classifier = null
-    version = null
+    archiveName = 'cli.jar'
+    from {
+        configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
     destinationDir = outDir
-    relocate('org.codehaus.groovy', 'org.codehaus.groovy')
-    relocate('groovy', 'groovy')
-    relocate('org.apache', 'org.apache')
-    mergeGroovyExtensionModules()
-    mergeServiceFiles()
 }
 
-shadowJar.dependsOn('micronautCreateStartScripts')
+fatJar.dependsOn('micronautCreateStartScripts')
 
 clean {
     delete outDir

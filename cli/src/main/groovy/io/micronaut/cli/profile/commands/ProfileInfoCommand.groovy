@@ -17,6 +17,7 @@ package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.build.parsing.CommandLine
 import io.micronaut.cli.config.CodeGenConfig
 import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.profile.Command
@@ -91,6 +92,20 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
             }
         }
         return true
+    }
+
+    @Override
+    protected int complete(CommandLine commandLine, CommandDescription desc, List<CharSequence> candidates, int cursor) {
+        List<String> lastOption = commandLine.remainingArgs
+        def profileNames = profileRepository.allProfiles.collect() { Profile p -> p.name }
+        if (!lastOption.empty) {
+            String name = lastOption.get(0)
+            profileNames = profileNames.findAll { String pn ->
+                pn.startsWith(name)
+            }.collect { it.substring(name.size())}
+        }
+        candidates.addAll profileNames.join(' ')
+        return cursor
     }
 
     protected Iterable<Command> findCommands(Profile profile, MicronautConsole console) {

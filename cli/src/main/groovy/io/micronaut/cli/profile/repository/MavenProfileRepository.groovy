@@ -17,6 +17,7 @@ package io.micronaut.cli.profile.repository
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import groovy.util.slurpersupport.GPathResult
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency

@@ -65,7 +65,7 @@ class MicronautCli {
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
     private static final String USAGE_MESSAGE = "create-service [NAME]"
-    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME],[NAME],[NAME]"
+    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
     private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original() // store original System.in, System.out and System.err
     private static ExecutionContext currentExecutionContext = null
 
@@ -411,7 +411,7 @@ class MicronautCli {
     }
 
     protected void startInteractiveMode(MicronautConsole console) {
-        console.updateStatus("Starting interactive mode...")
+        console.addStatus("Starting interactive mode...")
         ExecutorService commandExecutor = Executors.newFixedThreadPool(1)
         try {
             interactiveModeLoop(console, commandExecutor)

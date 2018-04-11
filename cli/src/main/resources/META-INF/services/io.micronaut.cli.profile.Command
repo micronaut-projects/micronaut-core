@@ -1,4 +1,5 @@
 io.micronaut.cli.profile.commands.CreateServiceCommand
+io.micronaut.cli.profile.commands.CreateFederationCommand
 io.micronaut.cli.profile.commands.CreateProfileCommand
 io.micronaut.cli.profile.commands.HelpCommand
 io.micronaut.cli.profile.commands.ListProfilesCommand
