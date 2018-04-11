@@ -107,7 +107,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
 }
 '''.bytes))
                 }
-                else {
+                else if(path.endsWith("application.json")) {
                     return Optional.of(new ByteArrayInputStream('''\
 { "hibernate":
     { "cache":
@@ -123,6 +123,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
 }     
 '''.bytes))
                 }
+                return Optional.empty()
             }
         }
 

@@ -20,6 +20,7 @@ import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 /**
@@ -50,7 +51,7 @@ public class HealthEndpoint {
     }
 
     @Read
-    Publisher getHealth() {
-        return healthAggregator.aggregate(healthIndicators);
+    Single getHealth() {
+        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators));
     }
 }

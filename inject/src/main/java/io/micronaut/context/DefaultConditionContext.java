@@ -16,15 +16,25 @@
 package io.micronaut.context;
 
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+
+import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A Default context implementation
+ * 
+ * @author Graeme Rocher
+ * @since 1.0
  */
 class DefaultConditionContext<T extends AnnotationMetadataProvider> implements ConditionContext<T> {
 
     private final BeanContext beanContext;
     private final T component;
+    private final List<Failure> failures = new ArrayList<>(2);
 
     DefaultConditionContext(BeanContext beanContext, T component) {
         this.beanContext = beanContext;
@@ -39,5 +49,21 @@ class DefaultConditionContext<T extends AnnotationMetadataProvider> implements C
     @Override
     public BeanContext getBeanContext() {
         return beanContext;
+    }
+
+    @Override
+    public ConditionContext<T> fail(@Nonnull Failure failure) {
+        failures.add(failure);
+        return this;
+    }
+
+    @Override
+    public String toString() {
+        return component.toString();
+    }
+
+    @Override
+    public List<Failure> getFailures() {
+        return Collections.unmodifiableList(failures);
     }
 }

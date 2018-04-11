@@ -22,9 +22,11 @@ import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
 
+@IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoReactiveConfigurationSpec extends Specification {
 
     void "test a basic connection"() {

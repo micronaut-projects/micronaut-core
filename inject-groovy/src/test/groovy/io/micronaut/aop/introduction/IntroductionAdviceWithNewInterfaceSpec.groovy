@@ -30,8 +30,8 @@ class IntroductionAdviceWithNewInterfaceSpec extends AbstractBeanDefinitionSpec 
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on concrete classes"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -69,8 +69,8 @@ class MyBean  {
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on abstract classes"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean2' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -78,7 +78,7 @@ import io.micronaut.context.annotation.*;
 @ListenerAdvice
 @Stub
 @javax.inject.Singleton
-abstract class MyBean  {
+abstract class MyBean2 {
 
     public String getFoo() { return "good"; }
 }
@@ -110,8 +110,8 @@ abstract class MyBean  {
 
     void "test that it is possible for @Introduction advice to implement additional interfaces on interfaces"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.aop.introduction.test.MyBean3' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package io.micronaut.aop.introduction.test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -119,7 +119,7 @@ import io.micronaut.context.annotation.*;
 @ListenerAdvice
 @Stub
 @javax.inject.Singleton
-interface MyBean  {
+interface MyBean3  {
 
     String getBar(); 
     

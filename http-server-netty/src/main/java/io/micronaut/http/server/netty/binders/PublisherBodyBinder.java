@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binders;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
@@ -72,12 +73,14 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
                 Optional<MediaType> contentType = source.getContentType();
+                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 HttpContentProcessor<?> processor = contentType
                     .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
                     .map(factory -> factory.build(nettyHttpRequest))
                     .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
 
-                return () -> Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
+                //noinspection unchecked
+                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument)context.getArgument()) {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
@@ -86,7 +89,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
                     @Override
                     protected void doOnNext(Object message) {
-                        ArgumentConversionContext<?> conversionContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                         }

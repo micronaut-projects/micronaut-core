@@ -49,6 +49,7 @@ import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
+import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -117,7 +118,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
-    private final Optional<SslContext> sslContext;
+    private final SslContext sslContext;
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
@@ -143,7 +144,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build();
+        this.sslContext = nettyClientSslBuilder.build().orElse(null);
         this.group = createEventLoopGroup(configuration);
         this.bootstrap.group(group)
                 .channel(NioSocketChannel.class)
@@ -275,10 +276,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
-
         return Flowable.fromPublisher(resolveRequestURI(request))
                 .flatMap(buildJsonStreamPublisher(request, type));
-
     }
 
     @SuppressWarnings("unchecked")
@@ -335,7 +334,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                 NettyStreamedHttpResponse<?> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                JacksonProcessor jacksonProcessor = new JacksonProcessor() {
+                boolean streamArray = !Iterable.class.isAssignableFrom(type.getType());
+                JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(),streamArray) {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                         httpContentFlowable.map(content -> {
@@ -353,7 +353,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                         super.subscribe(downstreamSubscriber);
                     }
                 };
-                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode ->
+                        mediaTypeCodec.decode(type, jsonNode)
+                );
             });
         };
     }
@@ -648,7 +650,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
-            sslCtx = sslContext.orElse(null);
+            sslCtx = sslContext;
         } else {
             sslCtx = null;
         }
@@ -784,7 +786,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 return new DefaultHttpContent(textChunk);
                             }
                             else if(o instanceof byte[]) {
-                                return new DefaultHttpContent(Unpooled.copiedBuffer((byte[])o));
+                                return new DefaultHttpContent(Unpooled.wrappedBuffer((byte[])o));
                             }
                             else if(mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
@@ -806,12 +808,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 @Override
                                 public HttpContent apply(HttpContent httpContent) throws Exception {
                                     if(!first) {
-                                        CompositeByteBuf compositeByteBuf = Unpooled.compositeBuffer(2);
-                                        compositeByteBuf.addComponent(true, Unpooled.copiedBuffer(",", StandardCharsets.UTF_8));
-                                        compositeByteBuf.addComponent(true, httpContent.content());
-                                        return httpContent.replace(
-                                                compositeByteBuf
-                                        );
+                                        return HttpContentUtil.prefixComma(httpContent);
                                     }
                                     else {
                                         first = false;
@@ -820,9 +817,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 }
                             });
                             requestBodyPublisher = Flowable.concat(
-                                    Flowable.fromCallable(() -> new DefaultHttpContent(Unpooled.copiedBuffer(new char[]{'['}, StandardCharsets.UTF_8))),
+                                    Flowable.fromCallable(HttpContentUtil::openBracket),
                                     requestBodyPublisher,
-                                    Flowable.fromCallable(() -> new DefaultHttpContent(Unpooled.copiedBuffer(new char[]{']'}, StandardCharsets.UTF_8)))
+                                    Flowable.fromCallable(HttpContentUtil::closeBracket)
                             );
                         }
 

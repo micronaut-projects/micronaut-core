@@ -41,10 +41,13 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanConfiguration;
@@ -356,12 +359,14 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, qualifier, false, true).orElse(null);
+            BeanDefinition<T> beanDefinition = findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null);
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
-                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, new NoInjectionBeanDefinition<>(beanType), singleton));
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(beanType);
+                beanDefinitionsClasses.add(dynamicRegistration);
+                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
             }
         }
         return this;
@@ -1554,10 +1559,10 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.trace("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
                 }
             }
-            return Collections.unmodifiableCollection(existing);
+            return existing;
         }
 
-        Collection<T> beansOfTypeList = new HashSet<>();
+        HashSet<T> beansOfTypeList = new HashSet<>();
         Collection<BeanDefinition<T>> processedDefinitions = new ArrayList<>();
 
         boolean allCandidatesAreSingleton = false;
@@ -1612,14 +1617,14 @@ public class DefaultBeanContext implements BeanContext {
                     }
                     addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, reduced.size() == 1);
                 }
-                beans = Collections.unmodifiableCollection(beansOfTypeList);
+                beans = beansOfTypeList;
             } else {
 
                 if (LOG.isDebugEnabled() && beansOfTypeList.isEmpty()) {
                     LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 allCandidatesAreSingleton = true;
-                beans = Collections.unmodifiableCollection(beansOfTypeList);
+                beans = beansOfTypeList;
             }
         } else if (!candidates.isEmpty()) {
             boolean hasNonSingletonCandidate = false;
@@ -1638,10 +1643,16 @@ public class DefaultBeanContext implements BeanContext {
             if (!hasNonSingletonCandidate) {
                 allCandidatesAreSingleton = true;
             }
-            beans = Collections.unmodifiableCollection(beansOfTypeList);
+            beans = beansOfTypeList;
         } else {
             allCandidatesAreSingleton = true;
-            beans = Collections.unmodifiableCollection(beansOfTypeList);
+            beans = beansOfTypeList;
+        }
+
+        if (Ordered.class.isAssignableFrom(beanType)) {
+            beans = beans.stream().sorted(OrderUtil.COMPARATOR).collect(StreamUtils.toImmutableCollection());
+        } else {
+            beans = Collections.unmodifiableCollection(beans);
         }
 
         if (allCandidatesAreSingleton) {
@@ -1844,7 +1855,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T> {
+    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
 
         public NoInjectionBeanDefinition(Class singletonClass) {
@@ -2016,6 +2027,41 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public Annotation[] getDeclaredAnnotations() {
             return singletonClass.getDeclaredAnnotations();
+        }
+
+        @Override
+        public String getBeanDefinitionName() {
+            return singletonClass.getName();
+        }
+
+        @Override
+        public String getReplacesBeanTypeName() {
+            return null;
+        }
+
+        @Override
+        public String getReplacesBeanDefinitionName() {
+            return null;
+        }
+
+        @Override
+        public BeanDefinition<T> load() {
+            return this;
+        }
+
+        @Override
+        public BeanDefinition<T> load(BeanContext context) {
+            return this;
+        }
+
+        @Override
+        public boolean isContextScope() {
+            return false;
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
         }
     }
 }

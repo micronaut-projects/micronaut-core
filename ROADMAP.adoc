@@ -48,7 +48,6 @@ Tasks to complete:
 We need endpoints for managing and/or exposing information about:
 
 - logging
-- info
 
 These should be built on the `Endpoint` API.
 
@@ -65,7 +64,6 @@ WebSocket Support must be implemented
 ### HTTP Client
 
 * Connection Pooling
-* multi part requests / file uploads - Zak/Puneet
 * Server Sent Events
 * CONTINUE request handling
 * Reactive Streams Publisher as request body to allow streaming
@@ -80,9 +78,8 @@ Built in metrics support on-top of Micro Meter (jack)
 
 #### File Upload Features
 
-* Add a CompletedFileUpload class that waits until the upload is finished and has similar methods to FileUpload. (zak)
-* Rename FileUpload to StreamFileUpload to denote it is designed to be streamed (zak)
 * Add support for @Size on blocking types that receive multipart data. Should override the global setting
+* Support multiple form data parts with the same name
 
 
 ## POST 1.0 Items

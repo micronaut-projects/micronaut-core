@@ -1,0 +1,25 @@
+dependencies {
+
+    compileOnly project(":inject-java")
+    compileOnly 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
+    compileOnly 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
+    compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
+
+    compileOnly 'io.opentracing.brave:brave-opentracing:0.30.0'
+    compileOnly 'com.uber.jaeger:jaeger-core:0.26.0'
+
+    compile 'io.opentracing:opentracing-api:0.31.0'
+    compile 'io.opentracing:opentracing-util:0.31.0'
+
+    compile project(":runtime")
+    compile project(":http-client")
+
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+
+    testCompile 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
+    testCompile 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
+    testCompile 'io.opentracing.brave:brave-opentracing:0.30.0'
+
+}

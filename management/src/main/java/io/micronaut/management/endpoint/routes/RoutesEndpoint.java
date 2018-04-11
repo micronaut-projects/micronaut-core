@@ -19,6 +19,7 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.web.router.Router;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 /**
@@ -40,7 +41,7 @@ public class RoutesEndpoint {
     }
 
     @Read
-    public Publisher getRoutes() {
-        return routeDataCollector.getData(router.uriRoutes());
+    public Single getRoutes() {
+        return Single.fromPublisher(routeDataCollector.getData(router.uriRoutes()));
     }
 }
