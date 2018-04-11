@@ -39,6 +39,32 @@ public class ClusterFactory {
             b.withPort(cassandraConfiguration.getPort());
         }
 
+        if (cassandraConfiguration.getClusterName() != null) {
+            b.withClusterName(cassandraConfiguration.getClusterName());
+        }
+
+        if (cassandraConfiguration.getUsername() != null && cassandraConfiguration.getPassword() != null) {
+            b.withCredentials(cassandraConfiguration.getUsername(), cassandraConfiguration.getPassword());
+        }
+
+        if (cassandraConfiguration.getMaxSchemaAgreementWaitSeconds() != null) {
+            b.withMaxSchemaAgreementWaitSeconds(cassandraConfiguration.getMaxSchemaAgreementWaitSeconds());
+        }
+
+        if (cassandraConfiguration.getWithoutJmxReporting()) {
+            b.withoutJMXReporting();
+        }
+
+        if (cassandraConfiguration.getWithoutMetrics()) {
+            b.withoutMetrics();
+        }
+
+        if (cassandraConfiguration.getSslEnabled()) {
+            b.withSSL();
+        }
+
+
+
         Cluster cluster = b.build();
         return cluster;
     }

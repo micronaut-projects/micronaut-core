@@ -28,7 +28,14 @@ class CassandraConfigurationSpec extends Specification {
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
                 ['cassandra.primary.node': "127.0.0.1",
-                 'cassandra.primary.port': 9042]
+                 'cassandra.primary.port': 9042,
+                 'cassandra.primary.clusterName': "ociCluster",
+                 'cassandra.primary.username': "ociUser",
+                 'cassandra.primary.password': "ociPassword",
+                 'cassandra.primary.maxSchemaAgreementWaitSeconds': 20,
+                 'cassandra.primary.withoutJmxReporting': true,
+                 'cassandra.primary.withoutMetrics': true,
+                 'cassandra.primary.sslEnabled': true]
         ))
         applicationContext.start()
 
@@ -41,9 +48,13 @@ class CassandraConfigurationSpec extends Specification {
         List<InetSocketAddress> inetSocketAddresses = cluster.manager.contactPoints
 
         then:
-        cluster.getClusterName() == "cluster1"
+        cluster.getClusterName() == "ociCluster"
         inetSocketAddresses[0].getHostName() == "127.0.0.1"
         inetSocketAddresses[0].getPort() == 9042
+        inetSocketAddresses[0].getPort() == 9042
+        inetSocketAddresses[0].getPort() == 9042
+        cluster.getConfiguration().getProtocolOptions().getMaxSchemaAgreementWaitSeconds() == 20
+
 
         cleanup:
         applicationContext.close()
