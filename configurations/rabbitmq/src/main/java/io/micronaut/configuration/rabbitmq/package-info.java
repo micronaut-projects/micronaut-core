@@ -1,5 +1,5 @@
 /**
- * Configuration for Tomcat JDBC data sources
+ * Configuration for RabbitMQ
  */
 @Configuration
 @Requires(classes = {Channel.class, Connection.class, ConnectionFactory.class})
