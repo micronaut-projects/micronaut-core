@@ -44,14 +44,26 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
     private String currentFieldName;
+    private boolean streamArray;
 
-    public JacksonProcessor(JsonFactory jsonFactory) {
+    /**
+     * Creates a new JacksonProcessor
+     *
+     * @param jsonFactory The JSON factory
+     * @param streamArray Whether arrays should be streamed
+     */
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray) {
         try {
             this.jsonFactory = jsonFactory;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+            this.streamArray = streamArray;
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
         }
+    }
+
+    public JacksonProcessor(JsonFactory jsonFactory) {
+        this(jsonFactory, false);
     }
 
     public JacksonProcessor() {
@@ -94,12 +106,23 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 while ((event = currentNonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
-                        byteFeeder.endOfInput();
-                        currentDownstreamSubscriber()
-                            .ifPresent(subscriber ->
-                                subscriber.onNext(root)
-                            );
-                        break;
+                        boolean isLast = nodeStack.isEmpty();
+                        if(isLast) {
+                            byteFeeder.endOfInput();
+                        }
+
+                        if(isLast && streamArray && root instanceof ArrayNode) {
+                            break;
+                        }
+                        else {
+                            currentDownstreamSubscriber()
+                                    .ifPresent(subscriber ->
+                                            subscriber.onNext(root)
+                                    );
+                        }
+                        if(isLast) {
+                            break;
+                        }
                     }
                 }
                 if (needMoreInput()) {
@@ -130,10 +153,23 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected array end literal");
                 }
                 JsonNode current = nodeStack.pop();
-                if (nodeStack.isEmpty())
+                if (nodeStack.isEmpty()) {
                     return current;
-                else
-                    return null;
+                }
+                else {
+                    if(streamArray && event == JsonToken.END_OBJECT && nodeStack.size() == 1) {
+                        JsonNode jsonNode = nodeStack.peekFirst();
+                        if(jsonNode instanceof ArrayNode) {
+                            return current;
+                        }
+                        else {
+                            return null;
+                        }
+                    }
+                    else {
+                        return null;
+                    }
+                }
 
             case FIELD_NAME:
                 if (nodeStack.isEmpty()) {

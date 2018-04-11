@@ -4,11 +4,10 @@ dependencies {
     compileOnly project(":inject-java")
 
     testCompile project(":http-client")
-    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
     testCompile project(":configurations:jdbc-tomcat")
+    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testCompile "com.h2database:h2:1.4.196"
     testCompile "mysql:mysql-connector-java:6.0.6"
-
 }

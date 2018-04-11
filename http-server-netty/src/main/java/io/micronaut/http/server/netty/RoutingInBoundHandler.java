@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
+import com.typesafe.netty.HandlerPublisher;
+import com.typesafe.netty.HandlerSubscriber;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Internal;
@@ -33,6 +35,7 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
@@ -67,9 +70,13 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Emitter;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
+import io.reactivex.functions.Consumer;
 import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -80,6 +87,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,6 +96,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -941,30 +950,56 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MediaType mediaType,
             Publisher<Object> publisher) {
 
-        Publisher<HttpContent> httpContentPublisher = Publishers.map(publisher, message -> {
-            if (message instanceof ByteBuf) {
-                return new DefaultHttpContent((ByteBuf) message);
-            } else if (message instanceof ByteBuffer) {
-                ByteBuffer byteBuffer = (ByteBuffer) message;
-                Object nativeBuffer = byteBuffer.asNativeBuffer();
-                if (nativeBuffer instanceof ByteBuf) {
-                    return new DefaultHttpContent((ByteBuf) nativeBuffer);
+        NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
+        boolean isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+
+        Publisher<HttpContent> httpContentPublisher = Publishers.map(publisher, new Function<Object, HttpContent>() {
+            boolean first = true;
+
+            @Override
+            public HttpContent apply(Object message) {
+                HttpContent httpContent;
+                if (message instanceof ByteBuf) {
+                    httpContent = new DefaultHttpContent((ByteBuf) message);
+                } else if (message instanceof ByteBuffer) {
+                    ByteBuffer byteBuffer = (ByteBuffer) message;
+                    Object nativeBuffer = byteBuffer.asNativeBuffer();
+                    if (nativeBuffer instanceof ByteBuf) {
+                        httpContent = new DefaultHttpContent((ByteBuf) nativeBuffer);
+                    } else {
+                        httpContent = new DefaultHttpContent(Unpooled.copiedBuffer(byteBuffer.asNioBuffer()));
+                    }
+                } else if (message instanceof byte[]) {
+                    httpContent = new DefaultHttpContent(Unpooled.copiedBuffer((byte[]) message));
+                } else if (message instanceof HttpContent) {
+                    httpContent = (HttpContent) message;
                 } else {
-                    return new DefaultHttpContent(Unpooled.copiedBuffer(byteBuffer.asNioBuffer()));
+
+                    MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
+                            new TextPlainCodec(serverConfiguration.getDefaultCharset()));
+
+                    ByteBuffer encoded = codec.encode(message, byteBufferFactory);
+                    httpContent = new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
                 }
-            } else if (message instanceof byte[]) {
-                return new DefaultHttpContent(Unpooled.copiedBuffer((byte[]) message));
-            } else if (message instanceof HttpContent) {
-                return (HttpContent) message;
-            } else {
-
-                MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
-                        new TextPlainCodec(serverConfiguration.getDefaultCharset()));
-
-                ByteBuffer encoded = codec.encode(message, new NettyByteBufferFactory(context.alloc()));
-                return new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
+                if(!isJson || first) {
+                    first = false;
+                    return httpContent;
+                }
+                else {
+                    return HttpContentUtil.prefixComma(httpContent);
+                }
             }
         });
+
+        if(isJson && !Publishers.isSingle(publisher.getClass())) {
+            // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
+            // we must wrap the JSON in array and delimit the emitted items
+            httpContentPublisher = Flowable.concat(
+                    Flowable.fromCallable(HttpContentUtil::openBracket),
+                    httpContentPublisher,
+                    Flowable.fromCallable(HttpContentUtil::closeBracket)
+            );
+        }
 
         if (mediaType.equals(MediaType.TEXT_EVENT_STREAM_TYPE)) {
 
@@ -993,11 +1028,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         HttpHeaders headers = streamedResponse.headers();
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        writeNettyResponseAndCloseChannel(
-                context,
-                request,
-                streamedResponse
-        );
+        context.writeAndFlush(streamedResponse)
+                .addListener((ChannelFutureListener) future -> {
+                    if(!future.isSuccess()) {
+                        ChannelPipeline pipeline = context.pipeline();
+                        HandlerPublisher handlerPublisher = pipeline.get(HandlerPublisher.class);
+                        if(handlerPublisher != null) {
+                            pipeline.remove(handlerPublisher);
+                        }
+                        pipeline.fireExceptionCaught(future.cause());
+                    }
+                    else if (!request.getHeaders().isKeepAlive()) {
+                        future.channel().close();
+                    }
+                });
     }
 
     private void writeSingleMessage(

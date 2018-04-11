@@ -17,6 +17,7 @@ package io.micronaut.jackson.env;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.io.ResourceLoader;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -46,7 +47,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     }
 
     @Override
-    protected Optional<InputStream> readInput(Environment environment, String fileName) {
+    protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
         if(fileName.equals("application.json")) {
             String v = getEnvValue();
             if(v != null) {

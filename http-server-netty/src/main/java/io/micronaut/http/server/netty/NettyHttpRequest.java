@@ -93,6 +93,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
     }
 
+    @Override
+    public String toString() {
+        return getMethod() + " " + getUri();
+    }
+
     /**
      * @return Obtain a reference to the native Netty HTTP request
      */

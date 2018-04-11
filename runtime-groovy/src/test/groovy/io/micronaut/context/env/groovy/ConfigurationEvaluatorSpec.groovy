@@ -17,6 +17,7 @@ package io.micronaut.context.env.groovy
 
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.io.ResourceLoader
 import spock.lang.Specification
 
 /**
@@ -28,7 +29,7 @@ class ConfigurationEvaluatorSpec extends Specification {
         given:
         GroovyPropertySourceLoader loader = new GroovyPropertySourceLoader() {
             @Override
-            protected Optional<InputStream> readInput(Environment environment, String fileName) {
+            protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
                 return Optional.of(new ByteArrayInputStream('''
 hibernate {
     cache {

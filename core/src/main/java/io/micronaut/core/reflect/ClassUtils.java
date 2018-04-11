@@ -102,6 +102,36 @@ public class ClassUtils {
     }
 
     /**
+     * The primitive type for the given type name. For example the value "byte" returns {@link Byte#TYPE}
+     *
+     * @param primitiveType The type name
+     * @return An optional type
+     */
+    public static Optional<Class> getPrimitiveType(String primitiveType) {
+        switch (primitiveType) {
+            case "byte":
+                return Optional.of(Byte.TYPE);
+            case "int":
+                return Optional.of(Integer.TYPE);
+            case "short":
+                return Optional.of(Short.TYPE);
+            case "long":
+                return Optional.of(Long.TYPE);
+            case "float":
+                return Optional.of(Float.TYPE);
+            case "double":
+                return Optional.of(Double.TYPE);
+            case "char":
+                return Optional.of(Character.TYPE);
+            case "boolean":
+                return Optional.of(Boolean.TYPE);
+            case "void":
+                return Optional.of(Void.TYPE);
+            default:
+                return Optional.empty();
+        }
+    }
+    /**
      * Attempt to load a class for the given name from the given class loader
      *
      * @param name        The name of the class
