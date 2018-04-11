@@ -35,6 +35,19 @@ public class ClusterFactory {
     public Cluster cassandraCluster(CassandraConfiguration cassandraConfiguration) {
         Builder b = Cluster.builder().addContactPoint(cassandraConfiguration.getNode());
 
+        buildCluster(cassandraConfiguration, b);
+
+        Cluster cluster = b.build();
+        return cluster;
+    }
+
+    /**
+     * Use the configured properties to build the cluster.
+     *
+     * @param cassandraConfiguration the read in properties
+     * @param b builder object to create the cluster
+     */
+    private void buildCluster(CassandraConfiguration cassandraConfiguration, Builder b) {
         if (cassandraConfiguration.getPort() != null) {
             b.withPort(cassandraConfiguration.getPort());
         }
@@ -62,11 +75,6 @@ public class ClusterFactory {
         if (cassandraConfiguration.getSslEnabled()) {
             b.withSSL();
         }
-
-
-
-        Cluster cluster = b.build();
-        return cluster;
     }
 
 }
