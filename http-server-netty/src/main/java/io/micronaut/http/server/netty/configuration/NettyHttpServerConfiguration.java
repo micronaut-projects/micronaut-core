@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,6 +94,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static class Parent extends EventLoopConfig {
     }
 
+    /**
+     * Abstract class for configuring the Netty event loop
+     */
     public static abstract class EventLoopConfig {
         protected int threads;
         protected Integer ioRatio;

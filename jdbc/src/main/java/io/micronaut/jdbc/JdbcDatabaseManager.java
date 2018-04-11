@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,11 @@ package io.micronaut.jdbc;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores information on popular JDBC drivers.
@@ -32,28 +36,28 @@ public class JdbcDatabaseManager {
 
     static {
         databases.add(new EmbeddedJdbcDatabase("org.h2.Driver", "h2", "jdbc:h2:mem:%s;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"));
-        databases.add(new EmbeddedJdbcDatabase("org.apache.derby.jdbc.EmbeddedDriver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[] { "derby" }, "jdbc:derby:memory:%s;create=true"));
-        databases.add(new EmbeddedJdbcDatabase("org.hsqldb.jdbc.JDBCDriver", "select 1 from INFORMATION_SCHEMA.SYSTEM_USERS", new String[] { "hsqldb" }, "jdbc:hsqldb:mem:%s"));
+        databases.add(new EmbeddedJdbcDatabase("org.apache.derby.jdbc.EmbeddedDriver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[]{"derby"}, "jdbc:derby:memory:%s;create=true"));
+        databases.add(new EmbeddedJdbcDatabase("org.hsqldb.jdbc.JDBCDriver", "select 1 from INFORMATION_SCHEMA.SYSTEM_USERS", new String[]{"hsqldb"}, "jdbc:hsqldb:mem:%s"));
 
         databases.add(new JdbcDatabase("com.mysql.jdbc.Driver", "mysql"));
-        databases.add(new JdbcDatabase("oracle.jdbc.OracleDriver", "SELECT 1 FROM DUAL", new String[] { "oracle" }));
+        databases.add(new JdbcDatabase("oracle.jdbc.OracleDriver", "SELECT 1 FROM DUAL", new String[]{"oracle"}));
         databases.add(new JdbcDatabase("org.postgresql.Driver", "postgresql"));
         databases.add(new JdbcDatabase("com.microsoft.sqlserver.jdbc.SQLServerDriver", "sqlserver"));
         databases.add(new JdbcDatabase("org.sqlite.JDBC", "sqlite"));
         databases.add(new JdbcDatabase("org.mariadb.jdbc.Driver", "mariadb"));
         databases.add(new JdbcDatabase("com.google.appengine.api.rdbms.AppEngineDriver", "gae"));
         databases.add(new JdbcDatabase("net.sourceforge.jtds.jdbc.Driver", "jtds"));
-        databases.add(new JdbcDatabase("org.firebirdsql.jdbc.FBDriver", "SELECT 1 FROM RDB$DATABASE", new String[] { "firebirdsql" }));
-        databases.add(new JdbcDatabase("com.ibm.db2.jcc.DB2Driver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[] { "db2" }));
-        databases.add(new JdbcDatabase("com.ibm.as400.access.AS400JDBCDriver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[] { "as400" }));
+        databases.add(new JdbcDatabase("org.firebirdsql.jdbc.FBDriver", "SELECT 1 FROM RDB$DATABASE", new String[]{"firebirdsql"}));
+        databases.add(new JdbcDatabase("com.ibm.db2.jcc.DB2Driver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[]{"db2"}));
+        databases.add(new JdbcDatabase("com.ibm.as400.access.AS400JDBCDriver", "SELECT 1 FROM SYSIBM.SYSDUMMY1", new String[]{"as400"}));
         databases.add(new JdbcDatabase("com.teradata.jdbc.TeraDriver", "teradata"));
-        databases.add(new JdbcDatabase("com.informix.jdbc.IfxDriver", "select count(*) from systables", new String[] { "informix" }));
+        databases.add(new JdbcDatabase("com.informix.jdbc.IfxDriver", "select count(*) from systables", new String[]{"informix"}));
     }
 
     /**
      * Searches defined database where the URL prefix matches one of the prefixes
      * defined in a {@link JdbcDatabase}. The prefix is determined by:
-     *
+     * <p>
      * jdbc:<prefix>:...
      *
      * @param jdbcUrl The connection URL
@@ -79,11 +83,12 @@ public class JdbcDatabaseManager {
      * @return An optional {@link EmbeddedJdbcDatabase}
      */
     public static Optional<EmbeddedJdbcDatabase> get(ClassLoader classLoader) {
-        return databases.stream()
-                .filter(JdbcDatabase::isEmbedded)
-                .map(EmbeddedJdbcDatabase.class::cast)
-                .filter(embeddedDatabase -> ClassUtils.isPresent(embeddedDatabase.getDriverClassName(), classLoader))
-                .findFirst();
+        return databases
+            .stream()
+            .filter(JdbcDatabase::isEmbedded)
+            .map(EmbeddedJdbcDatabase.class::cast)
+            .filter(embeddedDatabase -> ClassUtils.isPresent(embeddedDatabase.getDriverClassName(), classLoader))
+            .findFirst();
     }
 
     /**
@@ -93,9 +98,10 @@ public class JdbcDatabaseManager {
      * @return True if the driver matches an embedded database type
      */
     public static boolean isEmbedded(String driverClassName) {
-        return databases.stream()
-                .filter(JdbcDatabase::isEmbedded)
-                .anyMatch(db -> db.driverClassName.equals(driverClassName));
+        return databases
+            .stream()
+            .filter(JdbcDatabase::isEmbedded)
+            .anyMatch(db -> db.driverClassName.equals(driverClassName));
     }
 
     /**
@@ -118,7 +124,7 @@ public class JdbcDatabaseManager {
         }
 
         JdbcDatabase(String driverClassName, String urlPrefix) {
-            this(driverClassName, "SELECT 1", new String[]{ urlPrefix });
+            this(driverClassName, "SELECT 1", new String[]{urlPrefix});
         }
 
         /**

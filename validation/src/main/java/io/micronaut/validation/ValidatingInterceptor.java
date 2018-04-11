@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.validation;
 
@@ -19,9 +19,6 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.aop.InterceptPhase;
-import io.micronaut.aop.MethodInterceptor;
-import io.micronaut.aop.MethodInvocationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,10 +57,10 @@ public class ValidatingInterceptor implements MethodInterceptor {
     public ValidatingInterceptor(Optional<ValidatorFactory> validatorFactory) {
 
         executableValidator = validatorFactory
-                                    .map(factory -> factory.getValidator().forExecutables())
-                                    .orElse(null);
+            .map(factory -> factory.getValidator().forExecutables())
+            .orElse(null);
 
-        if(executableValidator == null && LOG.isWarnEnabled()) {
+        if (executableValidator == null && LOG.isWarnEnabled()) {
             LOG.warn("Beans requiring validation present, but no implementation of javax.validation configuration. Add an implementation (such as hibernate-validator) to prevent this error.");
         }
     }
@@ -74,16 +71,15 @@ public class ValidatingInterceptor implements MethodInterceptor {
             return context.proceed();
         } else {
             Method targetMethod = context.getTargetMethod();
-            if(targetMethod.getParameterTypes().length == 0) {
+            if (targetMethod.getParameterTypes().length == 0) {
                 return context.proceed();
-            }
-            else {
+            } else {
                 Set<ConstraintViolation<Object>> constraintViolations = executableValidator
-                        .validateParameters(
-                                context.getTarget(),
-                                targetMethod,
-                                context.getParameterValues()
-                        );
+                    .validateParameters(
+                        context.getTarget(),
+                        targetMethod,
+                        context.getParameterValues()
+                    );
                 if (constraintViolations.isEmpty()) {
                     return context.proceed();
                 } else {

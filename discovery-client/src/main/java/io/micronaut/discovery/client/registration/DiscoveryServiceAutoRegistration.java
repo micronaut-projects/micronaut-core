@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +15,16 @@
  */
 package io.micronaut.discovery.client.registration;
 
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.reactivex.Flowable;
-import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.registration.AutoRegistration;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
-import io.micronaut.discovery.registration.RegistrationException;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.NoSuchElementException;
 
 /**
  * Abstract class for {@link AutoRegistration} with discovery services
@@ -47,45 +38,39 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
     }
 
     protected void performRegistration(
-            String discoveryService,
-            RegistrationConfiguration registration,
-            ServiceInstance instance,
-            Publisher<HttpStatus> registrationObservable) {
-            registrationObservable.subscribe(new Subscriber<HttpStatus>() {
+        String discoveryService,
+        RegistrationConfiguration registration,
+        ServiceInstance instance,
+        Publisher<HttpStatus> registrationObservable) {
 
-                @Override
-                public void onSubscribe(Subscription s) {
-                    s.request(1);
+        registrationObservable.subscribe(new Subscriber<HttpStatus>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                s.request(1);
+            }
+
+            @Override
+            public void onNext(HttpStatus httpStatus) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Registered service [{}] with {}", instance.getId(), discoveryService);
                 }
+            }
 
-                @Override
-                public void onNext(HttpStatus httpStatus) {
-                    if (LOG.isInfoEnabled()) {
-                        LOG.info("Registered service [{}] with {}", instance.getId(), discoveryService);
-                    }
+            @Override
+            public void onError(Throwable t) {
+                if (LOG.isErrorEnabled()) {
+                    String message = getErrorMessage(discoveryService, t);
+                    LOG.error(message, t);
                 }
-
-                @Override
-                public void onError(Throwable t) {
-                    if (LOG.isErrorEnabled()) {
-                        String message = getErrorMessage(discoveryService, t);
-                        LOG.error(message, t);
-                    }
-                    if(registration.isFailFast() && instance instanceof EmbeddedServerInstance) {
-                        ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
-                    }
+                if (registration.isFailFast() && instance instanceof EmbeddedServerInstance) {
+                    ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
                 }
+            }
 
-                @Override
-                public void onComplete() {
-
-                }
-            });
-    }
-
-    private String getErrorMessage(String discoveryService, Throwable e) {
-        String description = "Error occurred during service registration with " + discoveryService + ": ";
-        return getErrorMessage(e, description);
+            @Override
+            public void onComplete() {
+            }
+        });
     }
 
     protected String getErrorMessage(Throwable e, String description) {
@@ -143,5 +128,10 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                 }
             });
         }
+    }
+
+    private String getErrorMessage(String discoveryService, Throwable e) {
+        String description = "Error occurred during service registration with " + discoveryService + ": ";
+        return getErrorMessage(e, description);
     }
 }

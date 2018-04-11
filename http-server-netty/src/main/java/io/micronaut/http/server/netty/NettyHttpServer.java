@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty;
 
@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
+import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
@@ -64,6 +65,7 @@ import java.net.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
@@ -98,6 +100,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final Optional<SslContext> sslContext;
+    private final AtomicBoolean running = new AtomicBoolean(false);
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
@@ -149,11 +152,11 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public boolean isRunning() {
-        return !SocketUtils.isTcpPortAvailable(serverPort);
+        return running.get() && !SocketUtils.isTcpPortAvailable(serverPort);
     }
 
     @Override
-    public EmbeddedServer start() {
+    public synchronized EmbeddedServer start() {
         if(!isRunning()) {
 
             workerGroup = createWorkerEventLoopGroup();
@@ -203,74 +206,77 @@ public class NettyHttpServer implements EmbeddedServer {
             Optional<String> host = serverConfiguration.getHost();
 
             bindServerToHost(serverBootstrap, host, new AtomicInteger(0));
-
+            running.set(true);
         }
 
         return this;
     }
 
     private void bindServerToHost(ServerBootstrap serverBootstrap, Optional<String> host, AtomicInteger attempts) {
-        ChannelFuture future;
-
+        boolean isRandomPort = serverConfiguration.getPort() == -1;
+        if(!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
+            throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
+        }
         if(LOG.isDebugEnabled()) {
             LOG.debug("Binding server to port: {}", serverPort);
         }
-        if(host.isPresent()) {
-            future = serverBootstrap.bind(host.get(), serverPort);
-        }
-        else {
-            future = serverBootstrap.bind(serverPort);
-        }
-
-        future.addListener(op -> {
-            if (!future.isSuccess()) {
-                Throwable cause = op.cause();
-                if (LOG.isErrorEnabled()) {
-                    if(cause instanceof BindException) {
-                        LOG.error("Unable to start server. Port already {} in use.", serverPort);
-                    }
-                    else {
-                        LOG.error("Error starting Micronaut server: " + cause.getMessage(), cause);
-                    }
-                }
-                int attemptCount = attempts.getAndIncrement();
-                if(serverConfiguration.getPort() == -1 && attemptCount < 3) {
-                    serverPort = SocketUtils.findAvailableTcpPort();
-                    bindServerToHost(serverBootstrap, host, attempts);
-                }
-                else {
-                    stop();
-                }
+        try {
+            if(host.isPresent()) {
+                serverBootstrap.bind(host.get(), serverPort).sync();
             }
             else {
-                applicationContext.publishEvent(new ServerStartupEvent(this));
-                Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-                applicationName.ifPresent(id -> {
-                    this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                    applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-                });
+                serverBootstrap.bind(serverPort).sync();
             }
-        });
+
+            applicationContext.publishEvent(new ServerStartupEvent(this));
+            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+            applicationName.ifPresent(id -> {
+                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+            });
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                if(e instanceof BindException) {
+                    LOG.error("Unable to start server. Port already {} in use.", serverPort);
+                }
+                else {
+                    LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+                }
+            }
+            int attemptCount = attempts.getAndIncrement();
+
+            if(isRandomPort && attemptCount < 3) {
+                serverPort = SocketUtils.findAvailableTcpPort();
+                bindServerToHost(serverBootstrap, host, attempts);
+            }
+            else {
+                stop();
+            }
+        }
+
     }
 
     @Override
-    public EmbeddedServer stop() {
+    public synchronized EmbeddedServer stop() {
         if (isRunning() && workerGroup != null) {
-            try {
-                workerGroup.shutdownGracefully()
-                           .addListener(this::logShutdownErrorIfNecessary);
-                parentGroup.shutdownGracefully()
-                           .addListener(this::logShutdownErrorIfNecessary);
-                applicationContext.publishEvent(new ServerShutdownEvent(this));
-                if(serviceInstance != null) {
-                    applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
-                }
-                if(applicationContext.isRunning()) {
-                    applicationContext.stop();
-                }
-            } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
+            if(running.compareAndSet(true,false)) {
+
+                try {
+                    workerGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                    applicationContext.publishEvent(new ServerShutdownEvent(this));
+                    if(serviceInstance != null) {
+                        applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
+                    }
+                    if(applicationContext.isRunning()) {
+                        applicationContext.stop();
+                    }
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
+                    }
                 }
             }
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,6 @@
  */
 package io.micronaut.retry.intercept;
 
-import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.retry.RetryState;
-import io.micronaut.retry.annotation.CircuitBreaker;
-import io.micronaut.retry.event.RetryEvent;
-import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
@@ -39,6 +28,8 @@ import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +52,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
 
-
     private final ApplicationEventPublisher eventPublisher;
     private final Map<Method, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
 
@@ -81,17 +71,17 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         if (retry != null) {
             MutableRetryState retryState;
             AnnotationRetryStateBuilder retryStateBuilder = new AnnotationRetryStateBuilder(
-                    context
+                context
             );
 
             if (isCircuitBreaker) {
-                long timeout = context.getValue(CircuitBreaker.class, "reset", Duration.class)
-                        .map(Duration::toMillis).orElse(Duration.ofSeconds(20).toMillis());
+                long timeout = context
+                    .getValue(CircuitBreaker.class, "reset", Duration.class)
+                    .map(Duration::toMillis).orElse(Duration.ofSeconds(20).toMillis());
                 retryState = circuitContexts.computeIfAbsent(
-                        context.getTargetMethod(),
-                        method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
+                    context.getTargetMethod(),
+                    method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
                 );
-
             } else {
                 retryState = (MutableRetryState) retryStateBuilder.build();
             }
@@ -109,17 +99,18 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 if (result == null) {
                     return result;
                 } else {
-                    Flowable observable = conversionService.convert(result, Flowable.class)
-                            .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
+                    Flowable observable = conversionService
+                        .convert(result, Flowable.class)
+                        .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
                     Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable))
-                                                        .map(o -> {
-                                                            retryState.close(null);
-                                                            return o;
-                                                        });
+                        .map(o -> {
+                            retryState.close(null);
+                            return o;
+                        });
 
-
-                    return conversionService.convert(retryObservable, returnType.asArgument())
-                            .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
+                    return conversionService
+                        .convert(retryObservable, returnType.asArgument())
+                        .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
                 }
 
             } else {
@@ -154,14 +145,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                             }
                         }
                     }
-
                 }
             }
         } else {
             return context.proceed();
         }
     }
-
 
     @SuppressWarnings("unchecked")
     private Function retryFlowable(MethodInvocationContext<Object, Object> context, MutableRetryState retryState, Flowable observable) {
@@ -179,13 +168,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 }
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}",
-                            context,
-                            delay,
-                            (exception).getMessage());
+                        context,
+                        delay,
+                        (exception).getMessage());
                 }
                 return retryObservable.delay(delay, TimeUnit.MILLISECONDS);
-            }
-            else {
+            } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
                 }

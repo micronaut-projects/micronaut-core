@@ -1,23 +1,35 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.cache.interceptor;
 
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.cache.AsyncCache;
+import io.micronaut.cache.AsyncCacheErrorHandler;
+import io.micronaut.cache.CacheErrorHandler;
+import io.micronaut.cache.CacheManager;
+import io.micronaut.cache.SyncCache;
+import io.micronaut.cache.annotation.CacheConfig;
+import io.micronaut.cache.annotation.CacheInvalidate;
+import io.micronaut.cache.annotation.CachePut;
+import io.micronaut.cache.annotation.Cacheable;
+import io.micronaut.cache.annotation.InvalidateOperations;
+import io.micronaut.cache.annotation.PutOperations;
+import io.micronaut.cache.exceptions.CacheSystemException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.publisher.SingleSubscriberPublisher;
@@ -29,9 +41,6 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.cache.*;
-import io.micronaut.cache.annotation.*;
-import io.micronaut.cache.exceptions.CacheSystemException;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -50,15 +59,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 
 /**
- * <p>An AOP {@link MethodInterceptor} implementation for the Cache annotations {@link Cacheable}, {@link CachePut} and {@link CacheInvalidate}</p>
+ * <p>An AOP {@link MethodInterceptor} implementation for the Cache annotations {@link Cacheable},
+ * {@link CachePut} and {@link CacheInvalidate}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
+
 public class CacheInterceptor implements MethodInterceptor<Object, Object> {
+    /**
+     * The position on the interceptor in the chain
+     */
     public static final int POSITION = InterceptPhase.CACHE.getPosition();
+
     private static final Logger LOG = LoggerFactory.getLogger(CacheInterceptor.class);
+
     private final CacheManager cacheManager;
     private final Map<Class<? extends CacheKeyGenerator>, CacheKeyGenerator> keyGenerators = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
@@ -173,7 +189,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cachePut.async();
                 if (async) {
                     ioExecutor.submit(() ->
-                            processCachePut(context, wrapper, cachePut, cacheOperation)
+                        processCachePut(context, wrapper, cachePut, cacheOperation)
                     );
                 } else {
                     processCachePut(context, wrapper, cachePut, cacheOperation);
@@ -187,12 +203,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cacheInvalidate.async();
                 if (async) {
                     ioExecutor.submit(() -> {
-                                try {
-                                    processCacheEvict(context, cacheInvalidate, cacheOperation, async);
-                                } catch (Exception e) {
-                                    throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
-                                }
+                            try {
+                                processCacheEvict(context, cacheInvalidate, cacheOperation, async);
+                            } catch (Exception e) {
+                                throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
                             }
+                        }
                     );
                 } else {
                     processCacheEvict(context, cacheInvalidate, cacheOperation, async);
@@ -201,23 +217,6 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         }
 
         return wrapper.optional ? Optional.ofNullable(wrapper.value) : wrapper.value;
-    }
-
-    private Object interceptPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, Class returnType) {
-        CacheOperation cacheOperation = new CacheOperation(context, returnType);
-        Cacheable cacheable = cacheOperation.cacheable;
-        if (cacheable != null) {
-
-            SingleSubscriberPublisher<Object> publisher = buildPublisher(context, returnTypeObject, cacheOperation, cacheable);
-            Optional converted = ConversionService.SHARED.convert(publisher, ConversionContext.of(returnTypeObject.asArgument()));
-            if (converted.isPresent()) {
-                return converted.get();
-            } else {
-                throw new UnsupportedOperationException("Cannot convert publisher into target type: " + returnType);
-            }
-        } else {
-            return context.proceed();
-        }
     }
 
     protected Object interceptCompletableFuture(MethodInvocationContext<Object, Object> context, ReturnType<?> returnTypeObject, Class returnType) {
@@ -302,13 +301,28 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         }
     }
 
+    private Object interceptPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, Class returnType) {
+        CacheOperation cacheOperation = new CacheOperation(context, returnType);
+        Cacheable cacheable = cacheOperation.cacheable;
+        if (cacheable != null) {
+
+            SingleSubscriberPublisher<Object> publisher = buildPublisher(context, returnTypeObject, cacheOperation, cacheable);
+            Optional converted = ConversionService.SHARED.convert(publisher, ConversionContext.of(returnTypeObject.asArgument()));
+            if (converted.isPresent()) {
+                return converted.get();
+            } else {
+                throw new UnsupportedOperationException("Cannot convert publisher into target type: " + returnType);
+            }
+        } else {
+            return context.proceed();
+        }
+    }
 
     private SingleSubscriberPublisher<Object> buildPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, CacheOperation cacheOperation, Cacheable cacheable) {
         return new SingleSubscriberPublisher<Object>() {
 
             @Override
             protected void doSubscribe(Subscriber<? super Object> subscriber) {
-
                 subscriber.onSubscribe(new Subscription() {
                     CompletableFuture future = null; // for cancellation
 
@@ -393,7 +407,6 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         };
     }
 
-
     private CompletableFuture<Object> processFuturePutOperations(MethodInvocationContext<Object, Object> context, CacheOperation cacheOperation, CompletableFuture<Object> returnFuture) {
         CachePut[] putOperations = cacheOperation.putOperations;
         if (putOperations != null) {
@@ -457,8 +470,6 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                     }
                 }
             }
-
-
         }
         return returnFuture;
     }
@@ -471,7 +482,6 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             return InstantiationUtils.instantiate(aClass);
         });
     }
-
 
     private CompletableFuture<Void> buildPutFutures(String[] cacheNames, Object result, Object key) {
         List<CompletableFuture<Boolean>> futures = new ArrayList<>();
@@ -566,10 +576,11 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private void processCacheEvict(
-            MethodInvocationContext context,
-            CacheInvalidate cacheConfig,
-            CacheOperation cacheOperation,
-            boolean async) {
+        MethodInvocationContext context,
+        CacheInvalidate cacheConfig,
+        CacheOperation cacheOperation,
+        boolean async) {
+
         String[] cacheNames = cacheOperation.getCacheNames(cacheConfig);
         CacheKeyGenerator keyGenerator = cacheOperation.getKeyGenerator(cacheConfig);
         boolean invalidateAll = cacheConfig.all();

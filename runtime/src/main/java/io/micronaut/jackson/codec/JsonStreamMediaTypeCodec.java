@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package io.micronaut.jackson.codec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.http.MediaType;
-import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.inject.Singleton;
 
@@ -31,6 +29,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
+
     public JsonStreamMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
         super(objectMapper, applicationConfiguration);
     }

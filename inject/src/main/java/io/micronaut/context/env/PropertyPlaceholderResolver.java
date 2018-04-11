@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.ConfigurationException;
 
 import java.util.Optional;
@@ -42,6 +41,6 @@ public interface PropertyPlaceholderResolver {
      * @throws ConfigurationException If the placeholders could not be resolved
      */
     default String resolveRequiredPlaceholders(String str) throws ConfigurationException {
-        return resolvePlaceholders(str).orElseThrow(()-> new ConfigurationException("Unable to resolve placeholders for property: " + str));
+        return resolvePlaceholders(str).orElseThrow(() -> new ConfigurationException("Unable to resolve placeholders for property: " + str));
     }
 }

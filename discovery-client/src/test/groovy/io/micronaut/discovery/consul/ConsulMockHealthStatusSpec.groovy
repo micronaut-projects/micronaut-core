@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ class ConsulMockHealthStatusSpec extends Specification {
         )
         PollingConditions conditions = new PollingConditions()
         ConsulClient consulClient = application.getApplicationContext().getBean(ConsulClient)
+
         then:
         conditions.eventually {
             Flowable.fromPublisher(consulClient.getInstances(serviceId)).blockingFirst().size() == 1

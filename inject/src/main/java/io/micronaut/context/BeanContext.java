@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -26,19 +26,21 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
- *
- * <p>Apart of the standard {@link javax.inject} annotations for dependency injection, additional annotations within the {@link io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
+ * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
+ * {@link javax.inject.Inject}.</p>
+ * <p>
+ * <p>Apart of the standard {@link javax.inject} annotations for dependency injection, additional annotations within
+ * the {@link io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface BeanContext extends
-        LifeCycle<BeanContext>,
-        ExecutionHandleLocator,
-        BeanLocator,
-        BeanDefinitionRegistry,
-        ApplicationEventPublisher {
+    LifeCycle<BeanContext>,
+    ExecutionHandleLocator,
+    BeanLocator,
+    BeanDefinitionRegistry,
+    ApplicationEventPublisher {
 
     @Override
     <T> BeanContext registerSingleton(Class<T> type, T singleton);
@@ -53,88 +55,92 @@ public interface BeanContext extends
 
     /**
      * Creates a new instance of the given bean performing dependency injection and returning a new instance.
-     *
+     * <p>
      * Note that the instance returned is not saved as a singleton in the context.
      *
      * @param beanType The bean type
-     * @param <T> The bean generic type
+     * @param <T>      The bean generic type
      * @return The instance
      */
     default <T> T createBean(Class<T> beanType) {
-        return createBean(beanType, (Qualifier<T>)null);
+        return createBean(beanType, (Qualifier<T>) null);
     }
 
     /**
      * Creates a new instance of the given bean performing dependency injection and returning a new instance.
-     *
+     * <p>
      * Note that the instance returned is not saved as a singleton in the context.
      *
      * @param beanType The bean type
-     * @param <T> The bean generic type
+     * @param <T>      The bean generic type
      * @return The instance
      */
     <T> T createBean(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     *
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
-     *
+     * <p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
+     * parameter will be used</p>
+     * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
-     * @param beanType The bean type
-     * @param qualifier The qualifier
+     * @param beanType       The bean type
+     * @param qualifier      The qualifier
      * @param argumentValues The argument values
-     * @param <T> The bean generic type
+     * @param <T>            The bean generic type
      * @return The instance
      */
     <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Map<String, Object> argumentValues);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     *
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
-     *
+     * <p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
+     * parameter will be used</p>
+     * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
-     * @param beanType The bean type
+     * @param beanType  The bean type
      * @param qualifier The qualifier
-     * @param args The argument values
-     * @param <T> The bean generic type
+     * @param args      The argument values
+     * @param <T>       The bean generic type
      * @return The instance
      */
-    <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Object...args);
+    <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Object... args);
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     *
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
-     *
+     * <p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
+     * parameter will be used</p>
+     * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType The bean type
-     * @param args The argument values
-     * @param <T> The bean generic type
+     * @param args     The argument values
+     * @param <T>      The bean generic type
      * @return The instance
      */
-    default <T> T createBean(Class<T> beanType, Object...args) {
+    default <T> T createBean(Class<T> beanType, Object... args) {
         return createBean(beanType, null, args);
     }
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     *
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
-     *
+     * <p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
+     * parameter will be used</p>
+     * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
-     * @param beanType The bean type
+     * @param beanType       The bean type
      * @param argumentValues The argument values
-     * @param <T> The bean generic type
+     * @param <T>            The bean generic type
      * @return The instance
      */
     default <T> T createBean(Class<T> beanType, Map<String, Object> argumentValues) {
-        return createBean(beanType,null, argumentValues);
+        return createBean(beanType, null, argumentValues);
     }
 
     /**
@@ -142,14 +148,14 @@ public interface BeanContext extends
      * destroyed and removed from the context, otherwise null will be returned.
      *
      * @param beanType The bean type
-     * @param <T> The concrete class
+     * @param <T>      The concrete class
      * @return The destroy instance or null if no such bean exists
      */
     <T> T destroyBean(Class<T> beanType);
 
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
-     *
+     * <p>
      * <p>Note that if the bean was produced by a {@link Factory} then this method will refresh the factory too</p>
      *
      * @param identifier The {@link BeanIdentifier}
@@ -168,7 +174,6 @@ public interface BeanContext extends
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
     }
-
 
     /**
      * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
@@ -207,6 +212,4 @@ public interface BeanContext extends
     static BeanContext build(ClassLoader classLoader) {
         return new DefaultBeanContext(classLoader);
     }
-
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package io.micronaut.jackson.annotation;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -22,8 +24,6 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotation that can be applied to types that use Jackson to customize serialization features
@@ -35,6 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 public @interface JacksonFeatures {
+
     /**
      * @return The enabled serialization features
      */
@@ -44,7 +45,6 @@ public @interface JacksonFeatures {
      * @return The disabled serialization features
      */
     SerializationFeature[] disabledSerializationFeatures() default {};
-
 
     /**
      * @return The enabled serialization features

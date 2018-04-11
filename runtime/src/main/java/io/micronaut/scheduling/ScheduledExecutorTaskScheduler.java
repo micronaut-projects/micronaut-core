@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package io.micronaut.scheduling;
 
+import static io.micronaut.core.util.ArgumentUtils.check;
+
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
@@ -22,10 +24,12 @@ import io.micronaut.scheduling.cron.CronExpression;
 import javax.inject.Named;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-
-import static io.micronaut.core.util.ArgumentUtils.check;
 
 /**
  * Simple abstraction over {@link ScheduledExecutorService}
@@ -35,10 +39,11 @@ import static io.micronaut.core.util.ArgumentUtils.check;
  */
 @Primary
 public class ScheduledExecutorTaskScheduler implements TaskScheduler {
+
     private final ScheduledExecutorService executorService;
 
     public ScheduledExecutorTaskScheduler(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        if(!(executorService instanceof ScheduledExecutorService)) {
+        if (!(executorService instanceof ScheduledExecutorService)) {
             throw new IllegalStateException("Cannot schedule tasks on ExecutorService that is not a ScheduledExecutorService: " + executorService);
         }
         this.executorService = (ScheduledExecutorService) executorService;
@@ -46,7 +51,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     @Override
     public ScheduledFuture<?> schedule(String cron, Runnable command) {
-        if(StringUtils.isEmpty(cron)) {
+        if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }
         check("command", command).notNull();
@@ -60,7 +65,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     @Override
     public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
-        if(StringUtils.isEmpty(cron)) {
+        if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }
         check("command", command).notNull();
@@ -75,9 +80,9 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
         check("command", command).notNull();
 
         return executorService.schedule(
-                command,
-                delay.toMillis(),
-                TimeUnit.MILLISECONDS
+            command,
+            delay.toMillis(),
+            TimeUnit.MILLISECONDS
         );
     }
 
@@ -86,9 +91,9 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
         check("delay", delay).notNull();
         check("callable", callable).notNull();
         return executorService.schedule(
-                callable,
-                delay.toMillis(),
-                TimeUnit.MILLISECONDS
+            callable,
+            delay.toMillis(),
+            TimeUnit.MILLISECONDS
         );
     }
 
@@ -98,10 +103,10 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
         check("command", command).notNull();
         long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;
         return executorService.scheduleAtFixedRate(
-                command,
-                initialDelayMillis,
-                period.toMillis(),
-                TimeUnit.MILLISECONDS
+            command,
+            initialDelayMillis,
+            period.toMillis(),
+            TimeUnit.MILLISECONDS
         );
     }
 
@@ -111,10 +116,10 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
         check("command", command).notNull();
         long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;
         return executorService.scheduleWithFixedDelay(
-                command,
-                initialDelayMillis,
-                delay.toMillis(),
-                TimeUnit.MILLISECONDS
+            command,
+            initialDelayMillis,
+            delay.toMillis(),
+            TimeUnit.MILLISECONDS
         );
     }
 
@@ -124,7 +129,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
             ZonedDateTime now = ZonedDateTime.now();
             ZonedDateTime zonedDateTime = cronExpression.nextTimeAfter(now);
             return Duration.ofMillis(
-                    zonedDateTime.toInstant().toEpochMilli() - ZonedDateTime.now().toInstant().toEpochMilli()
+                zonedDateTime.toInstant().toEpochMilli() - ZonedDateTime.now().toInstant().toEpochMilli()
             );
         };
     }

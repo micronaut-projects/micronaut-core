@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,16 +58,16 @@ public class ReactiveMongoProcessFactory implements BeanCreatedEventListener<Rea
         ReactiveMongoConfiguration configuration = event.getBean();
         try {
             Optional<ConnectionString> connectionString = configuration.getConnectionString();
-            if(connectionString.isPresent()) {
+            if (connectionString.isPresent()) {
                 String first = connectionString.get().getHosts().get(0);
-                if(SocketUtils.isTcpPortAvailable(new ServerAddress(first).getPort())) {
+                if (SocketUtils.isTcpPortAvailable(new ServerAddress(first).getPort())) {
 
                     // should be ok to do this without checking unless MongoNotAvailableCondition is not working properly
                     int port = new ServerAddress(first).getPort();
                     IMongodConfig mongodConfig = new MongodConfigBuilder()
-                            .version(Version.Main.PRODUCTION)
-                            .net(new Net("localhost", port, Network.localhostIsIPv6()))
-                            .build();
+                        .version(Version.Main.PRODUCTION)
+                        .net(new Net("localhost", port, Network.localhostIsIPv6()))
+                        .build();
 
                     MongodExecutable mongodExecutable = MongodStarter.getDefaultInstance().prepare(mongodConfig);
                     this.process = mongodExecutable.start();
@@ -83,7 +83,7 @@ public class ReactiveMongoProcessFactory implements BeanCreatedEventListener<Rea
     @Override
     @PreDestroy
     public void close() throws IOException {
-        if(process != null) {
+        if (process != null) {
             process.stop();
         }
     }

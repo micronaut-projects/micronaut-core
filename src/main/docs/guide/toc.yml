@@ -59,6 +59,7 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
+  multipartRequest: The Multipart Request
   clientFilter: HTTP Client Filter
 cloud:
   title: Cloud Deployment
@@ -78,6 +79,7 @@ management:
   providedEndpoints:
     title: Built-In Endpoints
     beansEndpoint: The Beans Endpoint
+    infoEndpoint: The Info Endpoint
     healthEndpoint: The Health Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint

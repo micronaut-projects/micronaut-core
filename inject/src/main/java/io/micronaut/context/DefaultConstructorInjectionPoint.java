@@ -1,6 +1,20 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.context;
 
-import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.Internal;
@@ -21,6 +35,7 @@ import java.lang.reflect.Modifier;
  */
 @Internal
 class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, AnnotationSource {
+
     private final Constructor<T> constructor;
     private final Argument[] arguments;
     private final BeanDefinition declaringComponent;
@@ -28,13 +43,14 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
 
     /**
      * @param beanDefinition The bean definition
-     * @param constructor The constructor used to construct the object
-     * @param arguments The arguments to the constructor
+     * @param constructor    The constructor used to construct the object
+     * @param arguments      The arguments to the constructor
      */
     DefaultConstructorInjectionPoint(
-            BeanDefinition beanDefinition,
-            Constructor<T> constructor,
-            Argument...arguments) {
+        BeanDefinition beanDefinition,
+        Constructor<T> constructor,
+        Argument... arguments) {
+
         this.declaringComponent = beanDefinition;
         this.constructor = constructor;
         this.requiresReflection = Modifier.isPrivate(constructor.getModifiers());
@@ -61,34 +77,33 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     public T invoke(Object... args) {
         this.constructor.setAccessible(true);
         Argument[] componentTypes = getArguments();
-        if(componentTypes.length == 0) {
+        if (componentTypes.length == 0) {
             try {
                 return constructor.newInstance();
             } catch (Throwable e) {
-                throw new BeanInstantiationException("Cannot instantiate bean of type ["+constructor.getDeclaringClass().getName()+"] using constructor ["+constructor+"]:" + e.getMessage(), e);
+                throw new BeanInstantiationException("Cannot instantiate bean of type [" + constructor.getDeclaringClass().getName() + "] using constructor [" + constructor + "]:" + e.getMessage(), e);
             }
-        }
-        else {
-            if(componentTypes.length != args.length) {
-                throw new BeanInstantiationException("Invalid bean argument count specified. Required: "+componentTypes.length+" . Received: " + args.length);
+        } else {
+            if (componentTypes.length != args.length) {
+                throw new BeanInstantiationException("Invalid bean argument count specified. Required: " + componentTypes.length + " . Received: " + args.length);
             }
 
             for (int i = 0; i < componentTypes.length; i++) {
                 Argument componentType = componentTypes[i];
-                if(!componentType.getType().isInstance(args[i])) {
-                    throw new BeanInstantiationException("Invalid bean argument received ["+args[i]+"] at position ["+i+"]. Required type is: " + componentType.getName());
+                if (!componentType.getType().isInstance(args[i])) {
+                    throw new BeanInstantiationException("Invalid bean argument received [" + args[i] + "] at position [" + i + "]. Required type is: " + componentType.getName());
                 }
             }
             try {
                 return constructor.newInstance(args);
             } catch (Throwable e) {
-                throw new BeanInstantiationException("Cannot instantiate bean of type ["+constructor.getDeclaringClass().getName()+"] using constructor ["+constructor+"]:" + e.getMessage(), e);
+                throw new BeanInstantiationException("Cannot instantiate bean of type [" + constructor.getDeclaringClass().getName() + "] using constructor [" + constructor + "]:" + e.getMessage(), e);
             }
         }
     }
 
     public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[] { constructor, constructor.getDeclaringClass() };
+        return new AnnotatedElement[]{constructor, constructor.getDeclaringClass()};
     }
 
     @Override

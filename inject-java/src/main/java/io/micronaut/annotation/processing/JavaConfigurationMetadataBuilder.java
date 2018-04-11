@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
@@ -65,65 +63,58 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         return typePaths.computeIfAbsent(declaringType.getQualifiedName().toString(), s -> {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(declaringType);
             StringBuilder path = new StringBuilder(annotationMetadata.getValue(ConfigurationReader.class, String.class).orElseThrow(() ->
-                    new IllegalStateException("@ConfigurationProperties found with no value for type: " + declaringType.getQualifiedName().toString())
+                new IllegalStateException("@ConfigurationProperties found with no value for type: " + declaringType.getQualifiedName().toString())
             ));
 
             prependSuperclasses(declaringType, path);
-            if( declaringType.getNestingKind() == NestingKind.MEMBER ) {
+            if (declaringType.getNestingKind() == NestingKind.MEMBER) {
                 // we have an inner class, so prepend inner class
                 Element enclosingElement = declaringType.getEnclosingElement();
-                if(enclosingElement instanceof TypeElement) {
+                if (enclosingElement instanceof TypeElement) {
                     TypeElement enclosingType = (TypeElement) enclosingElement;
-                    while(true) {
-
+                    while (true) {
                         Optional<String> parentConfig = annotationUtils.getAnnotationMetadata(enclosingType).getValue(ConfigurationReader.class, String.class);
-                        if(parentConfig.isPresent()) {
+                        if (parentConfig.isPresent()) {
                             path.insert(0, parentConfig.get() + '.');
                             prependSuperclasses(enclosingType, path);
-                            if( enclosingType.getNestingKind() == NestingKind.MEMBER) {
+                            if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
                                 Element el = enclosingType.getEnclosingElement();
-                                if(el instanceof  TypeElement) {
+                                if (el instanceof TypeElement) {
                                     enclosingType = (TypeElement) el;
-                                }
-                                else {
+                                } else {
                                     break;
                                 }
-                            }
-                            else {
+                            } else {
                                 break;
                             }
-                        }
-                        else {
+                        } else {
                             break;
                         }
                     }
-
                 }
-
             }
             return path.toString();
         });
-
-    }
-
-    private void prependSuperclasses(TypeElement declaringType, StringBuilder path) {
-        TypeMirror superclass = declaringType.getSuperclass();
-        while(superclass instanceof DeclaredType) {
-            DeclaredType declaredType = (DeclaredType) superclass;
-            Element element = declaredType.asElement();
-            Optional<String> parentConfig = annotationUtils.getAnnotationMetadata(element).getValue(ConfigurationReader.class, String.class);
-            if(parentConfig.isPresent()) {
-                path.insert(0, parentConfig.get() + '.');
-                superclass = ((TypeElement)element).getSuperclass();
-            }
-            else {
-                break;
-            }
-        }
     }
 
     @Override
     protected String getTypeString(TypeElement type) {
         return modelUtils.resolveTypeReference(type).toString();
     }
+
+    private void prependSuperclasses(TypeElement declaringType, StringBuilder path) {
+        TypeMirror superclass = declaringType.getSuperclass();
+        while (superclass instanceof DeclaredType) {
+            DeclaredType declaredType = (DeclaredType) superclass;
+            Element element = declaredType.asElement();
+            Optional<String> parentConfig = annotationUtils.getAnnotationMetadata(element).getValue(ConfigurationReader.class, String.class);
+            if (parentConfig.isPresent()) {
+                path.insert(0, parentConfig.get() + '.');
+                superclass = ((TypeElement) element).getSuperclass();
+            } else {
+                break;
+            }
+        }
+    }
+
 }
