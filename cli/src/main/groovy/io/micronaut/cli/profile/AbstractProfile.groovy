@@ -280,11 +280,14 @@ abstract class AbstractProfile implements Profile {
     @Override
     List<String> getBuildRepositories() {
         List<String> calculatedRepositories = []
-        def parents = getExtends()
-        for(profile in parents) {
-            calculatedRepositories.addAll(profile.buildRepositories)
+        if (buildRepositories.empty) {
+            def parents = getExtends()
+            for(profile in parents) {
+                calculatedRepositories.addAll(profile.buildRepositories)
+            }
+        } else {
+            calculatedRepositories.addAll(buildRepositories)
         }
-        calculatedRepositories.addAll(buildRepositories)
         return calculatedRepositories
     }
 
@@ -306,11 +309,14 @@ abstract class AbstractProfile implements Profile {
     @Override
     List<String> getRepositories() {
         List<String> calculatedRepositories = []
-        def parents = getExtends()
-        for(profile in parents) {
-            calculatedRepositories.addAll(profile.repositories)
+        if (repositories.empty) {
+            def parents = getExtends()
+            for(profile in parents) {
+                calculatedRepositories.addAll(profile.repositories)
+            }
+        } else {
+            calculatedRepositories.addAll(repositories)
         }
-        calculatedRepositories.addAll(repositories)
         return calculatedRepositories
     }
 

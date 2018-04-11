@@ -33,7 +33,7 @@ class CreateProfileCommand extends CreateServiceCommand {
 
     @Override
     protected void populateDescription() {
-        description.argument(name: "Profile Name", description: "The name of the plugin to create.", required: false)
+        description.argument(name: "Profile Name", description: "The name of the profile to create.", required: false)
     }
 
     @Override
@@ -42,4 +42,7 @@ class CreateProfileCommand extends CreateServiceCommand {
     @Override
     protected String getDefaultProfile() { "profile" }
 
+    protected List<String> getFlags() {
+        [INPLACE_FLAG, PROFILE_FLAG, FEATURES_FLAG]
+    }
 }

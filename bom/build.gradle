@@ -23,6 +23,19 @@ publishing {
                                     mkp.version(version)
                                 }
                             }
+
+                            for(Project p: rootProject.subprojects) {
+                                if (p.parent.name == "configurations") continue
+                                if (p.name.contains("test-suite")) continue
+                                if (p.name == "examples") continue
+                                if (p.name == "bom") continue
+
+                                mkp.dependency {
+                                    mkp.groupId p.group
+                                    mkp.artifactId p.name
+                                    mkp.version p.version
+                                }
+                            }
                         }
                     }
                 }

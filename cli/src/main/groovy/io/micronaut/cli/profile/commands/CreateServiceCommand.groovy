@@ -21,6 +21,8 @@ import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.build.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
+import io.micronaut.cli.io.support.GradleBuildTokens
+import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.util.NameUtils
 import org.eclipse.aether.graph.Dependency
 import io.micronaut.cli.build.logging.ConsoleAntBuilder
@@ -54,9 +56,12 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     public static final String FEATURES_FLAG = "features"
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
     public static final String INPLACE_FLAG = "inplace"
+    public static final String BUILD_FLAG = "build"
 
+    protected static final List<String> BUILD_OPTIONS = ["gradle", "maven"]
     protected static final String APPLICATION_YML = "application.yml"
     protected static final String BUILD_GRADLE = "build.gradle"
+    protected static final String POM_XML = "pom.xml"
 
     ProfileRepository profileRepository
     Map<String, String> variables = [:]
@@ -65,13 +70,27 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     String defaultpackagename
     File targetDirectory
 
-    CommandDescription description = new CommandDescription(name, "Creates a service", "create-service [NAME] --profile=web")
+    CommandDescription description = new CommandDescription(name, "Creates a service", "create-service [NAME]")
 
     CreateServiceCommand() {
         populateDescription()
-        description.flag(name: INPLACE_FLAG, description: "Used to create a service using the current directory")
-        description.flag(name: PROFILE_FLAG, description: "The profile to use", required:false)
-        description.flag(name: FEATURES_FLAG, description: "The features to use", required:false)
+        List<String> flags = getFlags()
+        if (flags.contains(INPLACE_FLAG)) {
+            description.flag(name: INPLACE_FLAG, description: "Used to create a service using the current directory")
+        }
+        if (flags.contains(BUILD_FLAG)) {
+            description.flag(name: BUILD_FLAG, description: "Which build tool to configure. Possible values: ${BUILD_OPTIONS.collect({"\"${it}\""}).join(', ')}.", required: false)
+        }
+        if (flags.contains(PROFILE_FLAG)) {
+            description.flag(name: PROFILE_FLAG, description: "The profile to use", required: false)
+        }
+        if (flags.contains(FEATURES_FLAG)) {
+            description.flag(name: FEATURES_FLAG, description: "The features to use", required: false)
+        }
+    }
+
+    protected List<String> getFlags() {
+        [INPLACE_FLAG, BUILD_FLAG, PROFILE_FLAG, FEATURES_FLAG]
     }
 
     protected void populateDescription() {
@@ -87,10 +106,10 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     protected int complete(CommandLine commandLine, CommandDescription desc, List<CharSequence> candidates, int cursor) {
         def lastOption = commandLine.lastOption()
         if(lastOption != null) {
-            // if value == true it means no profile is specified and only the flag is present
             def profileNames = profileRepository.allProfiles.collect() { Profile p -> p.name }
             if(lastOption.key == PROFILE_FLAG) {
                 def val = lastOption.value
+                // if value == true it means no profile is specified and only the flag is present
                 if( val == true) {
                     candidates.addAll(profileNames)
                     return cursor
@@ -134,6 +153,16 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     return cursor
                 }
             }
+            else if (lastOption.key == BUILD_FLAG) {
+                def val = lastOption.value
+                if (val == true) {
+                    candidates.addAll(BUILD_OPTIONS.collect {"$it "})
+                } else if (!BUILD_OPTIONS.contains(val)) {
+                    def valStr = val.toString()
+                    candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect {"$it "})
+                }
+                return cursor
+            }
         }
         return super.complete(commandLine, desc, candidates, cursor)
     }
@@ -147,14 +176,19 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         } else {
             int index = srcDir.absolutePath.lastIndexOf(searchDir) + searchDir.size() + 1
             String relativePath = (srcDir.absolutePath - srcDir.absolutePath.substring(0,index))
+            if (relativePath.startsWith("gradle-build")) {
+                relativePath = relativePath.substring("gradle-build".size())
+            }
+            if (relativePath.startsWith("maven-build")) {
+                relativePath = relativePath.substring("maven-build".size())
+            }
             destDir = new File(targetDirectory, relativePath)
         }
         destDir
     }
 
-    protected void appendFeatureFiles(File skeletonDir) {
+    protected void appendFeatureFiles(File skeletonDir, String build) {
         def ymlFiles = findAllFilesByName(skeletonDir, APPLICATION_YML)
-        def buildGradleFiles = findAllFilesByName(skeletonDir, BUILD_GRADLE)
 
         ymlFiles.each { File newYml ->
             File oldYml = new File(getDestinationDirectory(newYml), APPLICATION_YML)
@@ -166,9 +200,58 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             }
 
         }
-        buildGradleFiles.each { File srcFile ->
-            File destFile = new File(getDestinationDirectory(srcFile), BUILD_GRADLE)
-            destFile.text = destFile.getText(ENCODING) + System.lineSeparator() + srcFile.getText(ENCODING)
+
+        copyBuildFiles(new File(skeletonDir, build + "-build"), build, true)
+    }
+
+    @CompileDynamic
+    protected void copyBuildFiles(File skeletonDir, String build, boolean allowMerge) {
+        AntBuilder ant = new ConsoleAntBuilder()
+        if (!skeletonDir.exists()) {
+            return
+        }
+
+        if (build == "gradle") {
+            Set<File> sourceBuildGradles = findAllFilesByName(skeletonDir, BUILD_GRADLE)
+
+            sourceBuildGradles.each { File srcFile ->
+                File srcDir = srcFile.parentFile
+                File destDir = getDestinationDirectory(srcFile)
+                File destFile = new File(destDir, BUILD_GRADLE)
+
+                ant.copy(file:"${srcDir}/.gitignore", todir: destDir, failonerror:false)
+
+                if (!destFile.exists()) {
+                    ant.copy file:srcFile, tofile:destFile
+                } else if (allowMerge) {
+                    def concatFile = "${destDir}/concat.gradle"
+                    ant.move(file:destFile, tofile: concatFile)
+                    ant.concat([destfile: destFile, fixlastline: true], {
+                        path {
+                            pathelement location: concatFile
+                            pathelement location: srcFile
+                        }
+                    })
+                    ant.delete(file: concatFile, failonerror: false)
+                }
+            }
+        }
+        if (build == "maven") {
+            Set<File> sourcePomXmls = findAllFilesByName(skeletonDir, POM_XML)
+
+            sourcePomXmls.each { File srcFile ->
+                File srcDir = srcFile.parentFile
+                File destDir = getDestinationDirectory(srcFile)
+                File destFile = new File(destDir, POM_XML)
+
+                ant.copy(file:"${srcDir}/.gitignore", todir: destDir, failonerror:false)
+
+                if (!destFile.exists()) {
+                    ant.copy file:srcFile, tofile:destFile
+                } else if (allowMerge) {
+                    ant.echo(file: destFile, message: new XmlMerger().merge(srcFile, destFile))
+                }
+            }
         }
     }
 
@@ -204,13 +287,17 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         files
     }
 
-    boolean handle(CreateAppCommandObject cmd) {
+    boolean handle(CreateServiceCommandObject cmd) {
         if (profileRepository == null) throw new IllegalStateException("Property 'profileRepository' must be set")
 
         String profileName = cmd.profileName
 
         Profile profileInstance = profileRepository.getProfile(profileName)
         if (!validateProfile(profileInstance, profileName)) {
+            return false
+        }
+
+        if (!validateBuild(cmd.build)) {
             return false
         }
 
@@ -221,7 +308,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 return false
             }
 
-            initializeVariables(profileName, cmd.grailsVersion)
+            initializeVariables(profileName, cmd.micronautVersion)
 
             Path appFullDirectory = Paths.get(cmd.baseDir.path, appname)
 
@@ -245,7 +332,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     }
                 }
 
-                copySkeleton(profileInstance, p)
+                copySkeleton(profileInstance, p, cmd.build)
 
                 ymlCache.each { File applicationYmlFile, String previousApplicationYml ->
                     if(applicationYmlFile.exists()) {
@@ -269,14 +356,16 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
                 targetDirectory = targetDirs[f.profile]
 
-                appendFeatureFiles(skeletonDir)
+                appendFeatureFiles(skeletonDir, cmd.build)
 
                 if(skeletonDir.exists()) {
                     copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                 }
             }
 
-            replaceBuildTokens(profileName, profileInstance, features, projectTargetDirectory)
+            replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
+
             cmd.console.addStatus(
                 "Service created at ${projectTargetDirectory.absolutePath}"
             )
@@ -298,7 +387,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
         String profileName = evaluateProfileName(commandLine)
 
-        List<String> validFlags = [INPLACE_FLAG, PROFILE_FLAG, FEATURES_FLAG]
+        List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
             if (!validFlags.contains(key)) {
                 List possibleSolutions = validFlags.findAll { it.substring(0, 2) == key.substring(0, 2) }
@@ -311,18 +400,20 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             }
         }
 
-        boolean inPlace = commandLine.hasOption('inplace') || MicronautCli.isInteractiveModeActive()
+        boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
-        List<String> features = commandLine.optionValue("features")?.toString()?.split(',')?.toList()
+        List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
 
-        CreateAppCommandObject cmd = new CreateAppCommandObject(
+        CreateServiceCommandObject cmd = new CreateServiceCommandObject(
             appName: appName,
             baseDir: executionContext.baseDir,
             profileName: profileName,
-            grailsVersion: MicronautCli.getPackage().getImplementationVersion(),
+            micronautVersion: MicronautCli.getPackage().getImplementationVersion(),
             features: features,
             inplace: inPlace,
+            build: build,
             console: executionContext.console
         )
 
@@ -332,6 +423,14 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     protected boolean validateProfile(Profile profileInstance, String profileName) {
         if (profileInstance == null) {
             MicronautConsole.instance.error("Profile not found for name [$profileName]")
+            return false
+        }
+        return true
+    }
+
+    protected boolean validateBuild(String buildName) {
+        if (!BUILD_OPTIONS.contains(buildName)) {
+            MicronautConsole.instance.error("Build not one of the supported types [$buildName]. Supported types are ${BUILD_OPTIONS.collect({"\"${it}\""}).join(', ')}.")
             return false
         }
         return true
@@ -356,77 +455,21 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileDynamic
-    protected void replaceBuildTokens(String profileCoords, Profile profile, List<Feature> features, File targetDirectory) {
+    protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
-        def ln = System.getProperty("line.separator")
 
-        Closure repositoryUrl = { int spaces, String repo ->
-            repo.startsWith('http') ? "${' ' * spaces}maven { url \"${repo}\" }" : "${' ' * spaces}${repo}"
+        Map tokens
+        if (build == "gradle") {
+            tokens = new GradleBuildTokens().getTokens(profile, features)
         }
 
-        def repositories = profile.repositories.collect(repositoryUrl.curry(4)).unique().join(ln)
-
-        List<Dependency> profileDependencies = profile.dependencies
-        def dependencies = profileDependencies.findAll() { Dependency dep ->
-            dep.scope != 'build'
-        }
-        def buildDependencies = profileDependencies.findAll() { Dependency dep ->
-            dep.scope == 'build'
-        }
-
-        for(Feature f in features) {
-            dependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope != 'build'}
-            buildDependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope == 'build'}
-        }
-
-        dependencies.add(new Dependency(profileRepository.getProfileArtifact(profileCoords), "profile"))
-
-        dependencies = dependencies.unique()
-
-        dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "    ${dep.scope} \"${artifactStr}\"".toString()
-        }.unique().join(ln)
-
-        def buildRepositories = profile.buildRepositories.collect(repositoryUrl.curry(8)).unique().join(ln)
-
-        buildDependencies = buildDependencies.collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "        classpath \"${artifactStr}\"".toString()
-        }.unique().join(ln)
-
-        def buildPlugins = profile.buildPlugins.collect() { String name ->
-            "apply plugin:\"$name\""
-        }
-
-        for(Feature f in features) {
-            buildPlugins.addAll f.buildPlugins.collect() { String name ->
-                "apply plugin:\"$name\""
-            }
-        }
-
-        buildPlugins = buildPlugins.unique().join(ln)
 
         ant.replace(dir: targetDirectory) {
-            replacefilter {
-                replacetoken("@buildPlugins@")
-                replacevalue(buildPlugins)
-            }
-            replacefilter {
-                replacetoken("@dependencies@")
-                replacevalue(dependencies)
-            }
-            replacefilter {
-                replacetoken("@buildDependencies@")
-                replacevalue(buildDependencies)
-            }
-            replacefilter {
-                replacetoken("@buildRepositories@")
-                replacevalue(buildRepositories)
-            }
-            replacefilter {
-                replacetoken("@repositories@")
-                replacevalue(repositories)
+            tokens.each { k, v ->
+                replacefilter {
+                    replacetoken("@${k}@".toString())
+                    replacevalue(v)
+                }
             }
             variables.each { k, v ->
                 replacefilter {
@@ -438,7 +481,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     protected String evaluateProfileName(CommandLine mainCommandLine) {
-        mainCommandLine.optionValue('profile')?.toString() ?: getDefaultProfile()
+        mainCommandLine.optionValue(PROFILE_FLAG)?.toString() ?: getDefaultProfile()
     }
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
@@ -520,21 +563,21 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         }
     }
 
-    private void initializeVariables(String profileName, String grailsVersion) {
+    private void initializeVariables(String profileName, String micronautVersion) {
         variables.APPNAME = appname
 
-        variables['grails.codegen.defaultPackage'] = defaultpackagename
-        variables['grails.codegen.defaultPackage.path'] = defaultpackagename.replace('.', '/')
+        variables['defaultPackage'] = defaultpackagename
+        variables['defaultPackage.path'] = defaultpackagename.replace('.', '/')
 
         def projectClassName = NameUtils.getNameFromScript(appname)
 
-        variables['grails.codegen.projectClassName'] = projectClassName
-        variables['grails.codegen.projectNaturalName'] = NameUtils.getNaturalName(projectClassName)
-        variables['grails.codegen.projectName'] = NameUtils.getScriptName(projectClassName)
-        variables['grails.profile'] = profileName
-        variables['grails.version'] = grailsVersion
-        variables['grails.app.name'] = appname
-        variables['grails.app.group'] = groupname
+        variables['project.className'] = projectClassName
+        variables['project.naturalName'] = NameUtils.getNaturalName(projectClassName)
+        variables['project.name'] = NameUtils.getScriptName(projectClassName)
+        variables['profile'] = profileName
+        variables['version'] = micronautVersion
+        variables['app.name'] = appname
+        variables['app.group'] = groupname
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {
@@ -561,7 +604,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileStatic(TypeCheckingMode.SKIP)
-    private void copySkeleton(Profile profile, Profile participatingProfile) {
+    private void copySkeleton(Profile profile, Profile participatingProfile, String build) {
         def buildMergeProfileNames = profile.buildMergeProfileNames
         def excludes = profile.skeletonExcludes
         if (profile == participatingProfile) {
@@ -582,35 +625,18 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         }
         copySrcToTarget(ant, skeletonDir, excludes, profile.binaryExtensions)
 
-        Set<File> sourceBuildGradles = findAllFilesByName(skeletonDir, BUILD_GRADLE)
+        copySrcToTarget(ant, new File(skeletonDir, build + "-build"), excludes, profile.binaryExtensions)
 
-        sourceBuildGradles.each { File srcFile ->
-            File srcDir = srcFile.parentFile
-            File destDir = getDestinationDirectory(srcFile)
-            File destFile = new File(destDir, BUILD_GRADLE)
-
-            ant.copy(file:"${srcDir}/.gitignore", todir: destDir, failonerror:false)
-
-            if (!destFile.exists()) {
-                ant.copy file:srcFile, tofile:destFile
-            } else if (buildMergeProfileNames.contains(participatingProfile.name)) {
-                def concatFile = "${destDir}/concat.gradle"
-                ant.move(file:destFile, tofile: concatFile)
-                ant.concat([destfile: destFile, fixlastline: true], {
-                    path {
-                        pathelement location: concatFile
-                        pathelement location: srcFile
-                    }
-                })
-                ant.delete(file: concatFile, failonerror: false)
-            }
-        }
+        copyBuildFiles(new File(skeletonDir, build + "-build"), build, buildMergeProfileNames.contains(participatingProfile.name))
 
         ant.chmod(dir: targetDirectory, includes: profile.executablePatterns.join(' '), perm: 'u+x')
     }
 
     @CompileDynamic
     protected void copySrcToTarget(ConsoleAntBuilder ant, File srcDir, List excludes, Set<String> binaryFileExtensions) {
+        if (!srcDir.exists()) {
+            return
+        }
         ant.copy(todir: targetDirectory, overwrite: true, encoding: 'UTF-8') {
             fileSet(dir: srcDir, casesensitive: false) {
                 exclude(name: '**/.gitkeep')
@@ -618,6 +644,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     exclude name: exc
                 }
                 exclude name: "**/"+BUILD_GRADLE
+                exclude name: "**/"+POM_XML
+                exclude name: "maven-build/"
+                exclude name: "gradle-build/"
                 binaryFileExtensions.each { ext ->
                     exclude(name: "**/*.${ext}")
                 }
@@ -644,6 +673,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     exclude name: exc
                 }
                 exclude name: "**/"+BUILD_GRADLE
+                exclude name: "**/"+POM_XML
+                exclude name: "maven-build/"
+                exclude name: "gradle-build/"
             }
             mapper {
                 filtermapper {
@@ -662,13 +694,14 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         return v ? "${artifact.groupId}:${artifact.artifactId}:${v}" : "${artifact.groupId}:${artifact.artifactId}"
     }
 
-    static class CreateAppCommandObject {
+    static class CreateServiceCommandObject {
         String appName
         File baseDir
         String profileName
-        String grailsVersion
+        String micronautVersion
         List<String> features
         boolean inplace = false
+        String build = "gradle"
         MicronautConsole console
     }
 }
