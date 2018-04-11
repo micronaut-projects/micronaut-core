@@ -112,6 +112,16 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
+    static <T> MutableHttpRequest<T> GET(URI uri) {
+        return GET(uri.toString());
+    }
+    /**
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
     static <T> MutableHttpRequest<T> GET(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
             new IllegalStateException("No HTTP client implementation found on classpath")
@@ -120,6 +130,16 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return factory.get(uri);
     }
 
+    /**
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> OPTIONS(URI uri) {
+        return OPTIONS(uri.toString());
+    }
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI
      *
@@ -142,12 +162,36 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
+    static MutableHttpRequest<?> HEAD(URI uri) {
+        return HEAD(uri.toString());
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
     static MutableHttpRequest<?> HEAD(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
             new IllegalStateException("No HTTP client implementation found on classpath")
         );
 
         return factory.head(uri);
+    }
+
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> POST(URI uri, T body) {
+        return POST(uri.toString(), body);
     }
 
     /**
@@ -176,6 +220,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
+    static <T> MutableHttpRequest<T> PUT(URI uri, T body) {
+        return PUT(uri.toString(), body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
@@ -184,6 +240,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         );
 
         return factory.put(uri, body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> PATCH(URI uri, T body) {
+        return PATCH(uri.toString(), body);
     }
 
     /**
@@ -204,6 +272,17 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return factory.patch(uri, body);
     }
 
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> DELETE(URI uri, T body) {
+        return DELETE(uri.toString(), body);
+    }
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
      *

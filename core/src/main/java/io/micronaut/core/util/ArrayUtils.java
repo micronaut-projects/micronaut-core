@@ -82,7 +82,7 @@ public class ArrayUtils {
      * @param array The array
      * @return The string representation
      */
-    public static String toString(@Nullable Object... array) {
+    public static String toString(@Nullable Object[] array) {
         String delimiter = ",";
         return toString(delimiter, array);
     }
@@ -94,7 +94,7 @@ public class ArrayUtils {
      * @param array     The array
      * @return The string representation
      */
-    public static String toString(String delimiter, @Nullable Object... array) {
+    public static String toString(String delimiter, @Nullable Object[] array) {
         if (isEmpty(array)) {
             return "";
         } else {
