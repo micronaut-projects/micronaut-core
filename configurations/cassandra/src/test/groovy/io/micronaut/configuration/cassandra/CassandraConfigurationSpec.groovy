@@ -51,8 +51,6 @@ class CassandraConfigurationSpec extends Specification {
         cluster.getClusterName() == "ociCluster"
         inetSocketAddresses[0].getHostName() == "127.0.0.1"
         inetSocketAddresses[0].getPort() == 9042
-        inetSocketAddresses[0].getPort() == 9042
-        inetSocketAddresses[0].getPort() == 9042
         cluster.getConfiguration().getProtocolOptions().getMaxSchemaAgreementWaitSeconds() == 20
 
 
