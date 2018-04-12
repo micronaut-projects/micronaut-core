@@ -66,7 +66,6 @@ WebSocket Support must be implemented
 * Connection Pooling
 * Server Sent Events
 * CONTINUE request handling
-* Reactive Streams Publisher as request body to allow streaming
 
 #### Distributed Tracing
 

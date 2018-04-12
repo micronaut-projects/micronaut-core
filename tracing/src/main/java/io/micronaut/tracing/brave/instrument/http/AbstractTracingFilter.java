@@ -22,7 +22,6 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.tracing.brave.TraceRequestAttributes;
 
 import java.util.Optional;
 
