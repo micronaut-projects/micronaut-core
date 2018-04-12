@@ -22,12 +22,13 @@ import io.micronaut.context.annotation.EachProperty;
 /**
  * Allows the configuration of a Cassandra Cluster connection using the datastax driver.
  *
- * The client is able to be configured to multiple clusters.
+ * The client is able to be configured to multiple clusters. If there are multiple configuration keys, default can be
+ * used to denote the primary cluster bean.
  *
  * @author Nirav Assar
  * @since 1.0
  */
-@EachProperty(value = "cassandra")
+@EachProperty(value = "cassandra", primary = "default")
 public class CassandraConfiguration {
 
     @ConfigurationBuilder(allowZeroArgs = true, prefixes = { "with", "add" })
