@@ -70,7 +70,7 @@ class HttpTracingSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         def response = e.response
         response
-        reporter.spans.size() == 1
+        reporter.spans.size() == 2
         reporter.spans[0].tags().get('http.path') == '/traced/error/John'
         reporter.spans[0].tags().get('http.status_code') == '500'
         reporter.spans[0].tags().get('http.method') == 'GET'
