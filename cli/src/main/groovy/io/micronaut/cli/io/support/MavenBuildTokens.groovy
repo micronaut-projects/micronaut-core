@@ -1,5 +1,7 @@
 package io.micronaut.cli.io.support
 
+import groovy.xml.MarkupBuilder
+import groovy.xml.XmlUtil
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
@@ -20,58 +22,61 @@ class MavenBuildTokens {
 
         def ln = System.getProperty("line.separator")
 
-        Closure repositoryUrl = { int spaces, String repo ->
-            repo.startsWith('http') ? "${' ' * spaces}maven { url \"${repo}\" }" : "${' ' * spaces}${repo}"
+        def repositoriesWriter = new StringWriter()
+        MarkupBuilder repositoriesXml = new MarkupBuilder(repositoriesWriter)
+        profile.repositories.each { String repo ->
+            if (repo.startsWith('http')) {
+                repositoriesXml.repository {
+                    id(repo.replaceAll("^http(|s)://(.*?)/.*", '$2'))
+                    url(repo)
+                }
+            } else if (repo == 'jcenter()') {
+                repositoriesXml.repository {
+                    id('jcenter')
+                    url("https://jcenter.bintray.com/")
+                }
+            } else if (repo == 'google()') {
+                repositoriesXml.repository {
+                    id('google')
+                    url("https://dl.google.com/dl/android/maven2/")
+                }
+            }
         }
-
-        def repositories = profile.repositories.collect(repositoryUrl.curry(4)).unique().join(ln)
 
         List<Dependency> profileDependencies = profile.dependencies
-        def dependencies = profileDependencies.findAll() { Dependency dep ->
+        List<Dependency> dependencies = profileDependencies.findAll() { Dependency dep ->
             dep.scope != 'build'
-        }
-        def buildDependencies = profileDependencies.findAll() { Dependency dep ->
-            dep.scope == 'build'
         }
 
         for(Feature f in features) {
             dependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope != 'build'}
-            buildDependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope == 'build'}
         }
 
-        dependencies = dependencies.unique()
+        dependencies = dependencies.unique().sort({ Dependency dep -> dep.scope })
 
-        dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "    ${dep.scope} \"${artifactStr}\"".toString()
-        }.unique().join(ln)
-
-        def buildRepositories = profile.buildRepositories.collect(repositoryUrl.curry(8)).unique().join(ln)
-
-        buildDependencies = buildDependencies.collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "        classpath \"${artifactStr}\"".toString()
-        }.unique().join(ln)
-
-        def buildPlugins = profile.buildPlugins.collect() { String name ->
-            "apply plugin:\"$name\""
-        }
-
-        for(Feature f in features) {
-            buildPlugins.addAll f.buildPlugins.collect() { String name ->
-                "apply plugin:\"$name\""
+        def dependenciesWriter = new StringWriter()
+        MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
+        dependencies.each { Dependency dep ->
+            def artifact = dep.artifact
+            def v = artifact.version.replace('BOM', '')
+            dependenciesXml.dependency {
+                groupId(artifact.groupId)
+                artifactId(artifact.artifactId)
+                if (v) {
+                    version(artifact.version)
+                }
+                scope(scopeConversions.getOrDefault(dep.scope, dep.scope))
             }
         }
 
-        buildPlugins = buildPlugins.unique().join(ln)
-
-        tokens.put("buildPlugins", buildPlugins)
-        tokens.put("dependencies", dependencies)
-        tokens.put("buildDependencies", buildDependencies)
-        tokens.put("buildRepositories", buildRepositories)
-        tokens.put("repositories", repositories)
+        tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
+        tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
 
         tokens
+    }
 
+
+    String prettyPrint(String xml, int spaces) {
+        xml.replaceAll("(?m)^", " " * spaces)
     }
 }

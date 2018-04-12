@@ -22,6 +22,7 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.build.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.io.support.GradleBuildTokens
+import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.util.NameUtils
 import org.eclipse.aether.graph.Dependency
@@ -462,7 +463,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         if (build == "gradle") {
             tokens = new GradleBuildTokens().getTokens(profile, features)
         }
-
+        if (build == "maven") {
+            tokens = new MavenBuildTokens().getTokens(profile, features)
+        }
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
