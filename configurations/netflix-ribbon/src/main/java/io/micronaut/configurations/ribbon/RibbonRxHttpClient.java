@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -38,6 +39,7 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.reactivex.Flowable;
 import rx.Observable;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.net.URI;
 import java.util.Arrays;
@@ -66,9 +68,10 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         NettyClientSslBuilder nettyClientSslBuilder,
         MediaTypeCodecRegistry codecRegistry,
         RibbonExecutionListenerAdapter[] executionListeners,
+        @Nullable AnnotationMetadataResolver annotationMetadataResolver,
         HttpClientFilter... filters) {
 
-        super(loadBalancer, configuration, nettyClientSslBuilder, codecRegistry, filters);
+        super(loadBalancer, configuration, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver,filters);
         this.executionListeners = Arrays.asList(executionListeners);
         if (loadBalancer instanceof RibbonLoadBalancer) {
             this.loadBalancer = (RibbonLoadBalancer) loadBalancer;
