@@ -135,7 +135,12 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                             ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
                             return convertByteBuf(bytebuf, argument);
                         }
-                        return ConversionService.SHARED.convert(b, ConversionContext.of(type));
+                        Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
+                        if(!converted.isPresent()) {
+                            ByteBuf content = fullResponse.content();
+                            return convertByteBuf(content, type);
+                        }
+                        return converted;
                     });
                 } else {
                     ByteBuf content = fullResponse.content();

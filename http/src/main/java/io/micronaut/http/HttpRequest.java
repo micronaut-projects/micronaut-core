@@ -80,6 +80,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     boolean isSecure();
 
     @Override
+    default HttpRequest<B> setAttribute(CharSequence name, Object value) {
+        return (HttpRequest<B>) HttpMessage.super.setAttribute(name, value);
+    }
+
+    @Override
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
             .map((text) -> {

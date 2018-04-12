@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.brave.log;
+package io.micronaut.tracing.brave
 
-import brave.propagation.CurrentTraceContext;
-import io.micronaut.context.annotation.Requires;
-import org.slf4j.MDC;
+import zipkin2.Span
+import zipkin2.reporter.Reporter
 
 /**
- * TODO: Re-configure Slf4j MDC
- *
  * @author graemerocher
  * @since 1.0
  */
-
-@Requires(classes = {MDC.class, CurrentTraceContext.class})
-public class Slf4jLogContext {
+class TestReporter implements Reporter<Span> {
+    List<Span> spans = []
+    @Override
+    void report(Span span) {
+        spans.add(span)
+    }
 }

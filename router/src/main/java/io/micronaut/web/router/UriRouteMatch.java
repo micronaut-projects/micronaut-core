@@ -32,7 +32,10 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R> {
-
+    /**
+     * @return The backing {@link UriRoute}
+     */
+    UriRoute getRoute();
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
      * <p>

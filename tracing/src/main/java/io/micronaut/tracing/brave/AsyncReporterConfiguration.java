@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import zipkin2.reporter.AsyncReporter;
+import zipkin2.reporter.Reporter;
 import zipkin2.reporter.ReporterMetrics;
 import zipkin2.reporter.Sender;
 
@@ -26,13 +27,17 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
+ * A configuration for async Reporting on {@link zipkin2.Span} instances
+ *
  * @author graemerocher
  * @since 1.0
  */
-@ConfigurationProperties("brave.reporter")
+@ConfigurationProperties(AsyncReporterConfiguration.PREFIX)
 @Requires(beans = BraveTracerConfiguration.class)
 @Requires(beans = Sender.class)
 public class AsyncReporterConfiguration {
+
+    public static final String PREFIX = BraveTracerConfiguration.PREFIX + ".reporter";
 
     @ConfigurationBuilder(prefixes = "")
     private final AsyncReporter.Builder builder;
