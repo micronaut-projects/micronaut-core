@@ -15,6 +15,7 @@
  */
 package io.micronaut.function.client.http;
 
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -59,6 +60,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             configuration,
             nettyClientSslBuilder,
             codecRegistry,
+            AnnotationMetadataResolver.DEFAULT,
             filters
         );
     }

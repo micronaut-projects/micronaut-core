@@ -15,13 +15,18 @@
  */
 package io.micronaut.tracing.brave
 
+import brave.Tracing
+import brave.http.HttpClientHandler
+import brave.http.HttpServerHandler
+import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.tracing.brave.sender.HttpClientSender
-import io.opentracing.Scope
-import io.opentracing.Span
 import io.opentracing.Tracer
 import spock.lang.Specification
+import zipkin2.reporter.AsyncReporter
+import zipkin2.reporter.Reporter
 
 /**
  * @author graemerocher
@@ -43,13 +48,54 @@ class BraveTracerFactorySpec extends Specification {
 
     void "test brave tracer configuration"() {
         given:
-        ApplicationContext context = ApplicationContext.run('tracing.brave.http.endpoint':HttpClientSender.Builder.DEFAULT_ENDPOINT)
+        ApplicationContext context = ApplicationContext.run(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_ENDPOINT
+        )
 
-        when:"The tracer is obtained"
-        Tracer tracer = context.getBean(Tracer)
-
-
-        then:"It is present"
-        tracer != null
+        expect:"The tracer is obtained"
+        context.getBean(AsyncReporter)
+        context.getBean(Tracer)
+        context.getBean(Tracing)
+        context.getBean(HttpTracing)
+        context.getBean(HttpClientHandler)
+        context.getBean(HttpServerHandler)
     }
+
+    void "test brave tracer configuration no endpoint"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                'tracing.zipkin.enabled':true
+        )
+
+        expect:"The tracer is obtained"
+        !context.containsBean(Reporter)
+        context.getBean(Tracer)
+        context.getBean(Tracing)
+        context.getBean(HttpTracing)
+        context.getBean(HttpClientHandler)
+        context.getBean(HttpServerHandler)
+    }
+
+    void "test brace tracer report spans"() {
+        given:
+
+        ApplicationContext context = ApplicationContext.build()
+        context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true))
+        def reporter = new TestReporter()
+        context.registerSingleton(reporter)
+        context.start()
+
+        when:
+        Tracer tracer = context.getBean(Tracer)
+        def scope = tracer.buildSpan("test").startActive(true)
+        scope.close()
+
+        then:
+        reporter.spans.size() == 1
+        reporter.spans[0].name() == "test"
+    }
+
+
+
 }
