@@ -16,14 +16,6 @@
 package io.micronaut.validation
 
 import groovy.json.JsonSlurper
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.core.order.OrderUtil
-import io.micronaut.http.HttpStatus
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
 import io.micronaut.cache.AsyncCacheErrorHandler
 import io.micronaut.cache.CacheErrorHandler
 import io.micronaut.cache.CacheManager
@@ -31,8 +23,13 @@ import io.micronaut.cache.interceptor.CacheInterceptor
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
@@ -77,23 +74,27 @@ class ValidatedSpec extends Specification {
 
     def "test validated controller args"() {
         given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
-        OkHttpClient client = new OkHttpClient()
-
         when:
-        def request = new Request.Builder()
-                .url(new URL(server.URL,"/validated/args"))
-                .post(RequestBody.create(MediaType.parse("application/json"), '{"amount":"xxx"}'))
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
+                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                String
+        ))
+        flowable.blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
 
         when:
-        def result = new JsonSlurper().parseText(response.body().string())
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
         result.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
