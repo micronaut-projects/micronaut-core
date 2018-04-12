@@ -1,5 +1,3 @@
-apply plugin: 'application'
-
 repositories {
     jcenter()
     mavenCentral()
@@ -21,18 +19,17 @@ dependencies {
     testCompile "com.github.jnr:jnr-posix:3.0.6"
 }
 
-File outDir = new File(project.rootDir, 'bin')
+File outDir = new File(project.buildDir, 'bin')
 
-task micronautCreateStartScripts(type: MicronautCreateStartScripts) {
+task createStartScripts(type: MicronautCreateStartScripts) {
     description = "Creates OS specific scripts to run grails-shell as a JVM application."
     mainClassName = 'io.micronaut.cli.MicronautCli'
     applicationName = 'mn'
     defaultJvmOpts = ["-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=3"]
     outputDir = outDir
     classpath = configurations.runtime
-    projectArtifacts = tasks['jar'].outputs.files.collect { "dist/${it.name}" }
     doLast {
-        ant.replace(file: new File(outDir, 'mn'), token: 'media/gradle.icns', value: 'media/icons/grails.icns')
+        ant.replace(file: new File(outDir, 'mn'), token: 'gradle.icns', value: 'mn.icns')
         ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
     }
 }
@@ -48,28 +45,45 @@ class MicronautCreateStartScripts extends org.gradle.api.tasks.application.Creat
         generator.defaultJvmOpts = getDefaultJvmOpts()
         generator.optsEnvironmentVar = getOptsEnvironmentVar()
         generator.exitEnvironmentVar = getExitEnvironmentVar()
-        generator.classpath = ["bin/cli.jar"]
+        generator.classpath = project.tasks.getByName('fatJar').outputs.files.collect { it.name }
         generator.scriptRelPath = "bin/${getUnixScript().name}"
         generator.generateUnixScript(getUnixScript())
         generator.generateWindowsScript(getWindowsScript())
     }
 }
 
-task fatJar(type: Jar) {
+task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
     manifest {
         attributes 'Main-Class': 'io.micronaut.cli.GrailsCli',
                 'Implementation-Version': project.version
     }
-    archiveName = 'cli.jar'
     from {
         configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
     }
     with jar
-    destinationDir = outDir
+    destinationDir = project.buildDir
 }
 
-fatJar.dependsOn('micronautCreateStartScripts')
+task cliZip(type: Zip, dependsOn: ['fatJar']) {
+    archiveName = 'mn.zip'
+    from('build/bin') {
+        into('bin')
+    }
+    from('../media') {
+        into('media')
+    }
+    from fatJar.outputs.files
+    from('../LICENSE')
+}
 
-clean {
-    delete outDir
+
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact cliZip {
+                classifier "dist"
+            }
+        }
+    }
 }
