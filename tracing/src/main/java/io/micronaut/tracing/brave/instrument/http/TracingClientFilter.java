@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.tracing.brave.BraveTracerConfiguration;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -36,7 +37,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Filter("/**")
+@Filter("${"+BraveTracerConfiguration.PREFIX+".client.path:/**}")
 @Requires(beans = HttpClientHandler.class)
 public class TracingClientFilter extends AbstractTracingFilter implements HttpClientFilter {
 
@@ -51,7 +52,6 @@ public class TracingClientFilter extends AbstractTracingFilter implements HttpCl
 
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-        // TODO: handle error case
         Flowable<? extends HttpResponse<?>> requestPublisher = Flowable.fromPublisher(chain.proceed(request));
         requestPublisher = requestPublisher.doOnRequest( amount -> {
             if(amount > 0) {

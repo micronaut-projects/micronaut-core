@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.inject.BeanIdentifier;
 
 import javax.annotation.Nonnull;
@@ -40,7 +41,8 @@ public interface BeanContext extends
     ExecutionHandleLocator,
     BeanLocator,
     BeanDefinitionRegistry,
-    ApplicationEventPublisher {
+    ApplicationEventPublisher,
+    AnnotationMetadataResolver {
 
     @Override
     <T> BeanContext registerSingleton(Class<T> type, T singleton);

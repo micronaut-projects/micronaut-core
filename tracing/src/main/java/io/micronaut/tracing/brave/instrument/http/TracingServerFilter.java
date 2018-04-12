@@ -25,6 +25,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.tracing.brave.BraveTracerConfiguration;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -36,7 +37,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Filter("/**")
+@Filter("${"+BraveTracerConfiguration.PREFIX+".server.path:/**}")
 @Requires(beans = HttpServerHandler.class)
 public class TracingServerFilter extends AbstractTracingFilter implements HttpServerFilter {
 
