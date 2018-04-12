@@ -43,6 +43,7 @@ public class HttpClientSenderFactory {
      */
     @Bean
     @Singleton
+    @Requires(missingBeans = Sender.class)
     Sender zipkinSender() {
         return configuration.getBuilder().build();
     }

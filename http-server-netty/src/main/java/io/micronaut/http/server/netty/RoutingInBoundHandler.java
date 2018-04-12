@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -77,6 +78,7 @@ import io.reactivex.Emitter;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -198,7 +200,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
         } else if (uriRoutes.size() == 1) {
-            routeMatch = Optional.of(uriRoutes.get(0));
+            UriRouteMatch<Object> establishedRoute = uriRoutes.get(0);
+            request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
+            request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
+            routeMatch = Optional.of(establishedRoute);
         }
 
         RouteMatch<?> route;
@@ -598,74 +603,79 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             Publisher<? extends io.micronaut.http.HttpResponse<?>> finalPublisher;
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
-            Publisher<MutableHttpResponse<?>> routePublisher = Publishers.fromCompletableFuture(() -> {
-                CompletableFuture<MutableHttpResponse<?>> completableFuture = new CompletableFuture<>();
-                executor.submit(() -> {
+            Flowable<MutableHttpResponse<?>> routePublisher = Flowable.create((emitter) -> {
+                MutableHttpResponse<?> response;
+                io.micronaut.http.HttpRequest<?> httpRequest = requestReference.get();
 
-                    MutableHttpResponse<?> response;
-                    io.micronaut.http.HttpRequest<?> httpRequest = requestReference.get();
+                try {
+                    RouteMatch<?> routeMatch = finalRoute;
+                    if (!routeMatch.isExecutable()) {
+                        routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
+                    }
+                    Object result = routeMatch.execute();
 
-                    try {
-                        RouteMatch<?> routeMatch = finalRoute;
-                        if (!routeMatch.isExecutable()) {
-                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
-                        }
-                        Object result = routeMatch.execute();
-
-                        if (result == null) {
-                            Class<?> javaReturnType = routeMatch.getReturnType().getType();
-                            if (javaReturnType != void.class) {
-                                // handle re-mapping of errors
-                                result = router.route(HttpStatus.NOT_FOUND)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
-                                        .filter(RouteMatch::isExecutable)
-                                        .map(RouteMatch::execute)
-                                        .map(Object.class::cast)
-                                        .orElse(NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.notFound()));
-                                if (result instanceof MutableHttpResponse) {
-                                    response = (MutableHttpResponse<?>) result;
-                                } else {
-                                    response = io.micronaut.http.HttpResponse.status(HttpStatus.NOT_FOUND)
-                                            .body(result);
-                                }
-                            } else {
-                                response = NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.ok());
-                            }
-                        } else if (result instanceof io.micronaut.http.HttpResponse) {
-                            HttpStatus status = ((io.micronaut.http.HttpResponse) result).getStatus();
-                            if (status.getCode() >= 400) {
-                                // handle re-mapping of errors
-                                result = router.route(status)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
-                                        .filter(RouteMatch::isExecutable)
-                                        .map(RouteMatch::execute)
-                                        .map(Object.class::cast)
-                                        .orElse(result);
-                            }
+                    if (result == null) {
+                        Class<?> javaReturnType = routeMatch.getReturnType().getType();
+                        if (javaReturnType != void.class) {
+                            // handle re-mapping of errors
+                            result = router.route(HttpStatus.NOT_FOUND)
+                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
+                                    .filter(RouteMatch::isExecutable)
+                                    .map(RouteMatch::execute)
+                                    .map(Object.class::cast)
+                                    .orElse(NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.notFound()));
                             if (result instanceof MutableHttpResponse) {
                                 response = (MutableHttpResponse<?>) result;
                             } else {
-                                response = io.micronaut.http.HttpResponse.status(status)
+                                response = io.micronaut.http.HttpResponse.status(HttpStatus.NOT_FOUND)
                                         .body(result);
                             }
+                        } else {
+                            response = NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.ok());
                         }
-                        else if(result instanceof HttpStatus) {
-                            response = io.micronaut.http.HttpResponse.status((HttpStatus) result);
+                    } else if (result instanceof io.micronaut.http.HttpResponse) {
+                        HttpStatus status = ((io.micronaut.http.HttpResponse) result).getStatus();
+                        if (status.getCode() >= 400) {
+                            // handle re-mapping of errors
+                            result = router.route(status)
+                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
+                                    .filter(RouteMatch::isExecutable)
+                                    .map(RouteMatch::execute)
+                                    .map(Object.class::cast)
+                                    .orElse(result);
                         }
-                        else {
-                            response = io.micronaut.http.HttpResponse.ok(result);
+                        if (result instanceof MutableHttpResponse) {
+                            response = (MutableHttpResponse<?>) result;
+                        } else {
+                            response = io.micronaut.http.HttpResponse.status(status)
+                                    .body(result);
                         }
-
-                        completableFuture.complete(response);
-
-                    } catch (Throwable e) {
-                        completableFuture.completeExceptionally(e);
                     }
-                });
-                return completableFuture;
-            });
+                    else if(result instanceof HttpStatus) {
+                        response = io.micronaut.http.HttpResponse.status((HttpStatus) result);
+                    }
+                    else {
+                        response = io.micronaut.http.HttpResponse.ok(result);
+                    }
+
+                    emitter.onNext(response);
+                    emitter.onComplete();
+
+                } catch (Throwable e) {
+                    emitter.onError(e);
+                }
+            }, BackpressureStrategy.ERROR);
 
             finalPublisher = filterPublisher(request,requestReference, routePublisher);
+            if(finalPublisher instanceof Flowable) {
+                finalPublisher = ((Flowable<MutableHttpResponse<?>>)finalPublisher)
+                                        .subscribeOn(Schedulers.from(executor));
+            }
+            else {
+                finalPublisher = Flowable.fromPublisher(finalPublisher)
+                                         .subscribeOn(Schedulers.from(executor));
+            }
+
 
             finalPublisher.subscribe(new CompletionAwareSubscriber<io.micronaut.http.HttpResponse<?>>() {
                 @Override
@@ -680,6 +690,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnError(Throwable t) {
+                    request.setAttribute(HttpAttributes.ERROR, t);
                     context.pipeline().fireExceptionCaught(t);
                 }
 

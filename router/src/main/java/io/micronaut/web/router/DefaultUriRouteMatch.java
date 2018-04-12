@@ -130,6 +130,11 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
+    public UriRoute getRoute() {
+        return (UriRoute) abstractRoute;
+    }
+
+    @Override
     public HttpMethod getHttpMethod() {
         return httpMethod;
     }

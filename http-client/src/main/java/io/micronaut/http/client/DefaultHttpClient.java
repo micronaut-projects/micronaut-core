@@ -21,6 +21,7 @@ import com.typesafe.netty.http.HttpStreamsClientHandler;
 import com.typesafe.netty.http.StreamedHttpResponse;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
@@ -120,6 +121,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
     protected final Bootstrap bootstrap;
+    private final AnnotationMetadataResolver annotatationMetadataResolver;
     protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
     private final Charset defaultCharset;
@@ -139,6 +141,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                              @Parameter HttpClientConfiguration configuration,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
@@ -159,6 +162,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         }
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
+        this.annotatationMetadataResolver = annotationMetadataResolver != null ? annotationMetadataResolver : AnnotationMetadataResolver.DEFAULT;
     }
 
     public DefaultHttpClient(URL url,
@@ -166,19 +170,23 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, nettyClientSslBuilder, codecRegistry, filters);
+        this(LoadBalancer.fixed(url), configuration, nettyClientSslBuilder, codecRegistry,AnnotationMetadataResolver.DEFAULT, filters);
     }
 
     public DefaultHttpClient(LoadBalancer loadBalancer) {
         this(loadBalancer,
                 new DefaultHttpClientConfiguration(),
                 new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
-                createDefaultMediaTypeRegistry());
+                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
 
     public DefaultHttpClient(@Parameter URL url) {
         this(LoadBalancer.fixed(url));
+    }
+
+    public DefaultHttpClient( URL url, HttpClientConfiguration configuration) {
+        this(LoadBalancer.fixed(url), configuration, new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
     @Override
@@ -671,7 +679,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
-            Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
+            Filter filterAnn = annotatationMetadataResolver.resolveElement(filter).getAnnotation(Filter.class);
             if (filterAnn != null) {
                 String[] clients = filterAnn.clients();
                 if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {

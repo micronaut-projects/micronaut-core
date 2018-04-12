@@ -20,7 +20,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.DefaultHttpClient;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -47,7 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpClientSender extends Sender{
+public class HttpClientSender extends Sender {
 
     private final HttpClient httpClient ;
     private final Encoding encoding;
@@ -55,9 +57,12 @@ public class HttpClientSender extends Sender{
     private final boolean compressionEnabled;
     private final URI endpoint;
 
-    private HttpClientSender(Encoding encoding, int messageMaxBytes, boolean compressionEnabled, URI endpoint) {
+    private HttpClientSender(Encoding encoding, int messageMaxBytes, boolean compressionEnabled, URI endpoint, HttpClientConfiguration clientConfiguration) {
         try {
-            this.httpClient = HttpClient.create(new URL(endpoint.getScheme(), endpoint.getHost(), endpoint.getPort(), ""));
+            this.httpClient = new DefaultHttpClient(
+                    new URL(endpoint.getScheme(), endpoint.getHost(), endpoint.getPort(), ""),
+                    clientConfiguration
+            );
         } catch (MalformedURLException e) {
             throw new IllegalArgumentException("Invalid endpoint URI: " + endpoint);
         }
@@ -222,6 +227,11 @@ public class HttpClientSender extends Sender{
         private int messageMaxBytes = 5 * 1024;
         private boolean compressionEnabled = true;
         private URI endpoint = URI.create(DEFAULT_ENDPOINT);
+        private final HttpClientConfiguration clientConfiguration;
+
+        public Builder(HttpClientConfiguration clientConfiguration) {
+            this.clientConfiguration = clientConfiguration;
+        }
 
         /**
          * The encoding to use. Defaults to {@link Encoding#JSON}
@@ -277,7 +287,8 @@ public class HttpClientSender extends Sender{
                     encoding,
                     messageMaxBytes,
                     compressionEnabled,
-                    endpoint
+                    endpoint,
+                    clientConfiguration
             );
         }
     }

@@ -34,6 +34,8 @@ import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -71,10 +73,12 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -231,6 +235,26 @@ public class DefaultBeanContext implements BeanContext {
             });
         }
         return this;
+    }
+
+    @Override
+    @Nonnull
+    public AnnotatedElement resolveElement(Class<?> type) {
+        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
+        if(candidate.isPresent()) {
+            return candidate.get();
+        }
+        return type;
+    }
+
+    @Override
+    @Nonnull
+    public AnnotationMetadata resolveMetadata(Class<?> type) {
+        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
+        if(candidate.isPresent()) {
+            return candidate.get();
+        }
+        return AnnotationMetadata.EMPTY_METADATA;
     }
 
     @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})

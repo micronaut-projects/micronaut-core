@@ -18,13 +18,15 @@ package io.micronaut.tracing.brave;
 import brave.Clock;
 import brave.ErrorParser;
 import brave.Tracing;
-import brave.opentracing.BraveTracer;
+import brave.propagation.CurrentTraceContext;
 import brave.propagation.Propagation;
 import brave.sampler.Sampler;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.tracing.brave.sender.HttpClientSender;
 
@@ -37,16 +39,18 @@ import javax.inject.Inject;
  * @author graemerocher
  * @since 1.0
  */
-@Requires(classes = { BraveTracer.class, Tracing.class})
+@Requires(classes = { Tracing.class})
+@Requires(property = BraveTracerConfiguration.PREFIX + ".enabled", value = "true")
 @ConfigurationProperties(BraveTracerConfiguration.PREFIX)
-public class BraveTracerConfiguration {
+public class BraveTracerConfiguration implements Toggleable {
 
-    public static final String PREFIX = "tracing.brave";
+    public static final String PREFIX = "tracing.zipkin";
 
     @ConfigurationBuilder(prefixes = "", excludes = {"errorParser","clock","endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
     protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
 
+    private boolean enabled = false;
 
     /**
      * Constructs a new {@link BraveTracerConfiguration}
@@ -60,6 +64,21 @@ public class BraveTracerConfiguration {
         else {
             tracingBuilder.localServiceName(Environment.DEFAULT_NAME);
         }
+    }
+
+    /**
+     * @return Is tracing enabled
+     */
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * @param enabled True if tracing is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     /**
@@ -108,14 +127,26 @@ public class BraveTracerConfiguration {
         }
     }
 
+    /**
+     * Sets the current trace context
+     *
+     * @param traceContext The trace context
+     */
+    @Inject
+    public void setCurrentTraceContext(CurrentTraceContext traceContext) {
+        if(traceContext != null) {
+            tracingBuilder.currentTraceContext(traceContext);
+        }
+    }
+
 
     @ConfigurationProperties(HttpClientSenderConfiguration.PREFIX)
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
-    @Requires(classes = { BraveTracer.class, Tracing.class})
-    public static class HttpClientSenderConfiguration {
+    @Requires(classes = { Tracing.class})
+    public static class HttpClientSenderConfiguration extends HttpClientConfiguration {
         public static final String PREFIX = BraveTracerConfiguration.PREFIX + ".http";
         @ConfigurationBuilder(prefixes = "")
-        protected HttpClientSender.Builder clientSenderBuilder = new HttpClientSender.Builder();
+        protected HttpClientSender.Builder clientSenderBuilder = new HttpClientSender.Builder(this);
 
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;
