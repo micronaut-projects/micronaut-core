@@ -181,6 +181,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this(LoadBalancer.fixed(url));
     }
 
+    public DefaultHttpClient( URL url, HttpClientConfiguration configuration) {
+        this(LoadBalancer.fixed(url), configuration, new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()), createDefaultMediaTypeRegistry());
+    }
+
     @Override
     public HttpClient start() {
         if (!isRunning()) {

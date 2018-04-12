@@ -19,9 +19,11 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Common interface for HTTP messages
@@ -53,6 +55,65 @@ public interface HttpMessage<B> {
      */
     Optional<B> getBody();
 
+    /**
+     * Sets an attribute on the message
+     * @param name The name of the attribute
+     * @param value The value of the attribute
+     * @return This message
+     */
+    default HttpMessage<B> setAttribute(CharSequence name, Object value) {
+        if(StringUtils.isNotEmpty(name)) {
+            if(value == null) {
+                getAttributes().remove(name.toString());
+            }
+            else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Obtain the value of an attribute on the HTTP method
+     * @param name The name of the attribute
+     * @return An {@link Optional} value
+     */
+    default Optional<Object> getAttribute(CharSequence name) {
+        if(StringUtils.isNotEmpty(name)) {
+            return getAttributes().get(name.toString(), Object.class);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Obtain the value of an attribute on the HTTP method
+     * @param name The name of the attribute
+     * @param type The required type
+     * @return An {@link Optional} value
+     */
+    default <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if(StringUtils.isNotEmpty(name)) {
+            return getAttributes().get(name.toString(), type);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Remove an attribute. Returning the old value if it is present
+     *
+     * @param name The name of the attribute
+     * @param type The required type
+     * @return An {@link Optional} value
+     */
+    default <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {
+        if(StringUtils.isNotEmpty(name)) {
+            String key = name.toString();
+            Optional<T> value = getAttribute(key, type);
+            value.ifPresent(o -> getAttributes().remove(key));
+            return value;
+        }
+        return Optional.empty();
+    }
     /**
      * Return the body as the given type
      *
