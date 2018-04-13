@@ -27,6 +27,9 @@ include "test-suite-kotlin"
 include "validation"
 include "jdbc"
 include "runtime-groovy"
+include "cli"
+include "gradle-plugins"
+include "bom"
 
 // configurations
 include "configurations:gorm"
@@ -44,4 +47,3 @@ include "configurations:netflix-archaius"
 include "configurations:netflix-ribbon"
 include "configurations:netflix-hystrix"
 include "configurations:aws-common"
-
