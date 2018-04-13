@@ -18,12 +18,10 @@ package io.micronaut.core.convert
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.core.type.Argument
-import io.micronaut.core.convert.format.Format
-import io.micronaut.core.convert.format.ReadableBytes
-import io.micronaut.core.type.Argument
 import spock.lang.Specification
 import spock.lang.Unroll
 import java.lang.reflect.Field
+import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 
 /**
@@ -90,7 +88,7 @@ class DefaultConversionServiceSpec extends Specification {
 
         where:
         sourceObject | targetType | result
-        "1999/01/01" | Date       | Date.parse("yyyy/mm/dd", "1999/01/01")
+        "1999/01/01" | Date       | new SimpleDateFormat("yyyy/mm/dd").parse("1999/01/01")
     }
 
 
