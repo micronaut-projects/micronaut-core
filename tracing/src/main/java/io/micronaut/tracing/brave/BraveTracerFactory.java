@@ -21,6 +21,7 @@ import brave.Tracing;
 import brave.opentracing.BraveTracer;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
@@ -87,6 +88,7 @@ public class BraveTracerFactory {
     @Bean
     @Singleton
     @Requires(classes = {BraveTracer.class, Tracer.class})
+    @Primary
     Tracer braveTracer(Tracing tracing) {
         BraveTracer braveTracer = BraveTracer.create(tracing);
         if(!GlobalTracer.isRegistered()) {

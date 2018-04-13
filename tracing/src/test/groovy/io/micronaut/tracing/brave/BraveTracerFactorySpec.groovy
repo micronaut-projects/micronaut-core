@@ -24,6 +24,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.opentracing.Tracer
+import io.opentracing.noop.NoopTracer
 import spock.lang.Specification
 import zipkin2.reporter.AsyncReporter
 import zipkin2.reporter.Reporter
@@ -38,11 +39,11 @@ class BraveTracerFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         when:"The tracer is obtained"
-        context.getBean(Tracer)
+        Tracer tracer = context.getBean(Tracer)
 
 
         then:"It is present"
-        thrown(NoSuchBeanException)
+        tracer instanceof NoopTracer
 
     }
 
