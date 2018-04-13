@@ -65,13 +65,14 @@ public class TracingServerFilter extends AbstractTracingFilter implements HttpSe
                 withSpanInScope(request, span);
             }
         });
-        requestPublisher = requestPublisher.doAfterTerminate(() -> afterTerminate(request));
         return requestPublisher.map(response -> {
             Optional<Span> span = configuredSpan(request, response);
             span.ifPresent(s -> {
                 Throwable error = request.getAttribute(HttpAttributes.ERROR, Throwable.class).orElse(null);
                 serverHandler.handleSend(response, error, s);
+                afterTerminate(request);
             });
+
             return response;
         });
     }
