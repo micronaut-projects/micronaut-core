@@ -16,7 +16,7 @@
 package io.micronaut.cli.profile.commands.io
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.io.support.DefaultResourceLoader
 import io.micronaut.cli.io.support.FileSystemResource

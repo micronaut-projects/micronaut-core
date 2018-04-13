@@ -15,7 +15,7 @@
  */
 package io.micronaut.cli.profile
 
-import io.micronaut.cli.build.parsing.CommandLine
+import io.micronaut.cli.console.parsing.CommandLine
 
 /**
  * Abstract implementation of the {@link Step} interface

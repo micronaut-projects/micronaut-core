@@ -17,11 +17,11 @@ package io.micronaut.cli
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
-import io.micronaut.cli.build.logging.MicronautConsole
-import io.micronaut.cli.build.parsing.CommandLine
-import io.micronaut.cli.build.parsing.CommandLineParser
-import io.micronaut.cli.build.parsing.DefaultCommandLine
-import io.micronaut.cli.build.proxy.SystemPropertiesAuthenticator
+import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.console.parsing.CommandLine
+import io.micronaut.cli.console.parsing.CommandLineParser
+import io.micronaut.cli.console.parsing.DefaultCommandLine
+import io.micronaut.cli.console.proxy.SystemPropertiesAuthenticator
 import io.micronaut.cli.config.CodeGenConfig
 import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.interactive.completers.EscapingFileNameCompletor
