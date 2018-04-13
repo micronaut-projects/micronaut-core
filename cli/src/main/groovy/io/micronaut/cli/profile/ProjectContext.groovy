@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cli.profile;
+package io.micronaut.cli.profile
 
-import io.micronaut.cli.build.logging.MicronautConsole;
-import io.micronaut.cli.config.ConfigMap;
-
-import java.io.File;
+import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.config.ConfigMap
 
 /**
  * The project context used by a {@link io.micronaut.cli.profile.Profile}
@@ -26,22 +24,23 @@ import java.io.File;
  * @author Lari Hotari
  * @author Graeme Rocher
  */
-public interface ProjectContext {
+interface ProjectContext {
+
     /**
      * @return The {@link MicronautConsole} instance
      */
-    MicronautConsole getConsole();
+    MicronautConsole getConsole()
 
     /**
      *
      * @return The base directory of the project
      */
-    File getBaseDir();
+    File getBaseDir()
 
     /**
      * @return The codegen config
      */
-    ConfigMap getConfig();
+    ConfigMap getConfig()
 
     /**
      * Obtains a value from the codegen configuration
@@ -49,7 +48,7 @@ public interface ProjectContext {
      * @param path The path to value
      * @return The value or null if not set
      */
-    String navigateConfig(String... path);
+    String navigateConfig(String... path)
 
     /**
      * Obtains a value of the given type from the codegen configuration
@@ -58,5 +57,5 @@ public interface ProjectContext {
      * @param path The path to value
      * @return The value or null if not set
      */
-    <T> T navigateConfigForType(Class<T> requiredType, String... path);
+    public <T> T navigateConfigForType(Class<T> requiredType, String... path)
 }

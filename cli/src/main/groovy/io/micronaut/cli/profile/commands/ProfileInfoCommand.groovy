@@ -16,8 +16,8 @@
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.build.logging.MicronautConsole
-import io.micronaut.cli.build.parsing.CommandLine
+import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.config.CodeGenConfig
 import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.profile.Command

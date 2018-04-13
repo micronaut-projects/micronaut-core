@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cli.profile;
+package io.micronaut.cli.profile
 
-
-import io.micronaut.cli.build.parsing.CommandLine;
+import io.micronaut.cli.console.parsing.CommandLine
 
 /**
  * Context for the execution of {@link io.micronaut.cli.profile.Command} instances within a {@link io.micronaut.cli.profile.Profile}
@@ -24,22 +23,22 @@ import io.micronaut.cli.build.parsing.CommandLine;
  * @author Lari Hotari
  * @author Graeme Rocher
  */
-public interface ExecutionContext extends ProjectContext {
+interface ExecutionContext extends ProjectContext {
 
     /**
-     * @return The parsed command line arguments as an instance of {@link io.micronaut.cli.build.parsing.CommandLine}
+     * @return The parsed command line arguments as an instance of {@link io.micronaut.cli.console.parsing.CommandLine}
      */
-    CommandLine getCommandLine();
+    CommandLine getCommandLine()
 
     /**
      * Allows cancelling of the running command
      */
-    void cancel();
+    void cancel()
 
     /**
      * Attaches a listener for cancellation events
      *
      * @param listener The {@link CommandCancellationListener}
      */
-    void addCancelledListener(CommandCancellationListener listener);
+    void addCancelledListener(CommandCancellationListener listener)
 }

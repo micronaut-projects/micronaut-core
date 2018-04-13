@@ -17,7 +17,7 @@ package io.micronaut.cli.profile.commands.factory
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
-import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.util.NameUtils
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer

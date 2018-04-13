@@ -26,7 +26,7 @@ import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
-import io.micronaut.cli.build.parsing.ScriptNameResolver
+import io.micronaut.cli.console.parsing.ScriptNameResolver
 import io.micronaut.cli.interactive.completers.StringsCompleter
 import io.micronaut.cli.profile.commands.CommandRegistry
 import io.micronaut.cli.profile.commands.DefaultMultiStepCommand
