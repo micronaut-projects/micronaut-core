@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.brave.instrument.http;
-
 /**
- * Constants used to store Span objects within instrumented attributes
- *
- * @author graemerocher
- * @since 1.0
+ * Configuration for RabbitMQ
  */
-public interface TraceRequestAttributes {
+@Configuration
+@Requires(classes = {Channel.class, Connection.class, ConnectionFactory.class})
+package io.micronaut.configuration.rabbitmq;
 
-    String PREFIX = "micronaut.tracing.brave";
-    String CURRENT_SPAN = PREFIX + ".currentSpan";
-    String CURRENT_SCOPE = PREFIX + ".currentScope";
-}
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;

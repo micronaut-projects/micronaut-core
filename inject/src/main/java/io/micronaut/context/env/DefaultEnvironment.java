@@ -71,7 +71,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     protected final ClassPathResourceLoader resourceLoader;
 
-    private static EnvironmentsAndPackage environmentsAndPackage;
+    private EnvironmentsAndPackage environmentsAndPackage;
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
@@ -106,9 +106,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         specifiedNames.addAll(CollectionUtils.setOf(names));
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
         specifiedNames.addAll(environmentsAndPackage.enviroments);
-        Package aPackage = environmentsAndPackage.aPackage;
+        String aPackage = environmentsAndPackage.aPackage;
         if (aPackage != null) {
-            packages.add(aPackage.getName());
+            packages.add(aPackage);
         }
         this.classLoader = resourceLoader.getClassLoader();
         this.names = specifiedNames;
@@ -371,13 +371,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    private static EnvironmentsAndPackage getEnvironmentsAndPackage() {
-        EnvironmentsAndPackage environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+    private EnvironmentsAndPackage getEnvironmentsAndPackage() {
+        EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
-                environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+                environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
-                    DefaultEnvironment.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
+                    this.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
                 }
             }
         }
@@ -392,13 +392,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String methodName = stackTraceElement.getMethodName();
             if (methodName.contains("$spock_")) {
                 String className = stackTraceElement.getClassName();
-                String packageName = NameUtils.getPackageName(className);
-                environmentsAndPackage.aPackage = Package.getPackage(packageName);
+                environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
                 enviroments.add(TEST);
             } else if ("main".equals(methodName)) {
                 String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
                 if (environmentsAndPackage.aPackage == null) {
-                    environmentsAndPackage.aPackage = Package.getPackage(packageName);
+                    environmentsAndPackage.aPackage = packageName;
                 }
             } else {
                 String className = stackTraceElement.getClassName();
@@ -608,7 +607,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static class EnvironmentsAndPackage {
-        Package aPackage;
+        String aPackage;
         Set<String> enviroments = new HashSet<>(1);
     }
 }

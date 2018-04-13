@@ -499,8 +499,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 }
                                 if (data.isCompleted()) {
                                     subject.onComplete();
-                                } else {
-                                    subscription.request(1);
                                 }
 
                                 value = () -> {
@@ -552,10 +550,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
                         // we have enough data to satisfy the route, continue
                         doOnComplete();
-                    } else {
-                        // the route is not yet executable, so keep going
-                        subscription.request(1);
                     }
+                }
+                // if the route hasn't been executed or some subjects haven't completed
+                if (!executed ||
+                        subjects.values().stream().anyMatch((s) -> !s.hasComplete())) {
+                    subscription.request(1);
                 }
             }
 
@@ -809,7 +809,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                     if (message instanceof io.micronaut.http.HttpResponse) {
                                         response = (NettyHttpResponse<?>) message;
-                                        body = response.getBody().orElse(null);
+                                        body = response.getBody().orElse(message);
                                         fullHttpResponse = response.getNativeResponse();
                                     } else {
                                         response = defaultResponse;
@@ -1066,7 +1066,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             throw new IllegalStateException("Response publisher emitted null result");
         }
         else {
-            FullHttpResponse newResponse = encodeFullResponseBody(context, nativeResponse, message, codec, mediaType);
+            FullHttpResponse newResponse;
+            if(!(message instanceof io.micronaut.http.HttpResponse)) {
+                newResponse = encodeFullResponseBody(context, nativeResponse, message, codec, mediaType);
+            }
+            else {
+                newResponse = nativeResponse;
+            }
             writeNettyResponseAndCloseChannel(context, request, newResponse);
         }
 

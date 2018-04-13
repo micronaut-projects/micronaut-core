@@ -25,7 +25,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.tracing.brave.BraveTracerConfiguration;
+import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -37,9 +37,9 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Filter("${"+BraveTracerConfiguration.PREFIX+".server.path:/**}")
+@Filter(AbstractOpenTracingFilter.SERVER_PATH)
 @Requires(beans = HttpServerHandler.class)
-public class TracingServerFilter extends AbstractTracingFilter implements HttpServerFilter {
+public class BraveTracingServerFilter extends AbstractBraveTracingFilter implements HttpServerFilter {
 
     private final HttpServerHandler<HttpRequest<?>, HttpResponse<?>> serverHandler;
     private final TraceContext.Extractor<HttpHeaders> extractor;
@@ -48,7 +48,7 @@ public class TracingServerFilter extends AbstractTracingFilter implements HttpSe
      * @param httpTracing The {@link HttpTracing} instance
      * @param serverHandler The {@link HttpServerHandler} instance
      */
-    public TracingServerFilter(
+    public BraveTracingServerFilter(
             HttpTracing httpTracing,
             HttpServerHandler<HttpRequest<?>, HttpResponse<?>> serverHandler) {
         super(httpTracing);
@@ -65,13 +65,14 @@ public class TracingServerFilter extends AbstractTracingFilter implements HttpSe
                 withSpanInScope(request, span);
             }
         });
-        requestPublisher = requestPublisher.doAfterTerminate(() -> afterTerminate(request));
         return requestPublisher.map(response -> {
             Optional<Span> span = configuredSpan(request, response);
             span.ifPresent(s -> {
                 Throwable error = request.getAttribute(HttpAttributes.ERROR, Throwable.class).orElse(null);
                 serverHandler.handleSend(response, error, s);
+                afterTerminate(request);
             });
+
             return response;
         });
     }
