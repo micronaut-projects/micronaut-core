@@ -33,21 +33,22 @@ public class EndpointDefaultConfiguration {
      */
     public static final String PREFIX = "endpoints.all";
 
-    protected Boolean enabled;
-    protected Boolean sensitive;
+    protected Optional<Boolean> enabled = Optional.empty();
+    protected Optional<Boolean> sensitive = Optional.empty();
+
 
     /**
      * @return Whether the endpoint is enabled
      */
     public Optional<Boolean> isEnabled() {
-        return Optional.ofNullable(enabled);
+        return enabled;
     }
 
     /**
      * @return Does the endpoint expose sensitive information
      */
     public Optional<Boolean> isSensitive() {
-        return Optional.ofNullable(sensitive);
+        return sensitive;
     }
 
 }

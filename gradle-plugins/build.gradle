@@ -1,0 +1,14 @@
+apply plugin: 'groovy'
+
+dependencies {
+    compile gradleApi()
+    compile project(":cli")
+    compile "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.0"
+    compile "org.yaml:snakeyaml:1.14"
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Version': project.version
+    }
+}

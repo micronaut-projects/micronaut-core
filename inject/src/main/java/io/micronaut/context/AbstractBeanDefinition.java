@@ -879,19 +879,26 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return findBeanForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
         } else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
-            path.pushConstructorResolve(this, argument);
-            try {
-                Object bean;
-                Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-                bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
-                path.pop();
-                return bean;
-            } catch (NoSuchBeanException | BeanInstantiationException e) {
-                if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+            BeanResolutionContext.Segment current = path.peek();
+            boolean isNullable = argument.getDeclaredAnnotation(Nullable.class) != null;
+            if(isNullable && current != null && current.getArgument().equals(argument)) {
+                return null;
+            }
+            else {
+                path.pushConstructorResolve(this, argument);
+                try {
+                    Object bean;
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument);
+                    bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     path.pop();
-                    return null;
+                    return bean;
+                } catch (NoSuchBeanException | BeanInstantiationException e) {
+                    if (isNullable) {
+                        path.pop();
+                        return null;
+                    }
+                    throw new DependencyInjectionException(resolutionContext, argument, e);
                 }
-                throw new DependencyInjectionException(resolutionContext, argument, e);
             }
         }
     }

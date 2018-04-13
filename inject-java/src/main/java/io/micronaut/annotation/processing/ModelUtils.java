@@ -15,6 +15,9 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.processing.JavaModelUtils;
+
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -83,7 +86,7 @@ class ModelUtils {
         TypeElement typeElement = classElementFor(field);
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
-        Optional<ExecutableElement> element = methods.stream()
+        return methods.stream()
             .filter(method -> {
                 String methodName = method.getSimpleName().toString();
                 if (setterName.equals(methodName)) {
@@ -98,7 +101,6 @@ class ModelUtils {
                 return false;
             })
             .findFirst();
-        return element;
     }
 
     String setterNameFor(String fieldName) {
@@ -127,7 +129,7 @@ class ModelUtils {
         ).findFirst();
         if (!element.isPresent()) {
             element = constructors.stream().filter(ctor ->
-                Objects.nonNull(ctor.getModifiers().contains(PUBLIC))
+                ctor.getModifiers().contains(PUBLIC)
             ).findFirst();
         }
         return element.orElse(null);
@@ -144,35 +146,14 @@ class ModelUtils {
     // FIXME test for requires reflection (private qualifier is just one aspect)
     // e.g. see InjectTransform requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
     boolean requiresReflection(Element element) {
-        Set<Modifier> modifiers = element.getModifiers();
         return isPrivate(element);
     }
 
     // for cases where Element.getKind() == FIELD
     // and field.asType().toString() is something like
     // "int" return Integer.TYPE
-    // FIXME is there an API way to do this? I didn't find one so far
     Class<?> classOfPrimitiveFor(String primitiveType) {
-        switch (primitiveType) {
-            case "byte":
-                return Byte.TYPE;
-            case "int":
-                return Integer.TYPE;
-            case "short":
-                return Short.TYPE;
-            case "long":
-                return Long.TYPE;
-            case "float":
-                return Float.TYPE;
-            case "double":
-                return Double.TYPE;
-            case "char":
-                return Character.TYPE;
-            case "boolean":
-                return Boolean.TYPE;
-            default:
-                return Void.TYPE;
-        }
+        return ClassUtils.getPrimitiveType(primitiveType).orElseThrow(()-> new IllegalArgumentException("Unknown primitive type: " + primitiveType));
     }
 
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
@@ -310,19 +291,7 @@ class ModelUtils {
         return element.getModifiers().contains(STATIC);
     }
 
-    public Object[] resolveTypeReferences(AnnotationMirror[] mirrors) {
-        Stream<AnnotationMirror> mirrorStream = Arrays.stream(mirrors);
-        return resolveTypeReferences(mirrorStream);
-    }
-
-    protected Object[] resolveTypeReferences(Stream<AnnotationMirror> mirrorStream) {
-        return mirrorStream
-            .map(mirror ->
-                resolveTypeReference(mirror.getAnnotationType())
-            ).toArray(Object[]::new);
-    }
-
-    public Object resolveTypeReference(Element element) {
+    Object resolveTypeReference(Element element) {
         if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             return resolveTypeReferenceForTypeElement(typeElement);
@@ -331,24 +300,10 @@ class ModelUtils {
     }
 
     Object resolveTypeReferenceForTypeElement(TypeElement typeElement) {
-        Name qualifiedName = typeElement.getQualifiedName();
-        NestingKind nestingKind = typeElement.getNestingKind();
-        if (nestingKind == NestingKind.MEMBER) {
-            TypeElement enclosingElement = typeElement;
-            StringBuilder builder = new StringBuilder();
-            while (nestingKind == NestingKind.MEMBER) {
-                builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
-                enclosingElement = (TypeElement) enclosingElement.getEnclosingElement();
-                nestingKind = enclosingElement.getNestingKind();
-            }
-            Name enclosingName = enclosingElement.getQualifiedName();
-            return enclosingName.toString() + builder;
-        } else {
-            return qualifiedName.toString();
-        }
+        return JavaModelUtils.getClassName(typeElement);
     }
 
-    public boolean isFinal(Element element) {
+    boolean isFinal(Element element) {
         return element.getModifiers().contains(FINAL);
     }
 
@@ -358,7 +313,7 @@ class ModelUtils {
      * @param mirror The mirror
      * @return True if it is
      */
-    public boolean isOptional(TypeMirror mirror) {
+    boolean isOptional(TypeMirror mirror) {
         return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
     }
 }

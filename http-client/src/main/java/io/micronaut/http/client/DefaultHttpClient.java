@@ -21,6 +21,7 @@ import com.typesafe.netty.http.HttpStreamsClientHandler;
 import com.typesafe.netty.http.StreamedHttpResponse;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
@@ -73,6 +74,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.util.CharsetUtil;
 import io.reactivex.*;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
@@ -118,8 +120,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
-    private final Optional<SslContext> sslContext;
+    private final SslContext sslContext;
     protected final Bootstrap bootstrap;
+    private final AnnotationMetadataResolver annotatationMetadataResolver;
     protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
     private final Charset defaultCharset;
@@ -139,12 +142,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                              @Parameter HttpClientConfiguration configuration,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build();
+        this.sslContext = nettyClientSslBuilder.build().orElse(null);
         this.group = createEventLoopGroup(configuration);
         this.bootstrap.group(group)
                 .channel(NioSocketChannel.class)
@@ -159,6 +163,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         }
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
+        this.annotatationMetadataResolver = annotationMetadataResolver != null ? annotationMetadataResolver : AnnotationMetadataResolver.DEFAULT;
     }
 
     public DefaultHttpClient(URL url,
@@ -166,19 +171,30 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, nettyClientSslBuilder, codecRegistry, filters);
+        this(LoadBalancer.fixed(url), configuration, nettyClientSslBuilder, codecRegistry,AnnotationMetadataResolver.DEFAULT, filters);
     }
 
     public DefaultHttpClient(LoadBalancer loadBalancer) {
         this(loadBalancer,
                 new DefaultHttpClientConfiguration(),
                 new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
-                createDefaultMediaTypeRegistry());
+                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
 
     public DefaultHttpClient(@Parameter URL url) {
         this(LoadBalancer.fixed(url));
+    }
+
+    public DefaultHttpClient( URL url, HttpClientConfiguration configuration) {
+        this(LoadBalancer.fixed(url), configuration, new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+    }
+
+    public DefaultHttpClient( LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
+        this(loadBalancer,
+                configuration,
+                new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
+                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
     @Override
@@ -650,7 +666,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
-            sslCtx = sslContext.orElse(null);
+            sslCtx = sslContext;
         } else {
             sslCtx = null;
         }
@@ -671,7 +687,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
-            Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
+            Filter filterAnn = annotatationMetadataResolver.resolveElement(filter).getAnnotation(Filter.class);
             if (filterAnn != null) {
                 String[] clients = filterAnn.clients();
                 if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
@@ -751,7 +767,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     protected NettyRequestWriter buildNettyRequest(
-            io.micronaut.http.HttpRequest request,
+            io.micronaut.http.MutableHttpRequest request,
             MediaType requestContentType, boolean permitsBody) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
@@ -774,9 +790,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                     if( Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
+
                         Flowable<?> publisher = ConversionService.SHARED.convert(bodyValue, Flowable.class).orElseThrow(()->
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
+
                         Flowable<HttpContent> requestBodyPublisher = publisher.map(o -> {
                             if(o instanceof CharSequence) {
                                 ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
@@ -785,8 +803,19 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 }
                                 return new DefaultHttpContent(textChunk);
                             }
+                            else if(o instanceof ByteBuf) {
+                                ByteBuf byteBuf = (ByteBuf) o;
+                                if(LOG.isTraceEnabled()) {
+                                    LOG.trace("Stream Bytes Chunk. Length: {}", byteBuf.readableBytes());
+                                }
+                                return new DefaultHttpContent(byteBuf);
+                            }
                             else if(o instanceof byte[]) {
-                                return new DefaultHttpContent(Unpooled.copiedBuffer((byte[])o));
+                                byte[] bodyBytes = (byte[]) o;
+                                if(LOG.isTraceEnabled()) {
+                                    LOG.trace("Stream Bytes Chunk. Length: {}", bodyBytes.length);
+                                }
+                                return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
                             }
                             else if(mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
@@ -857,7 +886,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
 
-    protected <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
+    private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
         HttpHeaders headers = nettyRequest.headers();
         headers.set(HttpHeaderNames.HOST, requestURI.getHost());
         headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -877,19 +906,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 }
             }
         }
-    }
-
-    private void writeAndCloseRequest(Channel channel, HttpRequest nettyRequest, FlowableEmitter<?> emitter) {
-        channel.writeAndFlush(nettyRequest).addListener(f -> {
-            try {
-                if(!f.isSuccess()) {
-                    emitter.onError(f.cause());
-                }
-            } finally {
-                closeChannelAsync(channel);
-            }
-
-        });
     }
 
     private <O> void addFullHttpResponseHandler(io.micronaut.http.HttpRequest<?> request, Channel channel, Emitter<io.micronaut.http.HttpResponse<O>> emitter, io.micronaut.core.type.Argument<O> bodyType) {
@@ -1029,7 +1045,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     private HttpPostRequestEncoder buildMultipartRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
         io.netty.handler.codec.http.HttpRequest request = clientHttpRequest.getFullRequest(null);
-        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true);
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
         if (bodyValue instanceof MultipartBody.Builder) {
             bodyValue = ((MultipartBody.Builder) bodyValue).build();
         }
