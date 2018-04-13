@@ -22,6 +22,13 @@ repositories {
 
 version project.projectVersion
 
+ext {
+    distInstallDir = file("$buildDir/dist-tmp")
+    homeBinDir = file("bin")
+    homeLibDir = file("lib")
+    homeSrcDir = file("src")
+}
+
 subprojects { subproject ->
 
     version project.projectVersion
@@ -104,7 +111,9 @@ subprojects { subproject ->
     }
 
     dependencies {
-        compile "org.slf4j:slf4j-api:$slf4jVersion"
+        if (subproject.name != "bom") {
+            compile "org.slf4j:slf4j-api:$slf4jVersion"
+        }
 //        shadowCompile group:"org.slf4j", name:"slf4j-api", version:slf4jVersion
 
         compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])

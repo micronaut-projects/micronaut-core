@@ -24,6 +24,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.opentracing.Tracer
+import io.opentracing.noop.NoopTracer
 import spock.lang.Specification
 import zipkin2.reporter.AsyncReporter
 import zipkin2.reporter.Reporter
@@ -38,11 +39,11 @@ class BraveTracerFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         when:"The tracer is obtained"
-        context.getBean(Tracer)
+        Tracer tracer = context.getBean(Tracer)
 
 
         then:"It is present"
-        thrown(NoSuchBeanException)
+        tracer instanceof NoopTracer
 
     }
 
@@ -50,7 +51,7 @@ class BraveTracerFactorySpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
-                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_ENDPOINT
+                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_SERVER_URL
         )
 
         expect:"The tracer is obtained"
@@ -81,7 +82,10 @@ class BraveTracerFactorySpec extends Specification {
         given:
 
         ApplicationContext context = ApplicationContext.build()
-        context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true))
+        context.environment.addPropertySource(PropertySource.of(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.samplerProbability':1)
+        )
         def reporter = new TestReporter()
         context.registerSingleton(reporter)
         context.start()

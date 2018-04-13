@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.tracing.brave.BraveTracerConfiguration;
+import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -37,14 +37,14 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Filter("${"+BraveTracerConfiguration.PREFIX+".client.path:/**}")
+@Filter(AbstractOpenTracingFilter.CLIENT_PATH)
 @Requires(beans = HttpClientHandler.class)
-public class TracingClientFilter extends AbstractTracingFilter implements HttpClientFilter {
+public class BraveTracingClientFilter extends AbstractBraveTracingFilter implements HttpClientFilter {
 
     private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
     private final TraceContext.Injector<MutableHttpHeaders> injector;
 
-    public TracingClientFilter(HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler, HttpTracing httpTracing) {
+    public BraveTracingClientFilter(HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler, HttpTracing httpTracing) {
         super(httpTracing);
         this.clientHandler = clientHandler;
         this.injector = httpTracing.tracing().propagation().injector(MutableHttpHeaders::add);
@@ -59,18 +59,24 @@ public class TracingClientFilter extends AbstractTracingFilter implements HttpCl
                 withSpanInScope(request, span);
             }
         });
-        requestPublisher = requestPublisher.doAfterTerminate(() -> afterTerminate(request));
 
         return requestPublisher.map(response -> {
             Optional<Span> span = configuredSpan(request, response);
-            span.ifPresent(s -> clientHandler.handleReceive(response, null, s));
+            span.ifPresent(s -> {
+                clientHandler.handleReceive(response, null, s);
+                afterTerminate(request);
+            });
+
             return response;
         }).onErrorResumeNext(error -> {
             if(error instanceof HttpClientResponseException) {
                 HttpClientResponseException e = (HttpClientResponseException) error;
                 HttpResponse<?> response = e.getResponse();
                 Optional<Span> span = configuredSpan(request, response);
-                span.ifPresent(s -> clientHandler.handleReceive(response, e, s));
+                span.ifPresent(s -> {
+                    clientHandler.handleReceive(response, e, s);
+                    afterTerminate(request);
+                });
             }
 
             return Flowable.error(error);
