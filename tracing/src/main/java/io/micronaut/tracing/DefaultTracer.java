@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopTracer;
 import io.opentracing.noop.NoopTracerFactory;
 
 import javax.inject.Singleton;
@@ -35,7 +36,7 @@ public class DefaultTracer {
     @Singleton
     @Primary
     @Requires(missingBeans = Tracer.class)
-    Tracer noopTracer() {
+    NoopTracer noopTracer() {
         return NoopTracerFactory.create();
     }
 }

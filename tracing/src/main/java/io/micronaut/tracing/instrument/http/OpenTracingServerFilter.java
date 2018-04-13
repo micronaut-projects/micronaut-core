@@ -26,6 +26,7 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -40,6 +41,7 @@ import java.util.Optional;
  */
 @Filter(AbstractOpenTracingFilter.SERVER_PATH)
 @Requires(beans = Tracer.class)
+@Requires(missingBeans = NoopTracer.class)
 @Requires(missingBeans = BraveTracingServerFilter.class)
 public class OpenTracingServerFilter extends AbstractOpenTracingFilter implements HttpServerFilter {
 
