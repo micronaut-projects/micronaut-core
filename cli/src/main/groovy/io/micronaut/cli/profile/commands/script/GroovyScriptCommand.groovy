@@ -17,10 +17,10 @@ package io.micronaut.cli.profile.commands.script
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
-import io.micronaut.cli.build.logging.ConsoleAntBuilder
+import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.boot.SpringInvoker
-import io.micronaut.cli.build.logging.ConsoleLogger
-import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.console.logging.ConsoleLogger
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.codegen.model.ModelBuilder
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext

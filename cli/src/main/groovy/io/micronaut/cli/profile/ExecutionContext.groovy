@@ -15,7 +15,7 @@
  */
 package io.micronaut.cli.profile
 
-import io.micronaut.cli.build.parsing.CommandLine
+import io.micronaut.cli.console.parsing.CommandLine
 
 /**
  * Context for the execution of {@link io.micronaut.cli.profile.Command} instances within a {@link io.micronaut.cli.profile.Profile}
@@ -26,7 +26,7 @@ import io.micronaut.cli.build.parsing.CommandLine
 interface ExecutionContext extends ProjectContext {
 
     /**
-     * @return The parsed command line arguments as an instance of {@link io.micronaut.cli.build.parsing.CommandLine}
+     * @return The parsed command line arguments as an instance of {@link io.micronaut.cli.console.parsing.CommandLine}
      */
     CommandLine getCommandLine()
 

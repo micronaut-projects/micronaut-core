@@ -15,7 +15,7 @@
  */
 package io.micronaut.cli.profile
 
-import io.micronaut.cli.build.logging.MicronautConsole
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.config.ConfigMap
 
 /**
