@@ -20,6 +20,7 @@ import brave.ErrorParser;
 import brave.Tracing;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.Propagation;
+import brave.sampler.CountingSampler;
 import brave.sampler.Sampler;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -52,6 +53,7 @@ public class BraveTracerConfiguration implements Toggleable {
 
 
     private boolean enabled = false;
+    private float samplerProbability = 0.1f;
 
     /**
      * Constructs a new {@link BraveTracerConfiguration}
@@ -59,6 +61,7 @@ public class BraveTracerConfiguration implements Toggleable {
      * @param configuration The application configuration
      */
     public BraveTracerConfiguration(ApplicationConfiguration configuration) {
+        tracingBuilder.sampler(CountingSampler.create(samplerProbability));
         if(configuration != null) {
             tracingBuilder.localServiceName(configuration.getName().orElse(Environment.DEFAULT_NAME));
         }
@@ -80,6 +83,24 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /**
+     * @return The percentage of requests that will be traced by default (default value is 10%)
+     */
+    public float getSamplerProbability() {
+        return samplerProbability;
+    }
+
+    /**
+     * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
+     * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+     *
+     * @param samplerProbability The sampler probability
+     */
+    public void setSamplerProbability(float samplerProbability) {
+        tracingBuilder.sampler(CountingSampler.create(samplerProbability));
+        this.samplerProbability = samplerProbability;
     }
 
     /**
@@ -141,6 +162,9 @@ public class BraveTracerConfiguration implements Toggleable {
     }
 
 
+    /**
+     * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace
+     */
     @ConfigurationProperties(HttpClientSenderConfiguration.PREFIX)
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
     @Requires(classes = { Tracing.class})
