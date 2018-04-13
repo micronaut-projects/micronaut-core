@@ -219,7 +219,7 @@ class UploadSpec extends AbstractMicronautSpec {
     void "test file upload to byte array"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE,'some data'.bytes)
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
                 .addPart("title", "bar")
                 .build()
 
