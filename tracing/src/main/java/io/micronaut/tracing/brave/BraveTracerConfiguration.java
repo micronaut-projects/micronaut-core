@@ -27,6 +27,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.tracing.brave.sender.HttpClientSender;
 
@@ -146,7 +147,11 @@ public class BraveTracerConfiguration implements Toggleable {
     public static class HttpClientSenderConfiguration extends HttpClientConfiguration {
         public static final String PREFIX = BraveTracerConfiguration.PREFIX + ".http";
         @ConfigurationBuilder(prefixes = "")
-        protected HttpClientSender.Builder clientSenderBuilder = new HttpClientSender.Builder(this);
+        protected final HttpClientSender.Builder clientSenderBuilder;
+
+        public HttpClientSenderConfiguration() {
+            this.clientSenderBuilder = new HttpClientSender.Builder(this);
+        }
 
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;

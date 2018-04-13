@@ -50,7 +50,7 @@ class BraveTracerFactorySpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
-                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_ENDPOINT
+                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_SERVER_URL
         )
 
         expect:"The tracer is obtained"
