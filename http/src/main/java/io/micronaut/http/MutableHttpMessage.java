@@ -110,7 +110,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @param encoding The encoding to use
      * @return This message
      */
-    default MutableHttpMessage<B> contentEncoding(String encoding) {
+    default MutableHttpMessage<B> contentEncoding(CharSequence encoding) {
         if(encoding != null) {
             getHeaders().add(HttpHeaders.CONTENT_ENCODING, encoding);
         }

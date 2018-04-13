@@ -110,6 +110,11 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
         return (MutableHttpResponse<B>) MutableHttpMessage.super.contentType(mediaType);
     }
 
+    @Override
+    default MutableHttpResponse<B> contentEncoding(CharSequence encoding) {
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentEncoding(encoding);
+    }
+
     /**
      * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response
      *
