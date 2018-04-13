@@ -53,7 +53,7 @@ public class JaegerTracerFactory implements Closeable {
         Configuration configuration = this.configuration.getConfiguration();
         io.jaegertracing.Tracer.Builder tracerBuilder = configuration.getTracerBuilder();
         // TODO: customize tracer builder
-        Tracer tracer = configuration.getTracer();
+        Tracer tracer = tracerBuilder.build();
         if(!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);
         }
