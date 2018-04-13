@@ -13,17 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.brave.instrument.http;
+package io.micronaut.tracing.instrument.http;
 
 /**
- * Constants used to store Span objects within instrumented attributes
+ * Constants used to store Span objects within instrumented request attributes
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface TraceRequestAttributes {
 
-    String PREFIX = "micronaut.tracing.brave";
+    /**
+     * The prefix used for Micronaut tracing request attributes
+     */
+    String PREFIX = "micronaut.tracing";
+    /**
+     * The attribute used to store the current span
+     */
     String CURRENT_SPAN = PREFIX + ".currentSpan";
+
+    /**
+     * The attribute used to store the current span context
+     */
+    String CURRENT_SPAN_CONTEXT = PREFIX + ".currentSpanContext";
+    /**
+     * The attribute used to store the current scope
+     */
     String CURRENT_SCOPE = PREFIX + ".currentScope";
 }

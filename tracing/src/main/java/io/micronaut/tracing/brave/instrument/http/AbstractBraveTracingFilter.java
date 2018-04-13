@@ -22,6 +22,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
 
 import java.util.Optional;
 
@@ -31,10 +32,10 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-abstract class AbstractTracingFilter implements HttpFilter {
+abstract class AbstractBraveTracingFilter implements HttpFilter {
     private final HttpTracing httpTracing;
 
-    AbstractTracingFilter(HttpTracing httpTracing) {
+    AbstractBraveTracingFilter(HttpTracing httpTracing) {
         this.httpTracing = httpTracing;
     }
 
