@@ -133,7 +133,7 @@ class HttpTracingSpec extends Specification {
 
     ApplicationContext buildContext() {
         ApplicationContext context = ApplicationContext.build()
-        context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true))
+        context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true, 'tracing.zipkin.samplerProbability':1))
         def reporter = new TestReporter()
         context.registerSingleton(reporter)
         context.start()
