@@ -37,6 +37,9 @@ public interface AnnotationMetadataResolver {
      * @return The {@link AnnotationSource}
      */
     default @Nonnull AnnotatedElement resolveElement(Class<?> type) {
+        if(type == null) {
+            return AnnotationSource.EMPTY;
+        }
         return type;
     }
 
@@ -57,7 +60,7 @@ public interface AnnotationMetadataResolver {
      * @return The {@link AnnotationSource}
      */
     default @Nonnull AnnotatedElement resolveElement(Object object) {
-        return resolveElement(object.getClass());
+        return resolveElement(object != null ? object.getClass() : null);
     }
 
     /**
@@ -67,6 +70,6 @@ public interface AnnotationMetadataResolver {
      * @return The {@link AnnotationMetadata}
      */
     default @Nonnull AnnotationMetadata resolveMetadata(Object object) {
-        return resolveMetadata(object.getClass());
+        return resolveMetadata(object != null ? object.getClass() : null);
     }
 }

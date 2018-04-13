@@ -37,9 +37,12 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(value = "micronaut.server", cliPrefix = "")
+@ConfigurationProperties(value = HttpServerConfiguration.PREFIX, cliPrefix = "")
 public class HttpServerConfiguration {
-
+    /**
+     * The prefix used for configuration
+     */
+    public static final String PREFIX = "micronaut.server";
     /**
      * Constant for localhost
      */

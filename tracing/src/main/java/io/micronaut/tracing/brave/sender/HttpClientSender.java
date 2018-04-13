@@ -143,15 +143,7 @@ public class HttpClientSender extends Sender {
             return null;
         }
 
-        private MutableHttpRequest<Flowable<Object>> prepareRequest() {
-            MutableHttpRequest<Flowable<Object>> request = HttpRequest.POST(endpoint, spanFlowable());
-            if(compressionEnabled) {
-                return request.contentEncoding("gzip");
-            }
-            else {
-                return request;
-            }
-        }
+
 
         @Override
         public void enqueue(Callback<Void> callback) {
@@ -209,11 +201,16 @@ public class HttpClientSender extends Sender {
             return new HttpCall(httpClient, endpoint,compressionEnabled, encodedSpans);
         }
 
+        protected MutableHttpRequest<Flowable<Object>> prepareRequest() {
+            return HttpRequest.POST(endpoint, spanFlowable());
+        }
+
         private Flowable<Object> spanFlowable() {
             return Flowable.create(emitter -> {
                 for (byte[] encodedSpan : encodedSpans) {
                     emitter.onNext(encodedSpan);
                 }
+                emitter.onComplete();
             }, BackpressureStrategy.BUFFER);
         }
     }

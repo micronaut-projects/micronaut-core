@@ -759,7 +759,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     protected NettyRequestWriter buildNettyRequest(
-            io.micronaut.http.HttpRequest request,
+            io.micronaut.http.MutableHttpRequest request,
             MediaType requestContentType, boolean permitsBody) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
@@ -782,9 +782,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                     if( Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
+
                         Flowable<?> publisher = ConversionService.SHARED.convert(bodyValue, Flowable.class).orElseThrow(()->
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
+
                         Flowable<HttpContent> requestBodyPublisher = publisher.map(o -> {
                             if(o instanceof CharSequence) {
                                 ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
@@ -793,8 +795,19 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 }
                                 return new DefaultHttpContent(textChunk);
                             }
+                            else if(o instanceof ByteBuf) {
+                                ByteBuf byteBuf = (ByteBuf) o;
+                                if(LOG.isTraceEnabled()) {
+                                    LOG.trace("Stream Bytes Chunk. Length: {}", byteBuf.readableBytes());
+                                }
+                                return new DefaultHttpContent(byteBuf);
+                            }
                             else if(o instanceof byte[]) {
-                                return new DefaultHttpContent(Unpooled.wrappedBuffer((byte[])o));
+                                byte[] bodyBytes = (byte[]) o;
+                                if(LOG.isTraceEnabled()) {
+                                    LOG.trace("Stream Bytes Chunk. Length: {}", bodyBytes.length);
+                                }
+                                return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
                             }
                             else if(mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
@@ -865,7 +878,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
 
-    protected <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
+    private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
         HttpHeaders headers = nettyRequest.headers();
         headers.set(HttpHeaderNames.HOST, requestURI.getHost());
         headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -885,19 +898,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 }
             }
         }
-    }
-
-    private void writeAndCloseRequest(Channel channel, HttpRequest nettyRequest, FlowableEmitter<?> emitter) {
-        channel.writeAndFlush(nettyRequest).addListener(f -> {
-            try {
-                if(!f.isSuccess()) {
-                    emitter.onError(f.cause());
-                }
-            } finally {
-                closeChannelAsync(channel);
-            }
-
-        });
     }
 
     private <O> void addFullHttpResponseHandler(io.micronaut.http.HttpRequest<?> request, Channel channel, Emitter<io.micronaut.http.HttpResponse<O>> emitter, io.micronaut.core.type.Argument<O> bodyType) {

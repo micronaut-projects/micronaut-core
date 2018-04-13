@@ -103,6 +103,7 @@ class HttpTracingSpec extends Specification {
         reporter.spans[2].name() == 'get /traced/nested/{name}'
 
         cleanup:
+        client.close()
         context.close()
     }
 
