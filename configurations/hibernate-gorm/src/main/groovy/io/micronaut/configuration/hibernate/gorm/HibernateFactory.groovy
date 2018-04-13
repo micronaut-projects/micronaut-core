@@ -17,6 +17,7 @@ package io.micronaut.configuration.hibernate.gorm
 
 import grails.gorm.annotation.Entity
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
@@ -39,6 +40,7 @@ import java.util.stream.Stream
  */
 @Factory
 @CompileStatic
+@Slf4j
 class HibernateFactory {
 
     final ApplicationContext applicationContext
@@ -50,6 +52,7 @@ class HibernateFactory {
     @Bean(preDestroy = "close")
     @Context
     HibernateDatastore hibernateDatastore() {
+        log.info("Starting GORM for Hibernate")
         Stream<Class> entities = applicationContext.environment.scan(Entity)
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(
