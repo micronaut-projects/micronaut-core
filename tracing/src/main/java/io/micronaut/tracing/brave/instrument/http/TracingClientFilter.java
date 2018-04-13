@@ -59,18 +59,24 @@ public class TracingClientFilter extends AbstractTracingFilter implements HttpCl
                 withSpanInScope(request, span);
             }
         });
-        requestPublisher = requestPublisher.doAfterTerminate(() -> afterTerminate(request));
 
         return requestPublisher.map(response -> {
             Optional<Span> span = configuredSpan(request, response);
-            span.ifPresent(s -> clientHandler.handleReceive(response, null, s));
+            span.ifPresent(s -> {
+                clientHandler.handleReceive(response, null, s);
+                afterTerminate(request);
+            });
+
             return response;
         }).onErrorResumeNext(error -> {
             if(error instanceof HttpClientResponseException) {
                 HttpClientResponseException e = (HttpClientResponseException) error;
                 HttpResponse<?> response = e.getResponse();
                 Optional<Span> span = configuredSpan(request, response);
-                span.ifPresent(s -> clientHandler.handleReceive(response, e, s));
+                span.ifPresent(s -> {
+                    clientHandler.handleReceive(response, e, s);
+                    afterTerminate(request);
+                });
             }
 
             return Flowable.error(error);
