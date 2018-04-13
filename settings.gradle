@@ -27,8 +27,8 @@ include "test-suite-kotlin"
 include "validation"
 include "jdbc"
 include "runtime-groovy"
-//include "cli"
-//include "gradle-plugins"
+include "cli"
+include "gradle-plugins"
 include "bom"
 
 // configurations

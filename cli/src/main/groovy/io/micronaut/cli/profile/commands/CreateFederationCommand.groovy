@@ -3,8 +3,8 @@ package io.micronaut.cli.profile.commands
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
-import io.micronaut.cli.build.logging.ConsoleAntBuilder
-import io.micronaut.cli.build.parsing.CommandLine
+import io.micronaut.cli.console.logging.ConsoleAntBuilder
+import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.ProfileRepository
