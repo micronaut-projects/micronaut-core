@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger;
 
+import io.jaegertracing.Configuration;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
@@ -49,7 +50,10 @@ public class JaegerTracerFactory implements Closeable {
     @Singleton
     @Primary
     Tracer jaegerTracer() {
-        Tracer tracer = configuration.getConfiguration().getTracer();
+        Configuration configuration = this.configuration.getConfiguration();
+        io.jaegertracing.Tracer.Builder tracerBuilder = configuration.getTracerBuilder();
+        // TODO: customize tracer builder
+        Tracer tracer = configuration.getTracer();
         if(!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);
         }
