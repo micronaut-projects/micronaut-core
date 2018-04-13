@@ -40,7 +40,7 @@ class HttpClientSenderSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run(
                 'tracing.zipkin.enabled':true,
-                'tracing.zipkin.http.endpoint':HttpClientSender.Builder.DEFAULT_ENDPOINT
+                'tracing.zipkin.http.url':HttpClientSender.Builder.DEFAULT_SERVER_URL
         )
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())

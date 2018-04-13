@@ -13,39 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.brave.sender;
+package io.micronaut.tracing.brave;
 
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.client.LoadBalancerResolver;
-import io.micronaut.tracing.brave.BraveTracerConfiguration;
-import zipkin2.reporter.Sender;
+import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.discovery.ServiceInstanceList;
 
 import javax.inject.Singleton;
+import java.net.URI;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * A Factory for creating a Zipkin {@link Sender} based on {@link io.micronaut.tracing.brave.BraveTracerConfiguration.HttpClientSenderConfiguration}
+ * A {@link ServiceInstanceList} for Zipkin
  *
  * @author graemerocher
  * @since 1.0
  */
-@Factory
+@Singleton
 @Requires(beans = BraveTracerConfiguration.HttpClientSenderConfiguration.class)
-public class HttpClientSenderFactory {
+public class ZipkinServiceInstanceList implements ServiceInstanceList {
+    public static final String SERVICE_ID = "zipkin";
+
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
-    protected HttpClientSenderFactory(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
+    public ZipkinServiceInstanceList(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
         this.configuration = configuration;
     }
 
-    /**
-     * @return The {@link Sender}
-     */
-    @Bean
-    @Singleton
-    @Requires(missingBeans = Sender.class)
-    Sender zipkinSender(LoadBalancerResolver loadBalancerResolver) {
-        return configuration.getBuilder().build(loadBalancerResolver);
+    @Override
+    public String getID() {
+        return SERVICE_ID;
+    }
+
+    @Override
+    public List<ServiceInstance> getInstances() {
+        List<URI> servers = configuration.getBuilder().getServers();
+        return servers.stream().map(uri ->
+                ServiceInstance.builder(SERVICE_ID, uri).build()
+        ).collect(Collectors.toList());
     }
 }
