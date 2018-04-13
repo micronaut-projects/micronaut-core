@@ -76,8 +76,6 @@ task cliZip(type: Zip, dependsOn: ['fatJar']) {
     from('../LICENSE')
 }
 
-
-
 publishing {
     publications {
         maven(MavenPublication) {
