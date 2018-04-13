@@ -18,9 +18,13 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanContextConditional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
     private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
+    private static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
     @Override
     public boolean isEnabled(BeanContext context) {
@@ -42,7 +47,20 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
         if (enabled == null) {
             AnnotationMetadata annotationMetadata = getAnnotationMetadata();
             Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-            enabled = condition == null || condition.matches(new DefaultConditionContext<>(context, this));
+            DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
+            enabled = condition == null || condition.matches(conditionContext);
+            if(LOG.isDebugEnabled() && !enabled) {
+                if(this instanceof BeanConfiguration) {
+                    LOG.debug(this + " will not be loaded due to failing conditions:");
+                }
+                else {
+
+                    LOG.debug("Bean ["+this+"] will not be loaded due to failing conditions:");
+                }
+                for (Failure failure : conditionContext.getFailures()) {
+                    LOG.debug("* {}", failure.getMessage());
+                }
+            }
             this.enabled.put(contextId, enabled);
         }
         return enabled;

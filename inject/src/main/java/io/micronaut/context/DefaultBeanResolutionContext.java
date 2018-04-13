@@ -137,40 +137,13 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                 MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
-                } else {
-                    push(methodSegment);
+                }
+                else {
+                    path.push(methodSegment);
                 }
             } else {
                 ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
-                if (contains(constructorSegment)) {
-                    Segment last = peek();
-                    BeanDefinition declaringBean = last.getDeclaringType();
-                    // if the currently injected segment is a constructor argument and the type to be constructed is the
-                    // same as the candidate, then filter out the candidate to avoid a circular injection problem
-                    if (!declaringBean.equals(declaringType)) {
-                        if (declaringType instanceof ProxyBeanDefinition) {
-                            // take into account proxies
-                            if (!((ProxyBeanDefinition) declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
-                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
-                            } else {
-                                push(constructorSegment);
-                            }
-                        } else if (declaringBean instanceof ProxyBeanDefinition) {
-                            // take into account proxies
-                            if (!((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
-                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
-                            } else {
-                                push(constructorSegment);
-                            }
-                        } else {
-                            throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
-                        }
-                    } else {
-                        push(constructorSegment);
-                    }
-                } else {
-                    push(constructorSegment);
-                }
+                detectCircularDependency(declaringType, argument, constructorSegment);
             }
             return this;
         }
@@ -196,6 +169,44 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                 push(fieldSegment);
             }
             return this;
+        }
+
+        private void detectCircularDependency(BeanDefinition declaringType, Argument argument, Segment constructorSegment) {
+            if (contains(constructorSegment)) {
+                Segment last = peek();
+                if(last != null) {
+
+                    BeanDefinition declaringBean = last.getDeclaringType();
+                    // if the currently injected segment is a constructor argument and the type to be constructed is the
+                    // same as the candidate, then filter out the candidate to avoid a circular injection problem
+                    if (!declaringBean.equals(declaringType)) {
+                        if (declaringType instanceof ProxyBeanDefinition) {
+                            // take into account proxies
+                            if (!((ProxyBeanDefinition) declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
+                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                            } else {
+                                push(constructorSegment);
+                            }
+                        } else if (declaringBean instanceof ProxyBeanDefinition) {
+                            // take into account proxies
+                            if (!((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
+                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                            } else {
+                                push(constructorSegment);
+                            }
+                        } else {
+                            throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                        }
+                    } else {
+                        push(constructorSegment);
+                    }
+                }
+                else {
+                    throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                }
+            } else {
+                push(constructorSegment);
+            }
         }
     }
 

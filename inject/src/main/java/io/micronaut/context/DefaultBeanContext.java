@@ -34,6 +34,8 @@ import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -71,10 +73,12 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -233,6 +237,26 @@ public class DefaultBeanContext implements BeanContext {
         return this;
     }
 
+    @Override
+    @Nonnull
+    public AnnotatedElement resolveElement(Class<?> type) {
+        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
+        if(candidate.isPresent()) {
+            return candidate.get();
+        }
+        return type;
+    }
+
+    @Override
+    @Nonnull
+    public AnnotationMetadata resolveMetadata(Class<?> type) {
+        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
+        if(candidate.isPresent()) {
+            return candidate.get();
+        }
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
     @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})
     @Override
     public <T> Optional<T> refreshBean(BeanIdentifier identifier) {
@@ -359,12 +383,14 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, qualifier, false, true).orElse(null);
+            BeanDefinition<T> beanDefinition = findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null);
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
-                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, new NoInjectionBeanDefinition<>(beanType), singleton));
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(beanType);
+                beanDefinitionsClasses.add(dynamicRegistration);
+                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
             }
         }
         return this;
@@ -1853,7 +1879,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T> {
+    private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
 
         public NoInjectionBeanDefinition(Class singletonClass) {
@@ -2025,6 +2051,41 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public Annotation[] getDeclaredAnnotations() {
             return singletonClass.getDeclaredAnnotations();
+        }
+
+        @Override
+        public String getBeanDefinitionName() {
+            return singletonClass.getName();
+        }
+
+        @Override
+        public String getReplacesBeanTypeName() {
+            return null;
+        }
+
+        @Override
+        public String getReplacesBeanDefinitionName() {
+            return null;
+        }
+
+        @Override
+        public BeanDefinition<T> load() {
+            return this;
+        }
+
+        @Override
+        public BeanDefinition<T> load(BeanContext context) {
+            return this;
+        }
+
+        @Override
+        public boolean isContextScope() {
+            return false;
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
         }
     }
 }

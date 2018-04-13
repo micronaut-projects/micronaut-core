@@ -77,7 +77,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.BAD_REQUEST.reason
+        e.response.status == HttpStatus.BAD_REQUEST
 
 
         when:
@@ -128,7 +128,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.BAD_REQUEST.reason
+        e.response.status == HttpStatus.BAD_REQUEST
 
         when:
         def json = new JsonSlurper().parseText(e.response.getBody().get())
@@ -155,7 +155,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.BAD_REQUEST.reason
+        e.response.status == HttpStatus.BAD_REQUEST
 
         when:
         def json = new JsonSlurper().parseText(e.response.getBody().get())
@@ -181,7 +181,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.BAD_REQUEST.reason
+        e.response.status == HttpStatus.BAD_REQUEST
 
         when:
         def json = new JsonSlurper().parseText(e.response.getBody().get())
@@ -207,7 +207,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.BAD_REQUEST.reason
+        e.response.status == HttpStatus.BAD_REQUEST
 
         when:
         def json = new JsonSlurper().parseText(e.response.getBody().get())
@@ -219,7 +219,7 @@ class UploadSpec extends AbstractMicronautSpec {
     void "test file upload to byte array"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE,'some data'.bytes)
+                .addPart("data", "data.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
                 .addPart("title", "bar")
                 .build()
 
@@ -255,7 +255,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == HttpStatus.REQUEST_ENTITY_TOO_LARGE.reason
+        e.response.status == HttpStatus.REQUEST_ENTITY_TOO_LARGE
 
         when:
         def json = new JsonSlurper().parseText(e.response.getBody().get())
