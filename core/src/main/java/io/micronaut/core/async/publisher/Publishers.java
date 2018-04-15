@@ -140,7 +140,7 @@ public class Publishers {
     }
 
     /**
-     * Wraps a publisher in logic that executes before and after each emitted element or each emitted error
+     * Wraps a publisher in logic that executes around each invocation of the {@link Subscriber} interface
      *
      * @param publisher The publisher
      * @param before The before logic
@@ -160,25 +160,33 @@ public class Publishers {
                 try {
                     before.run();
                     actual.onNext(message);
-                    after.run();
                 } catch (Throwable e) {
                     onError(e);
+                } finally {
+                    after.run();
                 }
+
 
             }
 
             @Override
             protected void doOnError(Throwable t) {
-                before.run();
-                actual.onError(t);
-                after.run();
+                try {
+                    before.run();
+                    actual.onError(t);
+                } finally {
+                    after.run();
+                }
             }
 
             @Override
             protected void doOnComplete() {
-                before.run();
-                actual.onComplete();
-                after.run();
+                try {
+                    before.run();
+                    actual.onComplete();
+                } finally {
+                    after.run();
+                }
             }
         });
     }

@@ -47,7 +47,8 @@ public class JaegerConfiguration implements Toggleable  {
     @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
     protected final Configuration configuration;
 
-    public JaegerConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public JaegerConfiguration(
+            ApplicationConfiguration applicationConfiguration) {
         if(StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
@@ -123,6 +124,28 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
+     * Sets the sampler configuration
+     * @param samplerConfiguration The sampler configuration
+     */
+    @Inject
+    public void setSamplerConfiguration(@Nullable JaegerSamplerConfiguration samplerConfiguration) {
+        if(samplerConfiguration != null) {
+            configuration.withSampler(samplerConfiguration.configuration);
+        }
+    }
+
+    /**
+     * Sets the reporter configuration
+     * @param reporterConfiguration The reporter configuration
+     */
+    @Inject
+    public void setReporterConfiguration(@Nullable JaegerReporterConfiguration reporterConfiguration) {
+        if(reporterConfiguration != null) {
+            configuration.withReporter(reporterConfiguration.configuration);
+        }
+    }
+
+    /**
      * Sets the codec configuration
      * @param codecConfiguration The codec configuration
      */
@@ -149,13 +172,13 @@ public class JaegerConfiguration implements Toggleable  {
     public static class JaegerSamplerConfiguration {
 
         @ConfigurationBuilder(prefixes = "with")
-        protected Configuration.SamplerConfiguration samplerConfiguration = Configuration.SamplerConfiguration.fromEnv();
+        protected Configuration.SamplerConfiguration configuration = Configuration.SamplerConfiguration.fromEnv();
 
         /**
          * @return The {@link io.jaegertracing.Configuration.SamplerConfiguration}
          */
         public Configuration.SamplerConfiguration getSamplerConfiguration() {
-            return samplerConfiguration;
+            return configuration;
         }
     }
 

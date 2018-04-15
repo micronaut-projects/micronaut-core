@@ -20,17 +20,21 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
+import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingServerFilter;
+import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import io.reactivex.Flowable;
+import io.reactivex.functions.Action;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * An HTTP server instrumentation filter that uses Open Tracing
@@ -44,48 +48,64 @@ import java.util.Optional;
 @Requires(missingBeans = BraveTracingServerFilter.class)
 public class OpenTracingServerFilter extends AbstractOpenTracingFilter implements HttpServerFilter {
 
+    private static final CharSequence APPLIED = OpenTracingServerFilter.class.getName() + "-applied";
+
     public OpenTracingServerFilter(Tracer tracer) {
         super(tracer);
     }
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        SpanContext spanContext = tracer.extract(
-                Format.Builtin.HTTP_HEADERS,
-                new HttpHeadersTextMap(request.getHeaders())
-        );
-        request.setAttribute(
-                TraceRequestAttributes.CURRENT_SPAN_CONTEXT,
-                spanContext
-        );
+        if( request.getAttribute(APPLIED, Boolean.class).isPresent() ) {
+            return chain.proceed(request);
+        }
+        else {
+            request.setAttribute(APPLIED, true);
+            SpanContext spanContext = tracer.extract(
+                    Format.Builtin.HTTP_HEADERS,
+                    new HttpHeadersTextMap(request.getHeaders())
+            );
+            request.setAttribute(
+                    TraceRequestAttributes.CURRENT_SPAN_CONTEXT,
+                    spanContext
+            );
 
-        Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(chain.proceed(request));
+            Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(chain.proceed(request));
 
-        responsePublisher = responsePublisher.doOnRequest(amount -> {
-            if(amount > 0) {
-                Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
-                Span span = spanBuilder.start();
-                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-            }
-        });
+            responsePublisher = responsePublisher.doOnRequest(amount -> {
+                if(amount > 0) {
+                    Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
+                    spanBuilder.withTag(TAG_HTTP_SERVER, true);
+                    Scope scope = spanBuilder.startActive(true);
+                    Span span = scope.span();
+                    request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
+                    request.setAttribute(TraceRequestAttributes.CURRENT_SCOPE, scope);
 
-        return responsePublisher.map(response -> {
-            Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
-
-            currentSpan.ifPresent(span -> {
-                tracer.inject(
-                        span.context(),
-                        Format.Builtin.HTTP_HEADERS,
-                        new HttpHeadersTextMap(response.getHeaders())
-                );
-
-                String spanName = resolveSpanName(request);
-                span.setOperationName(spanName);
-                setResponseTags(request, response, span);
+                }
             });
 
-            return response;
-        });
+            responsePublisher = responsePublisher.map(response -> {
+                Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
+
+                currentSpan.ifPresent(span -> {
+                    tracer.inject(
+                            span.context(),
+                            Format.Builtin.HTTP_HEADERS,
+                            new HttpHeadersTextMap(response.getHeaders())
+                    );
+
+                    String spanName = resolveSpanName(request);
+                    span.setOperationName(spanName);
+                    setResponseTags(request, response, span);
+                });
+
+                return response;
+            });
+            return responsePublisher.doAfterTerminate(() -> {
+                Optional<Scope> registeredScope = request.getAttribute(TraceRequestAttributes.CURRENT_SCOPE, Scope.class);
+                registeredScope.ifPresent(Scope::close);
+            });
+        }
     }
 
 }

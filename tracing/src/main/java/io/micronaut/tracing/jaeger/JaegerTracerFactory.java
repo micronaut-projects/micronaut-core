@@ -16,13 +16,17 @@
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
+import io.jaegertracing.reporters.Reporter;
+import io.jaegertracing.samplers.Sampler;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
 
+import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
@@ -38,9 +42,30 @@ import java.io.IOException;
 public class JaegerTracerFactory implements Closeable {
 
     private final JaegerConfiguration configuration;
+    private Reporter reporter;
+    private Sampler sampler;
 
     public JaegerTracerFactory(JaegerConfiguration configuration) {
         this.configuration = configuration;
+    }
+
+    /**
+     * Allows setting a custom reporter
+     * @param reporter The {@link Reporter}
+     */
+    @Inject
+    public void setReporter(@Nullable Reporter reporter) {
+        this.reporter = reporter;
+    }
+
+    /**
+     * Allows setting a custom sampler
+     *
+     * @param sampler {@link Sampler}
+     */
+    @Inject
+    public void setSampler(@Nullable Sampler sampler) {
+        this.sampler = sampler;
     }
 
     /**
@@ -57,6 +82,12 @@ public class JaegerTracerFactory implements Closeable {
         }
         if(this.configuration.isZipkinSharedRpcSpan()) {
             tracerBuilder.withZipkinSharedRpcSpan();
+        }
+        if(reporter != null) {
+            tracerBuilder.withReporter(reporter);
+        }
+        if(sampler != null) {
+            tracerBuilder.withSampler(sampler);
         }
         Tracer tracer = tracerBuilder.build();
         if(!GlobalTracer.isRegistered()) {

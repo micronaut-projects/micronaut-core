@@ -60,6 +60,7 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
                 Scope activeSpan = tracer.scopeManager().active();
                 SpanContext activeContext = activeSpan != null ? activeSpan.span().context() : null;
                 Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);
+                spanBuilder.withTag(TAG_HTTP_CLIENT, true);
                 Span newSpan = spanBuilder.start();
                 SpanContext newContext = newSpan.context();
                 tracer.inject(
@@ -78,7 +79,10 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
 
         return requestFlowable.map(response -> {
             Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
-            currentSpan.ifPresent(span -> setResponseTags(request, response, span));
+            currentSpan.ifPresent(span -> {
+                setResponseTags(request, response, span);
+                span.finish();
+            });
 
             return response;
         }).onErrorResumeNext(error -> {
@@ -89,6 +93,7 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
                 currentSpan.ifPresent(span -> {
                     setResponseTags(request, response, span);
                     setErrorTags(span, error);
+                    span.finish();
                 });
             }
             return Flowable.error(error);
