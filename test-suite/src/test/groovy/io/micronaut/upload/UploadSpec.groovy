@@ -55,7 +55,28 @@ class UploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.getBody().get() == 'bar: Data{title=\'Foo\'}'
+    }
 
+    void "test simple in-memory file upload with JSON with multiple files"() {
+        given:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
+                .addPart("data", "bar.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Bar"}'.bytes)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveJson", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then: "the second file is ignored"
+        response.code() == HttpStatus.OK.code
+        response.getBody().get() == 'bar: Data{title=\'Foo\'}'
     }
 
     void "test simple in-memory file upload with invalid JSON"() {

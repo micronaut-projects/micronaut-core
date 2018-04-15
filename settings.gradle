@@ -28,7 +28,6 @@ include "validation"
 include "jdbc"
 include "runtime-groovy"
 include "cli"
-include "gradle-plugins"
 include "bom"
 
 // configurations
@@ -47,3 +46,4 @@ include "configurations:netflix-archaius"
 include "configurations:netflix-ribbon"
 include "configurations:netflix-hystrix"
 include "configurations:aws-common"
+include "configurations:rabbitmq"
