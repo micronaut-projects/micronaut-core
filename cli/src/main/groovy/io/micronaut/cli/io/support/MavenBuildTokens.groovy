@@ -11,6 +11,8 @@ class MavenBuildTokens {
     public static Map<String, String> scopeConversions = [:]
 
     static {
+        scopeConversions.put("compile", "compile")
+        scopeConversions.put("runtime", "runtime")
         scopeConversions.put("compileOnly", "provided")
         scopeConversions.put("testRuntime", "test")
         scopeConversions.put("testCompile", "test")
@@ -57,15 +59,18 @@ class MavenBuildTokens {
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
         dependencies.each { Dependency dep ->
-            def artifact = dep.artifact
-            def v = artifact.version.replace('BOM', '')
-            dependenciesXml.dependency {
-                groupId(artifact.groupId)
-                artifactId(artifact.artifactId)
-                if (v) {
-                    version(artifact.version)
+
+            if(scopeConversions.keySet().contains(dep.scope)) {
+                def artifact = dep.artifact
+                def v = artifact.version.replace('BOM', '')
+                dependenciesXml.dependency {
+                    groupId(artifact.groupId)
+                    artifactId(artifact.artifactId)
+                    if (v) {
+                        version(artifact.version)
+                    }
+                    scope(scopeConversions.getOrDefault(dep.scope, dep.scope))
                 }
-                scope(scopeConversions.getOrDefault(dep.scope, dep.scope))
             }
         }
 
