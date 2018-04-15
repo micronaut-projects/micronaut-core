@@ -51,8 +51,13 @@ public class JaegerTracerFactory implements Closeable {
     @Primary
     Tracer jaegerTracer() {
         Configuration configuration = this.configuration.getConfiguration();
-        io.jaegertracing.Tracer.Builder tracerBuilder = configuration.getTracerBuilder();
-        // TODO: customize tracer builder
+        io.jaegertracing.Tracer.Builder tracerBuilder = resolveBuilder(configuration);
+        if(this.configuration.isExpandExceptionLogs()) {
+            tracerBuilder.withExpandExceptionLogs();
+        }
+        if(this.configuration.isZipkinSharedRpcSpan()) {
+            tracerBuilder.withZipkinSharedRpcSpan();
+        }
         Tracer tracer = tracerBuilder.build();
         if(!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);
@@ -60,10 +65,25 @@ public class JaegerTracerFactory implements Closeable {
         return tracer;
     }
 
+
     @Override
     @PreDestroy
     public void close() throws IOException {
         configuration.getConfiguration().closeTracer();
+    }
+
+    /**
+     * Hooks for sub classes to override
+     * @param configuration The configuration
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void customizeConfiguration(Configuration configuration) {
+        // no-op
+    }
+
+    private io.jaegertracing.Tracer.Builder resolveBuilder(Configuration configuration) {
+        customizeConfiguration(configuration);
+        return configuration.getTracerBuilder();
     }
 
 }

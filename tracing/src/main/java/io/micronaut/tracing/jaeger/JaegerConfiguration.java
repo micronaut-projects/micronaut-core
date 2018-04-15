@@ -16,6 +16,7 @@
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
+import io.jaegertracing.metrics.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
@@ -40,6 +41,8 @@ public class JaegerConfiguration implements Toggleable  {
     public static final String PREFIX = "tracing.jaeger";
 
     private boolean enabled;
+    private boolean expandExceptionLogs;
+    private boolean zipkinSharedRpcSpan;
 
     @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
     protected final Configuration configuration;
@@ -49,6 +52,36 @@ public class JaegerConfiguration implements Toggleable  {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();
+    }
+
+    /**
+     * @return Whether to expand exception logs
+     */
+    public boolean isExpandExceptionLogs() {
+        return expandExceptionLogs;
+    }
+
+    /**
+     * Whether to expand exception logs
+     * @param expandExceptionLogs True if they should be expanded
+     */
+    public void setExpandExceptionLogs(boolean expandExceptionLogs) {
+        this.expandExceptionLogs = expandExceptionLogs;
+    }
+
+    /**
+     * @return Whether to use Zipkin shared RPC
+     */
+    public boolean isZipkinSharedRpcSpan() {
+        return zipkinSharedRpcSpan;
+    }
+
+    /**
+     * Whether to use Zipkin shared RPC
+     * @param zipkinSharedRpcSpan True if Zipkin shared RPC should be used
+     */
+    public void setZipkinSharedRpcSpan(boolean zipkinSharedRpcSpan) {
+        this.zipkinSharedRpcSpan = zipkinSharedRpcSpan;
     }
 
     @Override
@@ -100,6 +133,15 @@ public class JaegerConfiguration implements Toggleable  {
         }
     }
 
+    /**
+     * Sets the metrics factory to use
+     * @param metricsFactory The metrics factory
+     */
+    @Inject void setMetricsFactory(@Nullable MetricsFactory metricsFactory) {
+        if(metricsFactory != null) {
+            configuration.withMetricsFactory(metricsFactory);
+        }
+    }
     /**
      * The sampler configuration bean
      */
