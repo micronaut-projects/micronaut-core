@@ -36,6 +36,8 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     public static final String TAG_PATH = "http.path";
     public static final String TAG_ERROR = "error";
     public static final String TAG_HTTP_STATUS_CODE = "http.status_code";
+    public static final String TAG_HTTP_CLIENT = "http.client";
+    public static final String TAG_HTTP_SERVER = "http.server";
 
     protected final Tracer tracer;
 

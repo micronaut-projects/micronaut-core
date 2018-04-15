@@ -22,7 +22,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.tracing.annotation.ContinueSpan;
 import io.micronaut.tracing.annotation.NewSpan;
@@ -32,7 +31,8 @@ import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
+import io.reactivex.functions.Action;
+import io.reactivex.functions.Consumer;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -92,8 +92,10 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                     return Flowable.error(throwable);
                 });
 
+                Publisher<?> decoratedPublisher = tracePublisher(currentSpan, resultFlowable);
+
                 return conversionService.convert(
-                        resultFlowable,
+                        decoratedPublisher,
                         javaReturnType
                 ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
             } else {
@@ -117,48 +119,55 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                boolean single = Publishers.isSingle(javaReturnType);
                 Flowable<?> resultFlowable = conversionService.convert(context.proceed(), Flowable.class)
                         .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
-                AtomicReference<Scope> scopeRef = new AtomicReference<>();
+                AtomicReference<Span> spanRef = new AtomicReference<>();
+                boolean single = Publishers.isSingle(javaReturnType);
+
                 resultFlowable = resultFlowable.doOnRequest(amount -> {
                     if (amount > 0) {
-                        Scope scope = builder.startActive(true);
-                        scopeRef.set(scope);
+                        builder.withTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
+                        builder.withTag(METHOD_TAG, context.getMethodName());
 
-                        Span createdSpan = scope.span();
-                        createdSpan.setTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
-                        createdSpan.setTag(METHOD_TAG, context.getMethodName());
+                        Span createdSpan = builder.start();
                         tagArguments(createdSpan, context);
+                        spanRef.set(createdSpan);
                     }
                 });
 
-                if (single) {
-                    resultFlowable = resultFlowable.doOnNext(o -> teminateScope(scopeRef))
-                            .onErrorResumeNext(throwable -> {
-                                Scope scope = scopeRef.get();
-                                if (scope != null) {
-                                    teminateScope(scopeRef);
-                                    logError(scope.span(), throwable);
-                                }
-                                return Flowable.error(throwable);
-                            });
-                } else {
-                    resultFlowable = resultFlowable.doAfterTerminate(() ->
-                            teminateScope(scopeRef)
-                    ).onErrorResumeNext(throwable -> {
-                        Scope scope = scopeRef.get();
-                        if (scope != null) {
-                            teminateScope(scopeRef);
-                            logError(scope.span(), throwable);
+                if(single) {
+                    resultFlowable = resultFlowable.doAfterNext(o -> {
+                        Span span = spanRef.get();
+                        if(span != null) {
+                            span.finish();
                         }
-                        return Flowable.error(throwable);
+                    });
+                }
+                else {
+                    resultFlowable = resultFlowable.doOnTerminate(() -> {
+                        Span span = spanRef.get();
+                        if(span != null) {
+                            span.finish();
+                        }
                     });
                 }
 
+                resultFlowable = resultFlowable
+                        .onErrorResumeNext(throwable -> {
+                            Span referencedSpan = spanRef.get();
+                            if (referencedSpan != null) {
+                                logError(referencedSpan, throwable);
+                            }
+                            return Flowable.error(throwable);
+                        });
+
+                Publisher<?> decoratedFlowabled = tracePublisher(
+                        spanRef,
+                        resultFlowable
+                );
 
                 return conversionService.convert(
-                        resultFlowable,
+                        decoratedFlowabled,
                         javaReturnType
                 ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
             } else {
@@ -178,6 +187,56 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
+     * Wraps a publisher such that the scope is applied to each invocation of a {@link org.reactivestreams.Subscriber} method
+     *
+     * @param span The span to use
+     * @param publisher The publisher
+     * @return The resulting publisher
+     */
+    protected <T> Publisher<T> tracePublisher(Span span, Publisher<T> publisher) {
+        AtomicReference<Scope> scopeReference = new AtomicReference<>();
+        return Publishers.decorate(
+                            publisher,
+                () -> {
+                    Scope newScope = tracer.scopeManager().activate(span, false);
+                    scopeReference.set(newScope);
+                },
+                            ()-> {
+                                Scope scope = scopeReference.get();
+                                if(scope !=  null) {
+                                    scope.close();
+                                }
+                            }
+                    );
+    }
+
+    /**
+     * Wraps a publisher such that the scope is applied to each invocation of a {@link org.reactivestreams.Subscriber} method
+     *
+     * @param span The span to use
+     * @param publisher The publisher
+     * @return The resulting publisher
+     */
+    private <T> Publisher<T> tracePublisher(AtomicReference<Span> span, Publisher<T> publisher) {
+        AtomicReference<Scope> scopeReference = new AtomicReference<>();
+        return Publishers.decorate(
+                publisher,
+                () -> {
+                    Span referencedSpan = span.get();
+                    if(referencedSpan != null) {
+                        Scope newScope = tracer.scopeManager().activate(referencedSpan, false);
+                        scopeReference.set(newScope);
+                    }
+                },
+                ()-> {
+                    Scope scope = scopeReference.get();
+                    if(scope !=  null) {
+                        scope.close();
+                    }
+                }
+        );
+    }
+    /**
      * Logs an error to the span
      *
      * @param span The span
@@ -193,14 +252,8 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         span.log(fields);
     }
 
-    private void teminateScope(AtomicReference<Scope> scopeRef) {
-        Scope scope = scopeRef.get();
-        if (scope != null) {
-            scope.close();
-        }
-    }
 
-    private void tagArguments(Span currentSpan, MethodInvocationContext<Object, Object> context) {
+    private void tagArguments(Span span, MethodInvocationContext<Object, Object> context) {
         for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
             SpanTag spanTag = argumentValue.getAnnotation(SpanTag.class);
             Object v = argumentValue.getValue();
@@ -209,7 +262,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                 if (StringUtils.isEmpty(tagName)) {
                     tagName = argumentValue.getName();
                 }
-                currentSpan.setTag(tagName, v.toString());
+                span.setTag(tagName, v.toString());
             }
         }
     }
