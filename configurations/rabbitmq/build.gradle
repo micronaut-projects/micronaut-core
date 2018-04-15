@@ -1,0 +1,5 @@
+dependencies {
+    compile project(":inject")
+    compileOnly project(":inject-java")
+    compile 'com.rabbitmq:amqp-client:5.2.0'
+}
