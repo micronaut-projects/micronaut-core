@@ -16,6 +16,7 @@
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
+import brave.Tracer;
 import brave.http.HttpServerHandler;
 import brave.http.HttpTracing;
 import brave.propagation.TraceContext;
@@ -29,7 +30,6 @@ import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
 
 /**
  * Instruments incoming HTTP requests
@@ -56,25 +56,32 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
         this.extractor = httpTracing.tracing().propagation().extractor(ConvertibleMultiValues::get);
     }
 
+
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Flowable<? extends MutableHttpResponse<?>> requestPublisher = Flowable.fromPublisher(chain.proceed(request));
-        requestPublisher = requestPublisher.doOnRequest( amount -> {
-            if(amount > 0) {
-                Span span = serverHandler.handleReceive(extractor, request.getHeaders(), request);
-                withSpanInScope(request, span);
-            }
-        });
-        return requestPublisher.map(response -> {
-            Optional<Span> span = configuredSpan(request, response);
-            span.ifPresent(s -> {
-                Throwable error = request.getAttribute(HttpAttributes.ERROR, Throwable.class).orElse(null);
-                serverHandler.handleSend(response, error, s);
-                afterTerminate(request);
+        Span span = serverHandler.handleReceive(extractor, request.getHeaders(), request);
+        // place the span in scope such that down stream filters have access
+        try(Tracer.SpanInScope scope = httpTracing.tracing().tracer().withSpanInScope(span)) {
+            Flowable<MutableHttpResponse<?>> responseFlowable = Flowable.fromPublisher(chain.proceed(request));
+            responseFlowable = responseFlowable.doOnRequest( amount -> {
+                if(amount > 0) {
+                    withSpanInScope(request, span);
+                }
             });
 
-            return response;
-        });
+            responseFlowable = responseFlowable.map(response -> {
+                configuredSpan(request, response).ifPresent(s -> {
+                    Throwable error = request.getAttribute(HttpAttributes.ERROR, Throwable.class).orElse(null);
+                    serverHandler.handleSend(response, error, s);
+                });
+
+                return response;
+            });
+
+            return responseFlowable.doAfterTerminate(() ->
+                    afterTerminate(request)
+            );
+        }
     }
 
 }

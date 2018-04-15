@@ -33,7 +33,7 @@ import java.util.Optional;
  * @since 1.0
  */
 abstract class AbstractBraveTracingFilter implements HttpFilter {
-    private final HttpTracing httpTracing;
+    protected final HttpTracing httpTracing;
 
     AbstractBraveTracingFilter(HttpTracing httpTracing) {
         this.httpTracing = httpTracing;

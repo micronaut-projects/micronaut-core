@@ -60,8 +60,8 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
                 Scope activeSpan = tracer.scopeManager().active();
                 SpanContext activeContext = activeSpan != null ? activeSpan.span().context() : null;
                 Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);
-                Scope newScope = spanBuilder.startActive(true);
-                SpanContext newContext = newScope.span().context();
+                Span newSpan = spanBuilder.start();
+                SpanContext newContext = newSpan.context();
                 tracer.inject(
                         newContext,
                         Format.Builtin.HTTP_HEADERS,
@@ -72,36 +72,25 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
                         newContext
                 );
 
-                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, newScope.span());
-                request.setAttribute(TraceRequestAttributes.CURRENT_SCOPE, newScope);
+                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, newSpan);
             }
         });
 
         return requestFlowable.map(response -> {
-            Optional<SpanContext> spanContext = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN_CONTEXT, SpanContext.class);
-            spanContext.ifPresent(ctx -> {
-                Optional<Scope> scope = request.getAttribute(TraceRequestAttributes.CURRENT_SCOPE, Scope.class);
-                scope.ifPresent(resolvedScope -> {
-                    Span span = resolvedScope.span();
-                    setResponseTags(request, response, span);
-                    resolvedScope.close();
-                });
-            });
+            Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
+            currentSpan.ifPresent(span -> setResponseTags(request, response, span));
 
             return response;
         }).onErrorResumeNext(error -> {
             if(error instanceof HttpClientResponseException) {
                 HttpClientResponseException e = (HttpClientResponseException) error;
                 HttpResponse<?> response = e.getResponse();
-                Optional<Scope> scope = request.getAttribute(TraceRequestAttributes.CURRENT_SCOPE, Scope.class);
-                scope.ifPresent(resolvedScope -> {
-                    Span span = resolvedScope.span();
+                Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
+                currentSpan.ifPresent(span -> {
                     setResponseTags(request, response, span);
                     setErrorTags(span, error);
-                    resolvedScope.close();
                 });
             }
-
             return Flowable.error(error);
         });
     }

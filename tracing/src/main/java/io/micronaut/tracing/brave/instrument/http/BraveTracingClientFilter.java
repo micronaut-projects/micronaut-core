@@ -26,8 +26,11 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
+import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
 import io.reactivex.Flowable;
+import io.reactivex.functions.Consumer;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 
 import java.util.Optional;
 
@@ -56,27 +59,20 @@ public class BraveTracingClientFilter extends AbstractBraveTracingFilter impleme
         requestPublisher = requestPublisher.doOnRequest( amount -> {
             if(amount > 0) {
                 Span span = clientHandler.handleSend(injector, request.getHeaders(), request);
-                withSpanInScope(request, span);
+                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
             }
         });
 
         return requestPublisher.map(response -> {
             Optional<Span> span = configuredSpan(request, response);
-            span.ifPresent(s -> {
-                clientHandler.handleReceive(response, null, s);
-                afterTerminate(request);
-            });
-
+            span.ifPresent(s -> clientHandler.handleReceive(response, null, s));
             return response;
         }).onErrorResumeNext(error -> {
             if(error instanceof HttpClientResponseException) {
                 HttpClientResponseException e = (HttpClientResponseException) error;
                 HttpResponse<?> response = e.getResponse();
                 Optional<Span> span = configuredSpan(request, response);
-                span.ifPresent(s -> {
-                    clientHandler.handleReceive(response, e, s);
-                    afterTerminate(request);
-                });
+                span.ifPresent(s -> clientHandler.handleReceive(response, e, s));
             }
 
             return Flowable.error(error);

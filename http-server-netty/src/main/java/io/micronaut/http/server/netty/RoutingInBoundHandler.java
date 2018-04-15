@@ -685,7 +685,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnNext(io.micronaut.http.HttpResponse<?> message) {
-                    processResponse(context, request, (NettyHttpResponse<?>) message, defaultResponseMediaType, finalRoute);
+                    processResponse(
+                            context,
+                            request,
+                            (NettyHttpResponse<?>) message,
+                            defaultResponseMediaType,
+                            finalRoute
+                    );
                 }
 
                 @Override

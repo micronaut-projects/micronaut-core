@@ -140,6 +140,49 @@ public class Publishers {
     }
 
     /**
+     * Wraps a publisher in logic that executes before and after each emitted element or each emitted error
+     *
+     * @param publisher The publisher
+     * @param before The before logic
+     * @param after The after logic
+     * @param <T>       The generic type
+     * @return The mapped publisher
+     */
+    public static <T> Publisher<T> decorate(Publisher<T> publisher, Runnable before, Runnable after) {
+        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+            @Override
+            protected void doOnSubscribe(Subscription subscription) {
+                actual.onSubscribe(subscription);
+            }
+
+            @Override
+            protected void doOnNext(T message) {
+                try {
+                    before.run();
+                    actual.onNext(message);
+                    after.run();
+                } catch (Throwable e) {
+                    onError(e);
+                }
+
+            }
+
+            @Override
+            protected void doOnError(Throwable t) {
+                before.run();
+                actual.onError(t);
+                after.run();
+            }
+
+            @Override
+            protected void doOnComplete() {
+                before.run();
+                actual.onComplete();
+                after.run();
+            }
+        });
+    }
+    /**
      * Map the result from a publisher using the given mapper
      *
      * @param publisher The publisher

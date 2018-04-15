@@ -7,9 +7,15 @@ dependencies {
 
     compileOnly 'io.opentracing.brave:brave-opentracing:0.30.0'
     compileOnly 'io.jaegertracing:jaeger-core:0.27.0-RC1'
+    compileOnly "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
 
     compile 'io.opentracing:opentracing-api:0.31.0'
     compile 'io.opentracing:opentracing-util:0.31.0'
+
+    // instrumentations
+    compile 'io.opentracing.contrib:opentracing-rxjava-2:0.0.8'
+    compileOnly 'io.opentracing.contrib:opentracing-rxjava-1:0.0.8'
+
 
     compile project(":runtime")
     compile project(":http-client")
