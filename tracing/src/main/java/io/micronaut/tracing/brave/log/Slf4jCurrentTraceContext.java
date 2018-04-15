@@ -17,6 +17,7 @@ package io.micronaut.tracing.brave.log;
 
 import brave.internal.HexCodec;
 import brave.propagation.CurrentTraceContext;
+import brave.propagation.StrictCurrentTraceContext;
 import brave.propagation.TraceContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
@@ -45,7 +46,7 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
     private final CurrentTraceContext delegate;
 
     Slf4jCurrentTraceContext() {
-        this.delegate = CurrentTraceContext.Default.inheritable();
+        this.delegate = CurrentTraceContext.Default.create();
     }
 
     Slf4jCurrentTraceContext(CurrentTraceContext delegate) {

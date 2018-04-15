@@ -22,6 +22,7 @@ import io.micronaut.core.reflect.InstantiationUtils;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances
@@ -31,6 +32,12 @@ import java.util.concurrent.Executors;
  */
 @Factory
 public class ExecutorFactory {
+
+    private final ThreadFactory threadFactory;
+
+    public ExecutorFactory(ThreadFactory threadFactory) {
+        this.threadFactory = threadFactory;
+    }
 
     @EachBean(ExecutorConfiguration.class)
     @Bean(preDestroy = "shutdown")
@@ -42,21 +49,21 @@ public class ExecutorFactory {
                     .getThreadFactoryClass()
                     .flatMap(InstantiationUtils::tryInstantiate)
                     .map(factory -> Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), factory))
-                    .orElse(Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads()));
+                    .orElse(Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), threadFactory));
 
             case CACHED:
                 return executorConfiguration
                     .getThreadFactoryClass()
                     .flatMap(InstantiationUtils::tryInstantiate)
                     .map(Executors::newCachedThreadPool)
-                    .orElse(Executors.newCachedThreadPool());
+                    .orElse(Executors.newCachedThreadPool(threadFactory));
 
             case SCHEDULED:
                 return executorConfiguration
                     .getThreadFactoryClass()
                     .flatMap(InstantiationUtils::tryInstantiate)
                     .map(factory -> Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), factory))
-                    .orElse(Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize()));
+                    .orElse(Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), threadFactory));
 
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());

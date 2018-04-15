@@ -1089,14 +1089,11 @@ public class DefaultBeanContext implements BeanContext {
 
         if (!BeanCreatedEventListener.class.isInstance(bean)) {
 
-            Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, null);
+            Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, Qualifiers.byTypeArguments(beanDefinition.getBeanType()));
             for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
-                Optional<Class> targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanCreatedEventListener.class);
-                if (!targetType.isPresent() || targetType.get().isInstance(bean)) {
-                    bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, bean));
-                    if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
-                    }
+                bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, bean));
+                if (bean == null) {
+                    throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                 }
             }
         }

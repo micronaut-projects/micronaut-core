@@ -16,6 +16,7 @@
 package io.micronaut.tracing.brave
 
 import brave.SpanCustomizer
+import brave.propagation.StrictCurrentTraceContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpResponse
@@ -25,6 +26,9 @@ import io.micronaut.http.client.Client
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
+import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -51,6 +55,28 @@ class HttpTracingSpec extends Specification {
         reporter.spans[0].tags().get("foo") == 'bar'
         reporter.spans[0].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[0].name() == 'get /traced/hello/{name}'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test rxjava http tracing"() {
+        given:
+        ApplicationContext context = buildContext()
+        TestReporter reporter = context.getBean(TestReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/rxjava/John', String)
+
+        then:
+        response
+        reporter.spans.size() == 2
+        reporter.spans[0].tags().get('http.path') == '/traced/rxjava/John'
+        reporter.spans[0].name() == 'get /traced/rxjava/{name}'
+        reporter.spans[0].id() == reporter.spans[1].id()
+        reporter.spans[1].tags().get("foo") == 'bar'
 
         cleanup:
         context.close()
@@ -133,6 +159,7 @@ class HttpTracingSpec extends Specification {
 
     ApplicationContext buildContext() {
         ApplicationContext context = ApplicationContext.build()
+        context.registerSingleton(new StrictCurrentTraceContext())
         context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true, 'tracing.zipkin.samplerProbability':1))
         def reporter = new TestReporter()
         context.registerSingleton(reporter)
@@ -148,6 +175,14 @@ class HttpTracingSpec extends Specification {
         String hello(String name) {
             spanCustomizer.tag("foo", "bar")
             return name
+        }
+
+        @Get("/rxjava/{name}")
+        Single<String> rxjava(String name) {
+            Single.fromCallable({->
+                spanCustomizer.tag("foo", "bar")
+                return name
+            }).subscribeOn(Schedulers.io())
         }
 
         @Get("/error/{name}")
