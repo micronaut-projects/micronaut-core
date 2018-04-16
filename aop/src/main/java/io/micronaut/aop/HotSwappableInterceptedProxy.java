@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
 
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+package io.micronaut.aop;
 
 /**
  * <p>Extended version of {@link InterceptedProxy} that allows swapping out the previous instance.</p>
  *
- * <p>At compile time an implementation is generated that uses a {@link ReentrantReadWriteLock} to maintain a reference to the target of the proxy</p>
+ * <p>At compile time an implementation is generated that uses a {@link java.util.concurrent.locks.ReentrantReadWriteLock} to maintain a reference to the target of the proxy</p>
  *
+ * @param <T> The declaring type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface HotSwappableInterceptedProxy<T> extends InterceptedProxy<T> {
     /**
-     * Swaps the underlying proxied instance for a new instance
+     * Swaps the underlying proxied instance for a new instance.
      *
      * @param newInstance The new instance
      * @return The old instance
