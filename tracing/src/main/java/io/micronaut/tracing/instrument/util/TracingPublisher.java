@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import io.micronaut.core.async.publisher.Publishers;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
@@ -39,7 +40,7 @@ public class TracingPublisher<T> implements Publisher<T> {
     private final Tracer.SpanBuilder spanBuilder;
     private final Consumer<Span> onSubscribe;
     private final Span parentSpan;
-
+    private final boolean isSingle;
 
     /**
      * Creates a new tracing publisher for the given arguments
@@ -96,6 +97,7 @@ public class TracingPublisher<T> implements Publisher<T> {
         this.spanBuilder = spanBuilder;
         this.onSubscribe = onSubscribe;
         this.parentSpan = tracer.activeSpan();
+        this.isSingle = Publishers.isSingle(publisher.getClass());
         if(parentSpan != null && spanBuilder != null) {
             spanBuilder.asChildOf(parentSpan);
         }
@@ -114,6 +116,7 @@ public class TracingPublisher<T> implements Publisher<T> {
             onSubscribe.accept(span);
             try(Scope ignored = tracer.scopeManager().activate(span, false)) {
                 publisher.subscribe(new Subscriber<T>() {
+                    boolean finished = false;
                     @Override
                     public void onSubscribe(Subscription s) {
                         try(Scope ignored = tracer.scopeManager().activate(span, false)) {
@@ -125,6 +128,10 @@ public class TracingPublisher<T> implements Publisher<T> {
                     public void onNext(T t) {
                         try(Scope ignored = tracer.scopeManager().activate(span, false)) {
                             actual.onNext(t);
+                            if(isSingle) {
+                                finished = true;
+                                span.finish();
+                            }
                         }
                     }
 
@@ -138,9 +145,14 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onComplete() {
-                        try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        if(!finished) {
+                            try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+                                actual.onComplete();
+                                span.finish();
+                            }
+                        }
+                        else {
                             actual.onComplete();
-                            span.finish();
                         }
                     }
                 });

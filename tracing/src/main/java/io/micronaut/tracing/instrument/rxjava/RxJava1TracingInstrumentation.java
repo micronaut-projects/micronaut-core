@@ -17,10 +17,9 @@ package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.tracing.instrument.util.TracingRunnableInstrumenter;
 import rx.Observable;
-import rx.Scheduler;
 import rx.Single;
-import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.functions.Func2;
@@ -38,18 +37,12 @@ import javax.inject.Singleton;
 @Singleton
 @Context
 @Requires(classes = Single.class)
-@Requires(beans = RxJavaRunnableInstrumenter.class)
-public class RxJava1Instrumentation {
+@Requires(beans = TracingRunnableInstrumenter.class)
+public class RxJava1TracingInstrumentation {
 
     @PostConstruct
-    void init(RxJavaRunnableInstrumenter instrumenter) {
+    void init(TracingRunnableInstrumenter instrumenter) {
         if(instrumenter != null) {
-            RxJavaHooks.setOnObservableStart(new Func2<Observable, Observable.OnSubscribe, Observable.OnSubscribe>() {
-                @Override
-                public Observable.OnSubscribe call(Observable observable, Observable.OnSubscribe onSubscribe) {
-                    return onSubscribe;
-                }
-            });
             Func1<Action0, Action0> existing = RxJavaHooks.getOnScheduleAction();
             if(existing != null && !(existing instanceof InstrumentScheduleAction)) {
                 RxJavaHooks.setOnScheduleAction(action0 ->
@@ -63,9 +56,9 @@ public class RxJava1Instrumentation {
     }
 
     private static class InstrumentScheduleAction implements Func1<Action0, Action0> {
-        private final RxJavaRunnableInstrumenter instrumenter;
+        private final TracingRunnableInstrumenter instrumenter;
 
-        InstrumentScheduleAction(RxJavaRunnableInstrumenter instrumenter) {
+        InstrumentScheduleAction(TracingRunnableInstrumenter instrumenter) {
             this.instrumenter = instrumenter;
         }
 
