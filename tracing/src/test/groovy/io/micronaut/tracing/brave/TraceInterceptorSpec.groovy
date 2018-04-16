@@ -22,6 +22,8 @@ import io.micronaut.tracing.annotation.ContinueSpan
 import io.micronaut.tracing.annotation.NewSpan
 import io.micronaut.tracing.annotation.SpanTag
 import io.reactivex.Single
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -73,6 +75,23 @@ class TraceInterceptorSpec extends Specification {
         reporter.spans[0].tags().get("foo") == "bar"
     }
 
+    void "test trace mono"() {
+        given:
+        ApplicationContext applicationContext = buildContext()
+        TracedService tracedService = applicationContext.getBean(TracedService)
+        TestReporter reporter = applicationContext.getBean(TestReporter)
+
+        when:
+        String result = tracedService.mono("test").block()
+
+        then:
+        result == "test"
+        reporter.spans[0].tags().get("more.stuff") == 'test'
+        reporter.spans[0].tags().get("class") == 'TracedService'
+        reporter.spans[0].tags().get("method") == 'mono'
+        reporter.spans[0].tags().get("foo") == "bar"
+        reporter.spans[0].name() == 'trace-mono'
+    }
     ApplicationContext buildContext() {
         ApplicationContext context = ApplicationContext.build()
         context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true, 'tracing.zipkin.samplerProbability':1))
@@ -97,6 +116,14 @@ class TraceInterceptorSpec extends Specification {
         @NewSpan("trace-rx")
         Single<String> methodThree(@SpanTag("more.stuff") String name) {
             return Single.just(name)
+        }
+
+        @NewSpan("trace-mono")
+        Mono<String> mono(@SpanTag("more.stuff") String name) {
+            return Mono.fromCallable({
+                spanCustomizer.tag("foo", "bar")
+                return name
+            }).subscribeOn(Schedulers.elastic())
         }
 
         @NewSpan("trace-cs")

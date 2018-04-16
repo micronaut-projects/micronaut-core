@@ -32,16 +32,12 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
  * An interceptor that implements tracing logic for {@link io.micronaut.tracing.annotation.ContinueSpan} and
@@ -92,16 +88,22 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Publisher<?> resultFlowable = conversionService.convert(context.proceed(), Publisher.class)
-                        .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                Object returnObject = context.proceed();
+                if(returnObject == null || (returnObject instanceof TracingPublisher)) {
+                    return returnObject;
+                }
+                else {
+                    Publisher<?> resultFlowable = conversionService.convert(returnObject, Publisher.class)
+                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
-                resultFlowable = new TracingPublisher<>((Publisher<Object>) resultFlowable, tracer, span ->
-                        tagArguments(span, context)
-                );
-                return conversionService.convert(
-                        resultFlowable,
-                        javaReturnType
-                ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                    resultFlowable = new TracingPublisher<>((Publisher<Object>) resultFlowable, tracer, span ->
+                            tagArguments(span, context)
+                    );
+                    return conversionService.convert(
+                            resultFlowable,
+                            javaReturnType
+                    ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                }
             } else {
                 tagArguments(currentSpan, context);
                 try {
@@ -125,17 +127,23 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Publisher<?> resultPublisher = conversionService.convert(context.proceed(), Publisher.class)
-                        .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                Object returnedObject = context.proceed();
+                if(returnedObject == null || (returnedObject instanceof TracingPublisher)) {
+                    return returnedObject;
+                }
+                else {
+                    Publisher<?> resultPublisher = conversionService.convert(returnedObject, Publisher.class)
+                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
-                resultPublisher = new TracingPublisher<>((Publisher<Object>) resultPublisher, tracer, builder, span -> {
-                    populateTags(context, hystrixCommand, span);
-                });
+                    resultPublisher = new TracingPublisher<>((Publisher<Object>) resultPublisher, tracer, builder, span -> {
+                        populateTags(context, hystrixCommand, span);
+                    });
 
-                return conversionService.convert(
-                        resultPublisher,
-                        javaReturnType
-                ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                    return conversionService.convert(
+                            resultPublisher,
+                            javaReturnType
+                    ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                }
             } else {
                 if(CompletionStage.class.isAssignableFrom(javaReturnType)) {
                     try (Scope scope = builder.startActive(false)) {

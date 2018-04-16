@@ -18,6 +18,7 @@ package io.micronaut.session;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 
+import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -54,11 +55,13 @@ public class InMemorySession implements Session {
     }
 
     @Override
+    @Nonnull
     public String getId() {
         return id;
     }
 
     @Override
+    @Nonnull
     public Instant getLastAccessedTime() {
         return lastAccessTime;
     }
@@ -90,6 +93,7 @@ public class InMemorySession implements Session {
     }
 
     @Override
+    @Nonnull
     public Instant getCreationTime() {
         return creationTime;
     }
