@@ -13,14 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop.writer;
 
-import io.micronaut.aop.HotSwappableInterceptedProxy;
-import io.micronaut.aop.Intercepted;
-import io.micronaut.aop.InterceptedProxy;
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.Introduced;
-import io.micronaut.aop.Introduction;
+import io.micronaut.aop.*;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
@@ -36,19 +32,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.writer.AbstractClassFileWriter;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import io.micronaut.inject.writer.ExecutableMethodWriter;
-import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import io.micronaut.inject.writer.*;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
@@ -56,27 +41,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * A class that generates AOP proxy classes at compile time
+ * A class that generates AOP proxy classes at compile time.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor {
+    public static final int HASHCODE = 31;
+    public static final int MAX_LOCALS = 3;
 
     public static final Method METHOD_GET_PROXY_TARGET = Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
@@ -173,6 +151,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
      *
      * @param parent           The parent {@link BeanDefinitionWriter}
+     * @param settings          optional setting
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
     public AopProxyWriter(BeanDefinitionWriter parent,
@@ -203,7 +182,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link Introduction} advise
+     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *
      * @param packageName        The package name
      * @param className          The class name
@@ -321,14 +300,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Visit a method that is to be proxied
+     * Visit a method that is to be proxied.
      *
      * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
      * @param returnType     The return type of the method. Either a Class or a string representing the name of the type
+     * @param genericReturnType The generic return type
+     * @param returnTypeGenericTypes Map containing the return generic types
      * @param methodName     The method name
      * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
+     * @param annotationMetadata metadata
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
@@ -778,7 +760,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
 
     /**
-     * Write the proxy to the given compilation directory
+     * Write the proxy to the given compilation directory.
      *
      * @param compilationDir The target compilation directory
      * @throws IOException
@@ -789,7 +771,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Write the class to output via a visitor that manages output destination
+     * Write the class to output via a visitor that manages output destination.
      *
      * @param visitor the writer output visitor
      * @throws IOException If an error occurs
@@ -985,6 +967,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         return parentWriter != null ? parentWriter.getBeanDefinitionName() : null;
     }
 
+    /**
+     * visitInterceptorTypes.
+     *
+     * @param interceptorTypes types
+     */
     public void visitInterceptorTypes(Object... interceptorTypes) {
         if (interceptorTypes != null) {
             this.interceptorTypes.addAll(Arrays.asList(interceptorTypes));
@@ -1082,7 +1069,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         swapGenerator.loadLocal(var);
         swapGenerator.throwException();
 
-        swapGenerator.visitMaxs(2, 3);
+        swapGenerator.visitMaxs(2, MAX_LOCALS);
         swapGenerator.visitEnd();
     }
 
@@ -1167,30 +1154,39 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyConstructorGenerator.visitInsn(AASTORE);
     }
 
+    /**
+     * Method Reference class with names and a list of argument types. Used as the targets.
+     */
     private class MethodRef {
-        final String name;
-        final List<Object> argumentTypes;
+        protected final String name;
+        protected final List<Object> argumentTypes;
 
-        public MethodRef(String name, List<Object> argumentTypes) {
+        MethodRef(String name, List<Object> argumentTypes) {
             this.name = name;
             this.argumentTypes = argumentTypes;
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             MethodRef methodRef = (MethodRef) o;
 
-            if (!name.equals(methodRef.name)) return false;
+            if (!name.equals(methodRef.name)) {
+                return false;
+            }
             return argumentTypes.equals(methodRef.argumentTypes);
         }
 
         @Override
         public int hashCode() {
             int result = name.hashCode();
-            result = 31 * result + argumentTypes.hashCode();
+            result = HASHCODE * result + argumentTypes.hashCode();
             return result;
         }
     }

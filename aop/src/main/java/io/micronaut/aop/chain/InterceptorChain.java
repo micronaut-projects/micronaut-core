@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Around;
@@ -46,14 +47,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
+ *
  * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
+ *
+ * @param <B> The declaring type
+ * @param <R> The result of the method call
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 public class InterceptorChain<B, R> implements InvocationContext<B, R> {
+    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
@@ -61,8 +68,16 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
 
     private int index = 0;
-    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
 
+
+    /**
+     * Constructor.
+     *
+     * @param interceptors array of interceptors
+     * @param target target type
+     * @param method result method
+     * @param originalParameters parameters
+     */
     public InterceptorChain(Interceptor<B, R>[] interceptors,
                             B target,
                             ExecutableMethod<B, R> method,
@@ -154,9 +169,10 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     }
 
     /**
-     * Resolves the {@link Around} interceptors for a method
+     * Resolves the {@link Around} interceptors for a method.
      *
-     * @param method       The method
+     * @param beanContext bean context passed in
+     * @param method The method
      * @param interceptors The array of interceptors
      * @return The filtered array of interceptors
      */
@@ -170,7 +186,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      * Resolves the interceptors for a method for {@link Introduction} advise. For {@link Introduction} advise
      * any {@link Around} advise interceptors are applied first
      *
-     * @param method       The method
+     * @param beanContext Bean Context
+     * @param method The method
      * @param interceptors The array of interceptors
      * @return The filtered array of interceptors
      */
@@ -185,6 +202,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
+    /**
+     * Instrument annotation metadata.
+     *
+     * @param beanContext beanContext to configure
+     * @param method method to get annotation metadata
+     */
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         if (beanContext instanceof ApplicationContext && method.getAnnotationMetadata() instanceof DefaultAnnotationMetadata) {
             // ensure metadata is environment aware
@@ -192,6 +215,14 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
     }
 
+    /**
+     * Resolved Interceptors.
+     *
+     * @param method method to get annotations
+     * @param annotationType type
+     * @param interceptors interceptor
+     * @return the array of interceptors
+     */
     private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
         Set<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
 
