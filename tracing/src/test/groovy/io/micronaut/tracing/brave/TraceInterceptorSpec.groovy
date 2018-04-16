@@ -94,7 +94,10 @@ class TraceInterceptorSpec extends Specification {
     }
     ApplicationContext buildContext() {
         ApplicationContext context = ApplicationContext.build()
-        context.environment.addPropertySource(PropertySource.of('tracing.zipkin.enabled':true, 'tracing.zipkin.samplerProbability':1))
+        context.environment.addPropertySource(PropertySource.of(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1)
+        )
         def reporter = new TestReporter()
         context.registerSingleton(reporter)
         context.start()

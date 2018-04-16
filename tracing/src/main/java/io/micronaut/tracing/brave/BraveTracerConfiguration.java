@@ -86,21 +86,13 @@ public class BraveTracerConfiguration implements Toggleable {
     }
 
     /**
-     * @return The percentage of requests that will be traced by default (default value is 10%)
+     * @param samplerConfiguration The sampler configuration
      */
-    public float getSamplerProbability() {
-        return samplerProbability;
-    }
-
-    /**
-     * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
-     * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
-     *
-     * @param samplerProbability The sampler probability
-     */
-    public void setSamplerProbability(float samplerProbability) {
-        tracingBuilder.sampler(CountingSampler.create(samplerProbability));
-        this.samplerProbability = samplerProbability;
+    @Inject
+    public void setSamplerConfiguration(@Nullable SamplerConfiguration samplerConfiguration) {
+        if(samplerConfiguration != null) {
+            tracingBuilder.sampler(CountingSampler.create(samplerConfiguration.getProbability()));
+        }
     }
 
     /**
@@ -165,7 +157,7 @@ public class BraveTracerConfiguration implements Toggleable {
     /**
      * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace
      */
-    @ConfigurationProperties(HttpClientSenderConfiguration.PREFIX)
+    @ConfigurationProperties("http")
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
     @Requires(classes = { Tracing.class})
     public static class HttpClientSenderConfiguration extends HttpClientConfiguration {
@@ -179,6 +171,28 @@ public class BraveTracerConfiguration implements Toggleable {
 
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;
+        }
+    }
+
+
+
+    @ConfigurationProperties("sampler")
+    @Requires(classes = CountingSampler.class)
+    @Requires(missingBeans = Sampler.class)
+    public static class SamplerConfiguration {
+        private float probability = 0.1F;
+
+        public float getProbability() {
+            return probability;
+        }
+
+        /**
+         * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
+         * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         * @param probability The probability
+         */
+        public void setProbability(float probability) {
+            this.probability = probability;
         }
     }
 }
