@@ -202,12 +202,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
-    /**
-     * Instrument annotation metadata.
-     *
-     * @param beanContext beanContext to configure
-     * @param method method to get annotation metadata
-     */
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         if (beanContext instanceof ApplicationContext && method.getAnnotationMetadata() instanceof DefaultAnnotationMetadata) {
             // ensure metadata is environment aware
@@ -215,14 +209,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         }
     }
 
-    /**
-     * Resolved Interceptors.
-     *
-     * @param method method to get annotations
-     * @param annotationType type
-     * @param interceptors interceptor
-     * @return the array of interceptors
-     */
     private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
         Set<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
 

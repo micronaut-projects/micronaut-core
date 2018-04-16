@@ -72,19 +72,12 @@
         <property name="message" value="Line has trailing spaces."/>
     </module> -->
 
-    <!-- Checks for Headers                                -->
-    <!-- See http://checkstyle.sf.net/config_header.html   -->
-     <module name="Header">
-         <property name="headerFile" value="config/CHECKSTYLE.HEADER"/>
-         <property name="ignoreLines" value="2"/>
-     </module>
-
     <module name="TreeWalker">
 
         <!-- Checks for Javadoc comments.                     -->
         <!-- See http://checkstyle.sf.net/config_javadoc.html -->
         <module name="JavadocMethod">
-            <property name="scope" value="public"/>
+            <property name="excludeScope" value="private"/>
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>
@@ -160,7 +153,7 @@
         <!-- Checks for class design                         -->
         <!-- See http://checkstyle.sf.net/config_design.html -->
         <module name="DesignForExtension">
-            <property name="ignoredAnnotations" value="Override, Test"/>
+            <property name="ignoredAnnotations" value="Override"/>
         </module>
         <module name="FinalClass"/>
         <module name="HideUtilityClassConstructor"/>
