@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop.exceptions;
 
 import io.micronaut.inject.ExecutableMethod;
 
 /**
- * An exception thrown when {@link io.micronaut.aop.Introduction} advise cannot be implemented
+ * An exception thrown when {@link io.micronaut.aop.Introduction} advise cannot be implemented.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class UnimplementedAdviceException extends UnsupportedOperationException {
 
+    /**
+     * Constructor.
+     *
+     * @param method method
+     */
     public UnimplementedAdviceException(ExecutableMethod<?, ?> method) {
         super("All possible Introduction advise exhausted and no implementation found for method: " + method);
     }
