@@ -50,17 +50,20 @@ class MavenBuildTokens {
             dep.scope != 'build'
         }
 
-        for(Feature f in features) {
-            dependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope != 'build'}
+        for (Feature f in features) {
+            dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
         }
 
-        dependencies = dependencies.unique().sort({ Dependency dep -> dep.scope })
+        dependencies = dependencies.unique()
+                .sort({ Dependency dep -> dep.scope })
+                .groupBy { it.artifact }
+                .collect { k, v -> v.size() == 1 ? v.first() : resolveScopeDuplicate(v) }
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
         dependencies.each { Dependency dep ->
 
-            if(scopeConversions.keySet().contains(dep.scope)) {
+            if (scopeConversions.keySet().contains(dep.scope)) {
                 def artifact = dep.artifact
                 def v = artifact.version.replace('BOM', '')
                 dependenciesXml.dependency {
@@ -78,6 +81,13 @@ class MavenBuildTokens {
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
 
         tokens
+    }
+
+    Dependency resolveScopeDuplicate(List<Dependency> dependencies) {
+        dependencies.find { it.scope == 'compile' } ?:
+                dependencies.find { it.scope == 'provided' } ?:
+                        dependencies.find { it.scope = 'runtime' } ?:
+                                dependencies.find { it.scope = 'test' }
     }
 
 
