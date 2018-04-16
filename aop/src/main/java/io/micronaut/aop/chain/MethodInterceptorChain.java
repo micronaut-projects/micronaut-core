@@ -44,7 +44,7 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> impleme
      * @param interceptors array of interceptors
      * @param target target
      * @param executionHandle executionHandle
-     * @param originalParameters executionHandle
+     * @param originalParameters originalParameters
      */
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);

@@ -50,6 +50,11 @@ public enum InterceptPhase {
 
     private final int position;
 
+    /**
+     * Constructor.
+     *
+     * @param position The order of position
+     */
     InterceptPhase(int position) {
         this.position = position;
     }
