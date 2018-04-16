@@ -1,0 +1,10 @@
+sudo: required
+cache:
+  directories:
+  - "$HOME/.gradle"
+dist: trusty
+jdk:
+- oraclejdk8
+before_script:
+- rm -rf target
+script: "./travis-build.sh"
