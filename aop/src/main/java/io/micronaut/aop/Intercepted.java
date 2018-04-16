@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 /**
- * An interface implemented by generated proxy classes
+ * An interface implemented by generated proxy classes.
  *
  * @author Graeme Rocher
  * @since 1.0

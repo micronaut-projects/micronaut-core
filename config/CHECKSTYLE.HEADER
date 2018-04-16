@@ -13,23 +13,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package io.micronaut.aop;
-
-/**
- * A {@link Intercepted} that proxies another instance.
- *
- * @param <T> The declaring type
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-public interface InterceptedProxy<T> extends Intercepted {
-
-    /**
-     * This method will return the target object being proxied.
-     *
-     * @return The proxy target
-     */
-    T interceptedTarget();
-}

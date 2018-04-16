@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
-import io.micronaut.core.order.Ordered;
-
 /**
- * <p>{@link Interceptor} classes implement the {@link Ordered} interface
+ * <p>{@link Interceptor} classes implement the {@link io.micronaut.core.order.Ordered} interface
  * in order to control the order of execution when multiple interceptors are present.</p>
  *
  * <p>This class provides a set of common constants for typical phases used by interceptors thus making it easier to position an interceptor in the correct phase.</p>
@@ -28,24 +27,24 @@ import io.micronaut.core.order.Ordered;
  */
 public enum InterceptPhase {
     /**
-     * Validation phase of execution
+     * Validation phase of execution.
      */
     VALIDATE(-120),
     /**
-     * Caching phase of execution
+     * Caching phase of execution.
      */
     CACHE(-100),
     /**
-     * Trace phase of execution
+     * Trace phase of execution.
      */
     TRACE(-80),
     /**
-     * Retry phase of execution
+     * Retry phase of execution.
      */
     RETRY(-60),
 
     /**
-     * Transaction phase of execution
+     * Transaction phase of execution.
      */
     TRANSACTION(-20);
 

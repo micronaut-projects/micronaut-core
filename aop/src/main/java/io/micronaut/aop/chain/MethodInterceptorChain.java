@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
@@ -27,12 +28,24 @@ import java.lang.reflect.Method;
  * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
  *
+ *
+ * @param <T> type
+ * @param <R> result
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 public class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
+    /**
+     * Constructor.
+     *
+     * @param interceptors array of interceptors
+     * @param target target
+     * @param executionHandle executionHandle
+     * @param originalParameters executionHandle
+     */
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
     }
