@@ -32,12 +32,7 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CookieValue;
@@ -243,6 +238,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 request = HttpRequest.create(httpMethod, uri);
             }
 
+            // Set the URI template used to make the request for tracing purposes
+            request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()) );
+
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
                     request.header(entry.getKey(), entry.getValue());
@@ -359,6 +357,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private String resolveTemplate(Client clientAnnotation, String templateString) {
+        String path = clientAnnotation.path();
+        if(StringUtils.isNotEmpty(path)) {
+            return path + templateString;
+        }
+        else {
+            String[] value = clientAnnotation.value();
+            if(ArrayUtils.isNotEmpty(value)) {
+                if(value[0].startsWith("/")) {
+                    return value[0] + templateString;
+                }
+            }
+            return templateString;
+        }
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {

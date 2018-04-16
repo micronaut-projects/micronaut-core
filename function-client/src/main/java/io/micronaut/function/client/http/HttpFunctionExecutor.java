@@ -15,6 +15,7 @@
  */
 package io.micronaut.function.client.http;
 
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -32,14 +33,17 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.netty.channel.NettyThreadFactory;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.PreDestroy;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Optional;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * A {@link FunctionExecutor} that uses a {@link HttpClient} to execute a remote function definition
@@ -52,13 +56,21 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
     private final DefaultHttpClient httpClient;
 
-    public HttpFunctionExecutor(HttpClientConfiguration configuration, NettyClientSslBuilder nettyClientSslBuilder, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public HttpFunctionExecutor(
+            HttpClientConfiguration configuration,
+            @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
+            NettyClientSslBuilder nettyClientSslBuilder,
+            MediaTypeCodecRegistry codecRegistry,
+            AnnotationMetadataResolver annotationMetadataResolver,
+            HttpClientFilter... filters) {
         super();
         this.httpClient = new DefaultHttpClient(
             LoadBalancer.empty(),
             configuration,
+            threadFactory,
             nettyClientSslBuilder,
             codecRegistry,
+            annotationMetadataResolver,
             filters
         );
     }

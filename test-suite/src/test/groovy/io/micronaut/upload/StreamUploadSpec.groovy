@@ -179,7 +179,70 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         ((String)response.getBody().get()).contains(val) // TODO: optimize this to use Jackson non-blocking and JsonNode
+    }
 
+    void "test receiving multiple completed parts with the same name"() {
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "abc.txt", MediaType.TEXT_PLAIN_TYPE, "abc".bytes)
+                .addPart("data", "def.txt", MediaType.TEXT_PLAIN_TYPE, "abcdef".bytes)
+                .addPart("title", "bar")
+                .build()
 
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveMultipleCompleted", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == '{"files":[{"name":"abc.txt","size":3},{"name":"def.txt","size":6}],"title":"bar"}'
+    }
+
+    void "test receiving multiple streaming parts with the same name"() {
+        def val = ('Big ' + 'xxxx' * 200).bytes
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "abc.txt", MediaType.TEXT_PLAIN_TYPE, val)
+                .addPart("data", "def.txt", MediaType.TEXT_PLAIN_TYPE, val)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveMultipleStreaming", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == (val.length * 2).toString()
+    }
+
+    void "test receiving a publisher of publishers with the same name"() {
+        def val = ('Big ' + 'xxxx' * 200).bytes
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "abc.txt", MediaType.TEXT_PLAIN_TYPE, val)
+                .addPart("data", "def.txt", MediaType.TEXT_PLAIN_TYPE, val)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveMultiplePublishers", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == (val.length * 2).toString()
     }
 }

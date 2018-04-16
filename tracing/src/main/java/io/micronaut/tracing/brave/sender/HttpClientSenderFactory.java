@@ -18,6 +18,7 @@ package io.micronaut.tracing.brave.sender;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.tracing.brave.BraveTracerConfiguration;
 import zipkin2.reporter.Sender;
 
@@ -43,7 +44,8 @@ public class HttpClientSenderFactory {
      */
     @Bean
     @Singleton
-    Sender zipkinSender() {
-        return configuration.getBuilder().build();
+    @Requires(missingBeans = Sender.class)
+    Sender zipkinSender(LoadBalancerResolver loadBalancerResolver) {
+        return configuration.getBuilder().build(loadBalancerResolver);
     }
 }

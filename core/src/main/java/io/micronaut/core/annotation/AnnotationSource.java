@@ -44,7 +44,10 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface AnnotationSource extends AnnotatedElement {
-
+    /**
+     * An empty annotation source
+     */
+    AnnotationSource EMPTY = () -> AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     /**
      * <p>The annotated elements that this {@link AnnotationSource} is able to resolve annotations from</p>
      * <p>

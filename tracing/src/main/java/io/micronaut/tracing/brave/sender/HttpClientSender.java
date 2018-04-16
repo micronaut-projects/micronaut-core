@@ -16,11 +16,13 @@
 package io.micronaut.tracing.brave.sender;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.BlockingHttpClient;
-import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.*;
+import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -35,9 +37,9 @@ import zipkin2.reporter.Sender;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -47,7 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpClientSender extends Sender{
+public class HttpClientSender extends Sender {
 
     private final HttpClient httpClient ;
     private final Encoding encoding;
@@ -55,16 +57,16 @@ public class HttpClientSender extends Sender{
     private final boolean compressionEnabled;
     private final URI endpoint;
 
-    private HttpClientSender(Encoding encoding, int messageMaxBytes, boolean compressionEnabled, URI endpoint) {
-        try {
-            this.httpClient = HttpClient.create(new URL(endpoint.getScheme(), endpoint.getHost(), endpoint.getPort(), ""));
-        } catch (MalformedURLException e) {
-            throw new IllegalArgumentException("Invalid endpoint URI: " + endpoint);
-        }
+    private HttpClientSender(Encoding encoding, int messageMaxBytes, boolean compressionEnabled, HttpClientConfiguration clientConfiguration, LoadBalancerResolver loadBalancerResolver, String path) {
+        Optional<? extends LoadBalancer> loadBalancer = loadBalancerResolver.resolve(ZipkinServiceInstanceList.SERVICE_ID);
+        this.httpClient = loadBalancer.map(lb -> new DefaultHttpClient(
+                lb,
+                clientConfiguration
+        )).orElse(null);
         this.encoding = encoding;
         this.messageMaxBytes = messageMaxBytes;
         this.compressionEnabled = compressionEnabled;
-        this.endpoint = URI.create(endpoint.getPath());
+        this.endpoint = path != null ? URI.create(path) : URI.create(Builder.DEFAULT_PATH);
     }
 
     @Override
@@ -84,7 +86,7 @@ public class HttpClientSender extends Sender{
 
     @Override
     public Call<Void> sendSpans(List<byte[]> encodedSpans) {
-        if(httpClient.isRunning()) {
+        if(httpClient != null && httpClient.isRunning()) {
             return new HttpCall(httpClient, endpoint, compressionEnabled,encodedSpans);
         }
         else {
@@ -94,6 +96,10 @@ public class HttpClientSender extends Sender{
 
     @Override
     public CheckResult check() {
+        if(httpClient == null) {
+            return CheckResult.failed(new NoAvailableServiceException(ZipkinServiceInstanceList.SERVICE_ID));
+        }
+
         try {
             HttpResponse<Object> response = httpClient.toBlocking().exchange(HttpRequest.POST(endpoint, Collections.emptyList()));
             if(response.getStatus().getCode() < 300) {
@@ -109,7 +115,9 @@ public class HttpClientSender extends Sender{
 
     @Override
     public void close() throws IOException {
-        httpClient.close();
+        if(httpClient != null) {
+            httpClient.close();
+        }
     }
 
     private static class HttpCall extends Call<Void> {
@@ -138,15 +146,7 @@ public class HttpClientSender extends Sender{
             return null;
         }
 
-        private MutableHttpRequest<Flowable<Object>> prepareRequest() {
-            MutableHttpRequest<Flowable<Object>> request = HttpRequest.POST(endpoint, spanFlowable());
-            if(compressionEnabled) {
-                return request.contentEncoding("gzip");
-            }
-            else {
-                return request;
-            }
-        }
+
 
         @Override
         public void enqueue(Callback<Void> callback) {
@@ -204,11 +204,16 @@ public class HttpClientSender extends Sender{
             return new HttpCall(httpClient, endpoint,compressionEnabled, encodedSpans);
         }
 
+        protected MutableHttpRequest<Flowable<Object>> prepareRequest() {
+            return HttpRequest.POST(endpoint, spanFlowable());
+        }
+
         private Flowable<Object> spanFlowable() {
             return Flowable.create(emitter -> {
                 for (byte[] encodedSpan : encodedSpans) {
                     emitter.onNext(encodedSpan);
                 }
+                emitter.onComplete();
             }, BackpressureStrategy.BUFFER);
         }
     }
@@ -217,11 +222,26 @@ public class HttpClientSender extends Sender{
      * Constructs the {@link HttpClientSender}
      */
     public static class Builder {
-        public static final String DEFAULT_ENDPOINT = "http://localhost:9411/api/v2/spans";
+        public static final String DEFAULT_PATH = "/api/v2/spans";
+        public static final String DEFAULT_SERVER_URL = "http://localhost:9411";
         private Encoding encoding = Encoding.JSON;
         private int messageMaxBytes = 5 * 1024;
+        private String path = DEFAULT_PATH;
         private boolean compressionEnabled = true;
-        private URI endpoint = URI.create(DEFAULT_ENDPOINT);
+        private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
+        private final HttpClientConfiguration clientConfiguration;
+
+        public Builder(HttpClientConfiguration clientConfiguration) {
+            this.clientConfiguration = clientConfiguration;
+        }
+
+        /**
+         * @return The configured zipkin servers
+         *
+         */
+        public List<URI> getServers() {
+            return servers;
+        }
 
         /**
          * The encoding to use. Defaults to {@link Encoding#JSON}
@@ -261,9 +281,32 @@ public class HttpClientSender extends Sender{
          * @param endpoint The fully qualified URI of the Zipkin endpoint
          * @return This builder
          */
-        public Builder endpoint(URI endpoint) {
+        public Builder server(URI endpoint) {
             if(endpoint != null) {
-                this.endpoint = endpoint;
+                this.servers = Collections.singletonList(endpoint);
+            }
+            return this;
+        }
+
+        /**
+         * The endpoint to use
+         *
+         * @param endpoint The fully qualified URI of the Zipkin endpoint
+         * @return This builder
+         */
+        public Builder url(URI endpoint) {
+            return server(endpoint);
+        }
+
+        /**
+         * The endpoint to use
+         *
+         * @param urls The zipkin server URLs
+         * @return This builder
+         */
+        public Builder urls(List<URI> urls) {
+            if(CollectionUtils.isNotEmpty(urls)) {
+                this.servers = Collections.unmodifiableList(urls);
             }
             return this;
         }
@@ -272,12 +315,14 @@ public class HttpClientSender extends Sender{
          * Consructs a {@link HttpClientSender}
          * @return The sender
          */
-        public HttpClientSender build() {
+        public HttpClientSender build(LoadBalancerResolver loadBalancerResolver) {
             return new HttpClientSender(
                     encoding,
                     messageMaxBytes,
                     compressionEnabled,
-                    endpoint
+                    clientConfiguration,
+                    loadBalancerResolver,
+                    path
             );
         }
     }

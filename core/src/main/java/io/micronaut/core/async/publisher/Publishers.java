@@ -140,6 +140,57 @@ public class Publishers {
     }
 
     /**
+     * Wraps a publisher in logic that executes around each invocation of the {@link Subscriber} interface
+     *
+     * @param publisher The publisher
+     * @param before The before logic
+     * @param after The after logic
+     * @param <T>       The generic type
+     * @return The mapped publisher
+     */
+    public static <T> Publisher<T> decorate(Publisher<T> publisher, Runnable before, Runnable after) {
+        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+            @Override
+            protected void doOnSubscribe(Subscription subscription) {
+                actual.onSubscribe(subscription);
+            }
+
+            @Override
+            protected void doOnNext(T message) {
+                try {
+                    before.run();
+                    actual.onNext(message);
+                } catch (Throwable e) {
+                    onError(e);
+                } finally {
+                    after.run();
+                }
+
+
+            }
+
+            @Override
+            protected void doOnError(Throwable t) {
+                try {
+                    before.run();
+                    actual.onError(t);
+                } finally {
+                    after.run();
+                }
+            }
+
+            @Override
+            protected void doOnComplete() {
+                try {
+                    before.run();
+                    actual.onComplete();
+                } finally {
+                    after.run();
+                }
+            }
+        });
+    }
+    /**
      * Map the result from a publisher using the given mapper
      *
      * @param publisher The publisher

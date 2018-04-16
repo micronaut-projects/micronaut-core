@@ -46,9 +46,9 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
      */
     public static final CharSequence SESSION_ATTRIBUTE = "micronaut.SESSION";
 
-    final SessionStore<Session> sessionStore;
-    final HttpSessionIdResolver[] resolvers;
-    final HttpSessionIdEncoder[] encoders;
+    private final SessionStore<Session> sessionStore;
+    private final HttpSessionIdResolver[] resolvers;
+    private final HttpSessionIdEncoder[] encoders;
 
     public HttpSessionFilter(SessionStore<Session> sessionStore, HttpSessionIdResolver[] resolvers, HttpSessionIdEncoder[] encoders) {
         this.sessionStore = sessionStore;
@@ -107,7 +107,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
         final Optional<Session> session;
         final MutableHttpResponse<?> response;
 
-        public SessionAndResponse(Optional<Session> session, MutableHttpResponse<?> response) {
+        SessionAndResponse(Optional<Session> session, MutableHttpResponse<?> response) {
             this.session = session;
             this.response = response;
         }
