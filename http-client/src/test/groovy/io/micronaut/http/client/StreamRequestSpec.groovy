@@ -160,6 +160,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
+
+        cleanup:
+        client.close()
     }
 
 
