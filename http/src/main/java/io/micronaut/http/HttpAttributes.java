@@ -37,7 +37,6 @@ public enum HttpAttributes implements CharSequence {
      */
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),
 
-
     /**
      * Attribute used to store the HTTP method name, if required within the response
      */
