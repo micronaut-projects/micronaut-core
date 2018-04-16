@@ -38,7 +38,9 @@ import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -127,16 +129,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                         .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
                 resultPublisher = new TracingPublisher<>((Publisher<Object>) resultPublisher, tracer, builder, span -> {
-                    span.setTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
-                    span.setTag(METHOD_TAG, context.getMethodName());
-                    hystrixCommand.ifPresent(s -> builder.withTag(TAG_HYSTRIX_COMMAND, s));
-                    context.getValue(HYSTRIX_ANNOTATION, "group", String.class).ifPresent(s ->
-                            span.setTag(TAG_HYSTRIX_GROUP, s)
-                    );
-                    context.getValue(HYSTRIX_ANNOTATION, "threadPool", String.class).ifPresent(s ->
-                            span.setTag(TAG_HYSTRIX_THREAD_POOL, s)
-                    );
-                    tagArguments(span, context);
+                    populateTags(context, hystrixCommand, span);
                 });
 
                 return conversionService.convert(
@@ -144,18 +137,58 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                         javaReturnType
                 ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
             } else {
-                try (Scope scope = builder.startActive(true)) {
-                    tagArguments(scope.span(), context);
-                    try {
-                        return context.proceed();
-                    } catch (RuntimeException e) {
-                        logError(scope.span(), e);
-                        throw e;
+                if(CompletionStage.class.isAssignableFrom(javaReturnType)) {
+                    try (Scope scope = builder.startActive(false)) {
+                        Span span = scope.span();
+                        populateTags(context, hystrixCommand, span);
+                        try {
+                            CompletionStage<?> completionStage = (CompletionStage) context.proceed();
+                            if(completionStage != null) {
+
+                                return  completionStage.whenComplete((o, throwable) -> {
+                                    if(throwable != null) {
+                                        logError(span, throwable);
+                                    }
+                                    span.finish();
+                                });
+                            }
+                            return null;
+                        } catch (RuntimeException e) {
+                            logError(scope.span(), e);
+                            throw e;
+                        }
+
+                    }
+                }
+                else {
+
+                    try (Scope scope = builder.startActive(true)) {
+                        Span span = scope.span();
+                        populateTags(context, hystrixCommand, span);
+                        try {
+                            return context.proceed();
+                        } catch (RuntimeException e) {
+                            logError(scope.span(), e);
+                            throw e;
+                        }
                     }
                 }
             }
 
         }
+    }
+
+    private void populateTags(MethodInvocationContext<Object, Object> context, Optional<String> hystrixCommand, Span span) {
+        span.setTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
+        span.setTag(METHOD_TAG, context.getMethodName());
+        hystrixCommand.ifPresent(s -> span.setTag(TAG_HYSTRIX_COMMAND, s));
+        context.getValue(HYSTRIX_ANNOTATION, "group", String.class).ifPresent(s ->
+                span.setTag(TAG_HYSTRIX_GROUP, s)
+        );
+        context.getValue(HYSTRIX_ANNOTATION, "threadPool", String.class).ifPresent(s ->
+                span.setTag(TAG_HYSTRIX_THREAD_POOL, s)
+        );
+        tagArguments(span, context);
     }
 
 
