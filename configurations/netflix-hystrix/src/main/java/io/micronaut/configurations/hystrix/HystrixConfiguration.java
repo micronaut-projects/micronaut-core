@@ -43,6 +43,10 @@ public class HystrixConfiguration implements Closeable {
      */
     public static final String HYSTRIX_STREAM_ENABLED = "hystrix.stream.enabled";
 
+    public HystrixConfiguration() {
+        HystrixPlugins.reset();
+    }
+
     /**
      * Allows defining the {@link HystrixCommandExecutionHook} as a bean
      *

@@ -16,7 +16,7 @@
 package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.tracing.instrument.scheduling.TracingRunnable;
+import io.micronaut.tracing.instrument.util.TracingRunnable;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;

@@ -1,6 +1,7 @@
 dependencies {
 
     compileOnly project(":inject-java")
+    compileOnly project(":configurations:netflix-hystrix")
     compileOnly 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
     compileOnly 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
     compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
@@ -20,6 +21,7 @@ dependencies {
     compile project(":runtime")
     compile project(":http-client")
 
+    testCompile project(":configurations:netflix-hystrix")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":http-server-netty")
