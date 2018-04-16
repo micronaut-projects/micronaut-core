@@ -16,6 +16,8 @@
 package io.micronaut.aop;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.attr.AttributeHolder;
+import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.ArgumentValue;
 import io.micronaut.core.type.Executable;
@@ -34,12 +36,8 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMetadataDelegate {
+public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMetadataDelegate, MutableAttributeHolder {
 
-    /**
-     * @return Attributes that can be stored within the context to pass between interceptors
-     */
-    MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The bound {@link ArgumentValue} instances
@@ -67,6 +65,12 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return The return value of the method
      */
     R proceed(Interceptor from) throws RuntimeException;
+
+    @SuppressWarnings("unchecked")
+    @Override
+    default InvocationContext<T,R> setAttribute(CharSequence name, Object value) {
+        return (InvocationContext<T, R>) MutableAttributeHolder.super.setAttribute(name, value);
+    }
 
     /**
      * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.

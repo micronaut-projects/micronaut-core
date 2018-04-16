@@ -17,9 +17,13 @@ package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import rx.Observable;
+import rx.Scheduler;
 import rx.Single;
+import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Func1;
+import rx.functions.Func2;
 import rx.plugins.RxJavaHooks;
 
 import javax.annotation.PostConstruct;
@@ -40,6 +44,12 @@ public class RxJava1Instrumentation {
     @PostConstruct
     void init(RxJavaRunnableInstrumenter instrumenter) {
         if(instrumenter != null) {
+            RxJavaHooks.setOnObservableStart(new Func2<Observable, Observable.OnSubscribe, Observable.OnSubscribe>() {
+                @Override
+                public Observable.OnSubscribe call(Observable observable, Observable.OnSubscribe onSubscribe) {
+                    return onSubscribe;
+                }
+            });
             Func1<Action0, Action0> existing = RxJavaHooks.getOnScheduleAction();
             if(existing != null && !(existing instanceof InstrumentScheduleAction)) {
                 RxJavaHooks.setOnScheduleAction(action0 ->

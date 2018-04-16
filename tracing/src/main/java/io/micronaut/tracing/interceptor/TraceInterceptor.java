@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.interceptor;
 
+import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
@@ -26,18 +27,19 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.tracing.annotation.ContinueSpan;
 import io.micronaut.tracing.annotation.NewSpan;
 import io.micronaut.tracing.annotation.SpanTag;
+import io.micronaut.tracing.instrument.util.TracingPublisher;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Action;
-import io.reactivex.functions.Consumer;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * An interceptor that implements tracing logic for {@link io.micronaut.tracing.annotation.ContinueSpan} and
@@ -49,6 +51,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @Singleton
 @Requires(beans = Tracer.class)
 public class TraceInterceptor implements MethodInterceptor<Object, Object> {
+    private static final String TAG_HYSTRIX_COMMAND = "hystrix.command";
+    private static final String TAG_HYSTRIX_GROUP = "hystrix.group";
+    private static final String TAG_HYSTRIX_THREAD_POOL = "hystrix.threadPool";
+    private static final String HYSTRIX_ANNOTATION = "io.micronaut.configurations.hystrix.annotation.HystrixCommand";
 
     public static final String CLASS_TAG = "class";
     public static final String METHOD_TAG = "method";
@@ -59,6 +65,11 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     public TraceInterceptor(Tracer tracer, ConversionService<?> conversionService) {
         this.tracer = tracer;
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public int getOrder() {
+        return InterceptPhase.TRACE.getPosition();
     }
 
     @Override
@@ -79,23 +90,14 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Flowable<?> resultFlowable = conversionService.convert(context.proceed(), Flowable.class)
+                Publisher<?> resultFlowable = conversionService.convert(context.proceed(), Publisher.class)
                         .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
-                resultFlowable = resultFlowable.doOnRequest(amount -> {
-                    if (amount > 0) {
-                        tagArguments(currentSpan, context);
-                    }
-                });
-                resultFlowable = resultFlowable.onErrorResumeNext(throwable -> {
-                    logError(currentSpan, throwable);
-                    return Flowable.error(throwable);
-                });
-
-                Publisher<?> decoratedPublisher = tracePublisher(currentSpan, resultFlowable);
-
+                resultFlowable = new TracingPublisher<>((Publisher<Object>) resultFlowable, tracer, span ->
+                        tagArguments(span, context)
+                );
                 return conversionService.convert(
-                        decoratedPublisher,
+                        resultFlowable,
                         javaReturnType
                 ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
             } else {
@@ -110,8 +112,10 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         } else {
             // must be new
             String operationName = newSpan.value();
+            Optional<String> hystrixCommand = context.getValue(HYSTRIX_ANNOTATION, String.class);
             if (StringUtils.isEmpty(operationName)) {
-                operationName = context.getMethodName();
+                // try hystrix command name
+                operationName = hystrixCommand.orElse(context.getMethodName());
             }
             Tracer.SpanBuilder builder = tracer.buildSpan(operationName);
             if (currentSpan != null) {
@@ -119,55 +123,24 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Flowable<?> resultFlowable = conversionService.convert(context.proceed(), Flowable.class)
+                Publisher<?> resultPublisher = conversionService.convert(context.proceed(), Publisher.class)
                         .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
-                AtomicReference<Span> spanRef = new AtomicReference<>();
-                boolean single = Publishers.isSingle(javaReturnType);
 
-                resultFlowable = resultFlowable.doOnRequest(amount -> {
-                    if (amount > 0) {
-                        builder.withTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
-                        builder.withTag(METHOD_TAG, context.getMethodName());
-
-                        Span createdSpan = builder.start();
-                        tagArguments(createdSpan, context);
-                        spanRef.set(createdSpan);
-                    }
+                resultPublisher = new TracingPublisher<>((Publisher<Object>) resultPublisher, tracer, builder, span -> {
+                    span.setTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
+                    span.setTag(METHOD_TAG, context.getMethodName());
+                    hystrixCommand.ifPresent(s -> builder.withTag(TAG_HYSTRIX_COMMAND, s));
+                    context.getValue(HYSTRIX_ANNOTATION, "group", String.class).ifPresent(s ->
+                            span.setTag(TAG_HYSTRIX_GROUP, s)
+                    );
+                    context.getValue(HYSTRIX_ANNOTATION, "threadPool", String.class).ifPresent(s ->
+                            span.setTag(TAG_HYSTRIX_THREAD_POOL, s)
+                    );
+                    tagArguments(span, context);
                 });
 
-                if(single) {
-                    resultFlowable = resultFlowable.doAfterNext(o -> {
-                        Span span = spanRef.get();
-                        if(span != null) {
-                            span.finish();
-                        }
-                    });
-                }
-                else {
-                    resultFlowable = resultFlowable.doOnTerminate(() -> {
-                        Span span = spanRef.get();
-                        if(span != null) {
-                            span.finish();
-                        }
-                    });
-                }
-
-                resultFlowable = resultFlowable
-                        .onErrorResumeNext(throwable -> {
-                            Span referencedSpan = spanRef.get();
-                            if (referencedSpan != null) {
-                                logError(referencedSpan, throwable);
-                            }
-                            return Flowable.error(throwable);
-                        });
-
-                Publisher<?> decoratedFlowabled = tracePublisher(
-                        spanRef,
-                        resultFlowable
-                );
-
                 return conversionService.convert(
-                        decoratedFlowabled,
+                        resultPublisher,
                         javaReturnType
                 ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
             } else {
@@ -183,66 +156,16 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
 
         }
-
     }
 
-    /**
-     * Wraps a publisher such that the scope is applied to each invocation of a {@link org.reactivestreams.Subscriber} method
-     *
-     * @param span The span to use
-     * @param publisher The publisher
-     * @return The resulting publisher
-     */
-    protected <T> Publisher<T> tracePublisher(Span span, Publisher<T> publisher) {
-        AtomicReference<Scope> scopeReference = new AtomicReference<>();
-        return Publishers.decorate(
-                            publisher,
-                () -> {
-                    Scope newScope = tracer.scopeManager().activate(span, false);
-                    scopeReference.set(newScope);
-                },
-                            ()-> {
-                                Scope scope = scopeReference.get();
-                                if(scope !=  null) {
-                                    scope.close();
-                                }
-                            }
-                    );
-    }
 
-    /**
-     * Wraps a publisher such that the scope is applied to each invocation of a {@link org.reactivestreams.Subscriber} method
-     *
-     * @param span The span to use
-     * @param publisher The publisher
-     * @return The resulting publisher
-     */
-    private <T> Publisher<T> tracePublisher(AtomicReference<Span> span, Publisher<T> publisher) {
-        AtomicReference<Scope> scopeReference = new AtomicReference<>();
-        return Publishers.decorate(
-                publisher,
-                () -> {
-                    Span referencedSpan = span.get();
-                    if(referencedSpan != null) {
-                        Scope newScope = tracer.scopeManager().activate(referencedSpan, false);
-                        scopeReference.set(newScope);
-                    }
-                },
-                ()-> {
-                    Scope scope = scopeReference.get();
-                    if(scope !=  null) {
-                        scope.close();
-                    }
-                }
-        );
-    }
     /**
      * Logs an error to the span
      *
      * @param span The span
      * @param e    The error
      */
-    protected void logError(Span span, Throwable e) {
+    public static void logError(Span span, Throwable e) {
         HashMap<String, Object> fields = new HashMap<>();
         fields.put(Fields.ERROR_OBJECT, e);
         String message = e.getMessage();
@@ -266,5 +189,6 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
         }
     }
+
 
 }
