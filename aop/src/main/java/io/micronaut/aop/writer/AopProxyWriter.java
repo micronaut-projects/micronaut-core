@@ -219,6 +219,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
+    @Override
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         String[] interfaces = getImplementedInterfaceInternalNames();
         classWriter.visit(V1_8, ACC_PUBLIC, className, null, superType.getInternalName(), interfaces);
