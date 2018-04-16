@@ -64,6 +64,7 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
+        client.close()
     }
 
 
@@ -85,6 +86,7 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
+        client.close()
     }
 
     void "test simple 404 request as VndError"() {
@@ -111,7 +113,7 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
-
+        client.close()
     }
 
     void "test simple blocking get request"() {
@@ -134,6 +136,7 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         asyncClient.stop()
+        asyncClient.close()
     }
 
     void "test simple get request with type"() {
