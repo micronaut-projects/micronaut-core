@@ -28,6 +28,10 @@ dependencies {
 //    runtime 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
 //    runtime 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
 
+    // uncomment the following lines to add jaeger tracing
+//    compile "io.micronaut:tracing:${projectVersion}"
+//    runtime 'io.jaegertracing:jaeger-core:0.27.0-RC1'
+
 
     runtime "ch.qos.logback:logback-classic:1.2.3"
 

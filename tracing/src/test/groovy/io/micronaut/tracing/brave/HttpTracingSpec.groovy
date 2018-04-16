@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.brave
 
+import brave.Span
 import brave.SpanCustomizer
 import brave.propagation.StrictCurrentTraceContext
 import io.micronaut.context.ApplicationContext
@@ -51,7 +52,7 @@ class HttpTracingSpec extends Specification {
 
         then:
         response
-        reporter.spans.size() == 1
+        reporter.spans.size() == 2
         reporter.spans[0].tags().get("foo") == 'bar'
         reporter.spans[0].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[0].name() == 'get /traced/hello/{name}'
@@ -119,14 +120,19 @@ class HttpTracingSpec extends Specification {
 
         then:
         response
-        reporter.spans.size() == 3
+        reporter.spans.size() == 4
         reporter.spans[0].tags().get("foo") == 'bar'
         reporter.spans[0].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[0].name() == 'get /traced/hello/{name}'
+        reporter.spans[0].kind() == zipkin2.Span.Kind.SERVER
         reporter.spans[1].name() == 'get /traced/hello/{name}'
+        reporter.spans[1].kind() == zipkin2.Span.Kind.CLIENT
+        reporter.spans[1].tags().get('http.method') == 'GET'
+        reporter.spans[1].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[2].tags().get("foo") == null
         reporter.spans[2].tags().get('http.path') == '/traced/nested/John'
         reporter.spans[2].name() == 'get /traced/nested/{name}'
+        reporter.spans[2].kind() == zipkin2.Span.Kind.SERVER
 
         cleanup:
         client.close()
