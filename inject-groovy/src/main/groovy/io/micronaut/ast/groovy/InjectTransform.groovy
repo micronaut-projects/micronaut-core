@@ -15,6 +15,11 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.ast.groovy.visitor.LoadedVisitor
+import io.micronaut.core.io.service.ServiceDefinition
+import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.inject.visitor.TypeElementVisitor
+
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
@@ -122,6 +127,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
 
                 return
+            }
+        }
+
+        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor)
+        List<LoadedVisitor> loadedVisitors = []
+        for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
+            if (definition.isPresent()) {
+                loadedVisitors.add(new LoadedVisitor(definition.load()))
             }
         }
 
@@ -252,7 +265,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
             this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
-            this.isConfigurationProperties = configurationProperties != null ? configurationProperties : isConfigurationProperties(this.annotationMetadata)
+            this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
             if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -340,13 +353,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     populateIntroducedInterfaces(ann.classNode.annotations, interfacesToVisit)
                 }
             }
-        }
-
-        boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata.hasDeclaredStereotype(ConfigurationReader)) {
-                return true
-            }
-            return false
         }
 
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
