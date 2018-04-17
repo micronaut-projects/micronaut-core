@@ -44,6 +44,13 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     private final DiscoveryClient discoveryClient;
     private final Map<String, FunctionDefinition> functionDefinitionMap;
 
+    /**
+     * Constructor.
+     *
+     * @param discoveryClient discoveryClient
+     * @param providers providers
+     * @param definitions definitions
+     */
     public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
         this.discoveryClient = discoveryClient;
         this.functionDefinitionMap = new HashMap<>(definitions.length);

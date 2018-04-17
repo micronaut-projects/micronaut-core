@@ -30,8 +30,8 @@ public interface FunctionInvokerChooser {
      * Chooses a {@link FunctionInvoker}.
      *
      * @param definition The definition
-     * @param <I>
-     * @param <O>
+     * @param <I> input type
+     * @param <O> output type
      * @return An {@link Optional} instance of {@link FunctionInvoker}
      */
     <I, O> Optional<FunctionInvoker<I, O>> choose(FunctionDefinition definition);

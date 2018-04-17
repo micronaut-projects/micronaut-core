@@ -51,6 +51,12 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     private final FunctionDiscoveryClient discoveryClient;
     private final FunctionInvokerChooser functionInvokerChooser;
 
+    /**
+     * Constructor.
+     *
+     * @param discoveryClient discoveryClient
+     * @param functionInvokerChooser functionInvokerChooser
+     */
     public FunctionClientAdvice(FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
         this.discoveryClient = discoveryClient;
         this.functionInvokerChooser = functionInvokerChooser;

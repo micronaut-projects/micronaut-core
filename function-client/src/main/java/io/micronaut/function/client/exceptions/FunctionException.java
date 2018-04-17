@@ -24,10 +24,19 @@ package io.micronaut.function.client.exceptions;
  */
 public class FunctionException extends RuntimeException {
 
+    /**
+     * Constructor.
+     * @param message message
+     */
     public FunctionException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor.
+     * @param message message
+     * @param cause cause of the exception
+     */
     public FunctionException(String message, Throwable cause) {
         super(message, cause);
     }
