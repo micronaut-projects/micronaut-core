@@ -1,7 +1,6 @@
 package io.micronaut.cli.io.support
 
 import groovy.xml.MarkupBuilder
-import groovy.xml.XmlUtil
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
@@ -55,25 +54,25 @@ class MavenBuildTokens {
         }
 
         dependencies = dependencies.unique()
-                .sort({ Dependency dep -> dep.scope })
+                .findAll { scopeConversions.containsKey(it.scope) }
+                .collect { convertScope(it) }
+                .sort { it.scope }
                 .groupBy { it.artifact }
-                .collect { k, v -> v.size() == 1 ? v.first() : resolveScopeDuplicate(v) }
+                .collect { k, deps -> deps.size() == 1 ? deps.first() : resolveScopeDuplicate(deps) }
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
         dependencies.each { Dependency dep ->
 
-            if (scopeConversions.keySet().contains(dep.scope)) {
-                def artifact = dep.artifact
-                def v = artifact.version.replace('BOM', '')
-                dependenciesXml.dependency {
-                    groupId(artifact.groupId)
-                    artifactId(artifact.artifactId)
-                    if (v) {
-                        version(artifact.version)
-                    }
-                    scope(scopeConversions.getOrDefault(dep.scope, dep.scope))
+            def artifact = dep.artifact
+            def v = artifact.version.replace('BOM', '')
+            dependenciesXml.dependency {
+                groupId(artifact.groupId)
+                artifactId(artifact.artifactId)
+                if (v) {
+                    version(artifact.version)
                 }
+                scope(dep.scope)
             }
         }
 
@@ -83,13 +82,16 @@ class MavenBuildTokens {
         tokens
     }
 
+    Dependency convertScope(Dependency dependency) {
+        dependency.setScope(scopeConversions.getOrDefault(dependency.scope, dependency.scope))
+    }
+
     Dependency resolveScopeDuplicate(List<Dependency> dependencies) {
         dependencies.find { it.scope == 'compile' } ?:
                 dependencies.find { it.scope == 'provided' } ?:
                         dependencies.find { it.scope = 'runtime' } ?:
                                 dependencies.find { it.scope = 'test' }
     }
-
 
     String prettyPrint(String xml, int spaces) {
         xml.replaceAll("(?m)^", " " * spaces)
