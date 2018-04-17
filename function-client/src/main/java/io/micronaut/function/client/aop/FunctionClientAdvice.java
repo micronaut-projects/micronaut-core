@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aop;
 
 import io.micronaut.aop.MethodInterceptor;
@@ -22,7 +23,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.function.client.FunctionClient;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionInvoker;
@@ -40,7 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Implements advice for the {@link FunctionClient} annotation
+ * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
  *
  * @author graemerocher
  * @since 1.0

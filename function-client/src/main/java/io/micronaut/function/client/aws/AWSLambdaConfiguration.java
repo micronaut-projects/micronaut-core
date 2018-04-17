@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.auth.AWSCredentialsProviderChain;
@@ -37,7 +38,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
- * Configuration options for AWS Lambda
+ * Configuration options for AWS Lambda.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,7 +47,7 @@ import javax.inject.Inject;
 public class AWSLambdaConfiguration {
 
     /**
-     * Prefix for AWS Lambda settings
+     * Prefix for AWS Lambda settings.
      */
     public static final String PREFIX = AWSConfiguration.PREFIX + ".lambda";
 

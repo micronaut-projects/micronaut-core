@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -32,7 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Default implementation of the {@link FunctionDiscoveryClient} interface
+ * Default implementation of the {@link FunctionDiscoveryClient} interface.
  *
  * @author graemerocher
  * @since 1.0
