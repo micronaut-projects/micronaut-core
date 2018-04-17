@@ -21,6 +21,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.*;
 import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
@@ -101,7 +102,7 @@ public class HttpClientSender extends Sender {
 
         try {
             HttpResponse<Object> response = httpClient.toBlocking().exchange(HttpRequest.POST(endpoint, Collections.emptyList()));
-            if(response.getStatus().getCode() < 300) {
+            if(response.getStatus().getCode() < HttpStatus.MULTIPLE_CHOICES.getCode()) {
                 return CheckResult.OK;
             } else {
                 throw new IllegalStateException("check response failed: " + response);
