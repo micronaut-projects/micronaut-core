@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import javax.annotation.Nonnull;
 import java.util.function.Consumer;
 
 import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
@@ -38,7 +39,6 @@ public class TracingPublisher<T> implements Publisher<T> {
     private final Publisher<T> publisher;
     private final Tracer tracer;
     private final Tracer.SpanBuilder spanBuilder;
-    private final Consumer<Span> onSubscribe;
     private final Span parentSpan;
     private final boolean isSingle;
 
@@ -63,16 +63,6 @@ public class TracingPublisher<T> implements Publisher<T> {
         this(publisher, tracer, (Tracer.SpanBuilder)null);
     }
     /**
-     * Creates a new tracing publisher for the given arguments. This constructor will just add tracing of the
-     * existing span if it is presnet
-     *
-     * @param publisher The target publisher
-     * @param tracer The tracer
-     */
-    public TracingPublisher(Publisher<T> publisher, Tracer tracer, Consumer<Span> onSubscribe) {
-        this(publisher, tracer, null, onSubscribe);
-    }
-    /**
      * Creates a new tracing publisher for the given arguments
      *
      * @param publisher The target publisher
@@ -80,8 +70,9 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param spanBuilder The span builder that represents the span that will be created when the publisher is subscribed to
      */
     public TracingPublisher(Publisher<T> publisher, Tracer tracer, Tracer.SpanBuilder spanBuilder) {
-        this(publisher, tracer, spanBuilder, null);
+        this(publisher, tracer, spanBuilder, Publishers.isSingle(publisher.getClass()));
     }
+
 
     /**
      * Creates a new tracing publisher for the given arguments
@@ -89,20 +80,18 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param publisher The target publisher
      * @param tracer The tracer
      * @param spanBuilder The span builder that represents the span that will be created when the publisher is subscribed to
-     * @param onSubscribe A consumer that will be called when the publisher is subscribed to
+     * @param isSingle Does the publisher emit a single item
      */
-    public TracingPublisher(Publisher<T> publisher, Tracer tracer, Tracer.SpanBuilder spanBuilder, Consumer<Span> onSubscribe) {
+    public TracingPublisher(Publisher<T> publisher, Tracer tracer, Tracer.SpanBuilder spanBuilder,  boolean isSingle) {
         this.publisher = publisher;
         this.tracer = tracer;
         this.spanBuilder = spanBuilder;
-        this.onSubscribe = onSubscribe;
         this.parentSpan = tracer.activeSpan();
-        this.isSingle = Publishers.isSingle(publisher.getClass());
+        this.isSingle = isSingle;
         if(parentSpan != null && spanBuilder != null) {
             spanBuilder.asChildOf(parentSpan);
         }
     }
-
     @Override
     public void subscribe(Subscriber<? super T> actual) {
         Span span;
@@ -113,41 +102,44 @@ public class TracingPublisher<T> implements Publisher<T> {
             span = parentSpan;
         }
         if(span != null) {
-            onSubscribe.accept(span);
             try(Scope ignored = tracer.scopeManager().activate(span, false)) {
                 publisher.subscribe(new Subscriber<T>() {
                     boolean finished = false;
                     @Override
                     public void onSubscribe(Subscription s) {
                         try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+                            TracingPublisher.this.doOnSubscribe(span);
                             actual.onSubscribe(s);
                         }
                     }
 
                     @Override
-                    public void onNext(T t) {
-                        try(Scope ignored = tracer.scopeManager().activate(span, false)) {
-                            actual.onNext(t);
+                    public void onNext(T object) {
+                        try(Scope ignored = tracer.scopeManager().activate(span, isSingle)) {
+                            TracingPublisher.this.doOnNext(object, span);
+                            actual.onNext(object);
                             if(isSingle) {
                                 finished = true;
-                                span.finish();
+                                TracingPublisher.this.doOnFinish(span);
                             }
                         }
                     }
 
                     @Override
                     public void onError(Throwable t) {
-                        try(Scope ignored = tracer.scopeManager().activate(span, false)) {
-                            logError(span, t);
+                        try(Scope ignored = tracer.scopeManager().activate(span, true)) {
+                            TracingPublisher.this.onError(t, span);
                             actual.onError(t);
+                            finished = true;
                         }
                     }
 
                     @Override
                     public void onComplete() {
                         if(!finished) {
-                            try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+                            try(Scope ignored = tracer.scopeManager().activate(span, true)) {
                                 actual.onComplete();
+                                TracingPublisher.this.doOnFinish(span);
                                 span.finish();
                             }
                         }
@@ -163,4 +155,48 @@ public class TracingPublisher<T> implements Publisher<T> {
         }
     }
 
+    /**
+     * Designed for subclasses to override and implement custom behaviour when an item is emitted
+     * @param object The object
+     * @param span The span
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void doOnNext(@Nonnull T object, @Nonnull Span span) {
+        // no-op
+    }
+
+    /**
+     * Designed for subclasses to override and implement custom on subscribe behaviour
+     * @param span The span
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void doOnSubscribe(@Nonnull Span span) {
+        // no-op
+    }
+
+    /**
+     * Designed for subclasses to override and implement custom on finish behaviour. Fired
+     * prior to calling {@link Span#finish()}
+     * @param span The span
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void doOnFinish(@Nonnull Span span) {
+        // no-op
+    }
+
+    /**
+     * Designed for subclasses to override and implement custom on error behaviour
+     * @param throwable The error
+     * @param span The span
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void doOnError(@Nonnull Throwable throwable, @Nonnull Span span) {
+        // no-op
+    }
+
+
+    private void onError(Throwable t, Span span) {
+        logError(span, t);
+        doOnError(t, span);
+    }
 }

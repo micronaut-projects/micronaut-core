@@ -23,16 +23,16 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingClientFilter;
+import io.micronaut.tracing.instrument.util.TracingPublisher;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
+import javax.annotation.Nonnull;
 
 /**
  * An HTTP client instrumentation filter that uses Open Tracing
@@ -50,53 +50,52 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
         super(tracer);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-        Flowable<? extends HttpResponse<?>> requestFlowable = Flowable.fromPublisher(chain.proceed(request));
+        Publisher<? extends HttpResponse<?>> requestPublisher = chain.proceed(request);
+        Scope activeSpan = tracer.scopeManager().active();
+        SpanContext activeContext = activeSpan != null ? activeSpan.span().context() : null;
+        Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);
 
-        requestFlowable = requestFlowable.doOnRequest(amount -> {
-            if(amount > 0) {
-
-                Scope activeSpan = tracer.scopeManager().active();
-                SpanContext activeContext = activeSpan != null ? activeSpan.span().context() : null;
-                Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);
-                spanBuilder.withTag(TAG_HTTP_CLIENT, true);
-                Span newSpan = spanBuilder.start();
-                SpanContext newContext = newSpan.context();
+        return new TracingPublisher(
+                requestPublisher,
+                tracer,
+                spanBuilder,
+                true
+        ) {
+            @Override
+            protected void doOnSubscribe(@Nonnull Span span) {
+                span.setTag(TAG_HTTP_CLIENT, true);
+                SpanContext spanContext = span.context();
                 tracer.inject(
-                        newContext,
+                        spanContext,
                         Format.Builtin.HTTP_HEADERS,
                         new HttpHeadersTextMap(request.getHeaders())
                 );
                 request.setAttribute(
                         TraceRequestAttributes.CURRENT_SPAN_CONTEXT,
-                        newContext
+                        spanContext
                 );
-
-                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, newSpan);
+                request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
             }
-        });
 
-        return requestFlowable.map(response -> {
-            Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
-            currentSpan.ifPresent(span -> {
-                setResponseTags(request, response, span);
-                span.finish();
-            });
+            @Override
+            protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
+                if(object instanceof HttpResponse) {
+                    setResponseTags(request, (HttpResponse<?>) object, span);
+                }
+            }
 
-            return response;
-        }).onErrorResumeNext(error -> {
-            if(error instanceof HttpClientResponseException) {
-                HttpClientResponseException e = (HttpClientResponseException) error;
-                HttpResponse<?> response = e.getResponse();
-                Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
-                currentSpan.ifPresent(span -> {
+            @Override
+            protected void doOnError(@Nonnull Throwable error, @Nonnull Span span) {
+                if (error instanceof HttpClientResponseException) {
+                    HttpClientResponseException e = (HttpClientResponseException) error;
+                    HttpResponse<?> response = e.getResponse();
                     setResponseTags(request, response, span);
-                    setErrorTags(span, error);
-                    span.finish();
-                });
+                }
+                setErrorTags(span, error);
             }
-            return Flowable.error(error);
-        });
+        };
     }
 }

@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.attr.AttributeHolder;
 import io.micronaut.core.attr.MutableAttributeHolder;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.ArgumentValue;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -32,7 +31,10 @@ import java.util.Map;
  * the next {@link Interceptor} with the last interceptor in the chain being the original decorated method implementation.</p>
  * <p>
  * <p>The parameters to pass to the next {@link Interceptor} can be mutated using {@link MutableArgumentValue} interface returned by the {@link #getParameters()} method</p>
- *
+
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
+
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -54,6 +56,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * Proceeds with the invocation. If this is the last interceptor in the chain then the final implementation method is invoked
      *
      * @return The return value of the method
+     * @throws RuntimeException chain may throw RTE
      */
     R proceed() throws RuntimeException;
 
@@ -63,6 +66,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @param from The interceptor to start from (note: will not be included in the execution)
      * @return The return value of the method
+     * @throws RuntimeException chain may throw RTE
      */
     R proceed(Interceptor from) throws RuntimeException;
 

@@ -34,6 +34,7 @@ import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Optional;
@@ -70,6 +71,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         return InterceptPhase.TRACE.getPosition();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         boolean isContinue = context.hasAnnotation(ContinueSpan.class);
@@ -96,9 +98,12 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                     Publisher<?> resultFlowable = conversionService.convert(returnObject, Publisher.class)
                             .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
-                    resultFlowable = new TracingPublisher<>((Publisher<Object>) resultFlowable, tracer, span ->
-                            tagArguments(span, context)
-                    );
+                    resultFlowable = new TracingPublisher(resultFlowable, tracer) {
+                        @Override
+                        protected void doOnSubscribe(@Nonnull Span span) {
+                            tagArguments(span, context);
+                        }
+                    };
                     return conversionService.convert(
                             resultFlowable,
                             javaReturnType
@@ -135,9 +140,12 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                     Publisher<?> resultPublisher = conversionService.convert(returnedObject, Publisher.class)
                             .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
-                    resultPublisher = new TracingPublisher<>((Publisher<Object>) resultPublisher, tracer, builder, span -> {
-                        populateTags(context, hystrixCommand, span);
-                    });
+                    resultPublisher = new TracingPublisher(resultPublisher, tracer, builder) {
+                        @Override
+                        protected void doOnSubscribe(@Nonnull Span span) {
+                            populateTags(context, hystrixCommand, span);
+                        }
+                    };
 
                     return conversionService.convert(
                             resultPublisher,

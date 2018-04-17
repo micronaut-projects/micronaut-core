@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Support classes for binding to {@link io.micronaut.function.FunctionBean} parameters from AWS Lambda requests
+ * Support classes for binding to {@link io.micronaut.function.FunctionBean} parameters from AWS Lambda requests.
  *
  * @author Graeme Rocher
  * @since 1.0
