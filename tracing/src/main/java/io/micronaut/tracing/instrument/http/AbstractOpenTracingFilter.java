@@ -40,6 +40,8 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     public static final String TAG_HTTP_CLIENT = "http.client";
     public static final String TAG_HTTP_SERVER = "http.server";
 
+    private static final int HTTP_SUCCESS_CODE_UPPER_LIMIT = 299;
+
     protected final Tracer tracer;
 
     public AbstractOpenTracingFilter(Tracer tracer) {
@@ -56,7 +58,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     protected void setResponseTags(HttpRequest<?> request, HttpResponse<?> response, Span span) {
         HttpStatus status = response.getStatus();
         int code = status.getCode();
-        if(code > 299) {
+        if(code > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
             span.setTag(TAG_HTTP_STATUS_CODE, code);
             span.setTag(TAG_ERROR, status.getReason());
         }
