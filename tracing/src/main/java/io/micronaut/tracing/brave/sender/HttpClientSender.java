@@ -139,7 +139,7 @@ public class HttpClientSender extends Sender {
         public Void execute() throws IOException {
             BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
             HttpResponse<Object> response = blockingHttpClient.exchange(prepareRequest());
-            if(response.getStatus().getCode() >= 400) {
+            if(response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                 throw new IllegalStateException("Response return invalid status code: " + response.getStatus());
             }
             return null;
@@ -157,7 +157,7 @@ public class HttpClientSender extends Sender {
 
                 @Override
                 public void onNext(HttpResponse<ByteBuffer> response) {
-                    if(response.getStatus().getCode() >= 400) {
+                    if(response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                         callback.onError(new IllegalStateException("Response return invalid status code: " + response.getStatus()));
                     } else {
                         callback.onSuccess(null);
@@ -220,8 +220,11 @@ public class HttpClientSender extends Sender {
     public static class Builder {
         public static final String DEFAULT_PATH = "/api/v2/spans";
         public static final String DEFAULT_SERVER_URL = "http://localhost:9411";
+        private static final int BYTES_IN_KB = 1024;
+        private static final int FIVE = 5;
+
         private Encoding encoding = Encoding.JSON;
-        private int messageMaxBytes = 5 * 1024;
+        private int messageMaxBytes = FIVE * BYTES_IN_KB;
         private String path = DEFAULT_PATH;
         private boolean compressionEnabled = true;
         private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
