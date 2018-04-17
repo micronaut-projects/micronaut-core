@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Builds the Neo4j driver and retries the connection via {@link Retryable}
+ * Builds the Neo4j driver and retries the connection via {@link Retryable}.
  *
  * @author graemerocher
  * @since 1.0
@@ -40,6 +41,10 @@ public class Neo4jDriverBuilder {
 
     private final Neo4jBoltConfiguration boltConfiguration;
 
+    /**
+     * Constructor.
+     * @param boltConfiguration injected configuration
+     */
     public Neo4jDriverBuilder(Neo4jBoltConfiguration boltConfiguration) {
         if (boltConfiguration == null) {
             throw new IllegalArgumentException("Configuration cannot be null");
@@ -48,7 +53,7 @@ public class Neo4jDriverBuilder {
     }
 
     /**
-     * Builds the Neo4j driver and retries the connection if there is a {@link ServiceUnavailableException} exception
+     * Builds the Neo4j driver and retries the connection if there is a {@link ServiceUnavailableException} exception.
      * @return The Neo4j driver
      */
     @Retryable(ServiceUnavailableException.class)
