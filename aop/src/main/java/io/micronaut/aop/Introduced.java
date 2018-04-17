@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 /**
- * Marker interface for instances that are implemented automatically via {@link Introduction} advise
+ * Marker interface for instances that are implemented automatically via {@link Introduction} advise.
  *
  * @author Graeme Rocher
  * @since 1.0
