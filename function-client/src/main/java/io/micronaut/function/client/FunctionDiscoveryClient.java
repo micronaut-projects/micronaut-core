@@ -18,8 +18,6 @@ package io.micronaut.function.client;
 
 import org.reactivestreams.Publisher;
 
-import java.net.URI;
-
 /**
  * An interface for discovery functions, either remote or local.
  *
@@ -32,7 +30,7 @@ public interface FunctionDiscoveryClient {
      * Finds a function for the given function name.
      *
      * @param functionName The function name
-     * @return A {@link Publisher} that emits the {@link URI} of the function or a {@link io.micronaut.function.client.exceptions.FunctionNotFoundException} if no function is found
+     * @return A {@link Publisher} that emits the {@link java.net.URI} of the function or a {@link io.micronaut.function.client.exceptions.FunctionNotFoundException} if no function is found
      */
     Publisher<FunctionDefinition> getFunction(String functionName);
 }
