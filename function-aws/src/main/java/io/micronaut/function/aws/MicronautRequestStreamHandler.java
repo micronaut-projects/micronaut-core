@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.aws;
 
 import static io.micronaut.function.aws.MicronautRequestHandler.registerContextBeans;
@@ -27,7 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * <p>An implementation of the {@link RequestStreamHandler} for Micronaut</p>
+ * <p>An implementation of the {@link RequestStreamHandler} for Micronaut</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
