@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.MongoClient;
@@ -23,7 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
 
 /**
- * Builds the primary MongoClient
+ * Builds the primary MongoClient.
  *
  * @author graemerocher
  * @since 1.0
@@ -33,6 +34,11 @@ import io.micronaut.runtime.context.scope.Refreshable;
 @Factory
 public class DefaultMongoClientFactory {
 
+    /**
+     * Factory method to return a client.
+     * @param configuration configuration pulled in
+     * @return mongoClient
+     */
     @Bean(preDestroy = "close")
     @Refreshable(MongoSettings.PREFIX)
     @Primary

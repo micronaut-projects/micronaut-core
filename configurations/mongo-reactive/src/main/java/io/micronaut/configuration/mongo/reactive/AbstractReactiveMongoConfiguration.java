@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
@@ -35,7 +36,7 @@ import javax.validation.constraints.NotBlank;
 import java.util.Optional;
 
 /**
- * Abstract Mongo configuration type
+ * Abstract Mongo configuration type.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,7 +47,11 @@ abstract class AbstractReactiveMongoConfiguration {
 
     private final ApplicationConfiguration applicationConfiguration;
 
-    public AbstractReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     */
+    AbstractReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
     }
 
@@ -59,7 +64,7 @@ abstract class AbstractReactiveMongoConfiguration {
     }
 
     /**
-     * Sets the MongoDB URI
+     * Sets the MongoDB URI.
      *
      * @param uri The MongoDB URI
      */
@@ -143,6 +148,10 @@ abstract class AbstractReactiveMongoConfiguration {
         return clientSettings.build();
     }
 
+    /**
+     * Return the appplication name or a default name.
+     * @return applicationName
+     */
     protected String getApplicationName() {
         return applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
     }

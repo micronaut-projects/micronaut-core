@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.ConnectionString;
@@ -34,6 +35,10 @@ public abstract class AbstractMongoConfiguration {
 
     private final ApplicationConfiguration applicationConfiguration;
 
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     */
     public AbstractMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
     }
@@ -47,7 +52,7 @@ public abstract class AbstractMongoConfiguration {
     }
 
     /**
-     * Sets the MongoDB URI
+     * Sets the MongoDB URI.
      *
      * @param uri The MongoDB URI
      */
@@ -72,6 +77,10 @@ public abstract class AbstractMongoConfiguration {
      */
     public abstract MongoClientOptions buildOptions();
 
+    /**
+     * Get the application name or return the default.
+     * @return applicationName
+     */
     protected String getApplicationName() {
         return applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
     }
