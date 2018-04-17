@@ -51,11 +51,16 @@ public class AWSLambdaConfiguration {
      */
     public static final String PREFIX = AWSConfiguration.PREFIX + ".lambda";
 
+    @ConfigurationBuilder(prefixes = "with")
+    private AWSLambdaAsyncClientBuilder builder = AWSLambdaAsyncClient.asyncBuilder();
+
     private final AWSClientConfiguration clientConfiguration;
 
-    @ConfigurationBuilder(prefixes = "with")
-    AWSLambdaAsyncClientBuilder builder = AWSLambdaAsyncClient.asyncBuilder();
-
+    /**
+     * Constructor.
+     * @param clientConfiguration clientConfiguration
+     * @param environment environment
+     */
     public AWSLambdaConfiguration(AWSClientConfiguration clientConfiguration, Environment environment) {
         this.clientConfiguration = clientConfiguration;
 

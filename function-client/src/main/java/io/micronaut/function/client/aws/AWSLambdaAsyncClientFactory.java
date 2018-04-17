@@ -31,10 +31,18 @@ public class AWSLambdaAsyncClientFactory {
 
     private final AWSLambdaConfiguration configuration;
 
+    /**
+     * Constructor.
+     * @param configuration configuration from properties
+     */
     public AWSLambdaAsyncClientFactory(AWSLambdaConfiguration configuration) {
         this.configuration = configuration;
     }
 
+    /**
+     * The client returned from a builder.
+     * @return client object
+     */
     @Bean
     @Refreshable
     AWSLambdaAsync awsLambdaAsyncClient() {
