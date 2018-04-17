@@ -43,7 +43,7 @@ public class Neo4jDriverBuilder {
 
     /**
      * Constructor.
-     * @param boltConfiguration injected configuration
+     * @param boltConfiguration The configuration used to create the driver
      */
     public Neo4jDriverBuilder(Neo4jBoltConfiguration boltConfiguration) {
         if (boltConfiguration == null) {

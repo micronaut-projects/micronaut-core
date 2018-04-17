@@ -48,7 +48,7 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
     }
 
     /**
-     * Is the failed on erorr key set.
+     * Is the failed on error key set.
      * @param key key
      * @return boolean
      */
