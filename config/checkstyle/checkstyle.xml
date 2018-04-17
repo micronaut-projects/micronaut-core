@@ -159,6 +159,7 @@
         <module name="HideUtilityClassConstructor"/>
         <module name="VisibilityModifier">
             <property name="protectedAllowed" value="true"/>
+            <property name="packageAllowed" value="true"/>
         </module>
         <module name="InnerTypeLast"/>
         <module name="ModifierOrder"/>

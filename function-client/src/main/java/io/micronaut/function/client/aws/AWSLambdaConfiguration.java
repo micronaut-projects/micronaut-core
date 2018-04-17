@@ -52,7 +52,7 @@ public class AWSLambdaConfiguration {
     public static final String PREFIX = AWSConfiguration.PREFIX + ".lambda";
 
     @ConfigurationBuilder(prefixes = "with")
-    private AWSLambdaAsyncClientBuilder builder = AWSLambdaAsyncClient.asyncBuilder();
+    AWSLambdaAsyncClientBuilder builder = AWSLambdaAsyncClient.asyncBuilder();
 
     private final AWSClientConfiguration clientConfiguration;
 

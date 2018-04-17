@@ -52,7 +52,7 @@ import java.util.concurrent.Future;
 @Singleton
 public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, FunctionInvokerChooser {
 
-    public static final int STATUS_CODE_ERROR = 300;
+    private static final int STATUS_CODE_ERROR = 300;
     private final AWSLambdaAsync asyncClient;
     private final ByteBufferFactory byteBufferFactory;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
