@@ -33,7 +33,7 @@ public class Neo4jDriverFactory {
     private final Neo4jDriverBuilder driverBuilder;
 
     /**
-     * COnstructor.
+     * Constructor.
      * @param driverBuilder driverBuilder
      */
     public Neo4jDriverFactory(Neo4jDriverBuilder driverBuilder) {
