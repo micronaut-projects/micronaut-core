@@ -11,10 +11,10 @@ import io.micronaut.runtime.ApplicationConfiguration;
 
 
 @Requires(env= Environment.AMAZON_EC2)
-@Requires(beans = AWSClientConfiguration.class)
-@Requires(property = "aws.systemManager.parameterStore.enabled", value = "true", defaultValue = "false")
+//@Requires(beans = AWSClientConfiguration.class)
+@Requires(property = "aws.client.systemManager.parameterStore.enabled", value = "true", defaultValue = "false")
 @ConfigurationProperties("systemManager.parameterStore")
-public class AWSParameterStoreConfiguration extends AWSConfiguration {
+public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
 
 
     public static final String PREFIX = "config";
@@ -23,7 +23,16 @@ public class AWSParameterStoreConfiguration extends AWSConfiguration {
     String rootHierarchyPath;
     Boolean useSecureParameters = false;
     Boolean enabled;
+    String customKMSName;
 
+
+    public String getCustomKMSName() {
+        return customKMSName;
+    }
+
+    public void setCustomKMSName(String customKMSName) {
+        this.customKMSName = customKMSName;
+    }
 
     public Boolean isEnabled() {
         return enabled;
