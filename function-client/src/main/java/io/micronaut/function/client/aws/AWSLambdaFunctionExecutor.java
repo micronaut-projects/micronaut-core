@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.AWSLambdaAsync;
@@ -40,7 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * A {@link FunctionInvoker} for invoking functions on AWS
+ * A {@link FunctionInvoker} for invoking functions on AWS.
  *
  * @author graemerocher
  * @since 1.0

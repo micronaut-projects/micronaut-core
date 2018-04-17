@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.exceptions;
 
 /**
- * An exception thrown when an error occurs in the function system
+ * An exception thrown when an error occurs in the function system.
  *
  * @author graemerocher
  * @since 1.0

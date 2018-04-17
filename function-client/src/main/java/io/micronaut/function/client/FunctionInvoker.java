@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import io.micronaut.core.type.Argument;
@@ -24,7 +25,7 @@ import io.micronaut.core.type.Argument;
 public interface FunctionInvoker<I, O> {
 
     /**
-     * Invoke the given function definition for the given input and expected response type
+     * Invoke the given function definition for the given input and expected response type.
      *
      * @param definition The definition
      * @param input      The input

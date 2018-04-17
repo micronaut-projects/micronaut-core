@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import java.util.Optional;
 
 /**
- * Strategy interface for choosing a {@link FunctionInvoker}
+ * Strategy interface for choosing a {@link FunctionInvoker}.
  *
  * @author graemerocher
  * @since 1.0
@@ -26,7 +27,7 @@ import java.util.Optional;
 public interface FunctionInvokerChooser {
 
     /**
-     * Chooses a {@link FunctionInvoker}
+     * Chooses a {@link FunctionInvoker}.
      *
      * @param definition The definition
      * @param <I>
