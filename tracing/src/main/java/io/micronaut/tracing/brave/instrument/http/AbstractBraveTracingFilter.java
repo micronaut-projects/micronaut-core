@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
@@ -27,7 +28,7 @@ import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
 import java.util.Optional;
 
 /**
- * Abstract tracing filter shared across server and client
+ * Abstract tracing filter shared across server and client.
  *
  * @author graemerocher
  * @since 1.0
@@ -40,7 +41,7 @@ abstract class AbstractBraveTracingFilter implements HttpFilter {
     }
 
     /**
-     * Configures the request with the given Span
+     * Configures the request with the given Span.
      *
      * @param request The request
      * @param span The span
@@ -52,7 +53,7 @@ abstract class AbstractBraveTracingFilter implements HttpFilter {
     }
 
     /**
-     * Closes the scope after terminating the request
+     * Closes the scope after terminating the request.
      * @param request The request
      */
     void afterTerminate(HttpRequest<?> request) {

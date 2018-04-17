@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
@@ -35,7 +36,7 @@ import org.reactivestreams.Publisher;
 import javax.annotation.Nonnull;
 
 /**
- * An HTTP client instrumentation filter that uses Open Tracing
+ * An HTTP client instrumentation filter that uses Open Tracing.
  *
  * @author graemerocher
  * @since 1.0

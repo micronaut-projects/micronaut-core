@@ -13,23 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.tracing.instrument.util.TracingRunnableInstrumenter;
-import rx.Observable;
 import rx.Single;
 import rx.functions.Action0;
 import rx.functions.Func1;
-import rx.functions.Func2;
 import rx.plugins.RxJavaHooks;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 
 /**
- * Instrumentation for RxJava 1
+ * Instrumentation for RxJava 1.
  *
  * @author graemerocher
  * @since 1.0
@@ -48,8 +47,7 @@ public class RxJava1TracingInstrumentation {
                 RxJavaHooks.setOnScheduleAction(action0 ->
                         new InstrumentScheduleAction(instrumenter).call(existing.call(action0))
                 );
-            }
-            else {
+            } else {
                 RxJavaHooks.setOnScheduleAction(new InstrumentScheduleAction(instrumenter));
             }
         }

@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument.rxjava;
 
+package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
@@ -26,7 +26,7 @@ import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 
 /**
- * Enables RxJava 2 instrumentation
+ * Enables RxJava 2 instrumentation.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,8 +42,7 @@ public class RxJava2TracingInstrumentation {
             Function<? super Runnable, ? extends Runnable> existing = RxJavaPlugins.getScheduleHandler();
             if(existing != null && !(existing instanceof TracingRunnableInstrumenter)) {
                 RxJavaPlugins.setScheduleHandler(runnable -> instrumenter.apply(existing.apply(runnable)));
-            }
-            else {
+            } else {
                 RxJavaPlugins.setScheduleHandler(instrumenter::apply);
             }
         }

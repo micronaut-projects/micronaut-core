@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave;
 
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import zipkin2.reporter.AsyncReporter;
-import zipkin2.reporter.Reporter;
 import zipkin2.reporter.ReporterMetrics;
 import zipkin2.reporter.Sender;
 
@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
- * A configuration for async Reporting on {@link zipkin2.Span} instances
+ * A configuration for async Reporting on {@link zipkin2.Span} instances.
  *
  * @author graemerocher
  * @since 1.0
@@ -50,7 +50,7 @@ public class AsyncReporterConfiguration {
     }
 
     /**
-     * Obtains the {@link AsyncReporter.Builder}
+     * Obtains the {@link AsyncReporter.Builder}.
      * @return The builder
      */
     public AsyncReporter.Builder getBuilder() {
@@ -58,7 +58,7 @@ public class AsyncReporterConfiguration {
     }
 
     /**
-     * Sets the {@link ReporterMetrics} instance to use
+     * Sets the {@link ReporterMetrics} instance to use.
      * @param metrics The metrics instance
      */
     @Inject

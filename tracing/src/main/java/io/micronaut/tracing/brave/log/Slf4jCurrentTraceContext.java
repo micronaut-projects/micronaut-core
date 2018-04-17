@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.log;
 
 import brave.internal.HexCodec;
 import brave.propagation.CurrentTraceContext;
-import brave.propagation.StrictCurrentTraceContext;
 import brave.propagation.TraceContext;
-import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.Requires;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -28,20 +26,21 @@ import org.slf4j.MDC;
 import javax.annotation.Nullable;
 
 /**
- * A Slf4jCurrentTraceContext based on Spring Sleuth
+ * A Slf4jCurrentTraceContext based on Spring Sleuth.
  *
  * @author graemerocher
  * @since 1.0
  */
 
 class Slf4jCurrentTraceContext extends CurrentTraceContext {
-    private static final Logger LOG = LoggerFactory
-            .getLogger(Slf4jCurrentTraceContext.class);
 
     public static final String TRACE_ID = "traceId";
     public static final String PARENT_ID = "parentId";
     public static final String SPAN_ID = "spanId";
     public static final String SPAN_EXPORTABLE = "spanExportable";
+
+    private static final Logger LOG = LoggerFactory
+            .getLogger(Slf4jCurrentTraceContext.class);
 
     private final CurrentTraceContext delegate;
 
@@ -86,8 +85,7 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
                     LOG.trace("With parent: {}", currentSpan.parentId());
                 }
             }
-        }
-        else {
+        } else {
             MDC.remove(TRACE_ID);
             MDC.remove(PARENT_ID);
             MDC.remove(SPAN_ID);
@@ -108,14 +106,14 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
                 set(SPAN_EXPORTABLE, spanExportable);
             }
         }
+
         return new ThreadContextCurrentTraceContextScope();
     }
 
     private static void set(String key, @Nullable String value) {
         if (value != null) {
             MDC.put(key, value);
-        }
-        else {
+        } else {
             MDC.remove(key);
         }
     }

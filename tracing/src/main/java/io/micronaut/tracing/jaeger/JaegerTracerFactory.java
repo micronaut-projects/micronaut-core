@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
@@ -32,7 +33,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * Registers a Jaeger tracer based on the jaeger configuration
+ * Registers a Jaeger tracer based on the jaeger configuration.
  *
  * @author graemerocher
  * @since 1.0
@@ -50,7 +51,8 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Allows setting a custom reporter
+     * Allows setting a custom reporter.
+     *
      * @param reporter The {@link Reporter}
      */
     @Inject
@@ -59,7 +61,7 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Allows setting a custom sampler
+     * Allows setting a custom sampler.
      *
      * @param sampler {@link Sampler}
      */
@@ -69,7 +71,8 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Adds a Jaeger based Open Tracing {@link Tracer}
+     * Adds a Jaeger based Open Tracing {@link Tracer}.
+     *
      * @return The {@link Tracer}
      */
     @Singleton
@@ -96,7 +99,6 @@ public class JaegerTracerFactory implements Closeable {
         return tracer;
     }
 
-
     @Override
     @PreDestroy
     public void close() throws IOException {
@@ -104,7 +106,8 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Hooks for sub classes to override
+     * Hooks for sub classes to override.
+     *
      * @param configuration The configuration
      */
     @SuppressWarnings("WeakerAccess")

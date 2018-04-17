@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
@@ -30,9 +31,8 @@ import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-
 /**
- * Instruments incoming HTTP requests
+ * Instruments incoming HTTP requests.
  *
  * @author graemerocher
  * @since 1.0
@@ -55,7 +55,6 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
         this.serverHandler = serverHandler;
         this.extractor = httpTracing.tracing().propagation().extractor(ConvertibleMultiValues::get);
     }
-
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {

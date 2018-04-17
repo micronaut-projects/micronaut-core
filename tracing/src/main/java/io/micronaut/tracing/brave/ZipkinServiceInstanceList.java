@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * A {@link ServiceInstanceList} for Zipkin
+ * A {@link ServiceInstanceList} for Zipkin.
  *
  * @author graemerocher
  * @since 1.0

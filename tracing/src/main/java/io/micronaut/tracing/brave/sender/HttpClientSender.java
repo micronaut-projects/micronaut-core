@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.sender;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -35,7 +36,6 @@ import zipkin2.codec.Encoding;
 import zipkin2.reporter.Sender;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * An {@link Sender} implementation that uses Micronaut's {@link io.micronaut.http.client.HttpClient}
+ * An {@link Sender} implementation that uses Micronaut's {@link io.micronaut.http.client.HttpClient}.
  *
  * @author graemerocher
  * @since 1.0
@@ -88,8 +88,7 @@ public class HttpClientSender extends Sender {
     public Call<Void> sendSpans(List<byte[]> encodedSpans) {
         if(httpClient != null && httpClient.isRunning()) {
             return new HttpCall(httpClient, endpoint, compressionEnabled,encodedSpans);
-        }
-        else {
+        } else {
             throw new IllegalStateException("HTTP Client Closed");
         }
     }
@@ -104,8 +103,7 @@ public class HttpClientSender extends Sender {
             HttpResponse<Object> response = httpClient.toBlocking().exchange(HttpRequest.POST(endpoint, Collections.emptyList()));
             if(response.getStatus().getCode() < 300) {
                 return CheckResult.OK;
-            }
-            else {
+            } else {
                 throw new IllegalStateException("check response failed: " + response);
             }
         } catch (Exception e) {
@@ -146,8 +144,6 @@ public class HttpClientSender extends Sender {
             return null;
         }
 
-
-
         @Override
         public void enqueue(Callback<Void> callback) {
             Publisher<HttpResponse<ByteBuffer>> publisher = httpClient.exchange(prepareRequest());
@@ -162,8 +158,7 @@ public class HttpClientSender extends Sender {
                 public void onNext(HttpResponse<ByteBuffer> response) {
                     if(response.getStatus().getCode() >= 400) {
                         callback.onError(new IllegalStateException("Response return invalid status code: " + response.getStatus()));
-                    }
-                    else {
+                    } else {
                         callback.onSuccess(null);
                     }
                 }
@@ -219,7 +214,7 @@ public class HttpClientSender extends Sender {
     }
 
     /**
-     * Constructs the {@link HttpClientSender}
+     * Constructs the {@link HttpClientSender}.
      */
     public static class Builder {
         public static final String DEFAULT_PATH = "/api/v2/spans";
@@ -256,7 +251,8 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The message max bytes
+         * The message max bytes.
+         *
          * @param messageMaxBytes The max bytes
          * @return This builder
          */
@@ -266,7 +262,8 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * Whether compression is enabled (defaults to true)
+         * Whether compression is enabled (defaults to true).
+         *
          * @param compressionEnabled True if compression is enabled
          * @return This builder
          */
@@ -276,7 +273,7 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param endpoint The fully qualified URI of the Zipkin endpoint
          * @return This builder
@@ -289,7 +286,7 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param endpoint The fully qualified URI of the Zipkin endpoint
          * @return This builder
@@ -299,7 +296,7 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param urls The zipkin server URLs
          * @return This builder
@@ -312,7 +309,9 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * Consructs a {@link HttpClientSender}
+         * Constructs a {@link HttpClientSender}.
+         *
+         * @param loadBalancerResolver Resolver instance capable of resolving references to services into a concrete load-balance
          * @return The sender
          */
         public HttpClientSender build(LoadBalancerResolver loadBalancerResolver) {
