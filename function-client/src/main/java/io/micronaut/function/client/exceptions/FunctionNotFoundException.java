@@ -24,6 +24,10 @@ package io.micronaut.function.client.exceptions;
  */
 public class FunctionNotFoundException extends FunctionException {
 
+    /**
+     * Constructor.
+     * @param functionName string name
+     */
     public FunctionNotFoundException(String functionName) {
         super("No function found for name: " + functionName);
     }

@@ -19,6 +19,8 @@ package io.micronaut.function.client;
 import io.micronaut.core.type.Argument;
 
 /**
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */

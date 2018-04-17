@@ -42,6 +42,11 @@ public class LocalFunctionDefinitionProvider implements FunctionDefinitionProvid
     private final EmbeddedServer embeddedServer;
     private final LocalFunctionRegistry localFunctionRegistry;
 
+    /**
+     * Constructor.
+     * @param embeddedServer embeddedServer
+     * @param localFunctionRegistry localFunctionRegistry
+     */
     public LocalFunctionDefinitionProvider(EmbeddedServer embeddedServer, LocalFunctionRegistry localFunctionRegistry) {
         this.embeddedServer = embeddedServer;
         this.localFunctionRegistry = localFunctionRegistry;

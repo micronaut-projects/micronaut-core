@@ -47,6 +47,8 @@ import java.util.concurrent.ThreadFactory;
 /**
  * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
  *
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
@@ -55,6 +57,15 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
     private final DefaultHttpClient httpClient;
 
+    /**
+     * Constructor.
+     * @param configuration configuration
+     * @param threadFactory threadFactory
+     * @param nettyClientSslBuilder nettyClientSslBuilder
+     * @param codecRegistry codecRegistry
+     * @param annotationMetadataResolver annotationMetadataResolver
+     * @param filters filters
+     */
     public HttpFunctionExecutor(
             HttpClientConfiguration configuration,
             @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,

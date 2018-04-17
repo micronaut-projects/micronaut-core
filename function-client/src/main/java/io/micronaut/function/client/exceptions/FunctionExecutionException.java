@@ -21,10 +21,19 @@ package io.micronaut.function.client.exceptions;
  * @since 1.0
  */
 public class FunctionExecutionException extends FunctionException {
+    /**
+     * Constructor.
+     * @param message message
+     */
     public FunctionExecutionException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor.
+     * @param message message
+     * @param cause cause of the exception
+     */
     public FunctionExecutionException(String message, Throwable cause) {
         super(message, cause);
     }
