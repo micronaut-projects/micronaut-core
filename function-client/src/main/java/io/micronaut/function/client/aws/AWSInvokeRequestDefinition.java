@@ -37,6 +37,10 @@ public class AWSInvokeRequestDefinition implements FunctionDefinition {
     @ConfigurationBuilder
     protected InvokeRequest invokeRequest;
 
+    /**
+     * Constructor.
+     * @param name configured name from a property
+     */
     public AWSInvokeRequestDefinition(@Parameter String name) {
         this.invokeRequest = new InvokeRequest();
         this.invokeRequest.setFunctionName(name);
