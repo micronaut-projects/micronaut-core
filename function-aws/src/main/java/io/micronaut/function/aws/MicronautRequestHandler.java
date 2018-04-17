@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.aws;
 
 import com.amazonaws.services.lambda.runtime.ClientContext;
@@ -21,12 +22,13 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.function.FunctionBean;
 import io.micronaut.function.executor.AbstractFunctionExecutor;
 
 /**
- * <p>An Amazon Lambda {@link RequestHandler} implementation for Micronaut {@link FunctionBean}</p>
+ * <p>An Amazon Lambda {@link RequestHandler} implementation for Micronaut {@link io.micronaut.function.FunctionBean}</p>.
  *
+ * @param <I>      The request body type
+ * @param <O>      The response body type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -48,6 +50,12 @@ public abstract class MicronautRequestHandler<I, O> extends AbstractFunctionExec
         return applicationContext;
     }
 
+    /**
+     * Register the beans in the application.
+     *
+     * @param context context
+     * @param applicationContext application context
+     */
     static void registerContextBeans(Context context, ApplicationContext applicationContext) {
         applicationContext.registerSingleton(context);
         LambdaLogger logger = context.getLogger();
