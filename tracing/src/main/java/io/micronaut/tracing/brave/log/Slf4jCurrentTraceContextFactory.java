@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.log;
 
 import brave.propagation.CurrentTraceContext;
@@ -24,7 +25,7 @@ import org.slf4j.MDC;
 import javax.annotation.Nullable;
 
 /**
- * Factory for the current trace context object
+ * Factory for the current trace context object.
  *
  * @author graemerocher
  * @since 1.0
@@ -37,8 +38,7 @@ public class Slf4jCurrentTraceContextFactory {
     Slf4jCurrentTraceContext currentTraceContext(@Nullable CurrentTraceContext existing) {
         if(existing != null) {
             return new Slf4jCurrentTraceContext(existing);
-        }
-        else {
+        } else {
             return new Slf4jCurrentTraceContext();
         }
     }

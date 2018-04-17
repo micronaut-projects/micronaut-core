@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
@@ -22,7 +23,7 @@ import javax.inject.Singleton;
 import java.util.function.Function;
 
 /**
- * A function that instruments an existing Runnable with {@link TracingRunnable}
+ * A function that instruments an existing Runnable with {@link TracingRunnable}.
  *
  * @author graemerocher
  * @since 1.0

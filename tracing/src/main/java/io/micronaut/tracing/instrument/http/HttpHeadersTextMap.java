@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.core.util.CollectionUtils;
@@ -26,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A {@link TextMap} implementations for the headers
+ * A {@link TextMap} implementations for the headers.
  *
  * @author graemerocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.http.*;
@@ -24,7 +25,7 @@ import io.opentracing.Tracer;
 import java.util.Optional;
 
 /**
- * Abstract filter used for Open Tracing based HTTP tracing
+ * Abstract filter used for Open Tracing based HTTP tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,7 +47,8 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     }
 
     /**
-     * Sets the response tags
+     * Sets the response tags.
+     *
      * @param request The request
      * @param response The response
      * @param span The span
@@ -64,20 +66,24 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     }
 
     /**
-     * Sets the error tags to use on the span
+     * Sets the error tags to use on the span.
+     *
      * @param span The span
      * @param error The error
      */
     protected void setErrorTags(Span span, Throwable error) {
         if(error != null) {
             String message = error.getMessage();
-            if(message == null) message = error.getClass().getSimpleName();
+            if(message == null) {
+                message = error.getClass().getSimpleName();
+            }
             span.setTag(TAG_ERROR, message);
         }
     }
 
     /**
-     * Resolve the span name to use for the request
+     * Resolve the span name to use for the request.
+     *
      * @param request The request
      * @return The span name
      */
@@ -87,7 +93,8 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     }
 
     /**
-     * Creates a new span for the given request and span context
+     * Creates a new span for the given request and span context.
+     *
      * @param request The request
      * @param spanContext The span context
      * @return The span builder

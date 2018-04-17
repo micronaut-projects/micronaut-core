@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.util;
 
 import io.opentracing.Scope;
@@ -22,7 +23,7 @@ import io.opentracing.Tracer;
 import java.util.concurrent.Callable;
 
 /**
- * Tracing {@link Callable} implementation
+ * Tracing {@link Callable} implementation.
  *
  * @author graemerocher
  * @since 1.0
@@ -32,7 +33,6 @@ public class TracingCallable<V> implements Callable<V> {
     private final Callable<V> callable;
     private final Tracer tracer;
     private final Span span;
-
 
     public TracingCallable(Callable<V> callable, Tracer tracer) {
         this.callable = callable;
@@ -59,8 +59,7 @@ public class TracingCallable<V> implements Callable<V> {
         Scope active = tracer.scopeManager().active();
         if(active != null) {
             return active.span();
-        }
-        else {
+        } else {
             return tracer.activeSpan();
         }
     }

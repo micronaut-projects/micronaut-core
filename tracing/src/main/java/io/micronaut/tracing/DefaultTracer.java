@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing;
 
 import io.micronaut.context.annotation.Factory;
@@ -25,7 +26,7 @@ import io.opentracing.noop.NoopTracerFactory;
 import javax.inject.Singleton;
 
 /**
- * Creates a default NoopTracer if no other tracer is present
+ * Creates a default NoopTracer if no other tracer is present.
  *
  * @author graemerocher
  * @since 1.0
@@ -33,6 +34,11 @@ import javax.inject.Singleton;
 @Factory
 public class DefaultTracer {
 
+    /**
+     * Creates a default NoopTracer if no other tracer is present.
+     *
+     * @return {@link NoopTracer} No-op implementation of the Tracer interface, all methods are no-ops.
+     */
     @Singleton
     @Primary
     @Requires(missingBeans = Tracer.class)

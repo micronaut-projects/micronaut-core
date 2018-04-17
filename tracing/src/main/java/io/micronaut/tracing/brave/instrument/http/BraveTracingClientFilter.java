@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.http.HttpClientHandler;
@@ -28,7 +29,7 @@ import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import org.reactivestreams.Publisher;
 
 /**
- * Instruments outgoing HTTP requests
+ * Instruments outgoing HTTP requests.
  *
  * @author graemerocher
  * @since 1.0

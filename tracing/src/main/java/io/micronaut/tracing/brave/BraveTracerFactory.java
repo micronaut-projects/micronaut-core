@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave;
 
 import brave.CurrentSpanCustomizer;
@@ -33,7 +34,7 @@ import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 /**
- * Builds a {@link io.opentracing.Tracer} for Brave using {@link brave.opentracing.BraveTracer}
+ * Builds a {@link io.opentracing.Tracer} for Brave using {@link brave.opentracing.BraveTracer}.
  *
  * @author graemerocher
  * @since 1.0
@@ -49,7 +50,7 @@ public class BraveTracerFactory {
     }
 
     /**
-     * The {@link Tracing} bean
+     * The {@link Tracing} bean.
      *
      * @param reporter An optional {@link Reporter}
      * @return The {@link Tracing} bean
@@ -61,15 +62,15 @@ public class BraveTracerFactory {
         Tracing.Builder builder = braveTracerConfiguration.getTracingBuilder();
         if(reporter != null) {
             builder.spanReporter(reporter);
-        }
-        else {
+        } else {
             builder.spanReporter(Reporter.NOOP);
         }
         return builder.build();
     }
 
     /**
-     * The {@link SpanCustomizer} bean
+     * The {@link SpanCustomizer} bean.
+     *
      * @param tracing The {@link Tracing} bean
      * @return The {@link SpanCustomizer} bean
      */
@@ -81,7 +82,8 @@ public class BraveTracerFactory {
     }
 
     /**
-     * The Open Tracing {@link Tracer} bean
+     * The Open Tracing {@link Tracer} bean.
+     *
      * @param tracing The {@link Tracing} bean
      * @return The Open Tracing {@link Tracer} bean
      */
@@ -98,7 +100,8 @@ public class BraveTracerFactory {
     }
 
     /**
-     * A {@link Reporter} that is configured if no other Reporter is present and {@link AsyncReporterConfiguration} is enabled
+     * A {@link Reporter} that is configured if no other Reporter is present and {@link AsyncReporterConfiguration} is enabled.
+     *
      * @param configuration The configuration
      * @return The {@link AsyncReporter} bean
      */

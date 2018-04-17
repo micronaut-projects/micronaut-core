@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.hystrix;
 
 import com.netflix.hystrix.HystrixThreadPoolKey;
@@ -36,7 +37,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Replaces the default {@link HystrixConcurrencyStrategy} with one that is enhanced for Tracing
+ * Replaces the default {@link HystrixConcurrencyStrategy} with one that is enhanced for Tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -84,8 +85,7 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
         Callable<T> wrapped = super.wrapCallable(callable);
         if(callable instanceof TracingCallable) {
             return callable;
-        }
-        else {
+        } else {
             return new TracingCallable<>(wrapped, tracer);
         }
     }

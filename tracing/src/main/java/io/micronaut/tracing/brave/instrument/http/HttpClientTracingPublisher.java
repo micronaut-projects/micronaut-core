@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
@@ -32,7 +33,7 @@ import org.reactivestreams.Subscription;
 import java.util.Optional;
 
 /**
- * A Publisher that handles HTTP client request tracing
+ * A Publisher that handles HTTP client request tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -96,8 +97,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                             configureAttributes(response);
 
                             clientHandler.handleReceive(response, e, span);
-                        }
-                        else {
+                        } else {
                             span.error(error);
                             span.finish();
                         }
