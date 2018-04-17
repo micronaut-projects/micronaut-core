@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.async.client.MongoClientSettings;
@@ -27,7 +28,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
- * The default MongoDB configuration class
+ * The default MongoDB configuration class.
  *
  * @author graemerocher
  * @since 1.0
@@ -55,6 +56,10 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "ssl")
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     */
     public ReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }
