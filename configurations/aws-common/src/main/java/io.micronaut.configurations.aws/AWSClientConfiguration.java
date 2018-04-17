@@ -30,5 +30,5 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 public class AWSClientConfiguration extends AWSConfiguration {
 
     @ConfigurationBuilder
-    ClientConfiguration clientConfiguration = new ClientConfiguration();
+    public ClientConfiguration clientConfiguration = new ClientConfiguration();
 }
