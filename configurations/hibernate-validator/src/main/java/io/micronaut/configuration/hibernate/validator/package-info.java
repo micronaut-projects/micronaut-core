@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Contains configurations for Hibernate Validator
+ * Contains configurations for Hibernate Validator.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,8 +26,6 @@ package io.micronaut.configuration.hibernate.validator;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
 import org.hibernate.validator.HibernateValidator;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
 
 import javax.el.ELContext;
 import javax.xml.validation.Validator;
