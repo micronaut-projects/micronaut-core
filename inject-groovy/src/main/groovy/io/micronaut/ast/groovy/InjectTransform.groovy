@@ -1048,16 +1048,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        private List<ConstructorNode> findPublicConstructors(List<ConstructorNode> constructorNodes) {
-            List<ConstructorNode> publicConstructors = []
-            for (node in constructorNodes) {
-                if (Modifier.isPublic(node.modifiers)) {
-                    publicConstructors.add(node)
-                }
-            }
-            return publicConstructors
-        }
-
         private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
             List<ConstructorNode> nonPrivateConstructors = []
             for (node in constructorNodes) {
