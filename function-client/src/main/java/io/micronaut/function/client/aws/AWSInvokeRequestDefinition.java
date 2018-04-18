@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.model.InvokeRequest;
@@ -23,7 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.function.client.FunctionDefinition;
 
 /**
- * Builds an {@link InvokeRequest} for each definition under {@code aws.lambda.functions}
+ * Builds an {@link InvokeRequest} for each definition under {@code aws.lambda.functions}.
  *
  * @author graemerocher
  * @since 1.0
@@ -36,6 +37,10 @@ public class AWSInvokeRequestDefinition implements FunctionDefinition {
     @ConfigurationBuilder
     protected InvokeRequest invokeRequest;
 
+    /**
+     * Constructor.
+     * @param name configured name from a property
+     */
     public AWSInvokeRequestDefinition(@Parameter String name) {
         this.invokeRequest = new InvokeRequest();
         this.invokeRequest.setFunctionName(name);

@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
 /**
- * A strategy interface for handling exiting from a function when it is executed via the CLI
+ * A strategy interface for handling exiting from a function when it is executed via the CLI.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface FunctionExitHandler {
     /**
-     * Exit the function with an error
+     * Exit the function with an error.
      *
      * @param error The error
      * @param debug Whether to output debug information before exiting
@@ -31,12 +32,12 @@ public interface FunctionExitHandler {
     void exitWithError(Exception error, boolean debug);
 
     /**
-     * Exit the function with success
+     * Exit the function with success.
      */
     void exitWithSuccess();
 
     /**
-     * Exit the function indicating no data was supplied
+     * Exit the function indicating no data was supplied.
      */
     void exitWithNoData();
 }

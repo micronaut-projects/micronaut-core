@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
@@ -28,7 +29,7 @@ import java.io.IOException;
 import java.util.function.Function;
 
 /**
- * A super class that can be used to initialize a function
+ * A super class that can be used to initialize a function.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,13 +40,38 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     protected final boolean closeContext;
     private FunctionExitHandler functionExitHandler = new DefaultFunctionExitHandler();
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Constructor.
+     */
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
         this.applicationContext = applicationContext;
         startThis(applicationContext);
         injectThis(applicationContext);
         this.closeContext = true;
+    }
+
+    /**
+     * Start a function for an existing {@link ApplicationContext}.
+     *
+     * @param applicationContext The application context
+     */
+    protected FunctionInitializer(ApplicationContext applicationContext) {
+        this(applicationContext, true);
+    }
+
+    /**
+     * Start a function for an existing {@link ApplicationContext}.
+     *
+     * @param applicationContext The application context
+     * @param inject inject this into the application flag
+     */
+    protected FunctionInitializer(ApplicationContext applicationContext, boolean inject) {
+        this.applicationContext = applicationContext;
+        this.closeContext = false;
+        if (inject) {
+            injectThis(applicationContext);
+        }
     }
 
     @Override
@@ -57,29 +83,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * Start a function for an existing {@link ApplicationContext}
-     *
-     * @param applicationContext The application context
-     */
-    protected FunctionInitializer(ApplicationContext applicationContext) {
-        this(applicationContext, true);
-    }
-
-    /**
-     * Start a function for an existing {@link ApplicationContext}
-     *
-     * @param applicationContext The application context
-     */
-    protected FunctionInitializer(ApplicationContext applicationContext, boolean inject) {
-        this.applicationContext = applicationContext;
-        this.closeContext = false;
-        if (inject) {
-            injectThis(applicationContext);
-        }
-    }
-
-    /**
-     * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method
+     * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method.
      *
      * @param args     The arguments passed to main
      * @param supplier The function that executes this function
@@ -103,16 +107,16 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * Start this environment
+     * Start this environment.
      *
-     * @param applicationContext
+     * @param applicationContext The application context
      */
     protected void startThis(ApplicationContext applicationContext) {
         startEnvironment(applicationContext);
     }
 
     /**
-     * Injects this instance
+     * Injects this instance.
      *
      * @param applicationContext The {@link ApplicationContext}
      */
@@ -123,19 +127,31 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type
+     * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type.
      */
     public class ParseContext {
         private final String data;
         private final boolean debug;
 
-        public ParseContext(String[] args) {
+        /**
+         * Constructor.
+         *
+         * @param args command line args
+         */
+        ParseContext(String[] args) {
             CommandLine commandLine = FunctionApplication.parseCommandLine(args);
             debug = commandLine.hasOption(FunctionApplication.DEBUG_OPTIONS);
             data = commandLine.hasOption(FunctionApplication.DATA_OPTION) ? commandLine.optionValue(FunctionApplication.DATA_OPTION).toString() : null;
         }
 
-        public <T> T get(Class<T> type) {
+        /**
+         * Get.
+         *
+         * @param type type
+         * @param <T> generic return type
+         * @return Type
+         */
+        public final <T> T get(Class<T> type) {
             if (data == null) {
                 functionExitHandler.exitWithNoData();
                 return null;
