@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -29,7 +29,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -47,15 +46,13 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Delegates to Netty's {@link DefaultFullHttpResponse}
+ * Delegates to Netty's {@link FullHttpResponse}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
-
-    private static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
     protected FullHttpResponse nettyResponse;
     private final ConversionService conversionService;
@@ -64,7 +61,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
 
-    public NettyHttpResponse(DefaultFullHttpResponse nettyResponse, ConversionService conversionService) {
+    public NettyHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
@@ -154,7 +151,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> body(B body) {
+    public NettyHttpResponse<B> body(B body) {
         this.body = body;
         return this;
     }
@@ -164,55 +161,4 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
-    /**
-     * Lookup the response from the context
-     *
-     * @param request The context
-     * @return The {@link NettyHttpResponse}
-     */
-    @Internal
-    public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
-        return getOr(request, io.micronaut.http.HttpResponse.ok());
-    }
-
-    /**
-     * Lookup the response from the context
-     *
-     * @param request The context
-     * @return The {@link NettyHttpResponse}
-     */
-    @Internal
-    public static NettyHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
-        Attribute<NettyHttpResponse> attr = request.attr(KEY);
-        NettyHttpResponse nettyHttpResponse = attr.get();
-        if (nettyHttpResponse == null) {
-            nettyHttpResponse = (NettyHttpResponse) alternative;
-            attr.set(nettyHttpResponse);
-        }
-        return nettyHttpResponse;
-    }
-
-    /**
-     * Lookup the response from the request
-     *
-     * @param request The request
-     * @return The {@link NettyHttpResponse}
-     */
-    @Internal
-    public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
-        NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
-        return Optional.ofNullable(nettyHttpResponse);
-    }
-
-    /**
-     * Lookup the response from the request
-     *
-     * @param request The request
-     * @return The {@link NettyHttpResponse}
-     */
-    @Internal
-    public static Optional<NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
-        request.attr(KEY).set((NettyHttpResponse) response);
-        return Optional.ofNullable((NettyHttpResponse) response);
-    }
 }

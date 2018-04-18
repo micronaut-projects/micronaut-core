@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyHttpResponse;
 import io.netty.channel.ChannelHandlerContext;
 
 /**

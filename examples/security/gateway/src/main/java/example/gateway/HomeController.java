@@ -25,11 +25,9 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import static io.micronaut.http.HttpResponse.ok;
 
-@Singleton
 @Controller("/")
 public class HomeController {
 
