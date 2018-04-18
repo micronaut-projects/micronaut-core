@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -20,7 +21,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 
 /**
- * In the case where the <tt>redis.uri</tt> is not specified use the default configuration
+ * In the case where the <tt>redis.uri</tt> is not specified use the default configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
