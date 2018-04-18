@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.gorm.event;
 
 import io.micronaut.context.ApplicationContext;
@@ -26,7 +27,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.SmartApplicationListener;
 
 /**
- * Adapts Spring event model
+ * Adapts Spring event model.
  *
  * @author graemerocher
  * @since 1.0
@@ -34,6 +35,10 @@ import org.springframework.context.event.SmartApplicationListener;
 public class ConfigurableEventPublisherAdapter extends ApplicationEventPublisherAdapter implements ConfigurableApplicationEventPublisher {
     private final ApplicationContext applicationContext;
 
+    /**
+     * Constructor.
+     * @param applicationContext applicationContext
+     */
     public ConfigurableEventPublisherAdapter(ApplicationContext applicationContext) {
         super(applicationContext);
         this.applicationContext = applicationContext;

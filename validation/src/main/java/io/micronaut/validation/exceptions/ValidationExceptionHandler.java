@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
@@ -28,7 +29,7 @@ import org.springframework.validation.FieldError;
 import javax.inject.Singleton;
 
 /**
- * Default Exception handler for GORM validation errors
+ * Default Exception handler for GORM validation errors.
  *
  * @author graemerocher
  * @since 1.0
