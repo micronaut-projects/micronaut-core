@@ -40,6 +40,7 @@ import java.util.Set;
  */
 public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
+    private static final Type TYPE_DEFAULT_ANNOTATION_METADATA = Type.getType(DefaultAnnotationMetadata.class);
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
             StringUtils.class,
@@ -140,25 +141,45 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         }
     }
 
+    /**
+     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}
+     * @param generatorAdapter The generator adapter
+     * @param annotationMetadata The annotation metadata
+     */
+    public static void instantiateNewMetadata(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata) {
+        instantiateInternal(generatorAdapter, annotationMetadata, true);
+    }
+
+    private static void instantiateInternal(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, boolean isNew) {
+        if(isNew) {
+            generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA.getInternalName());
+            generatorAdapter.visitInsn(DUP);
+        }
+        else {
+            generatorAdapter.loadThis();
+        }
+        // 1st argument: the declared annotations
+        pushCreateAnnotationData(generatorAdapter, annotationMetadata.declaredAnnotations);
+        // 2nd argument: the declared stereotypes
+        pushCreateAnnotationData(generatorAdapter, annotationMetadata.declaredStereotypes);
+        // 3rd argument: all stereotypes
+        pushCreateAnnotationData(generatorAdapter, annotationMetadata.allStereotypes);
+        // 4th argument: all annotations
+        pushCreateAnnotationData(generatorAdapter, annotationMetadata.allAnnotations);
+        // 5th argument: annotations by stereotype
+        pushCreateAnnotationsByStereotypeData(generatorAdapter, annotationMetadata.annotationsByStereotype);
+
+        generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA, CONSTRUCTOR_ANNOTATION_METADATA);
+    }
+
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        Type superType = Type.getType(DefaultAnnotationMetadata.class);
-        startClass(classWriter, getInternalName(className), superType);
+        startClass(classWriter, getInternalName(className), TYPE_DEFAULT_ANNOTATION_METADATA);
 
         GeneratorAdapter constructor = startConstructor(classWriter);
-        constructor.loadThis();
-        // 1st argument: the declared annotations
-        pushCreateAnnotationData(constructor, annotationMetadata.declaredAnnotations);
-        // 2nd argument: the declared stereotypes
-        pushCreateAnnotationData(constructor, annotationMetadata.declaredStereotypes);
-        // 3rd argument: all stereotypes
-        pushCreateAnnotationData(constructor, annotationMetadata.allStereotypes);
-        // 4th argument: all annotations
-        pushCreateAnnotationData(constructor, annotationMetadata.allAnnotations);
-        // 5th argument: annotations by stereotype
-        pushCreateAnnotationsByStereotypeData(constructor, annotationMetadata.annotationsByStereotype);
+        DefaultAnnotationMetadata annotationMetadata = this.annotationMetadata;
 
-        constructor.invokeConstructor(superType, CONSTRUCTOR_ANNOTATION_METADATA);
+        instantiateInternal(constructor, annotationMetadata, false);
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();

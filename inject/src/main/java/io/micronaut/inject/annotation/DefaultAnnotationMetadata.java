@@ -30,6 +30,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
@@ -90,6 +91,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     private final Map<String, Annotation> declaredAnnotationMap;
     private Environment environment;
 
+    /**
+     * Constructs empty annotation metadata
+     */
     @Internal
     protected DefaultAnnotationMetadata() {
         annotationMap = new ConcurrentHashMap<>(2);
@@ -106,12 +110,12 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param annotationsByStereotype The annotations by stereotype
      */
     @Internal
-    protected DefaultAnnotationMetadata(
-        Map<String, Map<CharSequence, Object>> declaredAnnotations,
-        Map<String, Map<CharSequence, Object>> declaredStereotypes,
-        Map<String, Map<CharSequence, Object>> allStereotypes,
-        Map<String, Map<CharSequence, Object>> allAnnotations,
-        Map<String, Set<String>> annotationsByStereotype) {
+    public DefaultAnnotationMetadata(
+        @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+        @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+        @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+        @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+        @Nullable Map<String, Set<String>> annotationsByStereotype) {
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;

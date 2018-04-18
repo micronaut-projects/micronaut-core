@@ -797,7 +797,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
-                    params.getGenericTypes()
+                    params.getGenericTypes(),
+                    annotationMetadata
                 );
             } else {
                 error("Unexpected call to visitAnnotatedMethod(%s)", method);

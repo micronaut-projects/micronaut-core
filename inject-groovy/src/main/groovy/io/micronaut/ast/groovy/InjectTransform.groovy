@@ -595,13 +595,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap)
                         } else {
                             getBeanWriter().visitMethodInjectionPoint(
-                                AstGenericUtils.resolveTypeReference(declaringClass),
-                                requiresReflection,
-                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                methodName,
-                                paramsToType,
-                                qualifierTypes,
-                                genericTypeMap)
+                                    AstGenericUtils.resolveTypeReference(declaringClass),
+                                    requiresReflection,
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                    methodName,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap, annotationMetadata)
                         }
                     }
                 }
