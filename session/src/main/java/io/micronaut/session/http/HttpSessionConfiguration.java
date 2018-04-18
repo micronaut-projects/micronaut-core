@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -23,7 +24,7 @@ import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
- * Allows configuration of the session
+ * Allows configuration of the session.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,7 +33,7 @@ import java.util.Optional;
 public class HttpSessionConfiguration extends SessionConfiguration {
 
     /**
-     * Cookie name
+     * Cookie name.
      */
     public static final String DEFAULT_COOKIE_NAME = "SESSION";
 
