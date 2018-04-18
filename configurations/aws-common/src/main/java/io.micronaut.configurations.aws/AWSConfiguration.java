@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.aws;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS
+ * Configuration options for AWS.
  *
  * @author graemerocher
  * @since 1.0
@@ -27,7 +28,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 public class AWSConfiguration {
 
     /**
-     * Prefix for all AWS settings
+     * Prefix for all AWS settings.
      */
     public static final String PREFIX = "aws";
 }
