@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.attr;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -23,7 +24,7 @@ import java.util.Optional;
 
 /**
  *
- * An interface for objects that have attributes
+ * An interface for objects that have attributes.
  *
  * @author graemerocher
  * @since 1.0
@@ -40,7 +41,7 @@ public interface AttributeHolder {
 
 
     /**
-     * Obtain the value of an attribute on the HTTP method
+     * Obtain the value of an attribute on the HTTP method.
      * @param name The name of the attribute
      * @return An {@link Optional} value
      */
@@ -52,7 +53,7 @@ public interface AttributeHolder {
     }
 
     /**
-     * Obtain the value of an attribute on the HTTP method
+     * Obtain the value of an attribute on the HTTP method.
      * @param name The name of the attribute
      * @param type The required type
      * @return An {@link Optional} value
@@ -63,6 +64,4 @@ public interface AttributeHolder {
         }
         return Optional.empty();
     }
-
-
 }

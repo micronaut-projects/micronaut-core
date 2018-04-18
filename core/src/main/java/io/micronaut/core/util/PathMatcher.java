@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 /**
@@ -25,7 +26,7 @@ package io.micronaut.core.util;
  */
 public interface PathMatcher {
     /**
-     * The default Ant style patch matcher
+     * The default Ant style patch matcher.
      */
     AntPathMatcher ANT = new AntPathMatcher();
 

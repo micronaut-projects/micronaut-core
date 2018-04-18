@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import java.util.Collections;
@@ -20,7 +21,7 @@ import java.util.Iterator;
 import java.util.Optional;
 
 /**
- * Interface for reporting conversion errors
+ * Interface for reporting conversion errors.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,7 +29,7 @@ import java.util.Optional;
 public interface ErrorsContext extends Iterable<ConversionError> {
 
     /**
-     * Reject the version with the given exception
+     * Reject the version with the given exception.
      *
      * @param exception The exception
      */
@@ -37,7 +38,7 @@ public interface ErrorsContext extends Iterable<ConversionError> {
     }
 
     /**
-     * Reject the version with the given exception
+     * Reject the version with the given exception.
      *
      * @param value     The original value
      * @param exception The exception
@@ -52,7 +53,7 @@ public interface ErrorsContext extends Iterable<ConversionError> {
     }
 
     /**
-     * Obtain the last error
+     * Obtain the last error.
      *
      * @return The error
      */

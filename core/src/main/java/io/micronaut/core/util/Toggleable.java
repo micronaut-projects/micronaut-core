@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 /**
- * An interface for components or configurations that can be toggled on or off
+ * An interface for components or configurations that can be toggled on or off.
  *
  * @author Graeme Rocher
  * @since 1.0

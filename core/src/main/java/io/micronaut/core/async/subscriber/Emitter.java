@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
 /**
- * Base interface for classes that emit data. See {@link org.reactivestreams.Subscriber}
+ * Base interface for classes that emit data. See {@link org.reactivestreams.Subscriber}.
  *
  * @author Graeme Rocher
  * @since 1.0

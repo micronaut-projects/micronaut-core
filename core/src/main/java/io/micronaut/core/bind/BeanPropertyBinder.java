@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind;
 
 import io.micronaut.core.beans.BeanMap;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * <p>An interface that provides the ability to bind Maps and Java bean properties</p>
+ * <p>An interface that provides the ability to bind Maps and Java bean properties</p>.
  * <p>
  * <p>This class is designed specifically for binding of String based property data such as Form submissions and
  * dynamic binding of Java Properties files and should not be used beyond these two use cases.</p>
@@ -34,7 +35,7 @@ import java.util.Set;
 public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSequence, ? super Object>> {
 
     /**
-     * Bind a new instance of the given type from the given source
+     * Bind a new instance of the given type from the given source.
      *
      * @param type   The type
      * @param source The source
@@ -46,7 +47,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
-     * Bind an existing instance of the given type from the given source
+     * Bind an existing instance of the given type from the given source.
      *
      * @param object  The bean
      * @param context The conversion context
@@ -57,7 +58,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source);
 
     /**
-     * Bind an existing instance of the given type from the given source
+     * Bind an existing instance of the given type from the given source.
      *
      * @param object The bean
      * @param source The source
@@ -68,7 +69,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     <T2> T2 bind(T2 object, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
-     * Bind a new instance of the given type from the given source
+     * Bind a new instance of the given type from the given source.
      *
      * @param type   The type
      * @param source The source
@@ -82,7 +83,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     }
 
     /**
-     * Bind an existing instance of the given type from the given source
+     * Bind an existing instance of the given type from the given source.
      *
      * @param object  The bean
      * @param context The conversion context
@@ -95,7 +96,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     }
 
     /**
-     * Bind an existing instance of the given type from the given source
+     * Bind an existing instance of the given type from the given source.
      *
      * @param object The bean
      * @param source The source
@@ -108,7 +109,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     }
 
     /**
-     * Bind an existing instance of the given type from the given source
+     * Bind an existing instance of the given type from the given source.
      *
      * @param object The bean
      * @param source The source

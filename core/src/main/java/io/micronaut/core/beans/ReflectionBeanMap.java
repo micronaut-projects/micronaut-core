@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import io.micronaut.core.convert.ConversionService;
@@ -27,7 +28,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Simple reflection based BeanMap implementation
+ * Simple reflection based BeanMap implementation.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.service;
 
 import java.io.File;
@@ -26,7 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 /**
- * <p>Utility class for generated META-INF/services files</p>
+ * <p>Utility class for generated META-INF/services files</p>.
  *
  * @author Graeme Rocher
  * @since 1.0

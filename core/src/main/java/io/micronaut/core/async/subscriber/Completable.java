@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
 
 /**
- * Interface that exposes a callback to indicate when an operation has been completed
+ * Interface that exposes a callback to indicate when an operation has been completed.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +27,7 @@ import org.reactivestreams.Subscriber;
 public interface Completable {
 
     /**
-     * * Successful terminal state. To be called when the operation is complete
+     * * Successful terminal state. To be called when the operation is complete.
      *
      * @see Subscriber#onComplete()
      */

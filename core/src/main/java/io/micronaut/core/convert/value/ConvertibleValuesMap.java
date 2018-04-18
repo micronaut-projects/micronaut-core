@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -27,7 +28,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * An implementation of {@link ConvertibleValues} backed by a map
+ * An implementation of {@link ConvertibleValues} backed by a map.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -70,7 +71,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     }
 
     /**
-     * An empty {@link ConvertibleValuesMap}
+     * An empty {@link ConvertibleValuesMap}.
      *
      * @param <V> The generic type
      * @return The empty {@link ConvertibleValuesMap}

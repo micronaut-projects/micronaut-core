@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import org.reactivestreams.Subscriber;
@@ -26,7 +27,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
- * Adapts a {@link CompletableFuture} to a {@link org.reactivestreams.Publisher}
+ * Adapts a {@link CompletableFuture} to a {@link org.reactivestreams.Publisher}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,14 +38,14 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
     private final Queue<BiConsumer<? super T, ? super Throwable>> whenCompletes = new ConcurrentLinkedDeque<>();
 
     /**
-     * @param futureSupplier The function that supplies the future
+     * @param futureSupplier The function that supplies the future.
      */
     CompletableFuturePublisher(Supplier<CompletableFuture<T>> futureSupplier) {
         this.futureSupplier = futureSupplier;
     }
 
     /**
-     * Allow execution of callbacks when the publisher completes
+     * Allow execution of callbacks when the publisher completes.
      *
      * @param action The action
      * @return This publisher

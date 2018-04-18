@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.processor;
 
 import io.micronaut.core.async.subscriber.SingleThreadedBufferingSubscriber;
@@ -85,14 +86,14 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     /**
-     * Called when an message is received from the upstream {@link Subscriber}
+     * Called when an message is received from the upstream {@link Subscriber}.
      *
      * @param message The message
      */
     protected abstract void onUpstreamMessage(R message);
 
     /**
-     * Resolve the current {@link Subscriber}
+     * Resolve the current {@link Subscriber}.
      *
      * @return An {@link Optional} of the subscriber
      */
@@ -101,7 +102,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     /**
-     * Resolve the current {@link Subscriber}
+     * Resolve the current {@link Subscriber}.
      *
      * @return An {@link Optional} of the subscriber
      * @throws IllegalStateException If no {@link Subscriber} is present

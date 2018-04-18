@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
 import io.micronaut.core.type.Argument;
 
 /**
- * A subscriber that is aware of the target type
+ * A subscriber that is aware of the target type.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,7 +29,7 @@ public abstract class TypedSubscriber<T> extends CompletionAwareSubscriber<T> {
     private final Argument<T> typeArgument;
 
     /**
-     * Constructs a new {@link TypedSubscriber} for the given {@link Argument}
+     * Constructs a new {@link TypedSubscriber} for the given {@link Argument}.
      *
      * @param typeArgument The type argument
      */

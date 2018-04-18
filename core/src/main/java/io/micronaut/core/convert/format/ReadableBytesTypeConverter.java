@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.format;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -22,7 +23,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Converts String's to readable bytes
+ * Converts String's to readable bytes.
  *
  * @author Graeme Rocher
  * @since 1.0

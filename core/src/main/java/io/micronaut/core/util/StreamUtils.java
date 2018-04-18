@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import java.util.*;
@@ -23,7 +24,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 /**
- * Utility methods for working with streams
+ * Utility methods for working with streams.
  *
  * @author James Kleeh
  * @since 1.0
@@ -67,8 +68,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp >= 0)
+                if (cmp >= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {

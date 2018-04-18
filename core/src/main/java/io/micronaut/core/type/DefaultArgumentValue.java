@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Default implementation of {@link ArgumentValue}
+ * Default implementation of {@link ArgumentValue}.
  *
  * @author Graeme Rocher
  * @since 1.0

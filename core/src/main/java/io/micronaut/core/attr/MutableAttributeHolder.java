@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.attr;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -21,14 +22,14 @@ import io.micronaut.core.util.StringUtils;
 import java.util.Optional;
 
 /**
- * An interface for types that support mutating attributes
+ * An interface for types that support mutating attributes.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface MutableAttributeHolder extends AttributeHolder {
     /**
-     * Overrides the default {@link AttributeHolder#getAttributes()} method to return a mutable object
+     * Overrides the default {@link AttributeHolder#getAttributes()} method to return a mutable object.
      *
      * @return The mutable attributes
      */
@@ -36,7 +37,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
     MutableConvertibleValues<Object> getAttributes();
 
     /**
-     * Sets an attribute on the message
+     * Sets an attribute on the message.
      * @param name The name of the attribute
      * @param value The value of the attribute
      * @return This message
@@ -54,7 +55,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
     }
 
     /**
-     * Remove an attribute. Returning the old value if it is present
+     * Remove an attribute. Returning the old value if it is present.
      *
      * @param name The name of the attribute
      * @param type The required type

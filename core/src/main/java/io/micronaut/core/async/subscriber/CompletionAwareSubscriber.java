@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
@@ -21,7 +22,7 @@ import org.reactivestreams.Subscription;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A {@link Subscriber} that tracks completion state using a {@link AtomicBoolean}
+ * A {@link Subscriber} that tracks completion state using a {@link AtomicBoolean}.
  *
  * @param <T> the type of element signaled.
  *
@@ -72,6 +73,7 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
             }
         }
     }
+
     /**
      * Implement {@link Subscriber#onSubscribe(Subscription)}
      */

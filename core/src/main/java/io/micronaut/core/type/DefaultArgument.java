@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -27,7 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Represents an argument to a constructor or method
+ * Represents an argument to a constructor or method.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -86,8 +87,7 @@ class DefaultArgument<T> implements Argument<T> {
     public Annotation getQualifier() {
         if(this.qualifier != null) {
             return this.qualifier;
-        }
-        else {
+        } else {
             this.qualifier = AnnotationUtil.findAnnotationWithStereoType("javax.inject.Qualifier", getAnnotations()).orElse(null);
             return qualifier;
         }
@@ -110,16 +110,24 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public boolean equalsType(Argument<?> o) {
-        if (this == o) return true;
-        if (o == null) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null) {
+            return false;
+        }
         return Objects.equals(type, o.getType()) &&
             Objects.equals(typeParameters, o.getTypeVariables());
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultArgument<?> that = (DefaultArgument<?>) o;
         return Objects.equals(type, that.type) &&
             Objects.equals(name, that.name) &&
