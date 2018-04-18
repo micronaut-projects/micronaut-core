@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env.groovy;
 
 import io.micronaut.context.env.AbstractPropertySourceLoader;
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 
@@ -30,7 +30,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * Loads properties from a Groovy script
+ * Loads properties from a Groovy script.
  *
  * @author Graeme Rocher
  * @since 1.0
