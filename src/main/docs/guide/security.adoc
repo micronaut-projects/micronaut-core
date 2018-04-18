@@ -1,0 +1,10 @@
+Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
+
+To enable security capabilities enable security:
+
+[source, yaml]
+----
+micronaut:
+    security:
+        enabled: true
+----

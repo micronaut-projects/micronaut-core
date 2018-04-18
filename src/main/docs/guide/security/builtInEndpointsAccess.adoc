@@ -1,0 +1,15 @@
+When you turn on security, Built-in endpoints are secured depending on their sensitive value.
+
+[source, yaml]
+----
+endpoints:
+  beans:
+    enabled: true
+    sensitive: true # <1>
+  health:
+    enabled: true
+    sensitive: false  # <2>
+----
+
+<1> `/beans` endpoint is secured
+<2> `/health` endpoint is open for unauthenticated access.

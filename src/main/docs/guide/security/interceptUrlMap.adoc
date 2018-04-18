@@ -1,0 +1,34 @@
+Once you enable security, Micronaut returns HTTP Status Unauthorized ( 401 ) for any endpoint invocation.
+
+You can configure endpoint authentication and authorization access with an Intercept URL Map:
+
+[source, yaml]
+----
+micronaut:
+  security:
+    enabled: true
+    interceptUrlMap:
+      -
+        pattern: /images/*
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY # <1>
+      -
+        pattern: /books
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED # <2>
+      -
+        pattern: /books/grails
+        httpMethod: GET
+        access:
+          - ROLE_GRAILS # <3>
+          - ROLE_GROOVY
+----
+
+<1> Enable anonymous access
+<2> Enable access for everyone authenticated
+<3> Enable access for users who are granted any of the specified roles.
+
+As you see in the previous code listing, any endpoint is identified by a combination of pattern
+an HTTP Method.

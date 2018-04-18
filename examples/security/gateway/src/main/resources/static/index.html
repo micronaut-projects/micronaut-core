@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <style type="text/css">
+        body {
+            padding: 50px;
+        }
+        #loginForm {
+            max-width: 90%;
+        }
+        .alert {
+            margin: 10px 0;
+        }
+        #books img {
+            display: block;
+            float: left;
+            margin: 10px 10px 10px 0;
+        }
+    </style>
+</head>
+<body>
+<button id="logoutButton" style="display: none;" class="btn btn-primary" onclick="javascript:logout();">Logout</button>
+<div id="loginForm" style="display: none;">
+    <div class="form-group">
+        <label for="username">Username</label>
+        <input type="username" class="form-control" id="username" placeholder="Enter Username">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" class="form-control" id="password" placeholder="Password">
+    </div>
+    <button type="submit" class="btn btn-primary" onclick="javascript:login();">Login</button>
+    <div id="loginFormErrors"></div>
+    <div class="alert alert-primary" role="alert">
+        Login with LDAP usernames: riemann, gauss, euler, euclid - password: password<br/>
+        or LDAP usernames: einstein, newton, galiele , tesla - password: password<br/>
+        or Database usernames: user - password: user
+    </div>
+</div>
+<div id="books"></div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script   src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script type="text/javascript">
+
+    var serverUrl = 'http://localhost:8080'
+
+    function login() {
+        var username = $('#username').val();
+        var password = $('#password').val();
+        var path = "/auth";
+        var data =  {"username": username,"password": password};
+        $.post(path,data, function(data) {
+            clearLoginForm();
+            populateLocalStorageWithJwt(data);
+            loadBooks();
+        }).fail(function() {
+                document.getElementById('loginFormErrors').innerHTML = alertMessage('User not found or invalid credentials');
+            });
+    }
+
+    function refreshAccessToken(callback) {
+        var path = "/oauth/access_token";
+        var data = {"grant_type": "refresh_token", "refresh_token": getRefreshToken()};
+        console.log("refreshing with:" + JSON.stringify(data));
+        $.post(path, data, function(data) {
+            populateLocalStorageWithAccessToken(data);
+            callback();
+        }).fail(function() {
+            logout()
+        });
+    }
+
+    function clearLoginForm() {
+        $('#username').val('');
+        $('#password').val('');
+    }
+
+    function alertMessage(msg) {
+        var html = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+        html += '<strong>'+msg+'</strong>';
+        html += '<button type="button" class="close" data-dismiss="alert" aria-label="Close">';
+        html += '<span aria-hidden="true">&times;</span>';
+        html += '</button>';
+        html += '</div>';
+        return html;
+    }
+
+    function loadBooks() {
+        document.getElementById('loginFormErrors').innerHTML = '';
+        $('#loginForm').hide();
+        $('#logoutButton').show();
+
+        document.getElementById('books').innerHTML = '';
+        console.log("Roles: " + getRoles());
+        if ( getRoles().indexOf('ROLE_GRAILS') > -1 ) {
+            console.log('has role GRAILS');
+            var path = 'grails';
+            loadBooksByPathWithCallbacks(path)
+        }
+        if ( getRoles().indexOf('ROLE_GROOVY') > -1 ) {
+            console.log('has role groovy');
+            var path = 'groovy';
+            loadBooksByPathWithCallbacks(path)
+        }
+    }
+
+    function loadBooksByPathWithCallbacks(path) {
+        loadBooksByPath(path, function(data) {
+            console.log(path + " books returned");
+
+            var html = document.getElementById('books').innerHTML;
+            html += booksHtml(data);
+            document.getElementById('books').innerHTML = html;
+        }, function() {
+            console.log("unauthorized while loading "+ path +" books");
+            refreshAccessToken(function() {
+                console.log("token refreshed. loading books again");
+                loadBooks();
+            });
+        });
+    }
+
+    function booksHtml(data) {
+        var html = "";
+        console.log("# books: " + data.length);
+
+        for ( var x = 0; x < data.length; x++ ) {
+            var book = data[x];
+            html += bookHtml(book);
+        }
+        return html;
+    }
+    function bookHtml(book) {
+        console.log("book: " + book);
+        return "<img src='"+serverUrl + "/images/"+book.image + "' alt='" + book.title + "' width='130' height='160'/>";
+    }
+
+    function getRoles() {
+        return localStorage.getItem("roles");
+    }
+
+    function getAccessToken() {
+        return localStorage.getItem("accessToken");
+    }
+
+    function getRefreshToken() {
+        return localStorage.getItem("refreshToken");
+    }
+
+    function populateLocalStorageWithAccessToken(data) {
+        console.log("Access token: " + data.accessToken);
+        localStorage.setItem("accessToken", data.accessToken);
+
+        console.log("Refresh token: " + data.refreshToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
+    }
+
+    function populateLocalStorageWithJwt(data) {
+        populateLocalStorageWithAccessToken(data);
+
+        console.log("Username: " + data.username);
+        localStorage.setItem("username", data.username);
+
+        console.log("Roles: " + data.roles);
+        localStorage.setItem("roles", data.roles);
+    }
+
+    function logout() {
+        $('#loginForm').show();
+        $('#logoutButton').hide();
+        document.getElementById('books').innerHTML = '';
+        clearLocalStorageJwt();
+    }
+
+    function clearLocalStorageJwt() {
+        localStorage.removeItem("username");
+        localStorage.removeItem("roles");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+    }
+
+    function loadBooksByPath(path, callback, unauthorizedCallback) {
+        var accessToken = getAccessToken();
+        console.log("load books by path - accessToken:" + accessToken);
+        jQuery.ajax({
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer ' + accessToken
+            },
+            'type': 'GET',
+            'url': serverUrl + '/books/'+path,
+            'dataType': 'json',
+            statusCode: {
+                200: callback,
+                401: unauthorizedCallback
+            }
+        });
+    }
+
+    function postJson(path, data, callback, unauthorizedCallback, badRequestCallback) {
+        jQuery.ajax({
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            type: 'POST',
+            url: serverUrl + path,
+            data: JSON.stringify({username: 'gauss', password: 'password'}),
+            dataType: 'json',
+            statusCode: {
+                200: callback,
+                401: unauthorizedCallback,
+                400: badRequestCallback
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        console.log("on document ready");
+        var accessToken = getAccessToken()
+        if (typeof(accessToken) != 'undefined' && accessToken != null) {
+            loadBooks();
+        } else {
+            $('#loginForm').show();
+        }
+    });
+
+</script>
+</body>
+</html>

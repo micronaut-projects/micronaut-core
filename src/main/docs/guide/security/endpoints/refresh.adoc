@@ -1,0 +1,33 @@
+When using JWT, issued access tokens expire after a period of time, and they are paired with refresh tokens. To
+ease the refresh, you can enable `OauthController`, which exposes an endpoint as defined by link:{api}/io/micronaut/security/endpoints/OauthControllerApi.html[OauthControllerApi], with configuration property:
+
+|===
+
+| Configuration Property | Default Value | Possible Values
+
+| `micronaut.security.endpoints.refresh` | false | true or false
+
+|===
+
+The controller exposes an endpoint as defined by https://tools.ietf.org/html/rfc6749#section-6[section 6 of the OAuth 2.0 spec] - Refreshing an Access Token.
+
+Refresh tokens never expire, and can be used to obtain a new access token by sending a POST request to the `/oauth/access_token` endpoint:
+
+[source,bash]
+.Sample HTTP request to obtain an access token
+----
+POST /myApp/oauth/access_token HTTP/1.1
+Host: server.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&refresh_token=eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ....
+----
+
+As you can see, is a form request with 2 parameters:
+
+`grant_type`: must be `refresh_token` always.
+
+`refresh_token`: the refresh token obtained previously.
+
+NOTE: By default refresh tokens never expire, they must be securely stored in your client application.
+See https://tools.ietf.org/html/rfc6749#section-10.4[section 10.4 of the OAuth 2.0 spec] for more information.

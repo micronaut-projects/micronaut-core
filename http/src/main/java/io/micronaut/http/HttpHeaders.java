@@ -522,4 +522,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     default Optional<String> getOrigin() {
         return findFirst(ORIGIN);
     }
+
+    /**
+     * @return The {@link #AUTHORIZATION} header
+     */
+    default Optional<String> getAuthorization() {
+        return findFirst(AUTHORIZATION);
+    }
 }

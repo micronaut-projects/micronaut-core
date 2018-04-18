@@ -84,4 +84,24 @@ management:
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     stopEndpoint: The Server Stop Endpoint
-
+security:
+  title: Security
+  interceptUrlMap: Intercept URL Map
+  builtInEndpointsAccess: Built-In Endpoints Security
+  jwt: JSON Web Token
+  filter:
+    title: Token Read
+    bearerToken: Bearer Token Reader
+    cookieToken: Cookie Token Reader
+  render:
+    title: Token Render
+  generation:
+    title: Token Generation
+    token: Signed JWTs
+    encryption: Encrypted JWTs
+  endpoints:
+    title: Built-In Security Controllers
+    login:
+      title: Login Controller
+      authenticationProviders: Authentication Providers
+    refresh: Refresh Controller

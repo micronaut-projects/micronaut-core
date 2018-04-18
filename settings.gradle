@@ -29,6 +29,7 @@ include "jdbc"
 include "runtime-groovy"
 include "cli"
 include "bom"
+include "security"
 
 // configurations
 include "configurations:gorm"

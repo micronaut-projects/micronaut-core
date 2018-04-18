@@ -1,0 +1,24 @@
+You can enable `LoginController`, which exposes an endpoint as defined by link:{api}/io/micronaut/security/endpoints/LoginControllerApi.html[LoginControllerApi], with configuration property:
+
+|===
+
+| Configuration Property | Default Value | Possible Values
+
+| `micronaut.security.endpoints.login` | false | true or false
+
+|===
+
+The response payload contains link:{api}/io/micronaut/security/token/render/AccessRefreshToken.html[AccessRefreshToken] which
+encapsulates two JWT tokens. One access token which you will use in your subsequents calls to the server and
+a refresh token which you will use to get new access tokens once the access token expires.
+
+[source, bash]
+.Login Endpoint invocation example
+----
+curl -X "POST" "http://localhost:8080/login" \
+     -H 'Content-Type: application/json; charset=utf-8' \
+     -d $'{
+  "username": "euler",
+  "password": "password"
+}'
+----

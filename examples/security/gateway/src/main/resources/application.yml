@@ -1,0 +1,71 @@
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+router:
+  static:
+    resources:
+      enabled: true
+      mapping: /**
+      paths:
+        - classpath:static
+micronaut:
+  application:
+    name: gateway
+  server:
+    cors:
+      enabled: true
+    port: 8080
+  security:
+    enabled: true
+    token:
+      secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+    interceptUrlMap:
+      -
+        pattern: /
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /index.html
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /login
+        httpMethod: POST
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /auth
+        httpMethod: POST
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /oauth/access_token
+        httpMethod: POST
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /images/*
+        httpMethod: GET
+        access:
+          - IS_AUTHENTICATED_ANONYMOUSLY
+      -
+        pattern: /books/grails
+        httpMethod: GET
+        access:
+          - ROLE_GRAILS
+      -
+        pattern: /books/groovy
+        httpMethod: GET
+        access:
+          - ROLE_GROOVY
+endpoints:
+  beans:
+    enabled: true
+    sensitive: true
+  health:
+    enabled: true
+    sensitive: false

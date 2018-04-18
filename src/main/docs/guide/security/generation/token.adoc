@@ -1,0 +1,23 @@
+Micronaut security capabilities use signed JWT’s as specified by the
+https://tools.ietf.org/html/rfc7515[JSON Web Signature] specification.
+
+More specifically, the algorithm used is `HMAC SHA-256` with a specified shared secret.
+The relevant configuration properties are:
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.token.jwsAlgorithm` | `HS256` | Any value of `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`
+
+| `micronaut.security.token.secret` | `null` (this is required property) | The secret length must be at least 256 bits
+
+| `micronaut.security.token.rolesClaimName` | `roles` | Default claim name
+
+| `micronaut.security.token.defaultExpiration` |  `3600` | Access token expiration time in milliseconds
+
+| `micronaut.security.token.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds
+
+|===
+
+

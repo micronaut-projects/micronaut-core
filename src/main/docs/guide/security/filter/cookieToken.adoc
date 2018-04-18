@@ -1,0 +1,11 @@
+You can read a JWT token from a Cookie.
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.token.cookie.enabled` | `false` | link:{api}/io/micronaut/security/token/reader/CookieTokenReader.html[CookieTokenReader]. is disabled by default.
+
+| `micronaut.security.token.cookie.cookieName` | `JWT` | Cookie name
+
+|===

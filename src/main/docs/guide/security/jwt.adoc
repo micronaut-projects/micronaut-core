@@ -1,0 +1,39 @@
+JSON Web Token (JWT) is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
+
+=== How does a JWT looks like?
+
+image::jwt.png[]
+
+====  Header
+
+A base64-encoded JSON like:
+
+[source, json]
+.JWT header
+----
+{
+    "alg": "HS256",
+    "typ": "JWT"
+}
+----
+
+==== Claims
+
+A base64-encoded JSON like:
+
+[source, json]
+.JWT claims
+----
+{
+    "exp": 1422990129,
+    "sub": "jimi",
+    "roles": [
+        "ROLE_ADMIN",
+        "ROLE_USER"
+    ],
+    "iat": 1422986529
+}
+----
+
+==== Signature
+Depends on the algorithm specified on the header, it can be a digital signature of the base64-encoded header and claims, or an encryption of them using RSA.
