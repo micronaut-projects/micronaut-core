@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpRequest;
@@ -23,7 +24,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Represents a {@link Route} that matches a status
+ * Represents a {@link Route} that matches a status.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,9 +37,10 @@ public interface StatusRoute extends MethodBasedRoute {
     HttpStatus status();
 
     /**
-     * Match the given HTTP status
+     * Match the given HTTP status.
      *
      * @param status The status to match
+     * @param <T>    The matched route
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(HttpStatus status);

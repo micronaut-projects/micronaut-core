@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.type.Argument;
@@ -28,7 +29,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A route match designed to return an existing object
+ * A route match designed to return an existing object.
  *
  * @author James Kleeh
  * @since 1.0
@@ -37,6 +38,9 @@ public class BasicObjectRouteMatch implements RouteMatch<Object> {
 
     private final Object object;
 
+    /**
+     * @param object An object
+     */
     public BasicObjectRouteMatch(Object object) {
         this.object = object;
     }

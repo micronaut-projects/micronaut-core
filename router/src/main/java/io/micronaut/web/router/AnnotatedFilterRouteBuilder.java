@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
@@ -32,7 +32,7 @@ import javax.inject.Singleton;
 import java.util.Collection;
 
 /**
- * An {@link ExecutableMethodProcessor} for the {@link Filter} annotation
+ * An {@link io.micronaut.context.processor.ExecutableMethodProcessor} for the {@link Filter} annotation.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +42,14 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
 
     private final BeanContext beanContext;
 
+    /**
+     * Constructor.
+     *
+     * @param beanContext The bean context
+     * @param executionHandleLocator The execution handler locator
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public AnnotatedFilterRouteBuilder(
         BeanContext beanContext,
         ExecutionHandleLocator executionHandleLocator,
@@ -51,6 +59,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
         this.beanContext = beanContext;
     }
 
+    /**
+     * Executed after the bean creation.
+     */
     @PostConstruct
     public void process() {
         Collection<BeanDefinition<?>> filterDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(Filter.class));

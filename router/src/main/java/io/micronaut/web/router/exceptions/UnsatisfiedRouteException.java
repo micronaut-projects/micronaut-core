@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.exceptions;
 
 import io.micronaut.core.type.Argument;
 
 /**
- * An exception thrown when the an {@link Argument} to a {@link io.micronaut.web.router.Route} cannot be satisfied
+ * An exception thrown when the an {@link Argument} to a {@link io.micronaut.web.router.Route} cannot be satisfied.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,6 +28,9 @@ public class UnsatisfiedRouteException extends RoutingException {
 
     private final Argument<?> argument;
 
+    /**
+     * @param argument The {@link Argument}
+     */
     public UnsatisfiedRouteException(Argument<?> argument) {
         super(buildMessage(argument));
         this.argument = argument;

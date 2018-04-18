@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -33,7 +34,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Default implementation of {@link FilterRoute}
+ * Default implementation of {@link FilterRoute}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -45,6 +46,10 @@ class DefaultFilterRoute implements FilterRoute {
     Set<HttpMethod> httpMethods;
     private HttpFilter filter;
 
+    /**
+     * @param pattern A pattern
+     * @param filter A {@link Supplier} for an HTTP filter
+     */
     DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter) {
         Objects.requireNonNull(pattern, "Pattern argument is required");
         Objects.requireNonNull(pattern, "HttpFilter argument is required");
@@ -59,7 +64,8 @@ class DefaultFilterRoute implements FilterRoute {
             synchronized (this) { // double check
                 filter = this.filter;
                 if (filter == null) {
-                    this.filter = filter = filterSupplier.get();
+                    filter = filterSupplier.get();
+                    this.filter = filter;
                 }
             }
         }
@@ -92,7 +98,9 @@ class DefaultFilterRoute implements FilterRoute {
     @Override
     public FilterRoute methods(HttpMethod... methods) {
         if (ArrayUtils.isNotEmpty(methods)) {
-            if (httpMethods == null) httpMethods = new HashSet<>();
+            if (httpMethods == null) {
+                httpMethods = new HashSet<>();
+            }
             httpMethods.addAll(Arrays.asList(methods));
         }
         return this;
