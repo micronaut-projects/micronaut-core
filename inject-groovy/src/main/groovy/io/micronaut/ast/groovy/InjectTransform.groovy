@@ -20,6 +20,8 @@ import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.inject.visitor.TypeElementVisitor
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage
+import org.codehaus.groovy.syntax.SyntaxException
 
 import java.util.stream.Collectors
 
@@ -104,12 +106,11 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
+@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
     ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder = new GroovyConfigurationMetadataBuilder()
-    List<LoadedVisitor> typeElementVisitors = []
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -287,6 +288,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 defineBeanDefinition(concreteClass)
             }
             return beanWriter
+        }
+
+        @Override
+        void addError(String msg, ASTNode expr) {
+            SourceUnit source = getSourceUnit()
+            source.getErrorCollector().addError(
+                    new SyntaxErrorMessage(new SyntaxException(msg + '\n', expr.getLineNumber(), expr.getColumnNumber(), expr.getLastLineNumber(), expr.getLastColumnNumber()), source)
+            )
         }
 
         @Override
@@ -751,7 +760,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                           constructorGenericTypeMap)
                     proxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
                 } else {
-                    addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
+                    addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", targetClass)
                 }
 
             }
@@ -768,8 +777,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
                 return
             }
-            boolean isPackagePrivate = isPackagePrivate(fieldNode, fieldNode.modifiers)
-            if (fieldNode.isSynthetic() && !isPackagePrivate) {
+            if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
                 return
             }
             ClassNode declaringClass = fieldNode.declaringClass
@@ -780,7 +788,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
 
-            if ((isInject || isValue) && (declaringClass.getProperty(fieldNode.getName()) == null || isPackagePrivate)) {
+            if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
                     Object qualifierRef = resolveQualifier(fieldNode)
@@ -853,10 +861,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             if (fieldNode.name == 'metaClass') return
-            if (isPackagePrivate(fieldNode, fieldNode.modifiers)) {
-                visitField(fieldNode)
-                return
-            }
 
             def modifiers = propertyNode.getModifiers()
             if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
@@ -1000,7 +1004,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(parameters, paramsToType, qualifierTypes, genericTypeMap)
                         beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
                     } else {
-                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
+                        addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
 
@@ -1015,13 +1019,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
-            List<ConstructorNode> publicConstructors = findPublicConstructors(constructors)
+            List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors)
 
             ConstructorNode constructorNode
-            if (publicConstructors.size() == 1) {
-                constructorNode = publicConstructors[0]
+            if (nonPrivateConstructors.size() == 1) {
+                constructorNode = nonPrivateConstructors[0]
             } else {
-                constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
+                constructorNode = nonPrivateConstructors.find { it.getAnnotations(makeCached(Inject)) }
+                if (!constructorNode) {
+                    constructorNode = nonPrivateConstructors.find { Modifier.isPublic(it.modifiers) }
+                }
             }
             constructorNode
         }
@@ -1049,6 +1056,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
             return publicConstructors
+        }
+
+        private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
+            List<ConstructorNode> nonPrivateConstructors = []
+            for (node in constructorNodes) {
+                if (!Modifier.isPrivate(node.modifiers)) {
+                    nonPrivateConstructors.add(node)
+                }
+            }
+            return nonPrivateConstructors
         }
 
         private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {

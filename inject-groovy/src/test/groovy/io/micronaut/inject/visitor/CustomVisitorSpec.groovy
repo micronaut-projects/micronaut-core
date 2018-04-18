@@ -5,7 +5,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 
 class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 
-    void cleanup() {
+    void setup() {
         ControllerGetVisitor.VISITED_ELEMENTS = []
         AllElementsVisitor.VISITED_ELEMENTS = []
         AllClassesVisitor.VISITED_ELEMENTS = []

@@ -8,7 +8,7 @@ import io.micronaut.visitors.InjectVisitor
 
 class CustomVisitorSpec extends AbstractTypeElementSpec {
 
-    void cleanup() {
+    void setup() {
         ControllerGetVisitor.VISITED_ELEMENTS = []
         AllElementsVisitor.VISITED_ELEMENTS = []
         AllClassesVisitor.VISITED_ELEMENTS = []

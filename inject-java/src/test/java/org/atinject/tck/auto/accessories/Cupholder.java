@@ -15,6 +15,7 @@
  */
 package org.atinject.tck.auto.accessories;
 
+import groovy.transform.PackageScope;
 import org.atinject.tck.auto.Seat;
 
 import javax.inject.Inject;
@@ -27,7 +28,8 @@ public class Cupholder {
     public final Provider<Seat> seatProvider;
 
     @Inject
-    public Cupholder(Provider<Seat> seatProvider) {
+    @PackageScope
+    Cupholder(Provider<Seat> seatProvider) {
         this.seatProvider = seatProvider;
     }
 }
