@@ -156,7 +156,6 @@
             <property name="ignoredAnnotations" value="Override"/>
         </module>
         <module name="FinalClass"/>
-        <module name="HideUtilityClassConstructor"/>
         <module name="VisibilityModifier">
             <property name="protectedAllowed" value="true"/>
             <property name="packageAllowed" value="true"/>
