@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.event;
 
 import io.micronaut.session.Session;
 
 /**
- * Fired when a {@link io.micronaut.session.Session} expires
+ * Fired when a {@link io.micronaut.session.Session} expires.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class SessionExpiredEvent extends SessionDestroyedEvent {
 
+    /**
+     * Constructs a Session expired event.
+     *
+     * @param source The object on which the Event initially occurred.
+     */
     public SessionExpiredEvent(Session source) {
         super(source);
     }
