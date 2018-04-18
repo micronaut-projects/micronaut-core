@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.event;
 
 import io.micronaut.session.Session;
 
 /**
- * Fired when a session is created
+ * Fired when a session is created.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class SessionCreatedEvent extends AbstractSessionEvent {
 
+    /**
+     * Constructs a Session created event.
+     *
+     * @param source The object on which the Event initially occurred.
+     */
     public SessionCreatedEvent(Session source) {
         super(source);
     }

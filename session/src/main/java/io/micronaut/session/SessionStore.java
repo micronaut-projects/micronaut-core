@@ -13,28 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * <p>Interface for locating and saving sessions</p>
+ * <p>Interface for locating and saving sessions.</p>
  *
+ * @param <S> The session
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface SessionStore<S extends Session> {
 
     /**
-     * Create a new unsaved session
+     * Create a new unsaved session.
      *
      * @return The created session
      */
     S newSession();
 
     /**
-     * Find a session for the given ID
+     * Find a session for the given ID.
      *
      * @param id The ID of the session
      * @return A future the completes with an {@link Optional} session
@@ -42,7 +44,7 @@ public interface SessionStore<S extends Session> {
     CompletableFuture<Optional<S>> findSession(String id);
 
     /**
-     * Delete a session for the given ID
+     * Delete a session for the given ID.
      *
      * @param id The ID of the session
      * @return A future that outputs <tt>true</tt> if the session was successfully deleted
@@ -50,7 +52,7 @@ public interface SessionStore<S extends Session> {
     CompletableFuture<Boolean> deleteSession(String id);
 
     /**
-     * Save the given session
+     * Save the given session.
      *
      * @param session The session to save
      * @return A future that completes with the saved session once the operation is complete

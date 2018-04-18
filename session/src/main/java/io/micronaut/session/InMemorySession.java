@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -28,7 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link Session} that is help in-memory
+ * A {@link Session} that is help in-memory.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,17 +38,30 @@ public class InMemorySession implements Session {
 
     protected final Map<CharSequence, Object> attributeMap = new LinkedHashMap<>();
     protected final MutableConvertibleValues<Object> attributes = MutableConvertibleValues.of(attributeMap);
+    protected Instant lastAccessTime = Instant.now();
 
     private final String id;
     private final Instant creationTime;
     private Duration maxInactiveInterval;
-    protected Instant lastAccessTime = Instant.now();
     private boolean isNew = true;
 
+    /**
+     * Constructor.
+     *
+     * @param id The session id
+     * @param maxInactiveInterval The max inactive interval
+     */
     protected InMemorySession(String id, Duration maxInactiveInterval) {
         this(id, Instant.now(), maxInactiveInterval);
     }
 
+    /**
+     * Constructor.
+     *
+     * @param id The session id
+     * @param creationTime The creation time
+     * @param maxInactiveInterval The max inactive interval
+     */
     protected InMemorySession(String id, Instant creationTime, Duration maxInactiveInterval) {
         this.id = id;
         this.creationTime = creationTime;
@@ -128,7 +142,10 @@ public class InMemorySession implements Session {
         return attributes.get(name, conversionContext);
     }
 
-    void setNew(boolean aNew) {
+    /**
+     * @param aNew Set is new
+     */
+    public void setNew(boolean aNew) {
         isNew = aNew;
     }
 }
