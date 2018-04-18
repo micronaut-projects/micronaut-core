@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.tomcat;
 
 import io.micronaut.context.annotation.Bean;
@@ -21,7 +22,7 @@ import io.micronaut.context.annotation.Factory;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 /**
- * Creates a tomcat data source for each configuration bean
+ * Creates a tomcat data source for each configuration bean.
  *
  * @author James Kleeh
  * @since 1.0
