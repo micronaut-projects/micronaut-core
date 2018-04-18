@@ -13,28 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.javax.inject.tck
 
-import groovy.transform.PackageScope
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+package io.micronaut.annotation.processing.visitor;
+
+import io.micronaut.inject.visitor.ClassElement;
+
+import javax.lang.model.element.TypeElement;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * A class element returning data from a {@link TypeElement}.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-import javax.inject.Inject
-import javax.inject.Singleton
+public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
-@Singleton
-class Seat {
+    private final TypeElement classElement;
 
-    private final Cupholder cupholder
-
-    @Inject
-    @PackageScope Seat(Cupholder cupholder) {
-        this.cupholder = cupholder
+    JavaClassElement(TypeElement classElement) {
+        super(classElement);
+        this.classElement = classElement;
     }
 
-    Cupholder getCupholder() {
-        return cupholder
+    @Override
+    public String getName() {
+        return classElement.getQualifiedName().toString();
     }
 }

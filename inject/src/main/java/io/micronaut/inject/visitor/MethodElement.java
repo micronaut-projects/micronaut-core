@@ -13,28 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.javax.inject.tck
 
-import groovy.transform.PackageScope
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+package io.micronaut.inject.visitor;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * Stores data about an element that references a method.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-import javax.inject.Inject
-import javax.inject.Singleton
-
-@Singleton
-class Seat {
-
-    private final Cupholder cupholder
-
-    @Inject
-    @PackageScope Seat(Cupholder cupholder) {
-        this.cupholder = cupholder
-    }
-
-    Cupholder getCupholder() {
-        return cupholder
-    }
+public interface MethodElement extends Element {
 }

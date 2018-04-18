@@ -13,28 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.javax.inject.tck
 
-import groovy.transform.PackageScope
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+package io.micronaut.annotation.processing.visitor;
+
+import io.micronaut.inject.visitor.FieldElement;
+
+import javax.lang.model.element.VariableElement;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * A field element returning data from a {@link VariableElement}.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-import javax.inject.Inject
-import javax.inject.Singleton
+public class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
-@Singleton
-class Seat {
+    private final VariableElement variableElement;
 
-    private final Cupholder cupholder
-
-    @Inject
-    @PackageScope Seat(Cupholder cupholder) {
-        this.cupholder = cupholder
+    JavaFieldElement(VariableElement variableElement) {
+        super(variableElement);
+        this.variableElement = variableElement;
     }
 
-    Cupholder getCupholder() {
-        return cupholder
-    }
 }

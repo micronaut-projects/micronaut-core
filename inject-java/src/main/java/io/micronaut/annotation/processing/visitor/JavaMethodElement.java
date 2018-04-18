@@ -13,28 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.javax.inject.tck
 
-import groovy.transform.PackageScope
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+package io.micronaut.annotation.processing.visitor;
+
+import io.micronaut.inject.visitor.MethodElement;
+
+import javax.lang.model.element.ExecutableElement;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * A method element returning data from a {@link ExecutableElement}.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-import javax.inject.Inject
-import javax.inject.Singleton
+public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
-@Singleton
-class Seat {
+    private final ExecutableElement executableElement;
 
-    private final Cupholder cupholder
-
-    @Inject
-    @PackageScope Seat(Cupholder cupholder) {
-        this.cupholder = cupholder
+    JavaMethodElement(ExecutableElement executableElement) {
+        super(executableElement);
+        this.executableElement = executableElement;
     }
 
-    Cupholder getCupholder() {
-        return cupholder
-    }
 }

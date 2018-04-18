@@ -13,28 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.javax.inject.tck
-
-import groovy.transform.PackageScope
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+package io.micronaut.inject.visitor;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * Provides a way for {@link TypeElementVisitor} classes to
+ * log messages during compilation and fail compilation.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-import javax.inject.Inject
-import javax.inject.Singleton
+public interface VisitorContext {
 
-@Singleton
-class Seat {
-
-    private final Cupholder cupholder
-
-    @Inject
-    @PackageScope Seat(Cupholder cupholder) {
-        this.cupholder = cupholder
-    }
-
-    Cupholder getCupholder() {
-        return cupholder
-    }
+    void fail(String message, Element element);
 }
