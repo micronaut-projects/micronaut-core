@@ -13,36 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 /**
- * Interface for common Redis settings
+ * Interface for common Redis settings.
  *
  * @author Graeme Rocher
  */
 public interface RedisSetting {
     /**
-     * Prefix used for all settings
+     * Prefix used for all settings.
      */
     String PREFIX = "redis";
     /**
-     * The URI to the Redis server
+     * The URI to the Redis server.
      */
     String REDIS_URI = PREFIX + ".uri";
     /**
-     * The URIs to the Redis servers for cluster config
+     * The URIs to the Redis servers for cluster config.
      */
     String REDIS_URIS = PREFIX + ".uris";
     /**
-     * The named redis servers
+     * The named redis servers.
      */
     String REDIS_SERVERS = PREFIX + ".servers";
     /**
-     * Embedded Redis configuration
+     * Embedded Redis configuration.
      */
     String REDIS_EMBEDDED = PREFIX + ".embedded";
     /**
-     * Configured Redis caches
+     * Configured Redis caches.
      */
     String REDIS_CACHES = PREFIX + ".caches";
 }

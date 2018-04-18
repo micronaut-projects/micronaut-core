@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisClient;
@@ -23,14 +24,14 @@ import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import java.util.Optional;
 
 /**
- * Abstract version of the a factory class for creating Redis clients
+ * Abstract version of the a factory class for creating Redis clients.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class AbstractRedisClientFactory {
     /**
-     * Creates the {@link RedisClient} from the configuration
+     * Creates the {@link RedisClient} from the configuration.
      *
      * @param config The configuration
      * @return The {@link RedisClient}
@@ -42,7 +43,7 @@ public abstract class AbstractRedisClientFactory {
     }
 
     /**
-     * Creates the {@link StatefulRedisConnection} from the {@link RedisClient}
+     * Creates the {@link StatefulRedisConnection} from the {@link RedisClient}.
      *
      * @param redisClient The {@link RedisClient}
      * @return The {@link StatefulRedisConnection}
@@ -52,7 +53,7 @@ public abstract class AbstractRedisClientFactory {
     }
 
     /**
-     * Creates the {@link StatefulRedisPubSubConnection} from the {@link RedisClient}
+     * Creates the {@link StatefulRedisPubSubConnection} from the {@link RedisClient}.
      *
      * @param redisClient The {@link RedisClient}
      * @return The {@link StatefulRedisPubSubConnection}

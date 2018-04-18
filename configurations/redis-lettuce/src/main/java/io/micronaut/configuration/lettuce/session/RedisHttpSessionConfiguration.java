@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.session;
 
 import io.micronaut.configuration.lettuce.RedisSetting;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.serialize.JdkSerializer;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.session.Session;
-import io.micronaut.session.SessionStore;
 import io.micronaut.session.http.HttpSessionConfiguration;
 
 import java.nio.charset.Charset;
@@ -30,7 +28,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Configuration properties for Redis session
+ * Configuration properties for Redis session.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,35 +47,35 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     private String serverName;
 
     /**
-     * @return The name of the a configured Redis server to use
+     * @return The name of the a configured Redis server to use.
      */
     public Optional<String> getServerName() {
         return Optional.ofNullable(serverName);
     }
 
     /**
-     * @param serverName The server name
+     * @param serverName The server name.
      */
     void setServerName(String serverName) {
         this.serverName = serverName;
     }
 
     /**
-     * @return The topic to use to publish the creation of new sessions
+     * @return The topic to use to publish the creation of new sessions.
      */
     public String getSessionCreatedTopic() {
         return sessionCreatedTopic;
     }
 
     /**
-     * @param sessionCreatedTopic The topic to publish the creation of new sessions
+     * @param sessionCreatedTopic The topic to publish the creation of new sessions.
      */
     void setSessionCreatedTopic(String sessionCreatedTopic) {
         this.sessionCreatedTopic = sessionCreatedTopic;
     }
 
     /**
-     * @return The key of the sorted set used to maintain a set of active sessions
+     * @return The key of the sorted set used to maintain a set of active sessions.
      */
     public String getActiveSessionsKey() {
         return activeSessionsKey;
@@ -105,7 +103,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @return The {@link ObjectSerializer} type to use for serializing values. Defaults to {@link JdkSerializer}
+     * @return The {@link ObjectSerializer} type to use for serializing values. Defaults to {@link io.micronaut.core.serialize.JdkSerializer}
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
@@ -168,15 +166,15 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * The write mode for saving the session data
+     * The write mode for saving the session data.
      */
     enum WriteMode {
         /**
-         * Batch up changes an synchronize once only when {@link SessionStore#save(Session)} is called
+         * Batch up changes an synchronize once only when {@link io.micronaut.session.SessionStore#save(io.micronaut.session.Session)} is called.
          */
         BATCH,
         /**
-         * <p>Perform asynchronous write-behind when session attributes are changed in addition to batching up changes when  {@link SessionStore#save(Session)} is called</p>
+         * <p>Perform asynchronous write-behind when session attributes are changed in addition to batching up changes when  {@link io.micronaut.session.SessionStore#save(io.micronaut.session.Session)} is called</p>.
          *
          * <p>Errors that occur during these asynchronous operations are silently ignored</p>
          *
