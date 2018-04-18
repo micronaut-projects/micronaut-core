@@ -425,6 +425,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param declaringType      The declaring type
      * @param method             The method
      * @param arguments          The argument types
+     * @param annotationMetadata The annotation metadata
      * @param requiresReflection Whether the method requires reflection to invoke
      * @return this component definition
      */
@@ -434,9 +435,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             Class declaringType,
             String method,
             Argument[] arguments,
+            AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
 
-        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.methodInjectionPoints);
+        return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.methodInjectionPoints);
     }
 
     /**
@@ -481,8 +483,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final AbstractBeanDefinition addPostConstruct(Class declaringType,
                                                             String method,
                                                             Argument[] arguments,
+                                                            AnnotationMetadata annotationMetadata,
                                                             boolean requiresReflection) {
-        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.postConstructMethods);
+        return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.postConstructMethods);
     }
 
     /**
@@ -498,8 +501,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final AbstractBeanDefinition addPreDestroy(Class declaringType,
                                                          String method,
                                                          Argument[] arguments,
+                                                         AnnotationMetadata annotationMetadata,
                                                          boolean requiresReflection) {
-        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.preDestroyMethods);
+        return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.preDestroyMethods);
     }
 
     /**
@@ -1328,7 +1332,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         );
     }
 
-    private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
+    private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, AnnotationMetadata annotationMetadata, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
         boolean isPreDestroy = targetInjectionPoints == this.preDestroyMethods;
         if(isPreDestroy) {
             hasPreDestroyMethods = true;
@@ -1379,6 +1383,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     declaringType,
                     method,
                     arguments,
+                    annotationMetadata,
                     false
             );
         }

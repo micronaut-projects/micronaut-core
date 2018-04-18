@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -41,6 +42,7 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
     private final BeanDefinition declaringBean;
     private final boolean requiresReflection;
     private final AnnotationMetadata annotationMetadata;
+    private final AnnotatedElement[] annotatedElements;
 
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}
@@ -80,6 +82,14 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
         this.declaringBean = declaringBean;
         this.requiresReflection = requiresReflection;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        if(this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+            this.annotatedElements = AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
+        }
+        else {
+            this.annotatedElements = new AnnotatedElement[] {
+                    annotationMetadata
+            };
+        }
     }
 
     @Override
@@ -110,11 +120,7 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
 
     @Override
     public AnnotatedElement[] getAnnotatedElements() {
-        // TODO: replace with annotation metadata
-        return new AnnotatedElement[] {
-                getTargetMethod(),
-                declaringBean
-        };
+        return annotatedElements;
     }
 
     @Override

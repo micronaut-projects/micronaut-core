@@ -135,7 +135,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         private final Argument<?> genericReturnType;
 
         ReturnTypeImpl(Argument genericReturnType) {
-            this.genericReturnType = genericReturnType != null ? genericReturnType : Argument.of(getTargetMethod().getReturnType());
+            this.genericReturnType = genericReturnType != null ? genericReturnType : Argument.of(void.class);
         }
 
         @SuppressWarnings("unchecked")

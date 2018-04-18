@@ -860,14 +860,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public void visitMethodInjectionPoint(
-        Object declaringType,
-        boolean requiresReflection,
-        Object returnType,
-        String methodName,
-        Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
-        Map<String, Map<String, Object>> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes));
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata));
     }
 
     @Override

@@ -36,6 +36,8 @@ import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -168,11 +170,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Annotation.class, boolean.class);
 
-    private static final Method ADD_METHOD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Class.class, String.class, Argument[].class, boolean.class);
+    private static final Method ADD_METHOD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Class.class, String.class, Argument[].class,AnnotationMetadata.class, boolean.class);
 
-    private static final Method ADD_POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addPostConstruct", Class.class, String.class, Argument[].class, boolean.class);
+    private static final Method ADD_POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addPostConstruct", Class.class, String.class, Argument[].class,AnnotationMetadata.class, boolean.class);
 
-    private static final Method ADD_PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addPreDestroy", Class.class, String.class, Argument[].class, boolean.class);
+    private static final Method ADD_PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addPreDestroy", Class.class, String.class, Argument[].class, AnnotationMetadata.class, boolean.class);
 
     private static final Method ADD_SETTER_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Method.class, Argument.class, boolean.class);
 
@@ -629,7 +631,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object valueType, String setterName, Map<String, Object> genericTypes, boolean isOptional) {
+    public void visitSetterValue(
+            Object declaringType,
+            Object qualifierType,
+            boolean requiresReflection,
+            Object valueType,
+            String setterName,
+            Map<String, Object> genericTypes,
+            boolean isOptional) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
         // load 'this'
@@ -651,7 +660,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 ))
         );
 
-        // 4th  argument to addInjectionPoint: do we need reflection?
+        // 4th argument: The annotation metadata
+        // TODO: annotation metadata
+        constructorVisitor.visitInsn(ACONST_NULL);
+
+        // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
 
         // invoke add injection point method
@@ -674,7 +687,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                          Map<String, Map<String, Object>> genericTypes) {
         visitPostConstructMethodDefinition();
 
-        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, postConstructMethodVisitor, postConstructInstanceIndex, ADD_POST_CONSTRUCT_METHOD);
+        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata, constructorVisitor, postConstructMethodVisitor, postConstructInstanceIndex, ADD_POST_CONSTRUCT_METHOD);
     }
 
     /**
@@ -690,7 +703,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       Object returnType,
                                       String methodName) {
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
+        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), annotationMetadata, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
     }
 
     /**
@@ -704,7 +717,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       Object returnType,
                                       String methodName) {
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(declaringType, false, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
+        visitMethodInjectionPointInternal(declaringType, false, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), annotationMetadata, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
     }
 
     /**
@@ -716,7 +729,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void visitPreDestroyMethod(Object declaringType,
                                       String methodName) {
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(declaringType, false, Void.TYPE, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
+        visitMethodInjectionPointInternal(declaringType, false, Void.TYPE, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), annotationMetadata, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
     }
 
     @Override
@@ -728,7 +741,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       Map<String, Object> qualifierTypes,
                                       Map<String, Map<String, Object>> genericTypes) {
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
+        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex, ADD_PRE_DESTROY_METHOD);
     }
 
     /**
@@ -743,7 +756,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                           Object returnType,
                                           String methodName,
                                           Map<String, Object> argumentTypes) {
-        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, null, null);
+        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, null, null, annotationMetadata);
     }
 
     /**
@@ -762,7 +775,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                           Map<String, Object> argumentTypes,
                                           Map<String, Object> qualifierTypes,
                                           Map<String, Map<String, Object>> genericTypes) {
-        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes);
+        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
     }
 
     @Override
@@ -772,12 +785,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                           String methodName,
                                           Map<String, Object> argumentTypes,
                                           Map<String, Object> qualifierTypes,
-                                          Map<String, Map<String, Object>> genericTypes) {
+                                          Map<String, Map<String, Object>> genericTypes,
+                                          AnnotationMetadata annotationMetadata) {
         GeneratorAdapter constructorVisitor = this.constructorVisitor;
         GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
         int injectInstanceIndex = this.injectInstanceIndex;
 
-        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, injectMethodVisitor, injectInstanceIndex, ADD_METHOD_INJECTION_POINT_METHOD);
+        visitMethodInjectionPointInternal(
+                declaringType,
+                requiresReflection,
+                returnType,
+                methodName,
+                argumentTypes,
+                qualifierTypes,
+                genericTypes,
+                annotationMetadata,
+                constructorVisitor,
+                injectMethodVisitor,
+                injectInstanceIndex,
+                ADD_METHOD_INJECTION_POINT_METHOD);
     }
 
     @Override
@@ -1352,7 +1378,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                    Map<String, Object> argumentTypes,
                                                    Map<String, Object> qualifierTypes,
                                                    Map<String, Map<String, Object>> genericTypes,
-                                                   GeneratorAdapter constructorVisitor,
+                                                   AnnotationMetadata annotationMetadata, GeneratorAdapter constructorVisitor,
                                                    GeneratorAdapter injectMethodVisitor,
                                                    int injectInstanceIndex,
                                                    Method addMethodInjectionPointMethod) {
@@ -1382,7 +1408,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             constructorVisitor.visitInsn(ACONST_NULL);
         }
 
-        // 4th  argument to addInjectionPoint: do we need reflection?
+        // 4th argument: the annotation metadata
+        if(annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+            constructorVisitor.visitInsn(ACONST_NULL);
+        }
+        else {
+            AnnotationMetadataWriter.instantiateNewMetadata(constructorVisitor, (DefaultAnnotationMetadata) annotationMetadata);
+        }
+        // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
         Collection<Object> argumentTypeClasses = hasArguments ? argumentTypes.values() : Collections.emptyList();
 
