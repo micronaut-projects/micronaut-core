@@ -306,7 +306,9 @@ public class ReflectionUtils {
             type = type.getSuperclass();
             while (type != null) {
                 declaredField = findField(type, name);
-                if (declaredField.isPresent()) break;
+                if (declaredField.isPresent()) {
+                    break;
+                }
             }
         }
         return declaredField;

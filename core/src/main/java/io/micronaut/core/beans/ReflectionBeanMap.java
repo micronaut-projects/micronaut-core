@@ -77,8 +77,9 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
         PropertyDescriptor propertyDescriptor = propertyDescriptors.get(key);
         if (propertyDescriptor != null) {
             Method readMethod = propertyDescriptor.getReadMethod();
-            if (readMethod != null)
+            if (readMethod != null) {
                 return ReflectionUtils.invokeMethod(bean, readMethod);
+            }
         }
         return null;
     }

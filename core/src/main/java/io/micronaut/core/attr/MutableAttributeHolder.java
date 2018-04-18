@@ -46,8 +46,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
         if(StringUtils.isNotEmpty(name)) {
             if(value == null) {
                 getAttributes().remove(name.toString());
-            }
-            else {
+            } else {
                 getAttributes().put(name.toString(), value);
             }
         }

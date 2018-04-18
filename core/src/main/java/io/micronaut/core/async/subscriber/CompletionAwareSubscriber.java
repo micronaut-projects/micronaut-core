@@ -75,22 +75,22 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
     }
 
     /**
-     * Implement {@link Subscriber#onSubscribe(Subscription)}
+     * Implement {@link Subscriber#onSubscribe(Subscription)}.
      */
     protected abstract void doOnSubscribe(Subscription subscription);
 
     /**
-     * Implement {@link Subscriber#onNext(Object)}
+     * Implement {@link Subscriber#onNext(Object)}.
      */
     protected abstract void doOnNext(T message);
 
     /**
-     * Implement {@link Subscriber#onError(Throwable)}
+     * Implement {@link Subscriber#onError(Throwable)}.
      */
     protected abstract void doOnError(Throwable t);
 
     /**
-     * Implement {@link Subscriber#onComplete()}
+     * Implement {@link Subscriber#onComplete()}.
      */
     protected abstract void doOnComplete();
 }

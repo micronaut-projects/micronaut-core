@@ -19,7 +19,7 @@ package io.micronaut.core.io.file;
 import io.micronaut.core.io.ResourceLoader;
 
 /**
- * Abstraction to load resources from the file system
+ * Abstraction to load resources from the file system.
  */
 public interface FileSystemResourceLoader extends ResourceLoader {
 

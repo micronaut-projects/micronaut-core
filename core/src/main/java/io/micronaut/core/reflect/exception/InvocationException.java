@@ -17,7 +17,7 @@
 package io.micronaut.core.reflect.exception;
 
 /**
- * Runtime exception equivalent of {@link java.lang.reflect.InvocationTargetException}
+ * Runtime exception equivalent of {@link java.lang.reflect.InvocationTargetException}.
  *
  * @author Graeme Rocher
  * @since 1.0

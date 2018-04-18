@@ -16,7 +16,6 @@
 
 package io.micronaut.core.util;
 
-
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,7 +41,7 @@ public class StringUtils {
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
     /**
-     * Return whether the given string is empty
+     * Return whether the given string is empty.
      *
      * @param str The string
      * @return True if is
@@ -52,7 +51,7 @@ public class StringUtils {
     }
 
     /**
-     * Return whether the given string is not empty
+     * Return whether the given string is not empty.
      *
      * @param str The string
      * @return True if is
@@ -62,7 +61,7 @@ public class StringUtils {
     }
 
     /**
-     * Return whether the given string has non whitespace characters
+     * Return whether the given string has non whitespace characters.
      *
      * @param str The string
      * @return True if is
@@ -82,7 +81,7 @@ public class StringUtils {
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
      *
      * @param objects The objects
      * @return An set of strings
@@ -99,7 +98,7 @@ public class StringUtils {
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
      *
      * @param values The objects
      * @return An unmodifiable set of strings
@@ -122,7 +121,7 @@ public class StringUtils {
     }
 
     /**
-     * Is the given string a series of digits
+     * Is the given string a series of digits.
      *
      * @param str The string
      * @return True if it is a series of digits

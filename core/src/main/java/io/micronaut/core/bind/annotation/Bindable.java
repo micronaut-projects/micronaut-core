@@ -18,15 +18,13 @@ package io.micronaut.core.bind.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.core.type.Argument;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * An annotation stereotype for other annotations that indicates a method {@link Argument} is bindable.
+ * An annotation stereotype for other annotations that indicates a method {@link io.micronaut.core.type.Argument} is bindable.
  *
  * @author Graeme Rocher
  * @since 1.0

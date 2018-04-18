@@ -135,7 +135,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
     protected abstract void doOnError(Throwable t);
 
     /**
-     * Implement {@link Subscriber#onComplete()}
+     * Implement {@link Subscriber#onComplete()}.
      */
     protected abstract void doOnComplete();
 

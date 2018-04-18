@@ -247,14 +247,17 @@ class SimpleBeanInfo implements BeanInfo {
         // Get the list of methods belonging to this class
         Method[] basicMethods = beanClass.getMethods();
 
-        if (ArrayUtils.isEmpty(basicMethods))
+        if (ArrayUtils.isEmpty(basicMethods)) {
             return null;
+        }
 
         ArrayList<Method> methodList = new ArrayList<>(basicMethods.length);
 
         // Loop over the methods found, looking for public non-static methods
         for (Method basicMethod : basicMethods) {
-            if (basicMethod.getDeclaringClass() == Object.class) break;
+            if (basicMethod.getDeclaringClass() == Object.class) {
+                break;
+            }
             int modifiers = basicMethod.getModifiers();
             if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers) && !basicMethod.isBridge() && !basicMethod.isSynthetic() && basicMethod.getName().indexOf('$') == -1) {
                 methodList.add(basicMethod);

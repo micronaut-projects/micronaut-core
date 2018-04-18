@@ -18,7 +18,6 @@ package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.Argument;
 
 import java.util.Optional;
@@ -27,7 +26,7 @@ import java.util.Optional;
  * An interface for any type that is able to resolve and convert values.
  *
  * @author Graeme Rocher
- * @see TypeConverter
+ * @see io.micronaut.core.convert.TypeConverter
  * @since 1.0
  */
 public interface ValueResolver<K extends CharSequence> {
