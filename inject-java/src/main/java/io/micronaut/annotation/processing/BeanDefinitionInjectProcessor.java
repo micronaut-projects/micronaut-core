@@ -777,7 +777,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
-                    params.getGenericTypes()
+                    params.getGenericTypes(),
+                    annotationMetadata
                 );
             } else if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)) {
                 writer.visitPreDestroyMethod(
@@ -787,7 +788,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
-                    params.getGenericTypes()
+                    params.getGenericTypes(),
+                    annotationMetadata
                 );
             } else if (annotationMetadata.hasDeclaredStereotype(Inject.class)) {
                 writer.visitMethodInjectionPoint(
