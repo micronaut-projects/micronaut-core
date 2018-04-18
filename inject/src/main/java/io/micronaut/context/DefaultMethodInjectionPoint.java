@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,126 +15,120 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.util.Objects;
 
 /**
- * Represents an injection point for a method
+ * A method injection point that does not use reflection
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
 @Internal
-class DefaultMethodInjectionPoint implements MethodInjectionPoint {
+class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodInjectionPoint {
 
-    private final Method method;
-    private final Argument[] arguments;
-    private final boolean requiresReflection;
     private final BeanDefinition declaringBean;
-    private final AnnotatedElement[] annotationElements;
+    private final boolean requiresReflection;
+    private final AnnotationMetadata annotationMetadata;
 
-    DefaultMethodInjectionPoint(BeanDefinition declaringBean,
-                                Method method,
-                                boolean requiresReflection,
-                                Argument... arguments) {
-        this.method = method;
-        this.annotationElements = new AnnotatedElement[]{method, declaringBean.getBeanType()};
-        this.requiresReflection = requiresReflection;
-        if (requiresReflection) {
-            this.method.setAccessible(true);
-        }
-        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
-        this.declaringBean = declaringBean;
+    /**
+     * Constructs a new {@link DefaultMethodInjectionPoint}
+     * @param declaringBean The declaring bean
+     * @param declaringType The declaring type
+     * @param methodName The method name
+     * @param arguments The arguments
+     * @param requiresReflection Whether reflection is required
+     */
+    DefaultMethodInjectionPoint(
+            BeanDefinition declaringBean,
+            Class<?> declaringType,
+            String methodName,
+            @Nullable Argument[] arguments,
+            boolean requiresReflection) {
+       this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA, requiresReflection);
     }
 
-    DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
-                                Field field,
-                                Method method,
-                                boolean requiresReflection,
-                                Argument... arguments) {
-        this.method = method;
-        this.annotationElements = new AnnotatedElement[]{field, method, declaringComponent.getBeanType()};
+    /**
+     * Constructs a new {@link DefaultMethodInjectionPoint}
+     * @param declaringBean The declaring bean
+     * @param declaringType The declaring type
+     * @param methodName The method name
+     * @param arguments The arguments
+     * @param annotationMetadata The annotation metadata
+     * @param requiresReflection Whether reflection is required
+     */
+    DefaultMethodInjectionPoint(
+            BeanDefinition declaringBean,
+            Class<?> declaringType,
+            String methodName,
+            @Nullable Argument[] arguments,
+            @Nullable AnnotationMetadata annotationMetadata,
+            boolean requiresReflection) {
+        super(declaringType, methodName, arguments);
+        Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
+        this.declaringBean = declaringBean;
         this.requiresReflection = requiresReflection;
-        if (requiresReflection) {
-            this.method.setAccessible(true);
-        }
-        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
-        this.declaringBean = declaringComponent;
+        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    @Override
+    public Method getMethod() {
+        return getTargetMethod();
+    }
+
+    @Override
+    public String getName() {
+        return methodName;
+    }
+
+    @Override
+    public boolean isPreDestroyMethod() {
+        return annotationMetadata.hasDeclaredAnnotation(PreDestroy.class);
+    }
+
+    @Override
+    public boolean isPostConstructMethod() {
+        return annotationMetadata.hasDeclaredAnnotation(PostConstruct.class);
+    }
+
+    @Override
+    public Object invoke(Object instance, Object... args) {
+        Method targetMethod = getTargetMethod();
+        return ReflectionUtils.invokeMethod(instance, targetMethod, args);
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        // TODO: replace with annotation metadata
+        return new AnnotatedElement[] {
+                getTargetMethod(),
+                declaringBean
+        };
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
+    }
+
+    @Override
+    public BeanDefinition getDeclaringBean() {
+        return declaringBean;
     }
 
     @Override
     public boolean requiresReflection() {
         return requiresReflection;
     }
-
-    @Override
-    public boolean isPreDestroyMethod() {
-        return method.getAnnotation(PreDestroy.class) != null;
-    }
-
-    @Override
-    public boolean isPostConstructMethod() {
-        return method.getAnnotation(PostConstruct.class) != null;
-    }
-
-    @Override
-    public BeanDefinition getDeclaringBean() {
-        return this.declaringBean;
-    }
-
-    @Override
-    public String getName() {
-        return method.getName();
-    }
-
-    @Override
-    public Argument[] getArguments() {
-        return arguments;
-    }
-
-    @Override
-    public Method getMethod() {
-        return method;
-    }
-
-    @Override
-    public Object invoke(Object instance, Object... args) {
-        Argument[] componentTypes = getArguments();
-        if (componentTypes.length != args.length) {
-            throw new BeanInstantiationException("Invalid bean argument count specified. Required: " + componentTypes.length + " . Received: " + args.length);
-        }
-
-        for (int i = 0; i < componentTypes.length; i++) {
-            Class componentType = componentTypes[i].getType();
-            if (!componentType.isInstance(args[i])) {
-                throw new BeanInstantiationException("Invalid bean argument received [" + args[i] + "] at position [" + i + "]. Required type is: " + componentType.getName());
-            }
-        }
-        try {
-            return method.invoke(instance, args);
-        } catch (Throwable e) {
-            throw new BeanInstantiationException("Cannot inject arguments for method [" + method + "] using arguments [" + Arrays.asList(args) + "]:" + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public String toString() {
-        return "Injection Point: " + method.toGenericString();
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return this.annotationElements;
-    }
-
 }

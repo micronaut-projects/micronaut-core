@@ -53,11 +53,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public static final String FIELD_PARENT = "$parent";
 
-    /**
-     * Constant for field method
-     */
-    public static final String FIELD_METHOD = "$METHOD";
-
     protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
     protected final Type methodType;
@@ -171,10 +166,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         // load 'this'
         constructorWriter.loadThis();
 
-        // 1st argument Class.getMethod(..)
-        pushGetMethodFromTypeCall(constructorWriter, declaringTypeObject, methodName, argumentTypeClasses);
+        // 1st argument: the declaring class
+        constructorWriter.push(declaringTypeObject);
 
-        // 2nd argument the generic return type
+        // 2nd argument: the method name
+        constructorWriter.push(methodName);
+
+
+        // 3rd argument the generic return type
         // Argument.of(genericReturnType, returnTypeGenericTypes)
         if (genericReturnType instanceof Class && ((Class) genericReturnType).isPrimitive()) {
             constructorWriter.visitInsn(ACONST_NULL);
@@ -187,18 +186,27 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         }
 
         if (hasArgs) {
-            // 3rd Argument: Create a call to mapOf from generic types
+            // 4th argument: the generic types
             pushBuildArgumentsForMethod(
-                constructorWriter,
-                ga -> pushGetMethodFromTypeCall(constructorWriter, declaringTypeObject, methodName, argumentTypeClasses),
-                argumentTypes,
-                qualifierTypes,
-                genericTypes
+                    constructorWriter,
+                    argumentTypes,
+                    genericTypes
             );
             // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument.class, Argument[].class);
+            invokeConstructor(
+                    executorMethodConstructor,
+                    AbstractExecutableMethod.class,
+                    Class.class,
+                    String.class,
+                    Argument.class,
+                    Argument[].class);
         } else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument.class);
+            invokeConstructor(
+                    executorMethodConstructor,
+                    AbstractExecutableMethod.class,
+                    Class.class,
+                    String.class,
+                    Argument.class);
         }
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);

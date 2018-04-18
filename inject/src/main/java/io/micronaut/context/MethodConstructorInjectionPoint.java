@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
+class MethodConstructorInjectionPoint extends ReflectionMethodInjectionPoint implements ConstructorInjectionPoint {
 
     public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Argument... arguments) {
         super(declaringComponent, method, requiresReflection, arguments);
