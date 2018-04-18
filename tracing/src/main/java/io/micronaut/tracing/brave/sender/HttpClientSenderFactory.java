@@ -36,6 +36,11 @@ import javax.inject.Singleton;
 public class HttpClientSenderFactory {
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
+    /**
+     * Initialize the factory for creating Zipkin {@link Sender} with configurations.
+     *
+     * @param configuration The HTTP client sender configurations
+     */
     protected HttpClientSenderFactory(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
         this.configuration = configuration;
     }

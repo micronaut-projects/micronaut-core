@@ -44,6 +44,11 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
 
     protected final Tracer tracer;
 
+    /**
+     * Configure tracer in the filter for span creation and propagation across arbitrary transports.
+     *
+     * @param tracer The tracer
+     */
     public AbstractOpenTracingFilter(Tracer tracer) {
         this.tracer = tracer;
     }

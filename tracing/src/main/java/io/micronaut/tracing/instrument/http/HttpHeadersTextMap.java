@@ -35,6 +35,11 @@ import java.util.Map;
 class HttpHeadersTextMap implements TextMap {
     private final HttpHeaders headers;
 
+    /**
+     * Initialize headers.
+     *
+     * @param headers The HTTP headers
+     */
     HttpHeadersTextMap(HttpHeaders headers) {
         this.headers = headers;
     }

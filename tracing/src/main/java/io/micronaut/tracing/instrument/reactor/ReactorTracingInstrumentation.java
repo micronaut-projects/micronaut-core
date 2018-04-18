@@ -45,6 +45,12 @@ import java.util.function.Supplier;
 public class ReactorTracingInstrumentation {
     private static final Logger LOG = LoggerFactory.getLogger(ReactorTracingInstrumentation.class);
 
+    /**
+     * Initialize instrumentation for reactor with the tracer and factory.
+     *
+     * @param tracer For Span creation and propagation across arbitrary transports
+     * @param threadFactory The factory to create new threads on-demand
+     */
     @PostConstruct
     void init(Tracer tracer, ThreadFactory threadFactory) {
         try {

@@ -62,6 +62,12 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     private final Tracer tracer;
     private final ConversionService<?> conversionService;
 
+    /**
+     * Initialize the interceptor with tracer and conversion service.
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     * @param conversionService A service to convert from one type to another
+     */
     public TraceInterceptor(Tracer tracer, ConversionService<?> conversionService) {
         this.tracer = tracer;
         this.conversionService = conversionService;

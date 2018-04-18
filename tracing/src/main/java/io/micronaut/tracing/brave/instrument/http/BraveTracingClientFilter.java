@@ -40,6 +40,12 @@ public class BraveTracingClientFilter extends AbstractBraveTracingFilter impleme
 
     private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
 
+    /**
+     * Initialize tracing filter with clientHandler and httpTracing.
+     *
+     * @param clientHandler The standardize way to instrument http client
+     * @param httpTracing  The tracer for creation of span
+     */
     public BraveTracingClientFilter(HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler, HttpTracing httpTracing) {
         super(httpTracing);
         this.clientHandler = clientHandler;

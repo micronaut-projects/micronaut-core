@@ -13,30 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 /**
- * Constants used to store Span objects within instrumented request attributes
+ * Constants used to store Span objects within instrumented request attributes.
  *
  * @author graemerocher
  * @since 1.0
  */
 public enum TraceRequestAttributes implements CharSequence {
     /**
-     * The attribute used to store the current span
+     * The attribute used to store the current span.
      */
     CURRENT_SPAN("micronaut.tracing.currentSpan"),
+
     /**
-     * The attribute used to store the current scope
+     * The attribute used to store the current scope.
      */
     CURRENT_SCOPE("micronaut.tracing.currentScope"),
+
     /**
-     * The attribute used to store the current span context
+     * The attribute used to store the current span context.
      */
     CURRENT_SPAN_CONTEXT("micronaut.tracing.currentSpanContext");
 
     private final String attr;
 
+    /**
+     * @param attr request attribute
+     */
     TraceRequestAttributes(java.lang.String attr) {
         this.attr = attr;
     }

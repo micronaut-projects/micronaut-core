@@ -38,6 +38,11 @@ public class ZipkinServiceInstanceList implements ServiceInstanceList {
 
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
+    /**
+     * Create a {@link ServiceInstanceList} for Zipkin with existing configuration.
+     *
+     * @param configuration Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace.
+     */
     public ZipkinServiceInstanceList(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
         this.configuration = configuration;
     }

@@ -47,6 +47,11 @@ import javax.annotation.Nonnull;
 @Requires(missingBeans = BraveTracingClientFilter.class)
 public class OpenTracingClientFilter extends AbstractOpenTracingFilter implements HttpClientFilter {
 
+    /**
+     * Initialize the open tracing client filter with tracer.
+     *
+     * @param tracer The tracer for span creation and configuring across arbitrary transports
+     */
     public OpenTracingClientFilter(Tracer tracer) {
         super(tracer);
     }

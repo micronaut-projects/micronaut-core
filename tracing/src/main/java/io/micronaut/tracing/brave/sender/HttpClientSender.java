@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpClientSender extends Sender {
+public final class HttpClientSender extends Sender {
 
     private final HttpClient httpClient ;
     private final Encoding encoding;
@@ -119,6 +119,9 @@ public class HttpClientSender extends Sender {
         }
     }
 
+    /**
+     * The HTTP call.
+     */
     private static class HttpCall extends Call<Void> {
         private final HttpClient httpClient;
         private final URI endpoint;
@@ -128,7 +131,7 @@ public class HttpClientSender extends Sender {
         private AtomicReference<Subscription> subscription = new AtomicReference<>();
         private AtomicBoolean cancelled = new AtomicBoolean(false);
 
-        public HttpCall(HttpClient httpClient, URI endpoint, boolean compressionEnabled, List<byte[]> encodedSpans) {
+        HttpCall(HttpClient httpClient, URI endpoint, boolean compressionEnabled, List<byte[]> encodedSpans) {
             this.httpClient = httpClient;
             this.endpoint = endpoint;
             this.compressionEnabled = compressionEnabled;
@@ -230,6 +233,11 @@ public class HttpClientSender extends Sender {
         private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
         private final HttpClientConfiguration clientConfiguration;
 
+        /**
+         * Initialize the builder with HTTP client configurations.
+         *
+         * @param clientConfiguration The HTTP client configuration
+         */
         public Builder(HttpClientConfiguration clientConfiguration) {
             this.clientConfiguration = clientConfiguration;
         }

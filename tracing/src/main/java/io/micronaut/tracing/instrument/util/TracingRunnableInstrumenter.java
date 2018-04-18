@@ -34,6 +34,11 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
 
     private final Tracer tracer;
 
+    /**
+     * Create a function that instrument an existing Runnable.
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public TracingRunnableInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }
