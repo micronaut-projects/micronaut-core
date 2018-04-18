@@ -23,7 +23,7 @@ import java.util.ServiceConfigurationError;
 import java.util.function.Supplier;
 
 /**
- * Default implementation of {@link ServiceDefinition}
+ * Default implementation of {@link ServiceDefinition}.
  *
  * @author Graeme Rocher
  * @since 1.0

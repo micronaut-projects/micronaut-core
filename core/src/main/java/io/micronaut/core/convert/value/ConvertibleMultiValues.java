@@ -20,7 +20,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.value.OptionalValues;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -173,7 +172,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     }
 
     /**
-     * Creates a new {@link OptionalValues} for the given type and values.
+     * Creates a new {@link io.micronaut.core.value.OptionalValues} for the given type and values.
      *
      * @param values A map of values
      * @param <T>    The target generic type

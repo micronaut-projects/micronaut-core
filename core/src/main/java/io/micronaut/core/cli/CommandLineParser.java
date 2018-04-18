@@ -43,7 +43,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
     private String usageMessage;
 
     /**
-     * Adds a declared option
+     * Adds a declared option.
      *
      * @param name        The name of the option
      * @param description The description
@@ -98,7 +98,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         cl.setRawArguments(args);
         String lastOptionName = null;
         for (String arg : args) {
-            if (arg == null) continue;
+            if (arg == null) {
+                continue;
+            }
             String trimmed = arg.trim();
             if (StringUtils.isNotEmpty(trimmed)) {
                 if (trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {
@@ -169,7 +171,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
     }
 
     private void validateOptionName(String name) {
-        if (name.contains(" ")) throw new ParseException("Invalid argument: " + name);
+        if (name.contains(" ")) {
+            throw new ParseException("Invalid argument: " + name);
+        }
     }
 
     /**

@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan</p>
+ * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan</p>.
  *
  * @author Graeme Rocher
  * @since 1.0

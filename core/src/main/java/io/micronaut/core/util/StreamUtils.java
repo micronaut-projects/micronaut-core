@@ -56,6 +56,7 @@ public class StreamUtils {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
             if (!acc.hasAny) {
@@ -119,6 +120,7 @@ public class StreamUtils {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
             if (!acc.hasAny) {
@@ -131,8 +133,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp <= 0)
+                if (cmp <= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {

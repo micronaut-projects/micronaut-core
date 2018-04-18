@@ -29,7 +29,7 @@ import java.util.Optional;
 public interface ArgumentBinderRegistry<S> {
 
     /**
-     * Locate an {@link ArgumentBinder} for the given argument and source type
+     * Locate an {@link ArgumentBinder} for the given argument and source type.
      *
      * @param argument The argument
      * @param source   The source

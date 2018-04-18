@@ -245,9 +245,12 @@ public class Publishers {
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Object object) {
-        if(object == null) return false;
-        if(object instanceof Publisher) return true;
-        else {
+        if(object == null) {
+            return false;
+        }
+        if(object instanceof Publisher) {
+            return true;
+        } else {
             return isConvertibleToPublisher(object.getClass());
         }
     }
@@ -281,7 +284,9 @@ public class Publishers {
 
                 @Override
                 public void request(long n) {
-                    if (done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onNext(value);
                     subscriber.onComplete();
@@ -310,7 +315,9 @@ public class Publishers {
 
                 @Override
                 public void request(long n) {
-                    if (done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onError(error);
                 }

@@ -29,14 +29,6 @@ import java.util.Properties;
 public interface CommandLine {
 
     /**
-     * Default arguments
-     */
-    interface Arguments {
-        Option VERSION = new Option("version", "Outputs the version");
-        Option HELP = new Option("help", "Outputs help information");
-    }
-
-    /**
      * @return The remaining arguments after the command name
      */
     List<String> getRemainingArgs();
@@ -58,7 +50,7 @@ public interface CommandLine {
     boolean hasOption(String name);
 
     /**
-     * The value of an option
+     * The value of an option.
      *
      * @param name The option
      * @return The value
@@ -86,7 +78,7 @@ public interface CommandLine {
     Map<String, Object> getUndeclaredOptions();
 
     /**
-     * Parses a new {@link CommandLine} instance that combines this instance with the given arguments
+     * Parses a new {@link CommandLine} instance that combines this instance with the given arguments.
      *
      * @param args The arguments
      * @return A new {@link CommandLine} instance
@@ -99,13 +91,36 @@ public interface CommandLine {
     String[] getRawArguments();
 
     /**
-     * A build for constructing a command line parser
+     * Build and parse a new command line.
+     *
+     * @return The builder
+     */
+    static Builder build() {
+        return new CommandLineParser();
+    }
+
+    /**
+     * Parse a new command line with the default options.
+     *
+     * @param args The arguments
+     * @return The command line
+     */
+    static CommandLine parse(String... args) {
+        if (args == null || args.length == 0) {
+            return new DefaultCommandLine();
+        }
+        return new CommandLineParser().parse(args);
+    }
+
+    /**
+     * A build for constructing a command line parser.
      *
      * @param <T> The concrete type of the builder
      */
     interface Builder<T extends Builder> {
+
         /**
-         * Add an option
+         * Add an option.
          *
          * @param name        The name
          * @param description The description
@@ -114,7 +129,7 @@ public interface CommandLine {
         T addOption(String name, String description);
 
         /**
-         * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String..args)
+         * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String..args).
          *
          * @param string The string
          * @return The command line
@@ -133,24 +148,10 @@ public interface CommandLine {
     }
 
     /**
-     * Build and parse a new command line
-     *
-     * @return The builder
+     * Default arguments.
      */
-    static Builder build() {
-        return new CommandLineParser();
-    }
-
-    /**
-     * Parse a new command line with the default options
-     *
-     * @param args The arguments
-     * @return The command line
-     */
-    static CommandLine parse(String... args) {
-        if (args == null || args.length == 0) {
-            return new DefaultCommandLine();
-        }
-        return new CommandLineParser().parse(args);
+    interface Arguments {
+        Option VERSION = new Option("version", "Outputs the version");
+        Option HELP = new Option("help", "Outputs help information");
     }
 }

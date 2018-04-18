@@ -63,7 +63,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     }
 
     /**
-     * Whether to include JAR files
+     * Whether to include JAR files.
      *
      * @param includeJars The jar files to include
      * @return This scanner
@@ -74,7 +74,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     }
 
     /**
-     * Scan the given packages
+     * Scan the given packages.
      *
      * @param annotation The annotation to scan for
      * @param pkg        The package to scan

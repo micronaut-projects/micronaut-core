@@ -24,6 +24,7 @@ package io.micronaut.core.version;
  */
 public class SemanticVersion implements Comparable<SemanticVersion> {
 
+    private static final int PARTS_MIN = 3;
     /**
      * The major version.
      */
@@ -42,10 +43,14 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
      */
     private final String version;
 
+    /**
+     * Constructor.
+     * @param version version
+     */
     public SemanticVersion(String version) {
         this.version = version;
         String[] parts = version.replace('_', '.').split("\\.");
-        if (parts.length >= 3) {
+        if (parts.length >= PARTS_MIN) {
             try {
                 this.major = Integer.valueOf(parts[0]);
                 this.minor = Integer.valueOf(parts[1]);

@@ -231,7 +231,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // String[] -> String
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
-            if (object == null || object.length == 0) return Optional.empty();
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
 
             StringJoiner joiner = new StringJoiner("");
             for (String string : object) {
@@ -785,8 +787,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             ConvertiblePair pair = (ConvertiblePair) o;
 

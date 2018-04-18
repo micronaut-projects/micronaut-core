@@ -27,7 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Discovers the annotation names of a class
+ * Discovers the annotation names of a class.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -31,11 +31,9 @@
 package io.micronaut.core.io.scan;
 
 import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
@@ -53,6 +51,21 @@ import java.io.InputStream;
  * @author Graeme Rocher
  */
 class AnnotationClassReader {
+
+    /**
+     * Flag to skip the debug information in the class. If this flag is set the
+     * debug information of the class is not visited, i.e. the
+     * {@link org.objectweb.asm.MethodVisitor#visitLocalVariable visitLocalVariable} and
+     * {@link org.objectweb.asm.MethodVisitor#visitLineNumber visitLineNumber} methods will not be
+     * called.
+     */
+    public static final int SKIP_DEBUG = 2;
+
+    /**
+     * Start index of the class header information (access, name...) in
+     * {@link #b b}.
+     */
+    public final int header;
 
     /**
      * Pseudo access flag to distinguish between the synthetic attribute and the
@@ -141,15 +154,6 @@ class AnnotationClassReader {
     static final boolean ANNOTATIONS = true;
 
     /**
-     * Flag to skip the debug information in the class. If this flag is set the
-     * debug information of the class is not visited, i.e. the
-     * {@link MethodVisitor#visitLocalVariable visitLocalVariable} and
-     * {@link MethodVisitor#visitLineNumber visitLineNumber} methods will not be
-     * called.
-     */
-    public static final int SKIP_DEBUG = 2;
-
-    /**
      * The class to be parsed. <i>The content of this array must not be
      * modified. This field is intended for {@link Attribute} sub classes, and
      * is normally not needed by class generators or adapters.</i>
@@ -178,18 +182,12 @@ class AnnotationClassReader {
      */
     private final int maxStringLength;
 
-    /**
-     * Start index of the class header information (access, name...) in
-     * {@link #b b}.
-     */
-    public final int header;
-
     // ------------------------------------------------------------------------
     // Constructors
     // ------------------------------------------------------------------------
 
     /**
-     * Constructs a new {@link ClassReader} object.
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
      *
      * @param b the bytecode of the class to be read.
      */
@@ -198,7 +196,7 @@ class AnnotationClassReader {
     }
 
     /**
-     * Constructs a new {@link ClassReader} object.
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
      *
      * @param b   the bytecode of the class to be read.
      * @param off the start offset of the class data.
@@ -318,7 +316,7 @@ class AnnotationClassReader {
     }
 
     /**
-     * Constructs a new {@link ClassReader} object.
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
      *
      * @param is an input stream from which to read the class.
      * @throws IOException if a problem occurs during reading.
@@ -328,7 +326,7 @@ class AnnotationClassReader {
     }
 
     /**
-     * Constructs a new {@link ClassReader} object.
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
      *
      * @param name the binary qualified name of the class to be read.
      * @throws IOException if an exception occurs during reading.
@@ -389,7 +387,7 @@ class AnnotationClassReader {
     // ------------------------------------------------------------------------
 
     /**
-     * Makes the given visitor visit the Java class of this {@link ClassReader}
+     * Makes the given visitor visit the Java class of this {@link org.objectweb.asm.ClassReader}
      * . This class is the one specified in the constructor (see
      * {@link #AnnotationClassReader(byte[]) ClassReader}).
      *
@@ -400,7 +398,7 @@ class AnnotationClassReader {
     }
 
     /**
-     * Makes the given visitor visit the Java class of this {@link ClassReader}.
+     * Makes the given visitor visit the Java class of this {@link org.objectweb.asm.ClassReader}.
      * This class is the one specified in the constructor (see
      * {@link #AnnotationClassReader(byte[]) ClassReader}).
      *
