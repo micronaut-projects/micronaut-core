@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -23,7 +24,7 @@ import io.micronaut.core.type.Argument;
 import java.util.Optional;
 
 /**
- * An interface for any type that is able to resolve and convert values
+ * An interface for any type that is able to resolve and convert values.
  *
  * @author Graeme Rocher
  * @see TypeConverter
@@ -32,7 +33,7 @@ import java.util.Optional;
 public interface ValueResolver<K extends CharSequence> {
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name              The name
      * @param conversionContext The conversion context
@@ -42,7 +43,7 @@ public interface ValueResolver<K extends CharSequence> {
     <T> Optional<T> get(K name, ArgumentConversionContext<T> conversionContext);
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name
      * @param requiredType The required type
@@ -54,7 +55,7 @@ public interface ValueResolver<K extends CharSequence> {
     }
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name
      * @param requiredType The required type
@@ -66,7 +67,7 @@ public interface ValueResolver<K extends CharSequence> {
     }
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name
      * @param requiredType The required type

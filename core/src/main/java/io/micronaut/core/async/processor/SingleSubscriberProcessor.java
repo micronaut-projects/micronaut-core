@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.processor;
 
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -25,7 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * <p>A {@link Processor} that only allows a single {@link Subscriber}</p>
+ * <p>A {@link Processor} that only allows a single {@link Subscriber}</p>.
  *
  * @param <T> the type of element signaled to the {@link Subscriber}
  * @param <R> the type of element signaled by the {@link Publisher}
@@ -59,7 +60,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     };
 
     /**
-     * Override to implement {@link Publisher#subscribe(Subscriber)}
+     * Override to implement {@link Publisher#subscribe(Subscriber)}.
      *
      * @param subscriber The subscriber
      * @see Publisher#subscribe(Subscriber)
@@ -67,7 +68,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     protected abstract void doSubscribe(Subscriber<? super R> subscriber);
 
     /**
-     * Get the current {@link Subscriber}
+     * Get the current {@link Subscriber}.
      *
      * @return The {@link Subscriber}
      * @throws IllegalStateException if the subscriber is not present
@@ -79,7 +80,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Get the current {@link Subscriber}
+     * Get the current {@link Subscriber}.
      *
      * @return An {@link Optional} subscriber
      */
@@ -89,7 +90,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Called after {@link #doOnError(Throwable)} completes
+     * Called after {@link #doOnError(Throwable)} completes.
      *
      * @param throwable The error
      */
@@ -98,21 +99,21 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Called after {@link #doOnComplete()} completes
+     * Called after {@link #doOnComplete()} completes.
      */
     protected void doAfterComplete() {
         // no-op
     }
 
     /**
-     * Called after {@link #doOnSubscribe(Subscription)} completes
+     * Called after {@link #doOnSubscribe(Subscription)} completes.
      */
     protected void doAfterOnSubscribe(Subscription subscription) {
         // no-op
     }
 
     /**
-     * Perform the actual subscription to the subscriber
+     * Perform the actual subscription to the subscriber.
      *
      * @param subscription The subscription
      * @param subscriber   The subscriber (never null)

@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import java.util.Map;
 
 /**
- * An interface that provides basic bean information. Designed as a simpler replacement for
+ * An interface that provides basic bean information. Designed as a simpler replacement for.
  * {@link java.beans.BeanInfo}
  *
  * @author Graeme Rocher
@@ -31,7 +32,7 @@ public interface BeanInfo<T> {
     Class<T> getBeanClass();
 
     /**
-     * The properties of the bean
+     * The properties of the bean.
      *
      * @return The properties of the bean as a map where the key is the property name
      */

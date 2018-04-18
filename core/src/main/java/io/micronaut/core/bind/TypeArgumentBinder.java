@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind;
 
 import io.micronaut.core.type.Argument;
 
 /**
- * An {@link ArgumentBinder} that is resolved based on the argument type
+ * An {@link ArgumentBinder} that is resolved based on the argument type.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +27,7 @@ import io.micronaut.core.type.Argument;
 public interface TypeArgumentBinder<T, S> extends ArgumentBinder<T, S> {
 
     /**
-     * @return The argument type
+     * @return The argument type.
      */
     Argument<T> argumentType();
 }

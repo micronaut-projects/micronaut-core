@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 /**
- * An exception that occurs related to configuration
+ * An exception that occurs related to configuration.
  *
  * @author Graeme Rocher
  * @since 1.0

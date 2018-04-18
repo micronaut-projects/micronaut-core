@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import static io.micronaut.core.naming.NameUtils.decapitalize;
@@ -30,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Note: Based on code found in Apache Harmony
+ * Note: Based on code found in Apache Harmony.
  *
  * @author graemerocher
  * @since 1.0

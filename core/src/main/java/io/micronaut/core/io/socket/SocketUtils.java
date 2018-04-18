@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.socket;
 
 import io.micronaut.core.util.ArgumentUtils;
@@ -23,7 +24,7 @@ import java.net.Socket;
 import java.util.Random;
 
 /**
- * Utility methods for dealing with sockets
+ * Utility methods for dealing with sockets.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,7 +39,7 @@ public class SocketUtils {
     private static final Random random = new Random(System.currentTimeMillis());
 
     /**
-     * Finds an available TCP port
+     * Finds an available TCP port.
      *
      * @return The available port
      */
@@ -47,7 +48,7 @@ public class SocketUtils {
     }
 
     /**
-     * Finds an available TCP port
+     * Finds an available TCP port.
      *
      * @param minPortRange The minimum port range
      * @param maxPortRange The maximum port range
@@ -69,7 +70,7 @@ public class SocketUtils {
     }
 
     /**
-     * Check whether the given TCP port is available
+     * Check whether the given TCP port is available.
      *
      * @param currentPort The port
      * @return True if it is

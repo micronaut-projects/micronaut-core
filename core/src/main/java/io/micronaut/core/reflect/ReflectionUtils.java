@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
@@ -87,21 +88,25 @@ public class ReflectionUtils {
         });
 
     /**
-     * Is the method a setter
+     * Is the method a setter.
      *
      * @param name The method name
      * @param args The arguments
      * @return True if it is
      */
     public static boolean isSetter(String name, Class[] args) {
-        if (StringUtils.isEmpty(name) || args == null) return false;
-        if (args.length != 1) return false;
+        if (StringUtils.isEmpty(name) || args == null) {
+            return false;
+        }
+        if (args.length != 1) {
+            return false;
+        }
 
         return NameUtils.isSetterName(name);
     }
 
     /**
-     * Obtain the wrapper type for the given primitive type
+     * Obtain the wrapper type for the given primitive.
      *
      * @param primitiveType The primitive type
      * @return The wrapper type
@@ -115,7 +120,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtain the primitive type for the given wrapper type
+     * Obtain the primitive type for the given wrapper type.
      *
      * @param wrapperType The primitive type
      * @return The wrapper type
@@ -130,7 +135,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtains a declared method
+     * Obtains a declared method.
      *
      * @param type       The type
      * @param methodName The method name
@@ -146,7 +151,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtains a method
+     * Obtains a method.
      *
      * @param type       The type
      * @param methodName The method name
@@ -160,8 +165,9 @@ public class ReflectionUtils {
             return findMethod(type, methodName, argTypes);
         }
     }
+
     /**
-     * Obtains a declared method
+     * Obtains a declared method.
      *
      * @param type     The type
      * @param argTypes The argument types
@@ -177,7 +183,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Invokes a method
+     * Invokes a method.
      *
      * @param instance  The instance
      * @param method    The method
@@ -197,7 +203,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
      * @param type          The type
      * @param name          The name
@@ -219,7 +225,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
      * @param type          The type
      * @param name          The name
@@ -236,7 +242,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds an internal method defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist
+     * Finds an internal method defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist.
      *
      * @param type          The type
      * @param name          The name
@@ -255,7 +261,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds an internal constructor defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist
+     * Finds an internal constructor defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist.
      *
      * @param type          The type
      * @param argumentTypes The argument types
@@ -272,7 +278,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a field on the given type for the given name
+     * Finds a field on the given type for the given name.
      *
      * @param type The type
      * @param name The name
@@ -288,7 +294,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a field in the type or super type
+     * Finds a field in the type or super type.
      *
      * @param type The type
      * @param name The field name
@@ -307,7 +313,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a field in the type or super type
+     * Finds a field in the type or super type.
      *
      * @param type The type
      * @param name The field name
@@ -336,7 +342,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
      * @param type The type
      * @param name The name

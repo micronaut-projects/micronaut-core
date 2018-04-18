@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.cli;
 
 import java.util.ArrayList;
@@ -78,7 +79,6 @@ class DefaultCommandLine implements CommandLine {
         }
         return null;
     }
-
 
     @Override
     public String getRemainingArgsString() {

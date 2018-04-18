@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -26,7 +27,7 @@ import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
- * An abstract {@link AnnotatedArgumentBinder} implementation
+ * An abstract {@link AnnotatedArgumentBinder} implementation.
  *
  * @author Graeme Rocher
  * @since 1.0

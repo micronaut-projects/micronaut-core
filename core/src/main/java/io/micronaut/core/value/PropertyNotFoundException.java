@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 /**
- * Thrown when a property cannot be resolved
+ * Thrown when a property cannot be resolved.
  *
  * @author Graeme Rocher
  * @since 1.0

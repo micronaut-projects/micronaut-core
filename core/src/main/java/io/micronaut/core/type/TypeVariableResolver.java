@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import java.util.Collection;
@@ -20,7 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * An interface for types that hold and can resolve type variables
+ * An interface for types that hold and can resolve type variables.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,6 +32,7 @@ public interface TypeVariableResolver {
      * @return Obtain a map of the type parameters for the argument
      */
     Map<String, Argument<?>> getTypeVariables();
+
     /**
      * @return The type parameters as an array
      */
@@ -39,7 +41,6 @@ public interface TypeVariableResolver {
         Collection<Argument<?>> values = getTypeVariables().values();
         return values.toArray(new Argument[values.size()]);
     }
-
 
     /**
      * @return Return the first type parameter if it is present

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import org.reactivestreams.Subscriber;
@@ -24,7 +25,7 @@ import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
- * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result
+ * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result.
  *
  * @author Graeme Rocher
  * @since 1.0

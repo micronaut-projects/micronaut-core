@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.buffer;
 
 
@@ -21,7 +22,7 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 
 /**
- * Interface to allow interfacing with different byte buffer implementations, primarily as an abstraction over Netty
+ * Interface to allow interfacing with different byte buffer implementations, primarily as an abstraction over Netty.
  *
  * @author Graeme Rocher
  * @since 1.0

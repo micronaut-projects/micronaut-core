@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.naming;
 
 import java.util.Optional;
 
 /**
- * An interface for a components that resolve names
+ * An interface for a components that resolve names.
  *
  * @author Graeme Rocher
  * @since 1.0

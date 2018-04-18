@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -26,7 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * <p>An interface capable of binding the value of an {@link Argument} from a source</p>
+ * <p>An interface capable of binding the value of an {@link Argument} from a source</p>.
  * <p>
  * <p>The selection of an {@link ArgumentBinder} is done by the {@link ArgumentBinderRegistry}. Selection could
  * be based on type, annotation or other factors such as the request media type</p>
@@ -48,7 +49,7 @@ import java.util.Optional;
 public interface ArgumentBinder<T, S> {
 
     /**
-     * Bind the given argument from the given source
+     * Bind the given argument from the given source.
      *
      * @param context The {@link ArgumentConversionContext}
      * @param source  The source
@@ -57,18 +58,18 @@ public interface ArgumentBinder<T, S> {
     BindingResult<T> bind(ArgumentConversionContext<T> context, S source);
 
     /**
-     * The result of binding
+     * The result of binding.
      *
      * @param <T>
      */
     interface BindingResult<T> {
         /**
-         * An empty but satisfied result
+         * An empty but satisfied result.
          */
         BindingResult EMPTY = Optional::empty;
 
         /**
-         * An empty but unsatisfied result
+         * An empty but unsatisfied result.
          */
         BindingResult UNSATISFIED = new BindingResult() {
             @Override
@@ -110,7 +111,7 @@ public interface ArgumentBinder<T, S> {
         }
 
         /**
-         * Obtains the value. Callers should call {@link #isPresentAndSatisfied()} first
+         * Obtains the value. Callers should call {@link #isPresentAndSatisfied()} first.
          *
          * @return The value
          */

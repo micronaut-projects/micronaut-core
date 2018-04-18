@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
- * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
+ * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>.
  *
  * @param <T> The declaring type
  * @param <R> The result of the method call
@@ -28,12 +29,12 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 public interface Executable<T, R> extends AnnotationMetadataProvider {
 
     /**
-     * The required argument types
+     * The required argument types.
      */
     Argument[] getArguments();
 
     /**
-     * Invokes the method
+     * Invokes the method.
      *
      * @param instance  The instance
      * @param arguments The arguments

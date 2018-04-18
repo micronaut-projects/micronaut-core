@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * Default implementation of {@link OptionalMultiValues }
+ * Default implementation of {@link OptionalMultiValues }.
  *
  * @author Graeme Rocher
  * @since 1.0

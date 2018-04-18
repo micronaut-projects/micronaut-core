@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import io.micronaut.core.naming.Named;
@@ -22,7 +23,7 @@ import java.lang.reflect.Method;
 
 /**
  * An interface that provides basic bean information. Designed as a simpler replacement for
- * {@link java.beans.PropertyDescriptor}
+ * {@link java.beans.PropertyDescriptor}.
  *
  * @author Graeme Rocher
  * @since 1.0

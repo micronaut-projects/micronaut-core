@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind;
 
 import io.micronaut.core.type.Argument;
@@ -20,7 +21,7 @@ import io.micronaut.core.type.Argument;
 import java.util.Optional;
 
 /**
- * A registry of {@link ArgumentBinder} instances
+ * A registry of {@link ArgumentBinder} instances.
  *
  * @author Graeme Rocher
  * @since 1.0

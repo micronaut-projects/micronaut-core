@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io;
 
 import io.micronaut.core.annotation.Blocking;
@@ -24,7 +25,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- * Utility methods for I/O operations
+ * Utility methods for I/O operations.
  *
  * @author Graeme Rocher
  * @since 1.0

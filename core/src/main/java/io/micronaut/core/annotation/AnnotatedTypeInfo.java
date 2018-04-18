@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 /**
- * An interface that provides an abstraction for checking for the existence of annotations
+ * An interface that provides an abstraction for checking for the existence of annotations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ public interface AnnotatedTypeInfo {
     String getTypeName();
 
     /**
-     * Checks whether an annotation for the given name exists
+     * Checks whether an annotation for the given name exists.
      *
      * @param annotationName The annotation name
      * @return True if it does
