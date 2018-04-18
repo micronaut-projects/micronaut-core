@@ -216,14 +216,14 @@ public interface BeanDefinitionVisitor {
 
     /**
      * Visits a method injection point
-     *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     *  @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
      * @param requiresReflection Whether the method requires reflection
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes     The qualifier types of each argument. Can be null.
      * @param genericTypes       The generic types of each argument. Can be null.
+     * @param annotationMetadata
      */
     void visitPostConstructMethod(Object declaringType,
                                   boolean requiresReflection,
@@ -231,26 +231,7 @@ public interface BeanDefinitionVisitor {
                                   String methodName,
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
-                                  Map<String, Map<String, Object>> genericTypes);
-
-    /**
-     * Visits a method injection point
-     *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
-     * @param genericTypes       The generic types of each argument. Can be null.
-     */
-    void visitPreDestroyMethod(Object declaringType,
-                               boolean requiresReflection,
-                               Object returnType,
-                               String methodName,
-                               Map<String, Object> argumentTypes,
-                               Map<String, Object> qualifierTypes,
-                               Map<String, Map<String, Object>> genericTypes);
+                                  Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a method injection point
@@ -261,7 +242,26 @@ public interface BeanDefinitionVisitor {
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes     The qualifier types of each argument. Can be null.
      * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata
+     * @param annotationMetadata The annotation metadata
+     */
+    void visitPreDestroyMethod(Object declaringType,
+                               boolean requiresReflection,
+                               Object returnType,
+                               String methodName,
+                               Map<String, Object> argumentTypes,
+                               Map<String, Object> qualifierTypes,
+                               Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
+
+    /**
+     * Visits a method injection point
+     *  @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     * @param annotationMetadata The annotation metadata
      */
     void visitMethodInjectionPoint(Object declaringType,
                                    boolean requiresReflection,
@@ -269,7 +269,8 @@ public interface BeanDefinitionVisitor {
                                    String methodName,
                                    Map<String, Object> argumentTypes,
                                    Map<String, Object> qualifierTypes,
-                                   Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
+                                   Map<String, Map<String, Object>> genericTypes,
+                                   AnnotationMetadata annotationMetadata);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection

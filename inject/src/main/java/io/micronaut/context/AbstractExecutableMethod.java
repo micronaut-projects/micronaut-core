@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -24,6 +25,7 @@ import io.micronaut.inject.ExecutableMethod;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -41,6 +43,7 @@ import java.util.stream.Stream;
 public abstract class AbstractExecutableMethod extends AbstractExecutable implements ExecutableMethod {
 
     private final ReturnType returnType;
+    private final Argument<?> genericReturnType;
 
     @SuppressWarnings("WeakerAccess")
     protected AbstractExecutableMethod(Class<?> declaringType,
@@ -48,7 +51,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                                        Argument genericReturnType,
                                        Argument... arguments) {
         super(declaringType, methodName, arguments);
-        this.returnType = new ReturnTypeImpl(genericReturnType);
+        this.genericReturnType = genericReturnType;
+        this.returnType = new ReturnTypeImpl();
 
     }
 
@@ -132,16 +136,17 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     class ReturnTypeImpl implements ReturnType<Object> {
-        private final Argument<?> genericReturnType;
 
-        ReturnTypeImpl(Argument genericReturnType) {
-            this.genericReturnType = genericReturnType != null ? genericReturnType : Argument.of(void.class);
-        }
 
         @SuppressWarnings("unchecked")
         @Override
         public Class<Object> getType() {
-            return (Class<Object>) genericReturnType.getType();
+            if(genericReturnType != null) {
+                return (Class<Object>) genericReturnType.getType();
+            }
+            else {
+                return (Class<Object>) getTargetMethod().getReturnType();
+            }
         }
 
 
@@ -152,18 +157,29 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                 return new AnnotatedElement[]{method.getAnnotatedReturnType(), method};
             }
             else {
-                return genericReturnType.getAnnotatedElements();
+                if(genericReturnType != null) {
+                    return genericReturnType.getAnnotatedElements();
+                }
+                else {
+                    return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
+                }
             }
         }
 
         @Override
         public Argument[] getTypeParameters() {
-            return genericReturnType.getTypeParameters();
+            if(genericReturnType != null) {
+                return genericReturnType.getTypeParameters();
+            }
+            return Argument.ZERO_ARGUMENTS;
         }
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            return genericReturnType.getTypeVariables();
+            if(genericReturnType != null) {
+                return genericReturnType.getTypeVariables();
+            }
+            return Collections.emptyMap();
         }
     }
 }
