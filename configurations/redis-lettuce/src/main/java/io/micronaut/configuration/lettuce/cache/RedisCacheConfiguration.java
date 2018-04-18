@@ -66,7 +66,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
      * @param server The name of the server
      * @see io.micronaut.configuration.lettuce.NamedRedisServersConfiguration
      */
-    void setServer(String server) {
+    public void setServer(String server) {
         this.server = server;
     }
 
@@ -82,7 +82,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
      *
      * @param valueSerializer The value serializer.
      */
-    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
+    public void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
         this.valueSerializer = valueSerializer;
     }
 
@@ -100,7 +100,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
      *
      * @param keySerializer The key serializer
      */
-    void setKeySerializer(Class<ObjectSerializer> keySerializer) {
+    public void setKeySerializer(Class<ObjectSerializer> keySerializer) {
         this.keySerializer = keySerializer;
     }
 }
