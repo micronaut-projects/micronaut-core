@@ -32,26 +32,23 @@ public interface TypeElementVisitor<C, E> {
      * Executed when a class is encountered that matches the <C> generic
      *
      * @param element The element
-     * @param annotationMetadata The annotation metadata
      * @param context The visitor context
      */
-    void visitClass(ClassElement element, AnnotationMetadata annotationMetadata, VisitorContext context);
+    void visitClass(ClassElement element, VisitorContext context);
 
     /**
      * Executed when a method is encountered that matches the <E> generic
      *
      * @param element The element
-     * @param annotationMetadata The annotation metadata
      * @param context The visitor context
      */
-    void visitMethod(MethodElement element, AnnotationMetadata annotationMetadata, VisitorContext context);
+    void visitMethod(MethodElement element, VisitorContext context);
 
     /**
      * Executed when a field is encountered that matches the <E> generic
      *
      * @param element The element
-     * @param annotationMetadata The annotation metadata
      * @param context The visitor context
      */
-    void visitField(FieldElement element, AnnotationMetadata annotationMetadata, VisitorContext context);
+    void visitField(FieldElement element, VisitorContext context);
 }

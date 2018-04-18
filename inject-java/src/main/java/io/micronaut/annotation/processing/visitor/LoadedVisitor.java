@@ -93,11 +93,11 @@ public class LoadedVisitor {
      */
     public void visit(Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            visitor.visitField(new JavaFieldElement((VariableElement) element), annotationMetadata, visitorContext);
+            visitor.visitField(new JavaFieldElement((VariableElement) element, annotationMetadata), visitorContext);
         } else if (element instanceof ExecutableElement) {
-            visitor.visitMethod(new JavaMethodElement((ExecutableElement) element), annotationMetadata, visitorContext);
+            visitor.visitMethod(new JavaMethodElement((ExecutableElement) element, annotationMetadata), visitorContext);
         } else if (element instanceof TypeElement) {
-            visitor.visitClass(new JavaClassElement((TypeElement) element), annotationMetadata, visitorContext);
+            visitor.visitClass(new JavaClassElement((TypeElement) element, annotationMetadata), visitorContext);
         }
     }
 }

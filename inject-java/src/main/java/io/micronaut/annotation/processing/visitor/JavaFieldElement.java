@@ -16,6 +16,7 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.FieldElement;
 
 import javax.lang.model.element.VariableElement;
@@ -30,8 +31,8 @@ public class JavaFieldElement extends AbstractJavaElement implements FieldElemen
 
     private final VariableElement variableElement;
 
-    JavaFieldElement(VariableElement variableElement) {
-        super(variableElement);
+    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata) {
+        super(variableElement, annotationMetadata);
         this.variableElement = variableElement;
     }
 

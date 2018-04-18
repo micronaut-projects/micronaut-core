@@ -16,6 +16,8 @@
 
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+
 /**
  * Stores data about a compile time element. The underlying object can
  * be a class, field, or method.
@@ -23,7 +25,7 @@ package io.micronaut.inject.visitor;
  * @author James Kleeh
  * @since 1.0
  */
-public interface Element {
+public interface Element extends AnnotationMetadata {
 
     /**
      * @return The name of the element.

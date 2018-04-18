@@ -16,6 +16,7 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.FieldElement;
 import org.codehaus.groovy.ast.Variable;
 
@@ -28,11 +29,12 @@ import java.lang.reflect.Modifier;
  * @author James Kleeh
  * @since 1.0
  */
-public class GroovyFieldElement implements FieldElement {
+public class GroovyFieldElement extends AbstractGroovyElement implements FieldElement {
 
     private final Variable variable;
 
-    GroovyFieldElement(Variable variable) {
+    GroovyFieldElement(Variable variable, AnnotationMetadata annotationMetadata) {
+        super(annotationMetadata);
         this.variable = variable;
     }
 

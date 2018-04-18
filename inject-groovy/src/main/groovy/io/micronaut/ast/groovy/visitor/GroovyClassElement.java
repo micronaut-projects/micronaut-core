@@ -16,6 +16,7 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
 import org.codehaus.groovy.ast.ClassNode;
 
@@ -27,11 +28,12 @@ import java.lang.reflect.Modifier;
  * @author James Kleeh
  * @since 1.0
  */
-public class GroovyClassElement implements ClassElement {
+public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
     private final ClassNode classNode;
 
-    GroovyClassElement(ClassNode classNode) {
+    GroovyClassElement(ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        super(annotationMetadata);
         this.classNode = classNode;
     }
 

@@ -92,13 +92,13 @@ class LoadedVisitor {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                visitor.visitField(new GroovyFieldElement((Variable) annotatedNode), annotationMetadata, visitorContext)
+                visitor.visitField(new GroovyFieldElement((Variable) annotatedNode, annotationMetadata), visitorContext)
                 break
             case MethodNode:
-                visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode), annotationMetadata, visitorContext)
+                visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode, annotationMetadata), visitorContext)
                 break
             case ClassNode:
-                visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode), annotationMetadata, visitorContext)
+                visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode, annotationMetadata), visitorContext)
                 break
         }
     }

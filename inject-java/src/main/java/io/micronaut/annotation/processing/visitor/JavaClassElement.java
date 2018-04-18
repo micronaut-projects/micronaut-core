@@ -16,6 +16,7 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
 
 import javax.lang.model.element.TypeElement;
@@ -30,8 +31,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     private final TypeElement classElement;
 
-    JavaClassElement(TypeElement classElement) {
-        super(classElement);
+    JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata) {
+        super(classElement, annotationMetadata);
         this.classElement = classElement;
     }
 

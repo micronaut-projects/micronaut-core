@@ -16,6 +16,7 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.MethodElement;
 
 import javax.lang.model.element.ExecutableElement;
@@ -30,8 +31,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     private final ExecutableElement executableElement;
 
-    JavaMethodElement(ExecutableElement executableElement) {
-        super(executableElement);
+    JavaMethodElement(ExecutableElement executableElement, AnnotationMetadata annotationMetadata) {
+        super(executableElement, annotationMetadata);
         this.executableElement = executableElement;
     }
 

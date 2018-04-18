@@ -16,6 +16,7 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.MethodElement;
 import org.codehaus.groovy.ast.MethodNode;
 
@@ -25,11 +26,12 @@ import org.codehaus.groovy.ast.MethodNode;
  * @author James Kleeh
  * @since 1.0
  */
-public class GroovyMethodElement implements MethodElement {
+public class GroovyMethodElement extends AbstractGroovyElement implements MethodElement {
 
     private final MethodNode methodNode;
 
-    GroovyMethodElement(MethodNode methodNode) {
+    GroovyMethodElement(MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+        super(annotationMetadata);
         this.methodNode = methodNode;
     }
 

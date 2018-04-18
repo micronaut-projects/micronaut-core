@@ -1,6 +1,5 @@
 package io.micronaut.visitors;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.*;
 
 import javax.inject.Inject;
@@ -11,17 +10,17 @@ public class InjectVisitor implements TypeElementVisitor<Object, Inject> {
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
 
     @Override
-    public void visitClass(ClassElement element, AnnotationMetadata annotationMetadata, VisitorContext context) {
+    public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
     }
 
     @Override
-    public void visitMethod(MethodElement element, AnnotationMetadata annotationMetadata, VisitorContext context) {
+    public void visitMethod(MethodElement element, VisitorContext context) {
         visit(element);
     }
 
     @Override
-    public void visitField(FieldElement element, AnnotationMetadata annotationMetadata, VisitorContext context) {
+    public void visitField(FieldElement element, VisitorContext context) {
         visit(element);
     }
 
