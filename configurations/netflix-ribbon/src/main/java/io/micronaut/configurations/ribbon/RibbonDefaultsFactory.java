@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.config.IClientConfig;
@@ -36,7 +37,7 @@ import io.micronaut.context.annotation.Requires;
 public class RibbonDefaultsFactory {
 
     /**
-     * The default {@link ServerListFilter} to use
+     * The default {@link ServerListFilter} to use.
      *
      * @param defaultConfig The default {@link IClientConfig}
      * @return The default {@link ServerListFilter} to use
@@ -49,7 +50,7 @@ public class RibbonDefaultsFactory {
     }
 
     /**
-     * @return The default {@link IPing} to use
+     * @return The default {@link IPing} to use.
      */
     @Prototype
     @Primary
@@ -59,6 +60,7 @@ public class RibbonDefaultsFactory {
     }
 
     /**
+     * @param clientConfig clientConfig
      * @return The default {@link IRule} to use
      */
     @Prototype
