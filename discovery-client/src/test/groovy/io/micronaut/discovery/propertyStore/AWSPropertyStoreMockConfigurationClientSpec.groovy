@@ -17,8 +17,8 @@ package io.micronaut.discovery.propertyStore
 
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync
-import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
-import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult
+import com.amazonaws.services.simplesystemsmanagement.model.GetParametersRequest
+import com.amazonaws.services.simplesystemsmanagement.model.GetParametersResult
 import com.amazonaws.services.simplesystemsmanagement.model.Parameter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
@@ -62,16 +62,16 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
 
         given:
 
-        client.client.getParametersByPathAsync(_) >> {  GetParametersByPathRequest getRequest->
+        client.client.getParametersAsync(_) >> { GetParametersRequest getRequest->
 
-            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            FutureTask<GetParametersResult> futureTask = Mock(FutureTask)
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
-                GetParametersByPathResult result = new GetParametersByPathResult()
+                GetParametersResult result = new GetParametersResult()
 
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
 
-                if (getRequest.getPath() == "/config/application") {
+                if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application"
@@ -79,9 +79,9 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                     parameter.type = "StringList"
                     parameters.add(parameter)
                 }
-                if (getRequest.getPath() == "/config/application,test") {
+                if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application,test"
+                    parameter1.name = "/config/application_test"
                     parameter1.value = "foo=bar"
                     parameter1.type = "StringList"
                     parameters.add(parameter1)
@@ -117,14 +117,14 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
 
         given:
 
-        client.client.getParametersByPathAsync(_) >> {  GetParametersByPathRequest getRequest->
+        client.client.getParametersAsync(_) >> {  GetParametersRequest getRequest->
 
-            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            FutureTask<GetParametersResult> futureTask = Mock(FutureTask)
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
-                GetParametersByPathResult result = new GetParametersByPathResult()
+                GetParametersResult result = new GetParametersResult()
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
-                if (getRequest.getPath() == "/config/application") {
+                if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application"
@@ -132,9 +132,9 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                     parameter.type = "String"
                     parameters.add(parameter)
                 }
-                if (getRequest.getPath() == "/config/application,test") {
+                if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application,test"
+                    parameter1.name = "/config/application_test"
                     parameter1.value = "foo=bar"
                     parameter1.type = "String"
                     parameters.add(parameter1)
@@ -169,14 +169,14 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
 
         given:
 
-        client.client.getParametersByPathAsync(_) >> {  GetParametersByPathRequest getRequest->
+        client.client.getParametersAsync(_) >> {  GetParametersRequest getRequest->
 
-            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            FutureTask<GetParametersResult> futureTask = Mock(FutureTask)
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
-                GetParametersByPathResult result = new GetParametersByPathResult()
+                GetParametersResult result = new GetParametersResult()
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
-                if (getRequest.getPath() == "/config/application") {
+                if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application"
@@ -184,9 +184,9 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                     parameter.type = "SecureString"
                     parameters.add(parameter)
                 }
-                if (getRequest.getPath() == "/config/application,test") {
+                if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application,test"
+                    parameter1.name = "/config/application_test"
                     parameter1.value = "foo=bar"
                     parameter1.type = "SecureString"
                     parameters.add(parameter1)
