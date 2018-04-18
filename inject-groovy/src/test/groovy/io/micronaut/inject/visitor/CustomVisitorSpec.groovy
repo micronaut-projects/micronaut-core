@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 
 class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 
@@ -9,6 +10,7 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
         AllElementsVisitor.VISITED_ELEMENTS = []
         AllClassesVisitor.VISITED_ELEMENTS = []
         InjectVisitor.VISITED_ELEMENTS = []
+        AstAnnotationUtils.invalidateCache()
     }
 
     void "test class is visited by custom visitor"() {
@@ -47,16 +49,17 @@ class TestController {
 ''')
         expect:
         ControllerGetVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        AllElementsVisitor.VISITED_ELEMENTS == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "setterMethod", "getMethod", "postMethod"]
+        AllElementsVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        InjectVisitor.VISITED_ELEMENTS == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "setterMethod"]
+        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod"].toSet()
     }
 
     void "test non controller class is not visited by custom visitor"() {
         buildBeanDefinition('test.TestController', '''
 package test;
 
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.*
+import javax.inject.Inject
 
 @javax.inject.Singleton
 public class TestController {
@@ -89,6 +92,6 @@ public class TestController {
         ControllerGetVisitor.VISITED_ELEMENTS == []
         AllElementsVisitor.VISITED_ELEMENTS == []
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        InjectVisitor.VISITED_ELEMENTS == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "setterMethod"]
+        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod"].toSet()
     }
 }

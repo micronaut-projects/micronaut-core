@@ -765,7 +765,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitField(FieldNode fieldNode) {
             if (fieldNode.name == 'metaClass') return
             int modifiers = fieldNode.modifiers
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) || fieldNode.isSynthetic()) {
+            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
+                return
+            }
+            boolean isPackagePrivate = isPackagePrivate(fieldNode, fieldNode.modifiers)
+            if (fieldNode.isSynthetic() && !isPackagePrivate) {
                 return
             }
             ClassNode declaringClass = fieldNode.declaringClass
@@ -776,7 +780,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
 
-            if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
+            if ((isInject || isValue) && (declaringClass.getProperty(fieldNode.getName()) == null || isPackagePrivate)) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
                     Object qualifierRef = resolveQualifier(fieldNode)
@@ -849,6 +853,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             if (fieldNode.name == 'metaClass') return
+            if (isPackagePrivate(fieldNode, fieldNode.modifiers)) {
+                visitField(fieldNode)
+                return
+            }
+
             def modifiers = propertyNode.getModifiers()
             if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
                 return
