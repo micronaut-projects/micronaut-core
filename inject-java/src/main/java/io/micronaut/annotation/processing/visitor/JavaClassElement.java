@@ -13,4 +13,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.classElement = classElement;
     }
 
+    @Override
+    public String getName() {
+        return classElement.getQualifiedName().toString();
+    }
 }

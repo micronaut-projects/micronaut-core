@@ -10,7 +10,7 @@ public class JavaVisitorContext implements VisitorContext {
 
     private final Messager messager;
 
-    JavaVisitorContext(Messager messager) {
+    public JavaVisitorContext(Messager messager) {
         this.messager = messager;
     }
 

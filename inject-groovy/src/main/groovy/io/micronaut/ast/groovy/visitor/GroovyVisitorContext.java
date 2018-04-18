@@ -13,7 +13,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final ErrorCollector errorCollector;
     private final SourceUnit sourceUnit;
 
-    GroovyVisitorContext(SourceUnit sourceUnit) {
+    public GroovyVisitorContext(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
     }

@@ -19,8 +19,10 @@ class LoadedVisitor {
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
+    private final GroovyVisitorContext visitorContext
 
-    LoadedVisitor(TypeElementVisitor visitor) {
+    LoadedVisitor(TypeElementVisitor visitor, GroovyVisitorContext visitorContext) {
+        this.visitorContext = visitorContext
         this.visitor = visitor
         ClassNode classNode = ClassHelper.make(visitor.getClass())
         ClassNode definition = classNode.getAllInterfaces().find {
@@ -31,40 +33,32 @@ class LoadedVisitor {
         elementAnnotation = generics[1].type.name
     }
 
-    boolean matches(ClassNode classNode, AnnotatedNode astNode) {
-        AnnotationMetadata elementMetadata = AstAnnotationUtils.getAnnotationMetadata(astNode)
-
+    boolean matches(ClassNode classNode) {
         if (classAnnotation == ClassHelper.OBJECT) {
-            if (elementAnnotation == ClassHelper.OBJECT) {
-                return true
-            } else {
-                return elementMetadata.hasAnnotation(elementAnnotation)
-            }
-        } else {
-            AnnotationMetadata classMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
-            if (classMetadata.hasAnnotation(classAnnotation)) {
-                if (elementAnnotation == ClassHelper.OBJECT) {
-                    return true
-                } else {
-                    return elementMetadata.hasAnnotation(elementAnnotation)
-                }
-            } else {
-                return false
-            }
+            return true
         }
+        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
+        return annotationMetadata.hasAnnotation(classAnnotation)
     }
 
-    void visit(AnnotatedNode annotatedNode, GroovyVisitorContext context) {
+    boolean matches(AnnotationMetadata annotationMetadata) {
+        if (elementAnnotation == ClassHelper.OBJECT) {
+            return true
+        }
+        return annotationMetadata.hasAnnotation(elementAnnotation)
+    }
+
+    void visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                visitor.visitField(new GroovyFieldElement((Variable) annotatedNode), context)
+                visitor.visitField(new GroovyFieldElement((Variable) annotatedNode), annotationMetadata, visitorContext)
                 break
             case MethodNode:
-                visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode), context)
+                visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode), annotationMetadata, visitorContext)
                 break
             case ClassNode:
-                visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode), context)
+                visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode), annotationMetadata, visitorContext)
                 break
         }
     }
