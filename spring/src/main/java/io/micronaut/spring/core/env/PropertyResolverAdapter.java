@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.spring.core.env;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -22,7 +23,7 @@ import org.springframework.core.env.PropertyResolver;
 import java.util.Optional;
 
 /**
- * Adapts a {@link io.micronaut.core.value.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}
+ * Adapts a {@link io.micronaut.core.value.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +33,12 @@ public class PropertyResolverAdapter implements PropertyResolver {
     private final io.micronaut.core.value.PropertyResolver propertyResolver;
     private final PropertyPlaceholderResolver placeholderResolver;
 
+    /**
+     * Constructor.
+     *
+     * @param propertyResolver The property resolver
+     * @param placeholderResolver The property placeholder resolver
+     */
     public PropertyResolverAdapter(io.micronaut.core.value.PropertyResolver propertyResolver, PropertyPlaceholderResolver placeholderResolver) {
         this.propertyResolver = propertyResolver;
         this.placeholderResolver = placeholderResolver;
