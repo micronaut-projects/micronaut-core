@@ -98,20 +98,21 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
         String applicationPrefix = hasApplicationSpecificConfig ? applicationSpecificPath.substring(1) : null;
 
-        Flowable<GetParametersByPathResult> configurationValues = Flowable.fromPublisher(getHierarchy(commonConfigPath, false));
+        Flowable<GetParametersResult> configurationValues = Flowable.fromPublisher(getParameters(commonConfigPath));
 
         if (hasApplicationSpecificConfig) {
             configurationValues = Flowable.concat(
                     configurationValues,
-                    Flowable.fromPublisher(getHierarchy(applicationSpecificPath, false)));
+                    Flowable.fromPublisher(getParameters(applicationSpecificPath)));
         }
         if (activeNames!=null && activeNames.size() > 0) {
             // look for the environment configs since we can't wildcard partial paths on aws
+            // TODO why is this behaving different on unit vs integration tests and only returning 1 vs 2 items and not in a List????
             for (String activeName : activeNames) {
-                String environmentSpecificPath = commonConfigPath+","+activeName;
+                String environmentSpecificPath = commonConfigPath+"_"+activeName;
                 configurationValues = Flowable.concat(
                         configurationValues,
-                        Flowable.fromPublisher(getHierarchy(environmentSpecificPath, false)));
+                        Flowable.fromPublisher(getParameters(environmentSpecificPath)));
 
             }
 
@@ -139,9 +140,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             if (!lookupKey.startsWith("/")) {
                                 lookupKey = "/"+lookupKey;
                             }
-                            Flowable<GetParametersByPathResult> parameters = Flowable.fromPublisher(getHierarchy(lookupKey, true));
-
-                            Flowable<Map<String, Object>> properties = Flowable.fromPublisher(convertParameterHierarchyToMap(parameters.blockingFirst()));
+                            //Flowable<GetParametersResult> parameters = Flowable.fromPublisher(getParameters(lookupKey));
+                            //Flowable<GetParametersResult> parameters = Publishers.just(keyValues.getParameters())
+                            Flowable<Map<String, Object>> properties = Flowable.fromPublisher(convertParameterHierarchyToMap(keyValues));
                             for (String propertySourceName : propertySourceNames) {
 
                                 Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
@@ -210,13 +211,31 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     }
 
 
+    Publisher<GetParametersResult> getParameters(String path) {
 
+        GetParametersRequest getRequest = new GetParametersRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withNames(path);
+
+        Future<GetParametersResult> future = client.getParametersAsync(getRequest);
+
+        Flowable<GetParametersResult> invokeFlowable = Flowable.fromFuture(future,Schedulers.io());
+
+
+        invokeFlowable = invokeFlowable.onErrorResumeNext(throwable -> {
+            if (throwable instanceof SdkClientException) {
+                return Flowable.error(throwable);
+            } else {
+                return Flowable.error(new ConfigurationException("Error reading distributed configuration from AWS Parameter Store: " + throwable.getMessage(), throwable));
+            }
+        });
+        return invokeFlowable;
+
+    }
 
     private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
         Set<String> propertySourceNames;
-        if (prefix.indexOf(',') > -1) {
+        if (prefix.indexOf('_') > -1) {
 
-            String[] tokens = prefix.split(",");
+            String[] tokens = prefix.split("_");
             if (tokens.length == 1) {
                 propertySourceNames = Collections.singleton(tokens[0]);
             } else {
@@ -245,7 +264,18 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     }
 
     public Publisher<Map<String,Object>> convertParameterHierarchyToMap(GetParametersByPathResult result) {
-        List<Parameter> params = result.getParameters();
+        return convertParametersToMap(result.getParameters());
+
+    }
+
+    public Publisher<Map<String,Object>> convertParameterHierarchyToMap(GetParametersResult result) {
+        return convertParametersToMap(result.getParameters());
+
+    }
+
+
+    private Publisher<Map<String,Object>> convertParametersToMap(List<Parameter> params) {
+
         Map output = new HashMap<String,Object>();
         for (Parameter param : params) {
             switch (param.getType()) {
@@ -267,7 +297,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     String[] keyValue = param.getValue().split("=");
                     output.put(keyValue[0],keyValue[1]);
 
-                break;
+                    break;
 
                 default:
                 case "String":
@@ -279,6 +309,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         return Publishers.just(output);
 
     }
+
 
 
 }
