@@ -71,7 +71,7 @@ public class AWSLambdaConfiguration {
      * @return The builder for the {@link com.amazonaws.services.lambda.AWSLambdaAsync} instance
      */
     public AWSLambdaAsyncClientBuilder getBuilder() {
-        this.builder.setClientConfiguration(clientConfiguration.clientConfiguration);
+        this.builder.setClientConfiguration(clientConfiguration.getClientConfiguration());
         return builder;
     }
 
