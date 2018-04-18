@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.http.HttpRequest;
@@ -20,7 +21,7 @@ import io.micronaut.http.HttpRequest;
 import java.util.List;
 
 /**
- * Strategy interface for resolving {@link io.micronaut.session.Session} IDs
+ * Strategy interface for resolving {@link io.micronaut.session.Session} IDs.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,7 +29,7 @@ import java.util.List;
 public interface HttpSessionIdResolver {
 
     /**
-     * Resolve the Session ID from the given HTTP message
+     * Resolve the Session ID from the given HTTP message.
      *
      * @param message The session ID
      * @return An {@link java.util.Optional}

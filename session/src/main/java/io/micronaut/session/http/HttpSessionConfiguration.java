@@ -56,7 +56,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param base64Encode Enable the Base64 encode for sessions IDs sent back to clients
      */
-    void setBase64Encode(boolean base64Encode) {
+    protected void setBase64Encode(boolean base64Encode) {
         this.base64Encode = base64Encode;
     }
 
@@ -68,9 +68,10 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     *
      * @param cookieName Set the cookie name to use
      */
-    void setCookieName(String cookieName) {
+    protected void setCookieName(String cookieName) {
         this.cookieName = cookieName;
     }
 
@@ -84,7 +85,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param prefix Set the prefix to use when serializing session ID
      */
-    void setPrefix(String prefix) {
+    protected void setPrefix(String prefix) {
         this.prefix = prefix;
     }
 
@@ -98,7 +99,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param headerNames Set the header names when using a Header strategy
      */
-    void setHeaderNames(String[] headerNames) {
+    protected void setHeaderNames(String[] headerNames) {
         this.headerNames = headerNames;
     }
 
@@ -112,7 +113,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param cookiePath Set the cookie path to use
      */
-    void setCookiePath(String cookiePath) {
+    protected void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;
     }
 
@@ -126,7 +127,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param domainName Set the domain name to use for the cookie
      */
-    void setDomainName(String domainName) {
+    protected void setDomainName(String domainName) {
         this.domainName = domainName;
     }
 
@@ -140,7 +141,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param cookieMaxAge Set the max age to use for the cookie
      */
-    void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+    protected void setCookieMaxAge(TemporalAmount cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 
@@ -154,7 +155,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param rememberMe Enable the remember me setting
      */
-    void setRememberMe(boolean rememberMe) {
+    protected void setRememberMe(boolean rememberMe) {
         this.rememberMe = rememberMe;
     }
 }
