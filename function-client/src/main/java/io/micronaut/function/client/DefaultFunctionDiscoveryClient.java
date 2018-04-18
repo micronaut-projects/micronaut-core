@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -32,7 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Default implementation of the {@link FunctionDiscoveryClient} interface
+ * Default implementation of the {@link FunctionDiscoveryClient} interface.
  *
  * @author graemerocher
  * @since 1.0
@@ -43,6 +44,13 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     private final DiscoveryClient discoveryClient;
     private final Map<String, FunctionDefinition> functionDefinitionMap;
 
+    /**
+     * Constructor.
+     *
+     * @param discoveryClient discoveryClient
+     * @param providers providers
+     * @param definitions definitions
+     */
     public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
         this.discoveryClient = discoveryClient;
         this.functionDefinitionMap = new HashMap<>(definitions.length);

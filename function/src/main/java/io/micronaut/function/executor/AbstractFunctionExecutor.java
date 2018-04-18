@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
-import io.micronaut.function.LocalFunctionRegistry;
-
 /**
- * A class that executes the configured {@link LocalFunctionRegistry#FUNCTION_NAME} for the given inputs and outputs
+ * A class that executes the configured {@link io.micronaut.function.LocalFunctionRegistry#FUNCTION_NAME} for the given inputs and outputs.
+ *
+ * @param <I> input
+ * @param <O> output
+ * @param <C> context
  *
  * @author Graeme Rocher
  * @since 1.0
