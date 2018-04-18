@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
@@ -35,7 +36,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Default {@link ExceptionHandler} for {@link ConstraintViolationException}
+ * Default {@link ExceptionHandler} for {@link ConstraintViolationException}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -62,8 +63,9 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
                     continue;
                 }
                 message.append(node);
-                if (i.hasNext())
+                if (i.hasNext()) {
                     message.append('.');
+                }
             }
             message.append(": ").append(violation.getMessage());
             VndError error = new VndError(message.toString());

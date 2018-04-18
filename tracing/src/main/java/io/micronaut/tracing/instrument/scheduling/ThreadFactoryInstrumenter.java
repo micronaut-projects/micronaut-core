@@ -18,6 +18,7 @@ package io.micronaut.tracing.instrument.scheduling;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.tracing.instrument.util.TracingRunnable;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;

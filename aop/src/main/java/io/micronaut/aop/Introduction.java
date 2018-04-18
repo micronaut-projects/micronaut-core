@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Type;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * <p>Introduction advice allows interfaces and abstract classes to be implemented at compile time by
- * {@link MethodInterceptor} implementations</p>
+ * {@link MethodInterceptor} implementations.</p>
  *
  * <p>This annotation should be applied as a meta annotation to another annotation that references the {@link MethodInterceptor} by type</p>
  *
@@ -42,7 +42,7 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
- * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link Type} must implement {@link MethodInterceptor}</p>
+ * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link io.micronaut.context.annotation.Type} must implement {@link MethodInterceptor}</p>
  *
  * @author Graeme Rocher
  * @since 1.0

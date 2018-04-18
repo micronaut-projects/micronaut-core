@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -41,6 +42,10 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
     private CalculatedSettings calculatedSettings;
     private String name;
 
+    /**
+     * Constructor.
+     * @param name name that comes from properties
+     */
     public DatasourceConfiguration(@Parameter String name) {
         super();
         this.name = name;
@@ -86,6 +91,11 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
         return calculatedSettings.getUrl();
     }
 
+    /**
+     * Setter.
+     *
+     * @param url url of connection
+     */
     public void setUrl(String url) {
         setJdbcUrl(url);
     }
@@ -130,14 +140,27 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
         return calculatedSettings.getValidationQuery();
     }
 
+    /**
+     * Setter.
+     *
+     * @param validationQuery string of query
+     */
     public void setValidationQuery(String validationQuery) {
         setConnectionTestQuery(validationQuery);
     }
 
+    /**
+     * Get Jndi name.
+     * @return jndiName
+     */
     public String getJndiName() {
         return getDataSourceJNDI();
     }
 
+    /**
+     * Setter.
+     * @param jndiName jndi name
+     */
     public void setJndiName(String jndiName) {
         setDataSourceJNDI(jndiName);
     }

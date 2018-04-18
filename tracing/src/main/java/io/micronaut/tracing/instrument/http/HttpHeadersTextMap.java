@@ -31,10 +31,10 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
-public class HttpHeadersTextMap implements TextMap {
+class HttpHeadersTextMap implements TextMap {
     private final HttpHeaders headers;
 
-    public HttpHeadersTextMap(HttpHeaders headers) {
+    HttpHeadersTextMap(HttpHeaders headers) {
         this.headers = headers;
     }
 

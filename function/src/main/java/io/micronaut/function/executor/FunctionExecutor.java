@@ -13,22 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
-import io.micronaut.function.LocalFunctionRegistry;
-
 /**
- * <p>Allows executing the function configured by {@link LocalFunctionRegistry#FUNCTION_NAME}</p>
+ * <p>Allows executing the function configured by {@link io.micronaut.function.LocalFunctionRegistry#FUNCTION_NAME}</p>.
  * <p>
  * <p>Or a named function</p>
  *
+ * @param <I> input type
+ * @param <O> output type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface FunctionExecutor<I, O> {
 
     /**
-     * Execute the function configured by {@link LocalFunctionRegistry#FUNCTION_NAME}
+     * Execute the function configured by {@link io.micronaut.function.LocalFunctionRegistry#FUNCTION_NAME}.
      *
      * @param input The input
      * @return The output

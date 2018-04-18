@@ -24,4 +24,3 @@ import grails.gorm.annotation.Entity
 import org.grails.orm.hibernate.HibernateDatastore
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
-

@@ -126,7 +126,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         ClientRegistration reg = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        if (httpMethodMapping.isPresent()) {
+        if (httpMethodMapping.isPresent() && reg != null) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
@@ -240,6 +240,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()) );
+            String serviceId = clientAnnotation.value()[0];
+            request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
+
 
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -377,11 +380,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
         String[] clientId = clientAnn.value();
+        if(ArrayUtils.isEmpty(clientId)) {
+            return null;
+        }
 
         return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
-                    new HttpClientException("Invalid service reference [" + ArrayUtils.toString((Object[]) clientId) + "] specified to @Client")
+                    new HttpClientException("Invalid service reference [" + ArrayUtils.toString(clientId) + "] specified to @Client")
                 );
             String contextPath = "";
             String path = clientAnn.path();

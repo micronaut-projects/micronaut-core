@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument.scheduling;
+package io.micronaut.tracing.instrument.util;
 
 import io.opentracing.Scope;
 import io.opentracing.Span;
@@ -34,17 +34,7 @@ public class TracingRunnable implements Runnable {
     public TracingRunnable(Runnable runnable, Tracer tracer) {
         this.runnable = runnable;
         this.tracer = tracer;
-        span = getSpan(tracer);
-    }
-
-    private Span getSpan(Tracer tracer) {
-        Scope active = tracer.scopeManager().active();
-        if(active != null) {
-            return active.span();
-        }
-        else {
-            return tracer.activeSpan();
-        }
+        this.span = getSpan(tracer);
     }
 
     @Override
@@ -59,6 +49,16 @@ public class TracingRunnable implements Runnable {
             if (scope != null) {
                 scope.close();
             }
+        }
+    }
+
+    private Span getSpan(Tracer tracer) {
+        Scope active = tracer.scopeManager().active();
+        if(active != null) {
+            return active.span();
+        }
+        else {
+            return tracer.activeSpan();
         }
     }
 }

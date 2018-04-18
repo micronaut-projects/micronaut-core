@@ -6,7 +6,7 @@ import groovy.xml.XmlUtil
 
 class XmlMerger {
 
-    List<String> appendNodes = ['dependencies', 'plugins', 'pluginRepositories', 'plugins']
+    List<String> appendNodes = ['dependencies', 'plugins', 'pluginRepositories', 'repositories']
 
     String merge(File from, File to) {
         GPathResult xmlFrom = new XmlSlurper(false, false).parse(from)
@@ -31,7 +31,7 @@ class XmlMerger {
                         }
                     }
                 } else {
-                    merge(childNode, query, appendNodes)
+                    merge(childNode, query)
                 }
             }
         }

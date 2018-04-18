@@ -18,6 +18,7 @@ package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.tracing.instrument.util.TracingRunnableInstrumenter;
 import io.reactivex.functions.Function;
 import io.reactivex.plugins.RxJavaPlugins;
 
@@ -32,14 +33,14 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Context
-@Requires(beans = RxJavaRunnableInstrumenter.class)
-public class RxJava2Instrumentation {
+@Requires(beans = TracingRunnableInstrumenter.class)
+public class RxJava2TracingInstrumentation {
 
     @PostConstruct
-    void init(RxJavaRunnableInstrumenter instrumenter) {
+    void init(TracingRunnableInstrumenter instrumenter) {
         if(instrumenter != null) {
             Function<? super Runnable, ? extends Runnable> existing = RxJavaPlugins.getScheduleHandler();
-            if(existing != null && !(existing instanceof RxJavaRunnableInstrumenter)) {
+            if(existing != null && !(existing instanceof TracingRunnableInstrumenter)) {
                 RxJavaPlugins.setScheduleHandler(runnable -> instrumenter.apply(existing.apply(runnable)));
             }
             else {

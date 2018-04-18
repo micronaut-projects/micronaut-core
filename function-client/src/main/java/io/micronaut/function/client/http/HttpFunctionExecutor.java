@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.http;
 
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -24,10 +25,8 @@ import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
-import io.micronaut.function.executor.FunctionExecutor;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
@@ -46,8 +45,10 @@ import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * A {@link FunctionExecutor} that uses a {@link HttpClient} to execute a remote function definition
+ * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
  *
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
@@ -56,6 +57,15 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
     private final DefaultHttpClient httpClient;
 
+    /**
+     * Constructor.
+     * @param configuration configuration
+     * @param threadFactory threadFactory
+     * @param nettyClientSslBuilder nettyClientSslBuilder
+     * @param codecRegistry codecRegistry
+     * @param annotationMetadataResolver annotationMetadataResolver
+     * @param filters filters
+     */
     public HttpFunctionExecutor(
             HttpClientConfiguration configuration,
             @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
