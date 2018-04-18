@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.web;
 
 import io.micronaut.context.ExecutionHandleLocator;
@@ -50,7 +51,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * Process methods for {@link FunctionBean} instances
+ * Process methods for {@link FunctionBean} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -65,6 +66,14 @@ public class AnnotatedFunctionRouteBuilder
     private final String contextPath;
     private final Map<String, URI> availableFunctions = new ConcurrentHashMap<>();
 
+    /**
+     * Constructor.
+     * @param executionHandleLocator executionHandleLocator
+     * @param uriNamingStrategy uriNamingStrategy
+     * @param conversionService conversionService
+     * @param codecRegistry codecRegistry
+     * @param contextPath contextPath
+     */
     public AnnotatedFunctionRouteBuilder(
         ExecutionHandleLocator executionHandleLocator,
         UriNamingStrategy uriNamingStrategy,
@@ -125,7 +134,7 @@ public class AnnotatedFunctionRouteBuilder
     }
 
     /**
-     * A map of available functions with the key being the function name and the value being the function URI
+     * A map of available functions with the key being the function name and the value being the function URI.
      *
      * @return A map of functions
      */

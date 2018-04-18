@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * <p>Classes to support exposing {@link io.micronaut.function.FunctionBean} instances over the web</p>
+ * <p>Classes to support exposing {@link io.micronaut.function.FunctionBean} instances over the web</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
