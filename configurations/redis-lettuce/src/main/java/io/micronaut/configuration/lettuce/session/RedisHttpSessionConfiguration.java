@@ -56,7 +56,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param serverName The server name.
      */
-    void setServerName(String serverName) {
+    public void setServerName(String serverName) {
         this.serverName = serverName;
     }
 
@@ -70,7 +70,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param sessionCreatedTopic The topic to publish the creation of new sessions.
      */
-    void setSessionCreatedTopic(String sessionCreatedTopic) {
+    public void setSessionCreatedTopic(String sessionCreatedTopic) {
         this.sessionCreatedTopic = sessionCreatedTopic;
     }
 
@@ -84,7 +84,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param activeSessionsKey The key used to maintain a set of active sessions
      */
-    void setActiveSessionsKey(String activeSessionsKey) {
+    public void setActiveSessionsKey(String activeSessionsKey) {
         this.activeSessionsKey = activeSessionsKey;
     }
 
@@ -98,7 +98,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param namespace The key prefix to use for reading and writing sessions
      */
-    void setNamespace(String namespace) {
+    public void setNamespace(String namespace) {
         this.namespace = namespace;
     }
 
@@ -112,7 +112,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param valueSerializer The {@link ObjectSerializer} type to use for serializing values
      */
-    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
+    public void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
         this.valueSerializer = valueSerializer;
     }
 
@@ -133,7 +133,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param enableKeyspaceEvents Whether keyspace events should be enabled programmatically
      */
-    void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
+    public void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
         this.enableKeyspaceEvents = enableKeyspaceEvents;
     }
 
@@ -147,7 +147,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param writeMode The {@link RedisHttpSessionConfiguration.WriteMode}
      */
-    void setWriteMode(WriteMode writeMode) {
+    public void setWriteMode(WriteMode writeMode) {
         this.writeMode = writeMode;
     }
 
@@ -161,7 +161,7 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     /**
      * @param expiredSessionCheck The duration with which to check for expired sessions
      */
-    void setExpiredSessionCheck(Duration expiredSessionCheck) {
+    public void setExpiredSessionCheck(Duration expiredSessionCheck) {
         this.expiredSessionCheck = expiredSessionCheck;
     }
 
