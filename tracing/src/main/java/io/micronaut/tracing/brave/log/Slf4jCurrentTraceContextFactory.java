@@ -33,6 +33,12 @@ import javax.annotation.Nullable;
 @Factory
 public class Slf4jCurrentTraceContextFactory {
 
+    /**
+     * Current Slf4j trace context.
+     *
+     * @param existing Trace context
+     * @return Slf4j trace context
+     */
     @Requires(classes = {MDC.class, CurrentTraceContext.class})
     @Context
     Slf4jCurrentTraceContext currentTraceContext(@Nullable CurrentTraceContext existing) {

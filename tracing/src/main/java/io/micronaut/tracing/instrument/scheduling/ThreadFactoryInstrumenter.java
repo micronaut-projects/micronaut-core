@@ -37,6 +37,10 @@ public class ThreadFactoryInstrumenter implements BeanCreatedEventListener<Threa
 
     private final Tracer tracer;
 
+    /**
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public ThreadFactoryInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }

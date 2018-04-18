@@ -48,6 +48,11 @@ public class JaegerConfiguration implements Toggleable  {
     private boolean expandExceptionLogs;
     private boolean zipkinSharedRpcSpan;
 
+    /**
+     * Initialize Jaeger with common application configurations.
+     *
+     * @param applicationConfiguration The common application configurations
+     */
     public JaegerConfiguration(
             ApplicationConfiguration applicationConfiguration) {
         if(StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
@@ -93,6 +98,11 @@ public class JaegerConfiguration implements Toggleable  {
         return enabled;
     }
 
+    /**
+     * Enable/Disable Jaeger.
+     *
+     * @param enabled A boolean to enable/disabled Jaeger
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
@@ -211,6 +221,9 @@ public class JaegerConfiguration implements Toggleable  {
         @ConfigurationBuilder(prefixes = "with")
         protected Configuration.ReporterConfiguration configuration = Configuration.ReporterConfiguration .fromEnv();
 
+        /**
+         * @return The reporter configuration.
+         */
         public Configuration.ReporterConfiguration getReporterConfiguration() {
             return configuration;
         }

@@ -32,6 +32,12 @@ public class TracingRunnable implements Runnable {
     private final Tracer tracer;
     private final Span span;
 
+    /**
+     * Create enhanced {@link Runnable} with tracing.
+     *
+     * @param runnable Runnable
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public TracingRunnable(Runnable runnable, Tracer tracer) {
         this.runnable = runnable;
         this.tracer = tracer;

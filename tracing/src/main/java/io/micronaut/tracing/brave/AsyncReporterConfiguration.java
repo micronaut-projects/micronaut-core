@@ -42,6 +42,12 @@ public class AsyncReporterConfiguration {
     @ConfigurationBuilder(prefixes = "")
     private final AsyncReporter.Builder builder;
 
+    /**
+     * Create a configuration for async Reporting on {@link zipkin2.Span} instances.
+     *
+     * @param configuration BraveTracer configuration
+     * @param sender For sending list of spans to a transport such as http or Kafka
+     */
     public AsyncReporterConfiguration(BraveTracerConfiguration configuration, Sender sender) {
         if(configuration == null) {
             throw new IllegalArgumentException("Argument [configuration] cannot be null");

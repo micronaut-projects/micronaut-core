@@ -165,21 +165,38 @@ public class BraveTracerConfiguration implements Toggleable {
         @ConfigurationBuilder(prefixes = "")
         protected final HttpClientSender.Builder clientSenderBuilder;
 
+        /**
+         * Initialize the builder with client configurations.
+         */
         public HttpClientSenderConfiguration() {
             this.clientSenderBuilder = new HttpClientSender.Builder(this);
         }
 
+        /**
+         * Creates builder.
+         *
+         * @return The builder to construct the {@link HttpClientSender}
+         */
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;
         }
     }
 
+    /**
+     * The sampler configuration.
+     */
     @ConfigurationProperties("sampler")
     @Requires(classes = CountingSampler.class)
     @Requires(missingBeans = Sampler.class)
     public static class SamplerConfiguration {
         private float probability = DEFAULT_SAMPLER_PROBABILITY;
 
+        /**
+         * Get sampler probability. A value of 1.0
+         * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         *
+         * @return probability
+         */
         public float getProbability() {
             return probability;
         }

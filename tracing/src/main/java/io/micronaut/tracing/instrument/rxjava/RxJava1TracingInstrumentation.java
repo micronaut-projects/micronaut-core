@@ -39,6 +39,11 @@ import javax.inject.Singleton;
 @Requires(beans = TracingRunnableInstrumenter.class)
 public class RxJava1TracingInstrumentation {
 
+    /**
+     * Instrumentation for RxJava 1 using function with {@link io.micronaut.tracing.instrument.util.TracingRunnable}..
+     *
+     * @param instrumenter A function that instruments an existing Runnable with {@link io.micronaut.tracing.instrument.util.TracingRunnable}.
+     */
     @PostConstruct
     void init(TracingRunnableInstrumenter instrumenter) {
         if(instrumenter != null) {
@@ -53,6 +58,9 @@ public class RxJava1TracingInstrumentation {
         }
     }
 
+    /**
+     * A function that instruments an existing Runnable with {@link io.micronaut.tracing.instrument.util.TracingRunnable}.
+     */
     private static class InstrumentScheduleAction implements Func1<Action0, Action0> {
         private final TracingRunnableInstrumenter instrumenter;
 

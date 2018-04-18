@@ -25,6 +25,8 @@ import java.util.concurrent.Callable;
 /**
  * Tracing {@link Callable} implementation.
  *
+ * @param <V> The result type
+ *
  * @author graemerocher
  * @since 1.0
  */
@@ -34,6 +36,12 @@ public class TracingCallable<V> implements Callable<V> {
     private final Tracer tracer;
     private final Span span;
 
+    /**
+     * Create tracing task with the given tracer.
+     *
+     * @param callable A task that returns a result and may throw an exception
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public TracingCallable(Callable<V> callable, Tracer tracer) {
         this.callable = callable;
         this.tracer = tracer;

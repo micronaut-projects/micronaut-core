@@ -45,6 +45,11 @@ public class BraveTracerFactory {
 
     private final BraveTracerConfiguration braveTracerConfiguration;
 
+    /**
+     * Initialize the factory with tracer configuration.
+     *
+     * @param braveTracerConfiguration The tracer configuration
+     */
     public BraveTracerFactory(BraveTracerConfiguration braveTracerConfiguration) {
         this.braveTracerConfiguration = braveTracerConfiguration;
     }

@@ -46,6 +46,11 @@ public class JaegerTracerFactory implements Closeable {
     private Reporter reporter;
     private Sampler sampler;
 
+    /**
+     * Initialize Jaeger trace factory with the configurations.
+     *
+     * @param configuration Jaeger configurations
+     */
     public JaegerTracerFactory(JaegerConfiguration configuration) {
         this.configuration = configuration;
     }

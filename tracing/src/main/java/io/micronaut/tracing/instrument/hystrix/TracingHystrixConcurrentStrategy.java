@@ -51,6 +51,12 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     private final HystrixConcurrencyStrategy delegate;
     private final Tracer tracer;
 
+    /**
+     * Creates enhanced {@link HystrixConcurrencyStrategy} for tracing.
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     * @param hystrixConcurrencyStrategy Different behavior or implementations for concurrency related aspects of the system with default implementations
+     */
     @Inject
     public TracingHystrixConcurrentStrategy(Tracer tracer, @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
         this.delegate = hystrixConcurrencyStrategy != null ? hystrixConcurrencyStrategy : HystrixConcurrencyStrategyDefault.getInstance();

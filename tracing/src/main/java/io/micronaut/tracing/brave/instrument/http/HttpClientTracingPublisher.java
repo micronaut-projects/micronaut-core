@@ -40,12 +40,22 @@ import java.util.Optional;
  */
 @SuppressWarnings("PublisherImplementation")
 class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
+    private static final int HTTP_SUCCESS_CODE_UPPER_LIMIT = 299;
+
     private final Publisher<HttpResponse<?>> publisher;
     private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
     private final TraceContext.Injector<MutableHttpHeaders> injector;
     private final MutableHttpRequest<?> request;
     private final Tracer tracer;
 
+    /**
+     * Construct a publisher to handle HTTP client request tracing.
+     *
+     * @param publisher The response publisher
+     * @param request An extended version of request that allows mutating
+     * @param clientHandler The standardize way to instrument client
+     * @param httpTracing HttpTracing
+     */
     HttpClientTracingPublisher(
             Publisher<HttpResponse<?>> publisher,
             MutableHttpRequest<?> request,
@@ -78,7 +88,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                         configureAttributes(response);
                         configureSpan(span);
                         HttpStatus status = response.getStatus();
-                        if(status.getCode() > 299) {
+                        if(status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
 
                             span.tag(AbstractOpenTracingFilter.TAG_HTTP_STATUS_CODE, String.valueOf(status.getCode()));
                         }

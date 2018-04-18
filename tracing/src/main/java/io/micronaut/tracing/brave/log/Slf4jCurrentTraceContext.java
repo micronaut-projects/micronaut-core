@@ -44,10 +44,18 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
 
     private final CurrentTraceContext delegate;
 
+    /**
+     * Create Slf4j trace context with default implementation.
+     */
     Slf4jCurrentTraceContext() {
         this.delegate = CurrentTraceContext.Default.create();
     }
 
+    /**
+     * Create Slf4j trace context object with existing implementation.
+     *
+     * @param delegate The current trace context object
+     */
     Slf4jCurrentTraceContext(CurrentTraceContext delegate) {
         this.delegate = delegate;
     }
@@ -94,6 +102,9 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
 
         Scope scope = this.delegate.newScope(currentSpan);
 
+        /**
+         * A span remains in the thread context scope it was bound to until close is called.
+         */
         class ThreadContextCurrentTraceContextScope implements Scope {
             @Override public void close() {
                 if(LOG.isTraceEnabled()) {
