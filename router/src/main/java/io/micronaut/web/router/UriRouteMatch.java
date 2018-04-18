@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.type.Argument;
@@ -26,18 +27,21 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * A {@link RouteMatch} that matches a URI and {@link HttpMethod}
+ * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
  *
+ * @param <R> The route
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R> {
+
     /**
      * @return The backing {@link UriRoute}
      */
     UriRoute getRoute();
+
     /**
-     * <p>Returns the required arguments for this RouteMatch</p>
+     * <p>Returns the required arguments for this RouteMatch.</p>
      * <p>
      * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments
      * excluding those that have been subtracted from the URI variables</p>
