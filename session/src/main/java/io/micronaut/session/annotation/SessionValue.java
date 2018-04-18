@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Used to bind value from a {@link io.micronaut.session.Session}
+ * Used to bind value from a {@link io.micronaut.session.Session}.
  *
  * @author Graeme Rocher
  * @since 1.0

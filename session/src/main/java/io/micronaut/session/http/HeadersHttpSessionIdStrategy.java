@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.Requires;
@@ -29,7 +30,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Implementation that uses common HTTP headers to resolve the {@link io.micronaut.session.Session} ID
+ * Implementation that uses common HTTP headers to resolve the {@link io.micronaut.session.Session} ID.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +41,11 @@ public class HeadersHttpSessionIdStrategy implements HttpSessionIdStrategy {
 
     private final String[] headerNames;
 
+    /**
+     * Constructor.
+     *
+     * @param configuration The HTTP session configuration
+     */
     public HeadersHttpSessionIdStrategy(HttpSessionConfiguration configuration) {
         this.headerNames = configuration.getHeaderNames();
         if (ArrayUtils.isEmpty(headerNames)) {
