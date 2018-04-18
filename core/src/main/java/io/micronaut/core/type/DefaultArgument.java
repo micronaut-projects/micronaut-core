@@ -36,9 +36,10 @@ import java.util.Optional;
 class DefaultArgument<T> implements Argument<T> {
     private final Class<T> type;
     private final String name;
-    private final Annotation qualifier;
     private final AnnotatedElement annotatedElement;
     private final Map<String, Argument<?>> typeParameters;
+    private final Argument[] typeParameterArray;
+    private Annotation qualifier;
 
     DefaultArgument(Class<T> type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
         this.type = type;
@@ -46,6 +47,7 @@ class DefaultArgument<T> implements Argument<T> {
         this.annotatedElement = createInternalElement(annotations);
         this.qualifier = qualifier;
         this.typeParameters = initializeTypeParameters(genericTypes);
+        this.typeParameterArray = genericTypes;
     }
 
     DefaultArgument(Class<T> type, String name, Annotation qualifier, Argument... genericTypes) {
@@ -54,6 +56,7 @@ class DefaultArgument<T> implements Argument<T> {
         this.annotatedElement = AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
         this.qualifier = qualifier;
         this.typeParameters = initializeTypeParameters(genericTypes);
+        this.typeParameterArray = genericTypes;
     }
 
     @Override
@@ -62,6 +65,11 @@ class DefaultArgument<T> implements Argument<T> {
             return typeParameters.values().stream().findFirst();
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Argument[] getTypeParameters() {
+        return typeParameterArray;
     }
 
     @Override
@@ -76,7 +84,13 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public Annotation getQualifier() {
-        return this.qualifier;
+        if(this.qualifier != null) {
+            return this.qualifier;
+        }
+        else {
+            this.qualifier = AnnotationUtil.findAnnotationWithStereoType("javax.inject.Qualifier", getAnnotations()).orElse(null);
+            return qualifier;
+        }
     }
 
     @Override

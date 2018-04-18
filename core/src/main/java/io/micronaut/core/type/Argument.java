@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
@@ -80,6 +82,25 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     int typeHashCode();
 
     /**
+     * Convert an argument array to a class array
+     *
+     * @param arguments The arguments
+     * @return The class array
+     */
+    static Class[] toClassArray(Argument...arguments) {
+        if(ArrayUtils.isEmpty(arguments)) {
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        }
+        else {
+            Class[] types = new Class[arguments.length];
+            for (int i = 0; i < arguments.length; i++) {
+                Argument argument = arguments[i];
+                types[i] = argument.getType();
+            }
+            return types;
+        }
+    }
+     /**
      * Creates a new argument for the given type, name and qualifier
      *
      * @param type      The type

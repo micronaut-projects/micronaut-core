@@ -69,8 +69,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
@@ -197,10 +195,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else {
             Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
             return method.map(theMethod -> {
-                    ReflectionExecutableMethod<T, R> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
-                    executableMethodMap.put(methodKey, reflectionMethod);
-                    return reflectionMethod;
-                }
+                        ReflectionExecutableMethod<T, R> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
+                        executableMethodMap.put(methodKey, reflectionMethod);
+                        return reflectionMethod;
+                    }
             );
         }
     }
@@ -209,13 +207,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
         if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
             return executableMethodMap
-                .values()
-                .stream()
-                .filter((method) -> method.getMethodName().equals(name));
+                    .values()
+                    .stream()
+                    .filter((method) -> method.getMethodName().equals(name));
         } else {
             return ReflectionUtils
-                .findMethodsByName(type, name)
-                .map((method) -> new ReflectionExecutableMethod<>(this, method));
+                    .findMethodsByName(type, name)
+                    .map((method) -> new ReflectionExecutableMethod<>(this, method));
         }
     }
 
@@ -342,7 +340,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param message The message
      */
     @Internal
-    protected void warn(String message) {
+    protected final void warn(String message) {
         if (LOG.isWarnEnabled()) {
             LOG.warn(message);
         }
@@ -355,7 +353,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param property The property
      */
     @Internal
-    protected void warnMissingProperty(Class type, String method, String property) {
+    protected final void warnMissingProperty(Class type, String method, String property) {
         if (LOG.isWarnEnabled()) {
             LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
         }
@@ -369,7 +367,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @SuppressWarnings("unchecked")
     @Internal
-    protected Object getProxiedBean(BeanContext beanContext) {
+    protected final Object getProxiedBean(BeanContext beanContext) {
         DefaultBeanContext defaultBeanContext = (DefaultBeanContext) beanContext;
         Optional<String> qualifier = getAnnotationMetadata().getAnnotationNameByStereotype(javax.inject.Qualifier.class);
         return defaultBeanContext.getProxyTargetBean(getBeanType(), (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null));
@@ -382,7 +380,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return The bean definition
      */
     @Internal
-    protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
+    protected final AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
         MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
         executableMethodMap.put(key, executableMethod);
         return this;
@@ -396,7 +394,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return this component definition
      */
     @Internal
-    protected AbstractBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
+    protected final AbstractBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
         if (field.getAnnotation(Inject.class) != null) {
             requiredComponents.add(field.getType());
         }
@@ -411,7 +409,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return this component definition
      */
     @Internal
-    protected AbstractBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
+    protected final AbstractBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
         if (field.getAnnotation(Inject.class) != null) {
             requiredComponents.add(field.getType());
         }
@@ -419,20 +417,26 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return this;
     }
 
+
     /**
-     * Adds an injection point for a method. Typically called by a dynamically generated subclass.
+     * Adds an injection point for a method that cannot be resolved at runtime, but a compile time produced injection point
+     * exists. This allows the framework to recover and relay better error messages to the user instead of just NoSuchMethodError
      *
-     * @param method    The method
-     * @param arguments The arguments to the method
+     * @param declaringType      The declaring type
+     * @param method             The method
+     * @param arguments          The argument types
+     * @param requiresReflection Whether the method requires reflection to invoke
      * @return this component definition
      */
+    @SuppressWarnings("unchecked")
     @Internal
-    protected AbstractBeanDefinition addInjectionPoint(
-        Method method,
-        Argument[] arguments,
-        boolean requiresReflection) {
-        Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(method, arguments, requiresReflection, methodInjectionPoints);
+    protected final AbstractBeanDefinition addInjectionPoint(
+            Class declaringType,
+            String method,
+            Argument[] arguments,
+            boolean requiresReflection) {
+
+        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.methodInjectionPoints);
     }
 
     /**
@@ -442,18 +446,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return this component definition
      */
     @Internal
-    protected AbstractBeanDefinition addInjectionPoint(
-        Field field,
-        Method setter,
-        Argument argument,
-        boolean requiresReflection) {
+    protected final AbstractBeanDefinition addInjectionPoint(
+            Field field,
+            Method setter,
+            Argument argument,
+            boolean requiresReflection) {
 
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(
-            this,
-            field,
-            setter,
-            requiresReflection,
-            argument
+        ReflectionMethodInjectionPoint methodInjectionPoint = new ReflectionMethodInjectionPoint(
+                this,
+                field,
+                setter,
+                requiresReflection,
+                argument
         );
         if (field.getAnnotation(Inject.class) != null || setter.getAnnotation(Inject.class) != null) {
             requiredComponents.add(field.getType());
@@ -462,34 +466,40 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return this;
     }
 
+
+
     /**
      * Adds a post construct method definition
      *
+     * @param declaringType The declaring type
      * @param method             The method
      * @param arguments          The arguments
      * @param requiresReflection Whether the method requires reflection
      * @return This bean definition
      */
     @Internal
-    protected AbstractBeanDefinition addPostConstruct(Method method,
-                                                      Argument[] arguments,
-                                                      boolean requiresReflection) {
-        return addMethodInjectionPointInternal(method, arguments, requiresReflection, postConstructMethods);
+    protected final AbstractBeanDefinition addPostConstruct(Class declaringType,
+                                                            String method,
+                                                            Argument[] arguments,
+                                                            boolean requiresReflection) {
+        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.postConstructMethods);
     }
 
     /**
      * Adds a pre destroy method definition
      *
+     * @param declaringType The declaring type
      * @param method             The method
      * @param arguments          The arguments
      * @param requiresReflection Whether the method requires reflection
      * @return This bean definition
      */
     @Internal
-    protected AbstractBeanDefinition addPreDestroy(Method method,
-                                                   Argument[] arguments,
-                                                   boolean requiresReflection) {
-        return addMethodInjectionPointInternal(method, arguments, requiresReflection, preDestroyMethods);
+    protected final AbstractBeanDefinition addPreDestroy(Class declaringType,
+                                                         String method,
+                                                         Argument[] arguments,
+                                                         boolean requiresReflection) {
+        return addInjectionPointInternal(declaringType, method, arguments, requiresReflection, this.preDestroyMethods);
     }
 
     /**
@@ -728,8 +738,17 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
                 if (cliOption != null) {
-                    return applicationContext.containsProperty(cliOption);
+                    result = applicationContext.containsProperty(cliOption);
                 }
+            }
+            if(result && injectionPoint instanceof MissingMethodInjectionPoint) {
+                if(LOG.isWarnEnabled()) {
+                    LOG.warn("Bean definition for type [{}] is compiled against an older version and value [{}] can no longer be set for missing method: {}",
+                             getBeanType(),
+                             valString,
+                             injectionPoint.getName());
+                }
+                result = false;
             }
             return result;
         }
@@ -798,7 +817,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromMethodArgument(resolutionContext, context, injectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -814,7 +833,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromMethodArgument(resolutionContext, context, injectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -830,7 +849,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Optional findBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromMethodArgument(resolutionContext, context, injectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -846,7 +865,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Stream streamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromMethodArgument(resolutionContext, context, injectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -881,10 +900,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             BeanResolutionContext.Path path = resolutionContext.getPath();
             BeanResolutionContext.Segment current = path.peek();
             boolean isNullable = argument.getDeclaredAnnotation(Nullable.class) != null;
-            if(isNullable && current != null && current.getArgument().equals(argument)) {
+            if (isNullable && current != null && current.getArgument().equals(argument)) {
                 return null;
-            }
-            else {
+            } else {
                 path.pushConstructorResolve(this, argument);
                 try {
                     Object bean;
@@ -924,7 +942,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (context instanceof ApplicationContext) {
                 ApplicationContext propertyResolver = (ApplicationContext) context;
                 Value valAnn = argument.findAnnotation(Value.class)
-                    .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
+                        .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
 
                 String prop = valAnn.value();
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
@@ -957,7 +975,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint constructorInjectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -973,7 +991,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -989,7 +1007,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Stream streamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -1005,7 +1023,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Optional findBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
         return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -1051,12 +1069,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     Class<?> declaringClass = field.getDeclaringClass();
 
                     String valString = resolveValueString(
-                        resolutionContext,
-                        context,
-                        declaringClass,
-                        beanType,
-                        injectionPoint.getName(),
-                        valueAnn
+                            resolutionContext,
+                            context,
+                            declaringClass,
+                            beanType,
+                            injectionPoint.getName(),
+                            valueAnn
                     );
                     Argument fieldArgument = injectionPoint.asArgument();
                     ArgumentConversionContext conversionContext = ConversionContext.of(fieldArgument);
@@ -1087,20 +1105,20 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     @Internal
     protected <T1> Optional<T1> getValueForPath(
-        BeanResolutionContext resolutionContext,
-        BeanContext context,
-        Argument<T1> propertyType,
-        String... propertyPath) {
+            BeanResolutionContext resolutionContext,
+            BeanContext context,
+            Argument<T1> propertyType,
+            String... propertyPath) {
         if (context instanceof PropertyResolver) {
             PropertyResolver propertyResolver = (PropertyResolver) context;
             Class<?> beanType = getBeanType();
             String valString = resolveValueString(
-                resolutionContext,
-                context,
-                beanType,
-                beanType,
-                Arrays.stream(propertyPath).collect(Collectors.joining(".")),
-                null
+                    resolutionContext,
+                    context,
+                    beanType,
+                    beanType,
+                    Arrays.stream(propertyPath).collect(Collectors.joining(".")),
+                    null
             );
 
             return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
@@ -1125,12 +1143,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
 
             String valString = resolveValueString(
-                resolutionContext,
-                context,
-                declaringClass,
-                beanType,
-                injectionPoint.getName(),
-                valueAnn
+                    resolutionContext,
+                    context,
+                    declaringClass,
+                    beanType,
+                    injectionPoint.getName(),
+                    valueAnn
             );
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
@@ -1258,7 +1276,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Provider getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -1274,7 +1292,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Optional findBeanForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).findBean(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -1290,7 +1308,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
         );
     }
 
@@ -1306,20 +1324,82 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Stream getStreamOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
-            ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
+                ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
         );
     }
 
+    private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
+        boolean isPreDestroy = targetInjectionPoints == this.preDestroyMethods;
+        if(isPreDestroy) {
+            hasPreDestroyMethods = true;
+        }
+
+        boolean isPostConstruct = targetInjectionPoints == this.postConstructMethods;
+        if(isPostConstruct) {
+            hasPostConstructMethods = true;
+        }
+
+        MethodInjectionPoint injectionPoint;
+        if(requiresReflection) {
+
+            Optional<Method> beanMethod = ReflectionUtils.getMethod(declaringType, method, Argument.toClassArray(arguments));
+            if (beanMethod.isPresent()) {
+                Method javaMethod = beanMethod.get();
+                // transform arguments to include annotations
+                Argument[] newArguments;
+                if (ArrayUtils.isNotEmpty(arguments)) {
+
+                    newArguments = new Argument[arguments.length];
+                    for (int i = 0; i < arguments.length; i++) {
+                        Argument existing = arguments[0];
+                        Annotation qualifier = existing.getQualifier();
+                        newArguments[i] = Argument.of(
+                                javaMethod,
+                                existing.getName(),
+                                i,
+                                qualifier != null ? qualifier.annotationType() : null,
+                                existing.getTypeParameters());
+                    }
+                } else {
+                    newArguments = Argument.ZERO_ARGUMENTS;
+                }
+                injectionPoint = new ReflectionMethodInjectionPoint(this, javaMethod, true, newArguments);
+            } else {
+                injectionPoint = new MissingMethodInjectionPoint(
+                        this,
+                        declaringType,
+                        method,
+                        arguments
+                );
+            }
+        }
+        else {
+            injectionPoint = new DefaultMethodInjectionPoint(
+                    this,
+                    declaringType,
+                    method,
+                    arguments,
+                    false
+            );
+        }
+        targetInjectionPoints.add(injectionPoint);
+        if(isPostConstruct || isPreDestroy) {
+            this.methodInjectionPoints.add(injectionPoint);
+        }
+        addRequiredComponents(arguments);
+        return this;
+    }
+
     private Optional resolveValue(
-        ApplicationContext context,
-        ArgumentConversionContext<?> argument,
-        Value val,
-        String valString) {
+            ApplicationContext context,
+            ArgumentConversionContext<?> argument,
+            Value val,
+            String valString) {
 
         if (val != null) {
 
             return context.resolvePlaceholders(valString).flatMap(v ->
-                context.getConversionService().convert(v, argument)
+                    context.getConversionService().convert(v, argument)
             );
         } else {
             Optional<?> value = context.getProperty(valString, argument);
@@ -1362,9 +1442,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private boolean isInnerConfiguration(Class argumentType) {
         return !argumentType.isEnum() && isConfigurationProperties() &&
-            argumentType.getName().indexOf('$') > -1 &&
-            Arrays.asList(getBeanType().getClasses()).contains(argumentType) &&
-            Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
+                argumentType.getName().indexOf('$') > -1 &&
+                Arrays.asList(getBeanType().getClasses()).contains(argumentType) &&
+                Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
     private String resolvePrefix(BeanResolutionContext resolutionContext, BeanContext beanContext, Class<?> declaringClass, Class<?> beanType) {
@@ -1400,7 +1480,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     configurationPropertiesString = resolveConfigPropertiesValue(nestedType, beanContext);
                     if (configurationPropertiesString != null) {
                         prefix.insert(0, '.')
-                            .insert(0, configurationPropertiesString);
+                                .insert(0, configurationPropertiesString);
                         prependSuperClasses(prefix, nestedType, beanContext);
                     } else {
                         break;
@@ -1473,27 +1553,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return null;
     }
 
-    private AbstractBeanDefinition addMethodInjectionPointInternal(
-        Method method,
-        Argument[] arguments,
-        boolean requiresReflection,
-        Collection<MethodInjectionPoint> methodInjectionPoints) {
-        boolean isPreDestroy = !hasPreDestroyMethods && method.getAnnotation(PreDestroy.class) != null;
-        if (isPreDestroy) {
-            hasPreDestroyMethods = true;
-        }
-        boolean isPostConstruct = !hasPostConstructMethods && method.getAnnotation(PostConstruct.class) != null;
-        if (isPostConstruct) {
-            hasPostConstructMethods = true;
-        }
-
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, requiresReflection, arguments);
-        if (isPreDestroy || isPostConstruct || methodInjectionPoint.getAnnotation(Inject.class) != null) {
-            addRequiredComponents(methodInjectionPoint.getArguments());
-        }
-        methodInjectionPoints.add(methodInjectionPoint);
-        return this;
-    }
 
 
     private <B, X extends RuntimeException> B resolveBeanWithGenericsFromMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument, BeanResolver<B> beanResolver) throws X {
@@ -1595,7 +1654,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 qualifier = Qualifiers.byAnnotation(typeAnn);
             } else {
                 Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
-                    .map(map -> (Qualifier) map.get(argument));
+                        .map(map -> (Qualifier) map.get(argument));
                 qualifier = optional.orElse(null);
             }
         }
