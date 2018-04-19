@@ -16,19 +16,17 @@
 
 package io.micronaut.security.filters;
 
-import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.security.config.InterceptUrlMapPattern;
-import io.micronaut.security.config.SecurityConfigType;
 import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.endpoints.LoginController;
-import io.micronaut.security.endpoints.OauthController;
-import io.micronaut.security.endpoints.SecurityEndpointsConfiguration;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.reader.BearerTokenReader;
 import io.micronaut.security.token.reader.TokenReader;
@@ -36,10 +34,10 @@ import io.micronaut.security.token.validator.TokenValidator;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.net.URI;
-import java.util.*;
-import java.util.stream.Collectors;
-import io.micronaut.core.util.PathMatcher;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * JWT Filter.
@@ -47,101 +45,51 @@ import io.micronaut.core.util.PathMatcher;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = SecurityConfiguration.PREFIX + ".enabled")
 @Filter("/**")
 public class JwtFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
 
-    protected final SecurityConfiguration securityConfiguration;
     protected final TokenConfiguration tokenConfiguration;
-    protected final SecurityEndpointsConfiguration securityEndpointsConfiguration;
     protected final TokenReader tokenReader;
-    protected final BeanContext beanContext;
     protected final TokenValidator tokenValidator;
+    protected final EndpointAccessFetcher endpointAccessFetcher;
 
     /**
-     * @param beanContext {@link BeanContext}
-     * @param securityConfiguration {@link SecurityConfiguration}
      * @param tokenConfiguration The {@link TokenConfiguration} instance
      * @param tokenValidator The {@link TokenValidator} instance
-     * @param securityEndpointsConfiguration The {@link SecurityEndpointsConfiguration} instance
      * @param tokenReader The {@link TokenReader} instance
+     * @param endpointAccessFetcher Allow you to search for access restriction which apply to a request
      */
-    public JwtFilter(BeanContext beanContext,
-                     SecurityConfiguration securityConfiguration,
-                     TokenConfiguration tokenConfiguration,
+    public JwtFilter(TokenConfiguration tokenConfiguration,
                      TokenValidator tokenValidator,
-                     SecurityEndpointsConfiguration securityEndpointsConfiguration,
-                     TokenReader tokenReader) {
-        this.beanContext = beanContext;
-        this.securityConfiguration = securityConfiguration;
+                     TokenReader tokenReader,
+                     EndpointAccessFetcher endpointAccessFetcher) {
         this.tokenConfiguration = tokenConfiguration;
         this.tokenValidator = tokenValidator;
-        this.securityEndpointsConfiguration = securityEndpointsConfiguration;
         this.tokenReader = tokenReader;
+        this.endpointAccessFetcher = endpointAccessFetcher;
     }
 
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-
-        if (securityConfiguration.isEnabled()) {
-            List<InterceptUrlMapPattern> patternsForRequest = findAllPatternsForRequest(request,
-                    endpointsInterceptUrlMap(),
-                    securityConfiguration,
-                    securityEndpointsConfiguration);
-            HttpStatus status = filterRequest(request,
-                    patternsForRequest,
-                    tokenReader,
-                    tokenValidator,
-                    tokenConfiguration);
+            List<InterceptUrlMapPattern> patternsForRequest = endpointAccessFetcher.findAllPatternsForRequest(request);
+            HttpStatus status = filterRequest(request, patternsForRequest);
             if (status == HttpStatus.OK) {
                 return chain.proceed(request);
             }
             return Publishers.just(HttpResponse.status(status));
-
-        } else {
-            return chain.proceed(request);
-        }
-    }
-
-    /**
-     *
-     * @param request HttpRequest
-     * @param endpointsInterceptUrlMappings List of {@link InterceptUrlMapPattern} for Built-in Endpoints
-     * @param securityConfiguration {@link SecurityConfiguration}
-     * @param securityEndpointsConfiguration {@link SecurityEndpointsConfiguration}
-     * @return the List of {@link InterceptUrlMapPattern} which apply for an HTTP Request.
-     */
-    public static List<InterceptUrlMapPattern> findAllPatternsForRequest(HttpRequest<?> request,
-                                                                         List<InterceptUrlMapPattern> endpointsInterceptUrlMappings,
-                                                                         SecurityConfiguration securityConfiguration,
-                                                                         SecurityEndpointsConfiguration securityEndpointsConfiguration) {
-        endpointsInterceptUrlMappings.addAll(interceptUrlMapPatternsOfSecurityControllers(securityEndpointsConfiguration));
-        final boolean useInterceptUrlMap = securityConfiguration.getSecurityConfigType().equals(SecurityConfigType.INTERCEPT_URL_MAP);
-        if (useInterceptUrlMap) {
-            List<InterceptUrlMapPattern> configInterceptUrlMap = securityConfiguration.getInterceptUrlMap();
-            if (configInterceptUrlMap != null) {
-                endpointsInterceptUrlMappings.addAll(configInterceptUrlMap);
-            }
-        }
-        return patternsForRequest(request, endpointsInterceptUrlMappings);
     }
 
     /**
      *
      * @param request HTTP request
      * @param patternsForRequest Patterns which apply for this particular Request
-     * @param tokenReader JWT token reader
-     * @param tokenValidator JWT token validator
-     * @param tokenConfiguration TokenConfiguration
      * @return HttpStatus.OK if the request should be allowed, an appropiate HTTPStatus code signalizing the failure (UNAUTHORIZED, FORBIDDEN)
      */
-    public static HttpStatus filterRequest(HttpRequest<?> request,
-                                           List<InterceptUrlMapPattern> patternsForRequest,
-                                           TokenReader tokenReader,
-                                           TokenValidator tokenValidator,
-                                           TokenConfiguration tokenConfiguration
-                                           ) {
+    public HttpStatus filterRequest(HttpRequest<?> request,
+                                           List<InterceptUrlMapPattern> patternsForRequest) {
 
         if (matchesAccess(patternsForRequest, Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY))) {
             return HttpStatus.OK;
@@ -203,24 +151,6 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
     }
 
     /**
-     * Filters a List of {@link InterceptUrlMapPattern} which apply of this particular request.
-     * @param request HTTP Request
-     * @param interceptUrlMap List of {@link InterceptUrlMapPattern}
-     * @return a List of {@link InterceptUrlMapPattern}
-     */
-    public static List<InterceptUrlMapPattern> patternsForRequest(HttpRequest<?> request, List<InterceptUrlMapPattern> interceptUrlMap) {
-        final URI uri = request.getUri();
-        final String uriString = uri.toString();
-        final HttpMethod httpMethod = request.getMethod();
-        return interceptUrlMap
-                .stream()
-                .filter(p ->
-                        p.getHttpMethod().equals(httpMethod) &&
-                                PathMatcher.ANT.matches(p.getPattern(), uriString))
-                .collect(Collectors.toList());
-    }
-
-    /**
      *
      * @param interceptUrlMap Instance of {@link InterceptUrlMapPattern}
      * @param allowedAccesses e.g. ['ROLE_USER']
@@ -232,66 +162,5 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
                 .anyMatch(p ->
                         p.getAccess().stream().anyMatch(allowedAccesses::contains)
                 );
-    }
-
-    private List<InterceptUrlMapPattern> endpointsInterceptUrlMap() {
-        return interceptUrlMapOfEndpointConfigurations(beanContext.getBeansOfType(EndpointConfiguration.class));
-    }
-
-    /**
-     *
-     * @param endpointConfigurations Collection of {@link EndpointConfiguration}
-     * @return a List of {@link InterceptUrlMapPattern}
-     */
-    public static List<InterceptUrlMapPattern> interceptUrlMapOfEndpointConfigurations(Collection<EndpointConfiguration> endpointConfigurations) {
-        if (endpointConfigurations == null || endpointConfigurations.isEmpty()) {
-            return new ArrayList<>();
-        }
-        List<InterceptUrlMapPattern> patterns = new ArrayList<>();
-        List<String> anonymousAccess = Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY);
-        List<String> authenticatedAccess = Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED);
-        for (HttpMethod method : Arrays.asList(HttpMethod.GET, HttpMethod.POST)) {
-            patterns.addAll(endpointConfigurations.stream()
-                    .filter(ec -> ec.isEnabled().isPresent() ? ec.isEnabled().get() : false)
-                    .map(ec -> new InterceptUrlMapPattern(endpointPattern(ec), (ec.isSensitive().isPresent() ? ec.isSensitive().get() : false) ? authenticatedAccess : anonymousAccess, method))
-                    .collect(Collectors.toList()));
-        }
-        return patterns;
-    }
-
-    /**
-     *
-     * @param ec Instance of {@link EndpointConfiguration}
-     * @return / + endpoint.id
-     */
-    public static String endpointPattern(EndpointConfiguration ec) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("/");
-        sb.append(ec.getId());
-        return sb.toString();
-    }
-
-    /**
-     *
-     * @param securityEndpointsConfiguration Instance of {@link SecurityEndpointsConfiguration}
-     * @return a List of {@link InterceptUrlMapPattern}
-     */
-    public static List<InterceptUrlMapPattern> interceptUrlMapPatternsOfSecurityControllers(SecurityEndpointsConfiguration securityEndpointsConfiguration) {
-        final List<InterceptUrlMapPattern> results = new ArrayList<>();
-        final List<String> access = Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY);
-        if (securityEndpointsConfiguration != null) {
-            if (securityEndpointsConfiguration.isLogin()) {
-                results.add(new InterceptUrlMapPattern(LoginController.LOGIN_PATH, access, HttpMethod.POST));
-            }
-
-            if (securityEndpointsConfiguration.isRefresh()) {
-                final StringBuilder sb = new StringBuilder();
-                sb.append(OauthController.CONTROLLER_PATH);
-                sb.append(OauthController.ACCESS_TOKEN_PATH);
-                final String pattern = sb.toString();
-                results.add(new InterceptUrlMapPattern(pattern, access, HttpMethod.POST));
-            }
-        }
-        return results;
     }
 }
