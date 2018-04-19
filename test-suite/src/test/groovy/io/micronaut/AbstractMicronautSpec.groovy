@@ -15,20 +15,17 @@
  */
 package io.micronaut
 
-import io.micronaut.http.client.HttpClient
-import okhttp3.OkHttpClient
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.util.concurrent.TimeUnit
-
 /**
  * @author Graeme Rocher
  * @since 1.0
- */
+ */ 
 abstract class AbstractMicronautSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'

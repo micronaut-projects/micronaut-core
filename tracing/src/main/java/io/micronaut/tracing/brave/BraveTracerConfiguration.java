@@ -18,13 +18,17 @@ package io.micronaut.tracing.brave;
 import brave.Clock;
 import brave.ErrorParser;
 import brave.Tracing;
-import brave.opentracing.BraveTracer;
+import brave.propagation.CurrentTraceContext;
 import brave.propagation.Propagation;
+import brave.sampler.CountingSampler;
 import brave.sampler.Sampler;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.tracing.brave.sender.HttpClientSender;
 
@@ -37,16 +41,19 @@ import javax.inject.Inject;
  * @author graemerocher
  * @since 1.0
  */
-@Requires(classes = { BraveTracer.class, Tracing.class})
+@Requires(classes = { Tracing.class})
+@Requires(property = BraveTracerConfiguration.PREFIX + ".enabled", value = "true")
 @ConfigurationProperties(BraveTracerConfiguration.PREFIX)
-public class BraveTracerConfiguration {
+public class BraveTracerConfiguration implements Toggleable {
 
-    public static final String PREFIX = "tracing.brave";
+    public static final String PREFIX = "tracing.zipkin";
 
     @ConfigurationBuilder(prefixes = "", excludes = {"errorParser","clock","endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
     protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
 
+    private boolean enabled = false;
+    private float samplerProbability = 0.1f;
 
     /**
      * Constructs a new {@link BraveTracerConfiguration}
@@ -54,11 +61,37 @@ public class BraveTracerConfiguration {
      * @param configuration The application configuration
      */
     public BraveTracerConfiguration(ApplicationConfiguration configuration) {
+        tracingBuilder.sampler(CountingSampler.create(samplerProbability));
         if(configuration != null) {
             tracingBuilder.localServiceName(configuration.getName().orElse(Environment.DEFAULT_NAME));
         }
         else {
             tracingBuilder.localServiceName(Environment.DEFAULT_NAME);
+        }
+    }
+
+    /**
+     * @return Is tracing enabled
+     */
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * @param enabled True if tracing is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * @param samplerConfiguration The sampler configuration
+     */
+    @Inject
+    public void setSamplerConfiguration(@Nullable SamplerConfiguration samplerConfiguration) {
+        if(samplerConfiguration != null) {
+            tracingBuilder.sampler(CountingSampler.create(samplerConfiguration.getProbability()));
         }
     }
 
@@ -108,17 +141,58 @@ public class BraveTracerConfiguration {
         }
     }
 
+    /**
+     * Sets the current trace context
+     *
+     * @param traceContext The trace context
+     */
+    @Inject
+    public void setCurrentTraceContext(CurrentTraceContext traceContext) {
+        if(traceContext != null) {
+            tracingBuilder.currentTraceContext(traceContext);
+        }
+    }
 
-    @ConfigurationProperties(HttpClientSenderConfiguration.PREFIX)
+
+    /**
+     * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace
+     */
+    @ConfigurationProperties("http")
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
-    @Requires(classes = { BraveTracer.class, Tracing.class})
-    public static class HttpClientSenderConfiguration {
+    @Requires(classes = { Tracing.class})
+    public static class HttpClientSenderConfiguration extends HttpClientConfiguration {
         public static final String PREFIX = BraveTracerConfiguration.PREFIX + ".http";
         @ConfigurationBuilder(prefixes = "")
-        protected HttpClientSender.Builder clientSenderBuilder = new HttpClientSender.Builder();
+        protected final HttpClientSender.Builder clientSenderBuilder;
+
+        public HttpClientSenderConfiguration() {
+            this.clientSenderBuilder = new HttpClientSender.Builder(this);
+        }
 
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;
+        }
+    }
+
+
+
+    @ConfigurationProperties("sampler")
+    @Requires(classes = CountingSampler.class)
+    @Requires(missingBeans = Sampler.class)
+    public static class SamplerConfiguration {
+        private float probability = 0.1F;
+
+        public float getProbability() {
+            return probability;
+        }
+
+        /**
+         * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
+         * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         * @param probability The probability
+         */
+        public void setProbability(float probability) {
+            this.probability = probability;
         }
     }
 }

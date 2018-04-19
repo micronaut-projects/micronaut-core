@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.hibernate.gorm
 
 import grails.gorm.annotation.Entity
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
@@ -32,13 +34,14 @@ import javax.sql.DataSource
 import java.util.stream.Stream
 
 /**
- * <p>A factory for configuring GORM for Hibernate 5 within Micronaut</p>
+ * <p>A factory for configuring GORM for Hibernate 5 within Micronaut</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Factory
 @CompileStatic
+@Slf4j
 class HibernateFactory {
 
     final ApplicationContext applicationContext
@@ -50,6 +53,7 @@ class HibernateFactory {
     @Bean(preDestroy = "close")
     @Context
     HibernateDatastore hibernateDatastore() {
+        log.info("Starting GORM for Hibernate")
         Stream<Class> entities = applicationContext.environment.scan(Entity)
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
@@ -41,7 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * <p>A base function executor for handling input and output as streams</p>
+ * <p>A base function executor for handling input and output as streams</p>.
  *
  * @param <C> the context type
  * @author Graeme Rocher
@@ -49,7 +50,7 @@ import java.util.Optional;
  */
 public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     /**
-     * Execute the function for the given input and output
+     * Execute the function for the given input and output.
      *
      * @param input  The input
      * @param output The output
@@ -60,7 +61,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     }
 
     /**
-     * Execute the function with given context object
+     * Execute the function with given context object.
      *
      * @param input   The {@link InputStream}
      * @param output  THe {@link OutputStream}
@@ -108,6 +109,16 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         }
     }
 
+    /**
+     * Encode and write to output stream.
+     *
+     * @param environment environment
+     * @param registry local function registry
+     * @param returnType return type as Class
+     * @param result result object
+     * @param output outputstream
+     * @throws IOException input/output exception
+     */
     static void encode(Environment environment, LocalFunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
         if (ClassUtils.isJavaLangType(returnType)) {
             if (result instanceof Byte) {
@@ -150,7 +161,9 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Class<?> argType = arg.getType();
         if (ClassUtils.isJavaLangType(argType)) {
             Object converted = doConvertInput(conversionService, arg, input);
-            if (converted != null) return converted;
+            if (converted != null) {
+                return converted;
+            }
         } else if (argType.isInstance(input)) {
             return input;
         } else {
@@ -172,7 +185,9 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Object context) {
         if (ClassUtils.isJavaLangType(arg.getType())) {
             Object convert = doConvertInput(conversionService, arg, context);
-            if (convert != null) return convert;
+            if (convert != null) {
+                return convert;
+            }
         }
         throw new CodecException("Unable to decode argument from stream: " + arg);
     }

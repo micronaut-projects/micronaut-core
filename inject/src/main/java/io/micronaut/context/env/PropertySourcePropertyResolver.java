@@ -318,7 +318,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                                 if (v instanceof Map) {
                                     map = (Map) v;
                                 } else {
-                                    map = new LinkedHashMap(3);
+                                    map = new LinkedHashMap(10);
                                     entries.put(resolvedProperty, map);
                                 }
                                 map.put(index, value);

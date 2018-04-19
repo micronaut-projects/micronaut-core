@@ -32,12 +32,7 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CookieValue;
@@ -131,7 +126,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         ClientRegistration reg = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        if (httpMethodMapping.isPresent()) {
+        if (httpMethodMapping.isPresent() && reg != null) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
@@ -242,6 +237,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 uri = uriTemplate.expand(paramMap);
                 request = HttpRequest.create(httpMethod, uri);
             }
+
+            // Set the URI template used to make the request for tracing purposes
+            request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()) );
+            String serviceId = clientAnnotation.value()[0];
+            request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
+
 
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -361,13 +362,32 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return context.proceed();
     }
 
+    private String resolveTemplate(Client clientAnnotation, String templateString) {
+        String path = clientAnnotation.path();
+        if(StringUtils.isNotEmpty(path)) {
+            return path + templateString;
+        }
+        else {
+            String[] value = clientAnnotation.value();
+            if(ArrayUtils.isNotEmpty(value)) {
+                if(value[0].startsWith("/")) {
+                    return value[0] + templateString;
+                }
+            }
+            return templateString;
+        }
+    }
+
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
         String[] clientId = clientAnn.value();
+        if(ArrayUtils.isEmpty(clientId)) {
+            return null;
+        }
 
         return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
-                    new HttpClientException("Invalid service reference [" + ArrayUtils.toString((Object[]) clientId) + "] specified to @Client")
+                    new HttpClientException("Invalid service reference [" + ArrayUtils.toString(clientId) + "] specified to @Client")
                 );
             String contextPath = "";
             String path = clientAnn.path();

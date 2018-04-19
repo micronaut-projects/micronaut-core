@@ -66,7 +66,6 @@ WebSocket Support must be implemented
 * Connection Pooling
 * Server Sent Events
 * CONTINUE request handling
-* Reactive Streams Publisher as request body to allow streaming
 
 #### Distributed Tracing
 
@@ -81,6 +80,22 @@ Built in metrics support on-top of Micro Meter (jack)
 * Add support for @Size on blocking types that receive multipart data. Should override the global setting
 * Support multiple form data parts with the same name
 
+
+### CLI
+
+#### Profiles
+  - Function/Lambda (serverless)
+
+#### Features
+  - Http Client
+  - Tracing
+  - Mongodb
+  - GORM
+  
+#### Commands
+  - Create Controller
+  - Create Test
+  - Create Job (@Scheduled)
 
 ## POST 1.0 Items
 
@@ -111,3 +126,5 @@ An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client.
 - Rate limiting
 - Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
 - Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
+
+

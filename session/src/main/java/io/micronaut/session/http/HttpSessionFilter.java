@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -20,7 +21,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.session.Session;
@@ -32,8 +32,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A {@link HttpServerFilter} that resolves the current user {@link Session} if present and encodes the Session ID in
- * the response
+ * A {@link io.micronaut.http.filter.HttpServerFilter} that resolves the current user {@link Session} if present and encodes the Session ID in
+ * the response.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,14 +42,21 @@ import java.util.Optional;
 public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
 
     /**
-     * Constant for Micronaut SESSION attribute
+     * Constant for Micronaut SESSION attribute.
      */
     public static final CharSequence SESSION_ATTRIBUTE = "micronaut.SESSION";
 
-    final SessionStore<Session> sessionStore;
-    final HttpSessionIdResolver[] resolvers;
-    final HttpSessionIdEncoder[] encoders;
+    private final SessionStore<Session> sessionStore;
+    private final HttpSessionIdResolver[] resolvers;
+    private final HttpSessionIdEncoder[] encoders;
 
+    /**
+     * Constructor.
+     *
+     * @param sessionStore The session store
+     * @param resolvers The HTTP session id resolvers
+     * @param encoders The HTTP session id encoders
+     */
     public HttpSessionFilter(SessionStore<Session> sessionStore, HttpSessionIdResolver[] resolvers, HttpSessionIdEncoder[] encoders) {
         this.sessionStore = sessionStore;
         this.resolvers = resolvers;
@@ -103,11 +110,20 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
         });
     }
 
+    /**
+     * Store the session and the response.
+     */
     class SessionAndResponse {
         final Optional<Session> session;
         final MutableHttpResponse<?> response;
 
-        public SessionAndResponse(Optional<Session> session, MutableHttpResponse<?> response) {
+        /**
+         * Constructor.
+         *
+         * @param session The optional session
+         * @param response The mutable HTTP response
+         */
+        SessionAndResponse(Optional<Session> session, MutableHttpResponse<?> response) {
             this.session = session;
             this.response = response;
         }
