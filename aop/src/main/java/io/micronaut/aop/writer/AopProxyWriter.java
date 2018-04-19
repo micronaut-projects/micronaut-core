@@ -26,6 +26,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
@@ -38,6 +39,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -953,30 +955,47 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitFieldInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName) {
+    public void visitFieldInjectionPoint(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitFieldInjectionPoint(
                         declaringType,
-                        qualifierType,
-                        requiresReflection,
                         fieldType,
-                        fieldName)
+                        fieldName,
+                        requiresReflection,
+                        annotationMetadata,
+                        typeArguments
+                )
         );
     }
 
     @Override
-    public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
+    public void visitFieldValue(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments,
+            boolean isOptional) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitFieldValue(
                         declaringType,
-                        qualifierType,
-                        requiresReflection,
                         fieldType,
                         fieldName,
-                        isOptional)
+                        requiresReflection,
+                        annotationMetadata,
+                        typeArguments,
+                        isOptional
+                )
         );
-
     }
+
 
     @Override
     public String getPackageName() {

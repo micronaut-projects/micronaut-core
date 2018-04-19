@@ -21,11 +21,13 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.AnnotationValue;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -275,38 +277,43 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> argumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
-                                                 AnnotationMetadata annotationMetadata);
+                                                 @Nullable AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a field injection point
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
      * @param fieldType          The type of the field
      * @param fieldName          The name of the field
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param annotationMetadata The annotation metadata for the field
+     * @param typeArguments The generic type arguments
      */
     void visitFieldInjectionPoint(Object declaringType,
-                                  Object qualifierType,
-                                  boolean requiresReflection,
                                   Object fieldType,
-                                  String fieldName);
+                                  String fieldName,
+                                  boolean requiresReflection,
+                                  @Nullable AnnotationMetadata annotationMetadata,
+                                  @Nullable Map<String, Object> typeArguments);
 
     /**
      * Visits a field injection point
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
      * @param fieldType          The type of the field
      * @param fieldName          The name of the field
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param annotationMetadata The annotation metadata for the field
+     * @param typeArguments The generic type arguments
+     * @param isOptional Is the value optional
      */
-    void visitFieldValue(Object declaringType,
-                         Object qualifierType,
-                         boolean requiresReflection,
-                         Object fieldType,
-                         String fieldName,
-                         boolean isOptional);
+    void visitFieldValue( Object declaringType,
+                          Object fieldType,
+                          String fieldName,
+                          boolean requiresReflection,
+                          @Nullable AnnotationMetadata annotationMetadata,
+                          @Nullable Map<String, Object> typeArguments,
+                          boolean isOptional);
 
     /**
      * @return The package name of the bean
