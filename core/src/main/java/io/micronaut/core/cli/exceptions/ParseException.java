@@ -26,10 +26,18 @@ public class ParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1;
 
+    /**
+     * Constructor.
+     * @param message message
+     */
     public ParseException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor.
+     * @param cause cause
+     */
     public ParseException(Throwable cause) {
         super(cause);
     }

@@ -71,11 +71,21 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         return parse(cl, args);
     }
 
+    /**
+     * Parse the command line entry.
+     * @param cl commandLine
+     * @param args args passed in
+     * @return commandLine
+     */
     CommandLine parse(DefaultCommandLine cl, String[] args) {
         parseInternal(cl, args, true);
         return cl;
     }
 
+    /**
+     * Build the options message.
+     * @return message
+     */
     public String getOptionsHelpMessage() {
         String ls = System.getProperty("line.separator");
         usageMessage = "Available options:";
@@ -125,10 +135,20 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         }
     }
 
+    /**
+     * Create a default command line.
+     * @return commandLine
+     */
     protected DefaultCommandLine createCommandLine() {
         return new DefaultCommandLine();
     }
 
+    /**
+     * Process the passed in options.
+     * @param cl cl
+     * @param arg arg
+     * @return argument processed
+     */
     protected String processOption(DefaultCommandLine cl, String arg) {
         if (arg.length() < 2) {
             return null;
@@ -163,6 +183,11 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         return arg;
     }
 
+    /**
+     * Process System property arg.
+     * @param cl cl
+     * @param arg system arg
+     */
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
         int i = arg.indexOf("=");
         String name = arg.substring(2, i);

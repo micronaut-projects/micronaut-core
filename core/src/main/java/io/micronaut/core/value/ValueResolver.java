@@ -25,6 +25,7 @@ import java.util.Optional;
 /**
  * An interface for any type that is able to resolve and convert values.
  *
+ * @param <K> parent type
  * @author Graeme Rocher
  * @see io.micronaut.core.convert.TypeConverter
  * @since 1.0

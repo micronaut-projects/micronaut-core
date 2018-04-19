@@ -21,6 +21,9 @@ import io.micronaut.core.convert.TypeConverter;
 import java.lang.annotation.Annotation;
 
 /**
+ * @param <A> The annotation type
+ * @param <T> The argument type
+ * @param <S> The binding source type
  * @author Graeme Rocher
  * @since 1.0
  */

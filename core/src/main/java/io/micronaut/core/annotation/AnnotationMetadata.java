@@ -131,6 +131,8 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * Get all of the values for the given annotation and type of the underlying values.
      *
      * @param annotation The annotation name
+     * @param valueType valueType
+     * @param <T> Generic type
      * @return The {@link OptionalValues}
      */
     <T> OptionalValues<T> getValues(String annotation, Class<T> valueType);
@@ -260,6 +262,8 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * Get all of the values for the given annotation.
      *
      * @param annotation The annotation name
+     * @param valueType valueType
+     * @param <T> Generic type
      * @return The {@link ConvertibleValues}
      */
     default <T> OptionalValues<T> getValues(Class<? extends Annotation> annotation, Class<T> valueType) {
@@ -522,6 +526,8 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * Get the value of default "value" the given annotation.
      *
      * @param annotation The annotation class
+     * @param requiredType requiredType
+     * @param <T> Generic type
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {

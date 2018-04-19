@@ -79,11 +79,15 @@ import java.util.function.Function;
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
+    private static final int CACHE_MAX = 60;
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()
-                                                                                 .maximumSize(60)
+                                                                                 .maximumSize(CACHE_MAX)
                                                                                  .build();
 
+    /**
+     * Constructor.
+     */
     public DefaultConversionService() {
         registerDefaultConverters();
     }
@@ -154,6 +158,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return this;
     }
 
+    /**
+     * Default Converters.
+     */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
 
@@ -685,6 +692,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Map.class, ConvertibleValues.class, (object, targetType, context) -> Optional.of(new ConvertibleValuesMap<Object>(object)));
     }
 
+    /**
+     * Find the type converter.
+     * @param sourceType sourceType
+     * @param targetType  targetType
+     * @param formattingAnnotation formattingAnnotation
+     * @param <T> Generic type
+     * @return type converter
+     */
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, Class<? extends Annotation> formattingAnnotation) {
         TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = resolveHierarchy(sourceType);
@@ -770,6 +785,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return hierarchy;
     }
 
+    /**
+     * Binds the source and target.
+     */
     private class ConvertiblePair {
         final Class source;
         final Class target;
@@ -796,8 +814,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
             ConvertiblePair pair = (ConvertiblePair) o;
 
-            if (!source.equals(pair.source)) return false;
-            if (!target.equals(pair.target)) return false;
+            if (!source.equals(pair.source)) {
+                return false;
+            }
+            if (!target.equals(pair.target)) {
+                return false;
+            }
             return formattingAnnotation != null ? formattingAnnotation.equals(pair.formattingAnnotation) : pair.formattingAnnotation == null;
         }
 

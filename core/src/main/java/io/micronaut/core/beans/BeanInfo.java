@@ -22,6 +22,7 @@ import java.util.Map;
  * An interface that provides basic bean information. Designed as a simpler replacement for.
  * {@link java.beans.BeanInfo}
  *
+ * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */

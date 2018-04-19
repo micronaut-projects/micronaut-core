@@ -69,7 +69,7 @@ public class Introspector {
      * object. Subsequent calls to this method will be answered with the cached
      * data.
      * </p>
-     *
+     * @param <T> type Generic
      * @param beanClass the specified bean class.
      * @return the <code>BeanInfo</code> of the bean class.
      */

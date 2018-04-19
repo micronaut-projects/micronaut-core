@@ -23,10 +23,19 @@ package io.micronaut.core.value;
  * @since 1.0
  */
 public class ValueException extends RuntimeException {
+    /**
+     * Constructor.
+     * @param message message
+     * @param cause cause
+     */
     public ValueException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * Constructor.
+     * @param message message
+     */
     public ValueException(String message) {
         super(message);
     }

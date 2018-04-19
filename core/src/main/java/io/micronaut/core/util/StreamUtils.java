@@ -47,11 +47,19 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }
@@ -111,11 +119,19 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }

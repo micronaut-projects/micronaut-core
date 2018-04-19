@@ -131,6 +131,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param requiredType The required type
      * @param <T>          The concrete type
      * @return The value of the property
+     * @throws PropertyNotFoundException exception when property does not exist
      */
     default <T> T getRequiredProperty(String name, Class<T> requiredType) throws PropertyNotFoundException {
         return getProperty(name, requiredType).orElseThrow(() ->

@@ -22,7 +22,7 @@ import java.util.Optional;
 
 /**
  * A registry of {@link ArgumentBinder} instances.
- *
+ * @param <S> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -33,6 +33,12 @@ public class PropertyDescriptor implements Named {
     private final Method getter;
     private final Method setter;
 
+    /**
+     * Constructor.
+     * @param propertyName propertyName
+     * @param getter getter
+     * @param setter setter
+     */
     PropertyDescriptor(String propertyName, Method getter, Method setter) {
         this.propertyName = propertyName;
         this.getter = getter;

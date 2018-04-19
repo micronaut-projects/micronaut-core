@@ -21,6 +21,8 @@ import io.micronaut.core.type.Argument;
 /**
  * An {@link ArgumentBinder} that is resolved based on the argument type.
  *
+ *  @param <T> The argument type
+ *  @param <S> The source type
  * @author Graeme Rocher
  * @since 1.0
  */
