@@ -314,11 +314,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     }
 
-    @Override
-    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata, Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, argumentAnnotationMetadata, genericTypes);
-    }
-
     /**
      * Visit a method that is to be proxied.
      *
@@ -555,15 +550,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
-        if (!isInterface) {
-            proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(
-                targetClassFullName,
-                constructorArgumentTypes,
-                    constructArgumentMetadata,
-                constructorGenericTypes
-
-            );
-        }
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(
                 constructorAnnotationMedata,
                 constructorRequriesReflection,

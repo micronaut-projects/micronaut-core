@@ -213,7 +213,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_OPTIONAL = Type.getType(Optional.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
-    private static final String FIELD_PROXIED_CONSTRUCTOR = "$PROXIED_CONSTRUCTOR";
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -265,8 +264,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
     private GeneratorAdapter staticInit;
-    // in the case of producing proxied constructors this field stores the number of arguments of the original constructor
-    private int proxiedArgumentCount = -1;
 
     /**
      * Creates a bean definition writer
@@ -457,24 +454,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // now override the injectBean method
             visitInjectMethodDefinition();
         }
-    }
-
-    @Override
-    public void visitProxiedBeanDefinitionConstructor(
-            Object declaringType,
-            Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes) {
-        if (constructorVisitor != null) {
-            throw new IllegalStateException("Call visitProxiedBeanDefinitionConstructor(..) before visitBeanDefinitionConstructor(..)");
-        }
-
-        GeneratorAdapter staticInit = this.staticInit = this.staticInit == null ? visitStaticInitializer(classWriter) : this.staticInit;
-
-        Type proxiedType = getTypeReference(declaringType);
-
-        this.proxiedArgumentCount = argumentTypes.size();
-        pushInitializeConstructorField(staticInit, FIELD_PROXIED_CONSTRUCTOR, proxiedType, argumentTypes);
     }
 
     /**
@@ -2072,20 +2051,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             defaultConstructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
             defaultConstructorVisitor.visitEnd();
         }
-    }
-
-    private void pushInitializeConstructorField(GeneratorAdapter staticInit, String constructorField, Type beanType, Map<String, Object> argumentTypes) {
-        classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, constructorField, TYPE_CONSTRUCTOR.getDescriptor(), null, null);
-
-        Collection<Object> argumentClassNames = argumentTypes.values();
-
-        pushGetConstructorForType(staticInit, beanType, argumentClassNames);
-
-        staticInit.putStatic(
-                beanDefinitionType,
-                constructorField,
-                TYPE_CONSTRUCTOR
-        );
     }
 
     static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
