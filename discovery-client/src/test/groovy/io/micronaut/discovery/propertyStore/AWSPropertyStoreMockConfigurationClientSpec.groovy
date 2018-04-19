@@ -15,7 +15,7 @@
  */
 package io.micronaut.discovery.propertyStore
 
-import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
+
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult
@@ -34,7 +34,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 
 /**
