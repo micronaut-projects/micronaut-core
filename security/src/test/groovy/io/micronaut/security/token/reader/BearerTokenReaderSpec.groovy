@@ -28,7 +28,7 @@ class BearerTokenReaderSpec extends Specification {
         !bearerTokenReader.extractTokenFromAuthorization('XXX').isPresent()
     }
 
-    def "if authorization header not present returns null"() {
+    def "if authorization header not present returns empty"() {
         given:
         def request = HttpRequest.create(HttpMethod.GET, '/')
 
