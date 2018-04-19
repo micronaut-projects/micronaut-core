@@ -446,7 +446,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Map<String, Map<String, Object>> genericTypeMap = [:]
                 populateParameterData(methodNode.parameters, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
-                beanMethodWriter.visitBeanFactoryMethod(AstGenericUtils.resolveTypeReference(concreteClass), methodName, paramsToType, argumentAnnotationMetadata, genericTypeMap)
+                beanMethodWriter.visitBeanFactoryMethod(
+                        AstGenericUtils.resolveTypeReference(concreteClass),
+                        AstGenericUtils.resolveTypeReference(producedType),
+                        methodName,
+                        methodAnnotationMetadata,
+                        paramsToType,
+                        argumentAnnotationMetadata,
+                        genericTypeMap
+                )
 
                 if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()

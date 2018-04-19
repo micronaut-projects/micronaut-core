@@ -41,7 +41,6 @@ import java.util.Objects;
 class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     private final BeanDefinition declaringBean;
-    private final boolean requiresReflection;
     private final AnnotationMetadata annotationMetadata;
     private final AnnotatedElement[] annotatedElements;
     private final Class<?> declaringType;
@@ -55,15 +54,13 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
      * @param declaringType The declaring type
      * @param methodName The method name
      * @param arguments The arguments
-     * @param requiresReflection Whether reflection is required
      */
     DefaultMethodInjectionPoint(
             BeanDefinition declaringBean,
             Class<?> declaringType,
             String methodName,
-            @Nullable Argument[] arguments,
-            boolean requiresReflection) {
-       this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA, requiresReflection);
+            @Nullable Argument[] arguments) {
+       this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
     }
 
     /**
@@ -73,22 +70,19 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
      * @param methodName The method name
      * @param arguments The arguments
      * @param annotationMetadata The annotation metadata
-     * @param requiresReflection Whether reflection is required
      */
     DefaultMethodInjectionPoint(
             BeanDefinition declaringBean,
             Class<?> declaringType,
             String methodName,
             @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata,
-            boolean requiresReflection) {
+            @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
         this.declaringType = declaringType;
         this.methodName = methodName;
-        this.arguments = arguments;
+        this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
-        this.requiresReflection = requiresReflection;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         if(this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotatedElements = AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
@@ -102,8 +96,10 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public Method getMethod() {
-        return ReflectionUtils.getMethod(declaringType, methodName, argTypes)
-                 .orElseThrow(()-> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
+        Method method = ReflectionUtils.getMethod(declaringType, methodName, argTypes)
+                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
+        method.setAccessible(true);
+        return method;
     }
 
     @Override
@@ -144,7 +140,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public boolean requiresReflection() {
-        return requiresReflection;
+        return false;
     }
 
     @Override

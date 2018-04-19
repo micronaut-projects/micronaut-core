@@ -75,7 +75,6 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -131,21 +130,47 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     /**
      * Constructs a bean definition that is produced from a method call on another type ( factory bean )
      *
-     * @param method    The method to call
-     * @param arguments The arguments
+     * @param producedType The produced type
+     * @param declaringType The declaring type of the method
+     * @param methodName The method name
+     * @param methodMetadata The metadata for the method
+     * @param requiresReflection Whether reflection is required to invoke the method
+     * @param arguments The method arguments
      */
     @SuppressWarnings("unchecked")
     @Internal
-    protected AbstractBeanDefinition(Method method,
+    protected AbstractBeanDefinition(Class<T> producedType,
+                                     Class<?> declaringType,
+                                     String methodName,
+                                     AnnotationMetadata methodMetadata,
+                                     boolean requiresReflection,
                                      Argument... arguments) {
 
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
-        this.type = (Class<T>) method.getReturnType();
+        this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
-        this.declaringType = method.getDeclaringClass();
-        this.constructor = new MethodConstructorInjectionPoint(this, method, Modifier.isPrivate(method.getModifiers()), arguments);
+        this.declaringType = declaringType;
+
+        if(requiresReflection) {
+            this.constructor = new ReflectionMethodConstructorInjectionPoint(
+                    this,
+                    declaringType,
+                    methodName,
+                    arguments,
+                    methodMetadata
+            );
+        }
+        else {
+            this.constructor = new DefaultMethodConstructorInjectionPoint(
+                    this,
+                    declaringType,
+                    methodName,
+                    arguments,
+                    methodMetadata
+            );
+        }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
         this.addRequiredComponents(arguments);
@@ -467,34 +492,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 this.methodInjectionPoints
         );
     }
-
-    /**
-     * Adds an injection point for a setter and field to be set. Typically called by a dynamically generated subclass.
-     *
-     * @param setter The method
-     * @return this component definition
-     */
-    @Internal
-    protected final AbstractBeanDefinition addInjectionPoint(
-            Field field,
-            Method setter,
-            Argument argument,
-            boolean requiresReflection) {
-
-        ReflectionMethodInjectionPoint methodInjectionPoint = new ReflectionMethodInjectionPoint(
-                this,
-                field,
-                setter,
-                requiresReflection,
-                argument
-        );
-        if (field.getAnnotation(Inject.class) != null || setter.getAnnotation(Inject.class) != null) {
-            requiredComponents.add(field.getType());
-        }
-        methodInjectionPoints.add(methodInjectionPoint);
-        return this;
-    }
-
 
 
     /**
@@ -1359,43 +1356,25 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         );
     }
 
-    private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, AnnotationMetadata annotationMetadata, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
+    private AbstractBeanDefinition addInjectionPointInternal(
+            Class declaringType,
+            String method,
+            Argument[] arguments,
+            AnnotationMetadata annotationMetadata,
+            boolean requiresReflection,
+            List<MethodInjectionPoint> targetInjectionPoints) {
         boolean isPreDestroy = targetInjectionPoints == this.preDestroyMethods;
         boolean isPostConstruct = targetInjectionPoints == this.postConstructMethods;
 
         MethodInjectionPoint injectionPoint;
         if(requiresReflection) {
-
-            Optional<Method> beanMethod = ReflectionUtils.getMethod(declaringType, method, Argument.toClassArray(arguments));
-            if (beanMethod.isPresent()) {
-                Method javaMethod = beanMethod.get();
-                // transform arguments to include annotations
-                Argument[] newArguments;
-                if (ArrayUtils.isNotEmpty(arguments)) {
-
-                    newArguments = new Argument[arguments.length];
-                    for (int i = 0; i < arguments.length; i++) {
-                        Argument existing = arguments[0];
-                        Annotation qualifier = existing.getQualifier();
-                        newArguments[i] = Argument.of(
-                                javaMethod,
-                                existing.getName(),
-                                i,
-                                qualifier != null ? qualifier.annotationType() : null,
-                                existing.getTypeParameters());
-                    }
-                } else {
-                    newArguments = Argument.ZERO_ARGUMENTS;
-                }
-                injectionPoint = new ReflectionMethodInjectionPoint(this, javaMethod, true, newArguments);
-            } else {
-                injectionPoint = new MissingMethodInjectionPoint(
-                        this,
-                        declaringType,
-                        method,
-                        arguments
-                );
-            }
+            injectionPoint = new ReflectionMethodInjectionPoint(
+                    this,
+                    declaringType,
+                    method,
+                    arguments,
+                    annotationMetadata
+            );
         }
         else {
             injectionPoint = new DefaultMethodInjectionPoint(
@@ -1403,8 +1382,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     declaringType,
                     method,
                     arguments,
-                    annotationMetadata,
-                    false
+                    annotationMetadata
             );
         }
         targetInjectionPoints.add(injectionPoint);

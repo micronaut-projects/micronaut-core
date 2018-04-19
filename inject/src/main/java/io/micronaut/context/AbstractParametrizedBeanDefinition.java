@@ -45,10 +45,9 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
     private final Argument[] requiredArguments;
 
-    protected AbstractParametrizedBeanDefinition(Method method, Argument[] arguments) {
-        super(method, arguments);
+    public AbstractParametrizedBeanDefinition(Class<T> producedType, Class<?> declaringType, String methodName, AnnotationMetadata methodMetadata, boolean requiresReflection, Argument... arguments) {
+        super(producedType, declaringType, methodName, methodMetadata, requiresReflection, arguments);
         this.requiredArguments = resolveRequiredArguments();
-
     }
 
     protected AbstractParametrizedBeanDefinition(Class<T> type,
