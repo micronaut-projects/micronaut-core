@@ -17,7 +17,6 @@ package io.micronaut.inject.writer;
 
 import static io.micronaut.inject.writer.BeanDefinitionWriter.buildArgumentWithGenerics;
 import static io.micronaut.inject.writer.BeanDefinitionWriter.pushBuildArgumentsForMethod;
-import static io.micronaut.inject.writer.BeanDefinitionWriter.pushGetMethodFromTypeCall;
 
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -26,6 +25,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.AnnotationValue;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -34,7 +34,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -109,7 +108,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param returnTypeGenericTypes The return type generics
      * @param methodName             The method name
      * @param argumentTypes          The argument types
-     * @param qualifierTypes         The qualifier types
+     * @param argumentAnnotationMetadata         The argument annotation metadata
      * @param genericTypes           The generic types
      */
     public void visitMethod(Object declaringType,
@@ -118,7 +117,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                             Map<String, Object> returnTypeGenericTypes,
                             String methodName,
                             Map<String, Object> argumentTypes,
-                            Map<String, Object> qualifierTypes,
+                            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                             Map<String, Map<String, Object>> genericTypes) {
         Type declaringTypeObject = getTypeReference(declaringType);
         boolean hasArgs = !argumentTypes.isEmpty();
@@ -190,6 +189,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             pushBuildArgumentsForMethod(
                     constructorWriter,
                     argumentTypes,
+                    argumentAnnotationMetadata,
                     genericTypes
             );
             // now invoke super(..) if no arg constructor

@@ -124,8 +124,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final boolean isProvided;
     private final boolean isConfigurationProperties;
     private final Class<?> declaringType;
-    private boolean hasPreDestroyMethods = false;
-    private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
     private Map<Class, String> valuePrefixes;
@@ -438,7 +436,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
 
-        return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.methodInjectionPoints);
+        return addInjectionPointInternal(
+                declaringType,
+                method,
+                arguments,
+                annotationMetadata,
+                requiresReflection,
+                this.methodInjectionPoints
+        );
     }
 
     /**
@@ -1334,14 +1339,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, AnnotationMetadata annotationMetadata, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
         boolean isPreDestroy = targetInjectionPoints == this.preDestroyMethods;
-        if(isPreDestroy) {
-            hasPreDestroyMethods = true;
-        }
-
         boolean isPostConstruct = targetInjectionPoints == this.postConstructMethods;
-        if(isPostConstruct) {
-            hasPostConstructMethods = true;
-        }
 
         MethodInjectionPoint injectionPoint;
         if(requiresReflection) {

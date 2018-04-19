@@ -15,6 +15,9 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationValue;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,15 +28,15 @@ import java.util.Map;
 class ExecutableElementParamInfo {
 
     Map<String, Object> parameters = new LinkedHashMap<>();
-    Map<String, Object> qualifierTypes = new LinkedHashMap<>();
+    Map<String, AnnotationMetadata> annotationMetadata = new LinkedHashMap<>();
     Map<String, Map<String, Object>> genericTypes = new LinkedHashMap<>();
 
     void addParameter(String paramName, Object type) {
         parameters.put(paramName, type);
     }
 
-    void addQualifierType(String paramName, Object qualifier) {
-        qualifierTypes.put(paramName, qualifier);
+    void addAnnotationMetadata(String paramName, AnnotationMetadata metadata) {
+        annotationMetadata.put(paramName, metadata);
     }
 
     void addGenericTypes(String paramName, Map<String, Object> generics) {
@@ -44,8 +47,8 @@ class ExecutableElementParamInfo {
         return Collections.unmodifiableMap(parameters);
     }
 
-    Map<String, Object> getQualifierTypes() {
-        return Collections.unmodifiableMap(qualifierTypes);
+    Map<String, AnnotationMetadata> getAnnotationMetadata() {
+        return Collections.unmodifiableMap(annotationMetadata);
     }
 
     Map<String, Map<String, Object>> getGenericTypes() {

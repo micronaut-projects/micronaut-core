@@ -442,11 +442,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 Map<String, Object> paramsToType = [:]
-                Map<String, Object> qualifierTypes = [:]
+                Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
                 Map<String, Map<String, Object>> genericTypeMap = [:]
-                populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+                populateParameterData(methodNode.parameters, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
-                beanMethodWriter.visitBeanFactoryMethod(AstGenericUtils.resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
+                beanMethodWriter.visitBeanFactoryMethod(AstGenericUtils.resolveTypeReference(concreteClass), methodName, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
                 if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
@@ -571,9 +571,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
                         Map<String, Object> paramsToType = [:]
-                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
                         Map<String, Map<String, Object>> genericTypeMap = [:]
-                        populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+                        populateParameterData(methodNode.parameters, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
                         if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
                             getBeanWriter().visitPostConstructMethod(
@@ -582,7 +582,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
-                                    qualifierTypes,
+                                    argumentAnnotationMetadata,
                                     genericTypeMap,
                                     methodAnnotationMetadata)
                         } else if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
@@ -592,7 +592,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
-                                    qualifierTypes,
+                                    argumentAnnotationMetadata,
                                     genericTypeMap,
                                     methodAnnotationMetadata)
                         } else {
@@ -602,7 +602,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
-                                    qualifierTypes,
+                                    argumentAnnotationMetadata,
                                     genericTypeMap,
                                     methodAnnotationMetadata)
                         }
@@ -619,7 +619,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
 
                         Map<String, Object> paramsToType = [:]
-                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, AnnotationMetadata> qualifierTypes = [:]
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
@@ -672,7 +672,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         getBeanWriter().visitSetterValue(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            resolveQualifier(parameter),
+                            methodAnnotationMetadata,
                             false,
                             resolveParameterType(parameter),
                             methodNode.name,
@@ -722,14 +722,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (constructorNode != null) {
                     Map<String, Object> constructorParamsToType = [:]
-                    Map<String, Object> constructorQualifierTypes = [:]
+                    Map<String, AnnotationMetadata> constructorArgumentMetadata = [:]
                     Map<String, Map<String, Object>> constructorGenericTypeMap = [:]
                     Parameter[] parameters = constructorNode.parameters
                     populateParameterData(parameters,
                                           constructorParamsToType,
-                                          constructorQualifierTypes,
+                                          constructorArgumentMetadata,
                                           constructorGenericTypeMap)
-                    proxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
+                    proxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorArgumentMetadata, constructorGenericTypeMap)
                 } else {
                     addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
                 }
@@ -756,7 +756,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
-                    Object qualifierRef = resolveQualifier(fieldNode)
+                    // TODO: remove this, should pass annotation metadata
+                    Object qualifierRef = fieldAnnotationMetadata.getAnnotationNameByStereotype(Qualifier.class).orElse(null)
 
                     boolean isPrivate = Modifier.isPrivate(modifiers)
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
@@ -797,9 +798,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        Object resolveQualifier(AnnotatedNode annotatedNode) {
-            return AstAnnotationUtils.getAnnotationMetadata(annotatedNode).getAnnotationNameByStereotype(Qualifier).orElse(null)
-        }
 
         Object resolveParameterType(Parameter parameter) {
             ClassNode parameterType = parameter.type
@@ -991,16 +989,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             constructorNode
         }
 
-        private void populateParameterData(Parameter[] parameters, Map<String, Object> paramsToType, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypeMap) {
+        private void populateParameterData(Parameter[] parameters, Map<String, Object> paramsToType, Map<String, AnnotationMetadata> anntationMetadata, Map<String, Map<String, Object>> genericTypeMap) {
             for (param in parameters) {
                 String parameterName = param.name
 
                 paramsToType.put(parameterName, resolveParameterType(param))
 
-                Object qualifier = resolveQualifier(param)
-                if (qualifier != null) {
-                    qualifierTypes.put(parameterName, qualifier)
-                }
+                anntationMetadata.put(parameterName, AstAnnotationUtils.getAnnotationMetadata(param))
 
                 genericTypeMap.put(parameterName, resolveGenericTypes(param))
             }

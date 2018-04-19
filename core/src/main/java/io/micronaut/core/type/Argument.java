@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
@@ -121,6 +122,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      *
      * @param type The type
      * @param name The name
+     * @param typeParameters the type parameters
      * @param <T>  The generic type
      * @return The argument instance
      */
@@ -128,9 +130,26 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         Class<T> type,
         String name,
         @Nullable Argument... typeParameters) {
-        return new DefaultArgument<>(type, name, null, typeParameters);
+        return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
+    /**
+     * Creates a new argument for the given type and name
+     *
+     * @param type The type
+     * @param name The name
+     * @param annotationMetadata the annotation metadata
+     * @param typeParameters the type parameters
+     * @param <T>  The generic type
+     * @return The argument instance
+     */
+    static <T> Argument<T> of(
+            Class<T> type,
+            String name,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Argument... typeParameters) {
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters);
+    }
     /**
      * Creates a new argument for the given type and name
      *
@@ -142,7 +161,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     static <T> Argument<T> of(
         Class<T> type,
         String name) {
-        return new DefaultArgument<>(type, name, null, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -154,7 +173,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      */
     static <T> Argument<T> of(
         Class<T> type, @Nullable Argument... typeParameters) {
-        return new DefaultArgument<>(type, type.getSimpleName(), null, typeParameters);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
     /**
@@ -166,7 +185,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      */
     static <T> Argument<T> of(
         Class<T> type) {
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), null, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -192,7 +211,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
                 TypeVariable<Class<T>> parameter = parameters[i];
                 typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
             }
-            return new DefaultArgument<>(type, type.getSimpleName(), null, typeArguments);
+            return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
         }
     }
 
