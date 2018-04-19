@@ -53,11 +53,18 @@ public class LoginController implements LoginControllerApi {
 
     @Override
     public HttpResponse<AccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
-        Optional<AuthenticationResponse> authenticationResponse = authenticator.authenticate(usernamePasswordCredentials);
-        if ( authenticationResponse.isPresent() && authenticationResponse.get() instanceof UserDetails) {
-            return accessRefreshTokenGenerator.generate((UserDetails)authenticationResponse.get());
-
+        Optional<UserDetails> userDetails = authenticate(usernamePasswordCredentials);
+        if ( userDetails.isPresent()) {
+            return accessRefreshTokenGenerator.generate(userDetails.get());
         }
         return HttpResponse.status(HttpStatus.UNAUTHORIZED);
+    }
+
+    protected Optional<UserDetails> authenticate(UsernamePasswordCredentials usernamePasswordCredentials) {
+        Optional<AuthenticationResponse> authenticationResponse = authenticator.authenticate(usernamePasswordCredentials);
+        if ( authenticationResponse.isPresent() && authenticationResponse.get() instanceof UserDetails) {
+            return Optional.of((UserDetails)authenticationResponse.get());
+        }
+        return Optional.empty();
     }
 }

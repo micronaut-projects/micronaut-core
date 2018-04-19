@@ -33,6 +33,9 @@ public class JWEAlgorithmConverter implements TypeConverter<CharSequence, JWEAlg
 
     @Override
     public Optional<JWEAlgorithm> convert(CharSequence object, Class<JWEAlgorithm> targetType, ConversionContext context) {
+        if ( object == null ) {
+            return Optional.empty();
+        }
         String value = object.toString();
         JWEAlgorithm algorithm = JWEAlgorithm.parse(value);
         //The algorithm was created by the parse method

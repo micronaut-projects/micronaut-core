@@ -19,9 +19,6 @@ package io.micronaut.security.token.converters;
 import com.nimbusds.jose.EncryptionMethod;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
-
-import static com.nimbusds.jose.EncryptionMethod.*;
-
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -35,6 +32,9 @@ public class EncryptionMethodConverter implements TypeConverter<CharSequence, En
 
     @Override
     public Optional<EncryptionMethod> convert(CharSequence object, Class<EncryptionMethod> targetType, ConversionContext context) {
+        if ( object == null ) {
+            return Optional.empty();
+        }
         String value = object.toString();
         EncryptionMethod encryptionMethod = EncryptionMethod.parse(value);
         //The encryption method was just created by the parse method
