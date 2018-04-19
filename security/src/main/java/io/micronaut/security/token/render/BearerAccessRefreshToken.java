@@ -37,6 +37,11 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
     private String tokenType = "Bearer";
 
     /**
+     * Necessary for JSON serialization
+     */
+    public BearerAccessRefreshToken() {}
+
+    /**
      *
      * @param username a string e.g. admin
      * @param roles Collection of Strings e.g. ( [ROLE_USER, ROLE_ADMIN] )
