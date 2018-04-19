@@ -522,15 +522,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             final String beanMethodName = beanMethod.getSimpleName().toString();
             final Map<String, Object> beanMethodParameters = beanMethodParams.getParameters();
             final Object beanMethodDeclaringType = modelUtils.resolveTypeReference(beanMethod.getEnclosingElement());
+            AnnotationMetadata methodAnnotationMetadata = new JavaAnnotationMetadataBuilder(elementUtils).buildForMethod(beanMethod);
             beanMethodWriter.visitBeanFactoryMethod(
+
                 beanMethodDeclaringType,
+                 modelUtils.resolveTypeReference(returnType),
                 beanMethodName,
+                methodAnnotationMetadata,
                 beanMethodParameters,
                 beanMethodParams.getParameterMetadata(),
                 beanMethodParams.getGenericTypes()
             );
 
-            AnnotationMetadata methodAnnotationMetadata = new JavaAnnotationMetadataBuilder(elementUtils).buildForMethod(beanMethod);
+
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass)) {
                 Object[] interceptorTypes = methodAnnotationMetadata
                     .getAnnotationNamesByStereotype(AROUND_TYPE)
