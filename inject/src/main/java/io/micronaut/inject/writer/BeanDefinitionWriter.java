@@ -37,9 +37,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.annotation.DynamicAnnotation;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -97,13 +95,6 @@ import java.util.stream.Collectors;
  */
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
 
-    private static final org.objectweb.asm.commons.Method BUILD_ANNOTATION_METHOD = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-            DynamicAnnotation.class,
-            "buildAnnotation",
-            String.class,
-            Map.class
-    ));
-
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             ReflectionUtils.class,
             "getRequiredMethod",
@@ -143,17 +134,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Constructor.class,
-                    String.class,
-                    int.class,
-                    Class.class,
-                    Argument[].class
-            )
-    );
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_SIMPLE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
@@ -233,7 +213,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_OPTIONAL = Type.getType(Optional.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
-    private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
     private static final String FIELD_PROXIED_CONSTRUCTOR = "$PROXIED_CONSTRUCTOR";
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -947,6 +926,80 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitConfigBuilderMethodInternal(prefix, configurationPrefix, returnType, methodName, paramType, generics, false);
     }
 
+
+
+    @Override
+    public void visitConfigBuilderEnd() {
+        currentConfigBuilderState = null;
+    }
+
+    @Override
+    public void setRequiresMethodProcessing(boolean shouldPreProcess) {
+        this.preprocessMethods = shouldPreProcess;
+    }
+
+    @Override
+    public boolean requiresMethodProcessing() {
+        return this.preprocessMethods;
+    }
+
+    /**
+     * Visits a field injection point
+     *
+     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    public void visitFieldInjectionPoint(Object qualifierType,
+                                         boolean requiresReflection,
+                                         Object fieldType,
+                                         String fieldName) {
+        visitFieldInjectionPoint(beanFullClassName, qualifierType, requiresReflection, fieldType, fieldName);
+    }
+
+    /**
+     * Visits a field injection point
+     *
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    public void visitFieldInjectionPoint(boolean requiresReflection,
+                                         Object fieldType,
+                                         String fieldName) {
+        visitFieldInjectionPoint(beanFullClassName, null, requiresReflection, fieldType, fieldName);
+    }
+
+    @Override
+    public void visitFieldInjectionPoint(Object declaringType,
+                                         Object qualifierType,
+                                         boolean requiresReflection,
+                                         Object fieldType,
+                                         String fieldName) {
+        // Implementation notes.
+        // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
+        // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
+        // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
+        // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD, false);
+    }
+
+    @Override
+    public void visitFieldValue(Object declaringType,
+                                Object qualifierType,
+                                boolean requiresReflection,
+                                Object fieldType,
+                                String fieldName,
+                                boolean isOptional) {
+        // Implementation notes.
+        // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
+        // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
+        // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
+        // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD, isOptional);
+    }
+
     private void visitConfigBuilderMethodInternal(
             String prefix,
             String configurationPrefix,
@@ -1104,78 +1157,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
         injectMethodVisitor.visitVarInsn(ASTORE, optionalInstanceIndex);
         injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
-    }
-
-    @Override
-    public void visitConfigBuilderEnd() {
-        currentConfigBuilderState = null;
-    }
-
-    @Override
-    public void setRequiresMethodProcessing(boolean shouldPreProcess) {
-        this.preprocessMethods = shouldPreProcess;
-    }
-
-    @Override
-    public boolean requiresMethodProcessing() {
-        return this.preprocessMethods;
-    }
-
-    /**
-     * Visits a field injection point
-     *
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
-    public void visitFieldInjectionPoint(Object qualifierType,
-                                         boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
-        visitFieldInjectionPoint(beanFullClassName, qualifierType, requiresReflection, fieldType, fieldName);
-    }
-
-    /**
-     * Visits a field injection point
-     *
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
-    public void visitFieldInjectionPoint(boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
-        visitFieldInjectionPoint(beanFullClassName, null, requiresReflection, fieldType, fieldName);
-    }
-
-    @Override
-    public void visitFieldInjectionPoint(Object declaringType,
-                                         Object qualifierType,
-                                         boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
-        // Implementation notes.
-        // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
-        // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
-        // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
-        // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD, false);
-    }
-
-    @Override
-    public void visitFieldValue(Object declaringType,
-                                Object qualifierType,
-                                boolean requiresReflection,
-                                Object fieldType,
-                                String fieldName,
-                                boolean isOptional) {
-        // Implementation notes.
-        // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
-        // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
-        // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
-        // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD, isOptional);
     }
 
     private void buildFactoryMethodClassConstructor(
