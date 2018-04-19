@@ -7,11 +7,14 @@ import com.amazonaws.services.simplesystemsmanagement.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.env.*;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
+import io.micronaut.discovery.client.ClientUtil;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
@@ -36,7 +39,6 @@ import java.util.concurrent.Future;
 @Singleton
 @Requires(env= Environment.AMAZON_EC2)
 @Requires(beans = AWSParameterStoreConfiguration.class)
-//@Requires(beans = AWSClientConfiguration.class)
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
 
@@ -52,15 +54,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     AWSParameterStoreConfigClient(AWSClientConfiguration awsConfiguration, AWSParameterStoreConfiguration awsParameterStoreConfiguration, Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
-        //this.awsSystemManagementClientFactory = awsSystemManagementClientFactory;
 
         try {
-            //TODO convert to async client
-            //AWSSystemManagementClientFactory factory = new AWSSystemManagementClientFactory(awsParameterStoreConfiguration);
-            //this.client =  factory.awsSimpleSystemsManagementAsyncClient();
-            //this.client = AWSSimpleSystemsManagementClientBuilder.standard().withClientConfiguration(awsConfiguration.clientConfiguration).build();
             this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.clientConfiguration).build();
-
         } catch (SdkClientException sce) {
             LOG.warn("Error creating Simple Systems Management client - check your credentials");
         }
@@ -107,13 +103,11 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         }
         if (activeNames!=null && activeNames.size() > 0) {
             // look for the environment configs since we can't wildcard partial paths on aws
-            // TODO why is this behaving different on unit vs integration tests and only returning 1 vs 2 items and not in a List????
             for (String activeName : activeNames) {
                 String environmentSpecificPath = commonConfigPath+"_"+activeName;
                 configurationValues = Flowable.concat(
                         configurationValues,
                         Flowable.fromPublisher(getParameters(environmentSpecificPath)));
-
             }
 
         }
@@ -140,13 +134,23 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             if (!lookupKey.startsWith("/")) {
                                 lookupKey = "/"+lookupKey;
                             }
-                            //Flowable<GetParametersResult> parameters = Flowable.fromPublisher(getParameters(lookupKey));
-                            //Flowable<GetParametersResult> parameters = Publishers.just(keyValues.getParameters())
+
                             Flowable<Map<String, Object>> properties = Flowable.fromPublisher(convertParameterHierarchyToMap(keyValues));
+                            // if we we have child properties
+                            Flowable<GetParametersByPathResult> hierarchy = Flowable.fromPublisher(getHierarchy(lookupKey,true));
+                            Flowable<Map<String, Object>> propertiesHierarchy = Flowable.fromPublisher(convertParameterHierarchyToMap(hierarchy.blockingFirst()));
+                            properties = Flowable.concat(
+                                    properties,
+                                    propertiesHierarchy);
+
                             for (String propertySourceName : propertySourceNames) {
 
                                 Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
-                                values.putAll(properties.blockingFirst());
+                                for (Map<String, Object> propMap : properties.toList().blockingGet()) {
+                                    values.putAll(propMap);
+
+                                }
+
                             }
 
                         }
@@ -232,28 +236,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     }
 
     private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        Set<String> propertySourceNames;
-        if (prefix.indexOf('_') > -1) {
-
-            String[] tokens = prefix.split("_");
-            if (tokens.length == 1) {
-                propertySourceNames = Collections.singleton(tokens[0]);
-            } else {
-                String name = tokens[0];
-                Set<String> newSet = new HashSet<>(tokens.length - 1);
-                for (int j = 1; j < tokens.length; j++) {
-                    String envName = tokens[j];
-                    if (!activeNames.contains(envName)) {
-                        return Collections.emptySet();
-                    }
-                    newSet.add(name + '[' + envName + ']');
-                }
-                propertySourceNames = newSet;
-            }
-        } else {
-            propertySourceNames = Collections.singleton(prefix);
-        }
-        return propertySourceNames;
+        return ClientUtil.calcPropertySourceNames(prefix,activeNames);
     }
 
     @Inject

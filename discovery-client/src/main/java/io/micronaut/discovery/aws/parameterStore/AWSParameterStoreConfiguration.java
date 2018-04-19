@@ -23,16 +23,7 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
     String rootHierarchyPath;
     Boolean useSecureParameters = false;
     Boolean enabled;
-    String customKMSName;
 
-
-    public String getCustomKMSName() {
-        return customKMSName;
-    }
-
-    public void setCustomKMSName(String customKMSName) {
-        this.customKMSName = customKMSName;
-    }
 
     public Boolean isEnabled() {
         return enabled;
