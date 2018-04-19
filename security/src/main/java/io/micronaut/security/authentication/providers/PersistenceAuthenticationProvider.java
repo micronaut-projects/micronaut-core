@@ -45,7 +45,8 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
 
     @Override
     public AuthenticationResponse authenticate(UsernamePasswordCredentials creds) {
-        Optional<UserState> optionalUserState = userFetcher.findByUsername(creds.getUsername());
+        final String username = creds.getUsername();
+        Optional<UserState> optionalUserState = userFetcher.findByUsername(username);
 
         if ( !optionalUserState.isPresent()) {
             return new AuthenticationFailed(AuthenticationFailure.USER_NOT_FOUND);
@@ -66,7 +67,7 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
         if ( !passwordEncoder.matches(creds.getPassword(), user.getPassword()) ) {
             return new AuthenticationFailed(AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH);
         }
-        List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(user.getUsername());
-        return new UserDetails(user.getUsername(), authorities);
+        List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(username);
+        return new UserDetails(username, authorities);
     }
 }
