@@ -23,6 +23,11 @@ import io.micronaut.core.convert.TypeConverter;
 import javax.inject.Singleton;
 import java.util.Optional;
 
+/**
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Singleton
 public class JWEAlgorithmConverter implements TypeConverter<CharSequence, JWEAlgorithm> {
 

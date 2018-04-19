@@ -25,6 +25,11 @@ import static com.nimbusds.jose.EncryptionMethod.*;
 import javax.inject.Singleton;
 import java.util.Optional;
 
+/**
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Singleton
 public class EncryptionMethodConverter implements TypeConverter<CharSequence, EncryptionMethod> {
 
