@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -43,6 +44,7 @@ public final class MultipartBody {
      * @param parts The List of all parts to be sent in the body of Netty multipart request, such a File, String, Bytes etc.
      */
     private MultipartBody(List<Part> parts) {
+        parts.sort(Comparator.comparing(o -> o.name));
         this.parts = parts;
     }
 

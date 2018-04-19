@@ -13,10 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 /**
- * A MethodInterceptor extends the generic {@link Interceptor} and provides an interface more specific to method interception
+ * A MethodInterceptor extends the generic {@link Interceptor} and provides an interface more specific to method interception.
+ *
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,7 +28,7 @@ package io.micronaut.aop;
 public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
 
     /**
-     * Extended version of the {@link #intercept(InvocationContext)} method that accepts a {@link MethodInvocationContext}
+     * Extended version of the {@link #intercept(InvocationContext)} method that accepts a {@link MethodInvocationContext}.
      *
      * @param context The context
      * @return The result

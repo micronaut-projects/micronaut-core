@@ -25,6 +25,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -65,6 +66,7 @@ import java.net.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -97,6 +99,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
+    private final ThreadFactory threadFactory;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final Optional<SslContext> sslContext;
@@ -116,6 +119,7 @@ public class NettyHttpServer implements EmbeddedServer {
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
             @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
+            @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             ExecutorSelector executorSelector,
             NettyServerSslBuilder nettyServerSslBuilder,
             ChannelOutboundHandler... outboundHandlers
@@ -141,6 +145,7 @@ public class NettyHttpServer implements EmbeddedServer {
         this.binderRegistry = binderRegistry;
         this.staticResourceResolver = resourceResolver;
         this.sslContext = nettyServerSslBuilder.build();
+        this.threadFactory = threadFactory;
     }
 
     /**
@@ -353,11 +358,27 @@ public class NettyHttpServer implements EmbeddedServer {
     private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
             Optional<ExecutorService> executorService = config.getExecutorName().flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name)));
-            NioEventLoopGroup group = executorService.map(service -> new NioEventLoopGroup(config.getNumOfThreads(), service)).orElseGet(() -> new NioEventLoopGroup(config.getNumOfThreads()));
+            NioEventLoopGroup group = executorService.map(service ->
+                    new NioEventLoopGroup(config.getNumOfThreads(), service)
+            ).orElseGet(() ->
+                    {
+                        if(threadFactory != null) {
+                            return new NioEventLoopGroup(config.getNumOfThreads(), threadFactory);
+                        }
+                        else {
+                            return new NioEventLoopGroup(config.getNumOfThreads());
+                        }
+                    }
+            );
             config.getIoRatio().ifPresent(group::setIoRatio);
             return group;
         } else {
-            return new NioEventLoopGroup();
+            if(threadFactory != null) {
+                return new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
+            }
+            else {
+                return new NioEventLoopGroup();
+            }
         }
     }
 

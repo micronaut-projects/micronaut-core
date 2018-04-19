@@ -18,9 +18,39 @@ package io.micronaut.inject.method.arrayinjection
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-class SetterArrayInjectionSpec extends Specification {
+import javax.inject.Named
+
+class SetterArrayInjectionSpec extends AbstractTypeElementSpec {
+
+    void "test setter injection compile"() {
+        given:"A bean that has setter injection"
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Executable
+class MyBean {
+    
+    @javax.inject.Inject
+    public void setFoo(Foo foo) {}
+}
+
+
+@javax.inject.Singleton
+class Foo {}
+
+''')
+        then:"the default scope is singleton"
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].name == 'setFoo'
+    }
+
     void "test injection via setter that takes an array"() {
         given:
         BeanContext context = new DefaultBeanContext()

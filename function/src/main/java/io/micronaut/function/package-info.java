@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 /**
- * <p>A set of classes to support a programming model for Server-less application development using Micronaut</p>
+ * <p>A set of classes to support a programming model for Server-less application development using Micronaut</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+
 package io.micronaut.function;

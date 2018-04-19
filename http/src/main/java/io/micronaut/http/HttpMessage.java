@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -32,7 +33,7 @@ import java.util.Optional;
  * @see HttpResponse
  * @since 1.0
  */
-public interface HttpMessage<B> {
+public interface HttpMessage<B> extends MutableAttributeHolder {
 
     /**
      * @return The {@link HttpHeaders} object
@@ -46,12 +47,18 @@ public interface HttpMessage<B> {
      *
      * @return The attributes of the message
      */
+    @Override
     MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The request body
      */
     Optional<B> getBody();
+
+    @Override
+    default HttpMessage<B> setAttribute(CharSequence name, Object value) {
+        return (HttpMessage<B>) MutableAttributeHolder.super.setAttribute(name, value);
+    }
 
     /**
      * Return the body as the given type

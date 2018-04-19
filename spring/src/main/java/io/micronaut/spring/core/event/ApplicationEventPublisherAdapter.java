@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.spring.core.event;
 
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
- * An adapter for Spring's {@link ApplicationEventPublisher} interface
+ * An adapter for Spring's {@link ApplicationEventPublisher} interface.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,6 +29,11 @@ public class ApplicationEventPublisherAdapter implements ApplicationEventPublish
 
     private final io.micronaut.context.event.ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Constructor.
+     *
+     * @param eventPublisher The application event publisher
+     */
     public ApplicationEventPublisherAdapter(io.micronaut.context.event.ApplicationEventPublisher eventPublisher) {
         if (eventPublisher == null) {
             throw new IllegalArgumentException("Event publisher must be specified");

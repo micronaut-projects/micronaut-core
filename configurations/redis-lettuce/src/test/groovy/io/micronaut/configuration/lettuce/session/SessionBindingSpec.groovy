@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 package io.micronaut.configuration.lettuce.session
-import okhttp3.OkHttpClient
-import okhttp3.Request
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.session.annotation.SessionValue
-import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -35,32 +38,34 @@ class SessionBindingSpec extends Specification {
 
     void "test bind simple session argument using HTTP header processing"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
                 'micronaut.session.http.redis.enabled':'true'
         ])
-        OkHttpClient httpClient = new OkHttpClient()
-
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        def response = httpClient.newCall(request.build())
-                .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get()== "not in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
 
-
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple")
+                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), String
+        ))
+        response = flowable.blockingFirst()
+        
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         cleanup:
@@ -70,32 +75,34 @@ class SessionBindingSpec extends Specification {
 
     void "test bind simple session argument using Cookie processing"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
                 'micronaut.session.http.redis.enabled':'true'
         ])
-        OkHttpClient httpClient = new OkHttpClient()
-
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        def response = httpClient.newCall(request.build())
-                .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get() == "not in session"
         response.header(HttpHeaders.SET_COOKIE)
 
         when:
         def sessionId = response.header(HttpHeaders.SET_COOKIE)
 
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple")
+                .header(HttpHeaders.COOKIE, sessionId), String
+        ))
+        response = flowable.blockingFirst()
 
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-                .header(HttpHeaders.COOKIE, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.SET_COOKIE)
 
         cleanup:
@@ -104,41 +111,44 @@ class SessionBindingSpec extends Specification {
 
     void "test bind optional session"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
                 'micronaut.session.http.redis.enabled':'true'
         ])
-        OkHttpClient httpClient = new OkHttpClient()
-
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
-        def response = httpClient.newCall(request.build())
-                .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/optional"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "no session"
+        response.getBody().get() == "no session"
         !response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        response = httpClient.newCall(request.build())
-                .execute()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get() == "not in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
 
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/optional")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), String
+        ))
+        response = flowable.blockingFirst()
 
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
-                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         cleanup:

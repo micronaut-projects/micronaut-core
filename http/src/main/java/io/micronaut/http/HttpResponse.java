@@ -36,14 +36,18 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     HttpStatus getStatus();
 
+    @Override
+    default HttpResponse<B> setAttribute(CharSequence name, Object value) {
+        return (HttpResponse<B>) HttpMessage.super.setAttribute(name, value);
+    }
+
     /**
      * Return the first value for the given header or null
      *
      * @param name The name
      * @return The header value
      */
-    default @Nullable
-    String header(@Nullable CharSequence name) {
+    default @Nullable String header(@Nullable CharSequence name) {
         if (name == null) return null;
         return getHeaders().get(name);
     }
@@ -51,8 +55,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The body or null
      */
-    default @Nullable
-    B body() {
+    default @Nullable B body() {
         return getBody().orElse(null);
     }
 

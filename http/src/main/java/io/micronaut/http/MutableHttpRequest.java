@@ -89,7 +89,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     }
 
     @Override
-    default MutableHttpRequest<B> contentEncoding(String encoding) {
+    default MutableHttpRequest<B> contentEncoding(CharSequence encoding) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.contentEncoding(encoding);
     }
 }
