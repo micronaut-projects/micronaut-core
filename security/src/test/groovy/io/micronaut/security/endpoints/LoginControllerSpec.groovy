@@ -25,7 +25,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.AuthenticationException
 import io.micronaut.security.authentication.Authenticator
-import io.micronaut.security.authentication.AuthenticationSuccess
+import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator
 import io.micronaut.security.token.configuration.TokenConfiguration
@@ -118,7 +118,7 @@ class LoginControllerSpec extends Specification {
         def accessRefreshTokenGenerator = Mock(AccessRefreshTokenGenerator)
         def tokenConfiguration = Mock(TokenConfiguration)
         def authenticator = Stub(Authenticator) {
-            authenticate(_) >> Optional.of(new AuthenticationSuccess('admin', ['ROLE_USER']))
+            authenticate(_) >> Optional.of(new UserDetails('admin', ['ROLE_USER']))
         }
         LoginController loginController = new LoginController(accessRefreshTokenGenerator, tokenConfiguration, authenticator)
 

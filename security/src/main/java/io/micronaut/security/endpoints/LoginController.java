@@ -62,7 +62,7 @@ public class LoginController implements LoginControllerApi {
     public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
         Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
         if (response.map(AuthenticationResponse::isAuthenticated).orElse(false)) {
-            return accessRefreshTokenGenerator.generate((AuthenticationSuccess) response.get());
+            return accessRefreshTokenGenerator.generate((UserDetails) response.get());
         }
         throw new AuthenticationException(response.flatMap(AuthenticationResponse::getMessage).orElse(null));
     }

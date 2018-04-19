@@ -5,7 +5,7 @@ import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationProvider
 import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
-import io.micronaut.security.authentication.AuthenticationSuccess
+import io.micronaut.security.authentication.UserDetails
 
 import javax.inject.Singleton
 
@@ -16,7 +16,7 @@ class AuthenticationProviderUserPassword implements AuthenticationProvider {
     @Override
     AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
         if ( authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password' ) {
-            return new AuthenticationSuccess('user', [])
+            return new UserDetails('user', [])
         }
         return new AuthenticationFailed()
     }

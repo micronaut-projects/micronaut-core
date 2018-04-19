@@ -16,7 +16,7 @@
 
 package io.micronaut.security.token.render;
 
-import io.micronaut.security.authentication.AuthenticationSuccess;
+import io.micronaut.security.authentication.UserDetails;
 
 /**
  * Responsible for converting token information to an {@link AccessRefreshToken}.
@@ -42,5 +42,5 @@ public interface TokenRenderer {
      * @param refreshToken JWT token
      * @return instance of {@link AccessRefreshToken}
      */
-    AccessRefreshToken render(AuthenticationSuccess userDetails, Integer expiresIn, String accessToken, String refreshToken);
+    AccessRefreshToken render(UserDetails userDetails, Integer expiresIn, String accessToken, String refreshToken);
 }

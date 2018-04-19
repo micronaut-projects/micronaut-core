@@ -25,7 +25,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class AuthenticationSuccess implements AuthenticationResponse {
+public class UserDetails implements AuthenticationResponse {
 
     private String username;
     private Collection<String> roles;
@@ -35,7 +35,7 @@ public class AuthenticationSuccess implements AuthenticationResponse {
      * @param username e.g. admin
      * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
      */
-    public AuthenticationSuccess(String username, Collection<String> roles) {
+    public UserDetails(String username, Collection<String> roles) {
         this.username = username;
         this.roles = roles;
     }
@@ -91,7 +91,7 @@ public class AuthenticationSuccess implements AuthenticationResponse {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        AuthenticationSuccess that = (AuthenticationSuccess) o;
+        UserDetails that = (UserDetails) o;
         return Objects.equals(username, that.username) &&
                 Objects.equals(roles, that.roles);
     }

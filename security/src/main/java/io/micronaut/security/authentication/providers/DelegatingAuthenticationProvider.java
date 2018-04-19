@@ -80,6 +80,6 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
             return new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
         }
         List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(username);
-        return new AuthenticationSuccess(username, authorities);
+        return new UserDetails(username, authorities);
     }
 }

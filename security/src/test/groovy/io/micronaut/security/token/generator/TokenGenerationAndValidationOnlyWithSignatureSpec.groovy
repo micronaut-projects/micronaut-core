@@ -19,7 +19,7 @@ package io.micronaut.security.token.generator
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import io.micronaut.security.authentication.AuthenticationSuccess
+import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.token.configuration.EncryptionConfiguration
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator
 import io.micronaut.security.token.configuration.SignatureConfiguration
@@ -60,7 +60,7 @@ class TokenGenerationAndValidationOnlyWithSignatureSpec extends Specification {
                 new EncryptionConfigurationGenerator(tokenEncryptionConfiguration, null),
                 new JWTClaimsSetGenerator()
         )
-        AuthenticationSuccess userDetails = new AuthenticationSuccess('sherlock', ['ROLE_DETECTIVE'])
+        UserDetails userDetails = new UserDetails('sherlock', ['ROLE_DETECTIVE'])
 
         when:
         String jwtToken = generator.generateToken(userDetails, defaultExpiration)

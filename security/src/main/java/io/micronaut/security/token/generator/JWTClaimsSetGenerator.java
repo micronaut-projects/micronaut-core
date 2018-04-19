@@ -17,7 +17,7 @@
 package io.micronaut.security.token.generator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
-import io.micronaut.security.authentication.AuthenticationSuccess;
+import io.micronaut.security.authentication.UserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
@@ -41,11 +41,11 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
      * @return
      */
     @Override
-    public Map<String, Object> generateClaims(AuthenticationSuccess userDetails, Integer expiration) {
+    public Map<String, Object> generateClaims(UserDetails userDetails, Integer expiration) {
         return generateClaimsSet(userDetails, expiration).getClaims();
     }
 
-    private JWTClaimsSet generateClaimsSet(AuthenticationSuccess userDetails, Integer expiration) {
+    private JWTClaimsSet generateClaimsSet(UserDetails userDetails, Integer expiration) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
         builder.subject(userDetails.getUsername());
 

@@ -38,7 +38,7 @@ class AuthenticatorSpec extends Specification {
             authenticate(_) >> { throw new Exception('Authentication provider raised exception') }
         }
         def authProviderOK = Stub(AuthenticationProvider) {
-            authenticate(_) >> new AuthenticationSuccess('admin', [])
+            authenticate(_) >> new UserDetails('admin', [])
         }
         Authenticator authenticator = new Authenticator([authProviderExceptionRaiser, authProviderOK])
 
@@ -48,7 +48,7 @@ class AuthenticatorSpec extends Specification {
 
         then:
         rsp.isPresent()
-        rsp.get() instanceof AuthenticationSuccess
+        rsp.get() instanceof UserDetails
     }
 
     def "if no authentication provider can authentication, the last error is sent back"() {

@@ -16,7 +16,7 @@
 
 package io.micronaut.security.token.generator;
 
-import io.micronaut.security.authentication.AuthenticationSuccess;
+import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator;
 import io.micronaut.security.token.configuration.SignatureConfigurationGenerator;
 import org.pac4j.core.profile.CommonProfile;
@@ -67,7 +67,7 @@ public class JwtTokenGenerator implements TokenGenerator {
      * @return JWT token
      */
     @Override
-    public String generateToken(AuthenticationSuccess userDetails, Integer expiration) {
+    public String generateToken(UserDetails userDetails, Integer expiration) {
         Map<String, Object> claims = claimsGenerator.generateClaims(userDetails, expiration);
         return generateToken(claims);
     }

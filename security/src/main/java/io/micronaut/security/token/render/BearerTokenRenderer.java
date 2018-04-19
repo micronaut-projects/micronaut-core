@@ -16,7 +16,7 @@
 
 package io.micronaut.security.token.render;
 
-import io.micronaut.security.authentication.AuthenticationSuccess;
+import io.micronaut.security.authentication.UserDetails;
 import javax.inject.Singleton;
 
 /**
@@ -33,7 +33,7 @@ public class BearerTokenRenderer implements TokenRenderer {
     }
 
     @Override
-    public AccessRefreshToken render(AuthenticationSuccess userDetails, Integer expiresIn, String accessToken, String refreshToken) {
+    public AccessRefreshToken render(UserDetails userDetails, Integer expiresIn, String accessToken, String refreshToken) {
         return new BearerAccessRefreshToken(userDetails.getUsername(), userDetails.getRoles(), expiresIn, accessToken, refreshToken);
     }
 }

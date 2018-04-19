@@ -17,7 +17,7 @@
 package io.micronaut.security.token.generator;
 
 import io.micronaut.http.HttpResponse;
-import io.micronaut.security.authentication.AuthenticationSuccess;
+import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.render.AccessRefreshToken;
 
 import java.util.Map;
@@ -38,7 +38,7 @@ public interface AccessRefreshTokenGenerator {
      * @param userDetails Authenticated user's representation.
      * @return The http response
      */
-    HttpResponse<AccessRefreshToken> generate(AuthenticationSuccess userDetails);
+    HttpResponse<AccessRefreshToken> generate(UserDetails userDetails);
 
     /**
      * Generate an {@link AccessRefreshToken} response for the given
