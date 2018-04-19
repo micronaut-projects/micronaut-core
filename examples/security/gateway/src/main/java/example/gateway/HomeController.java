@@ -31,12 +31,6 @@ import static io.micronaut.http.HttpResponse.ok;
 @Controller("/")
 public class HomeController {
 
-    protected final LoginClient loginClient;
-
-    public HomeController(LoginClient loginClient) {
-        this.loginClient = loginClient;
-    }
-
     @Produces(MediaType.TEXT_HTML)
     @Get(uri = "/")
     HttpResponse index() {
@@ -46,18 +40,5 @@ public class HomeController {
     @Get("/notInInterceptUrlMap")
     HttpResponse notInInterceptUrlMap() {
         return ok();
-    }
-
-    @Post("/login")
-    public HttpResponse login(@Body UsernamePasswordCredentials usernamePassword) {
-        HttpResponse rsp = loginClient.login(usernamePassword);
-        return HttpResponse.status(rsp.status()).body(rsp.body());
-    }
-
-    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    @Post("/auth")
-    public HttpResponse auth(String username, String password) {
-        HttpResponse rsp = loginClient.login(new UsernamePasswordCredentials(username, password));
-        return HttpResponse.status(rsp.status()).body(rsp.body());
     }
 }
