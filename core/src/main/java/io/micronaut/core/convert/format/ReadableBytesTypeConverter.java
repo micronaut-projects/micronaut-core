@@ -29,6 +29,9 @@ import java.util.Optional;
  * @since 1.0
  */
 public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharSequence, Number, ReadableBytes> {
+
+    private static final int KB_UNIT = 1024;
+
     @Override
     public Class<ReadableBytes> annotationType() {
         return ReadableBytes.class;
@@ -39,15 +42,15 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
         String value = object.toString().toUpperCase(Locale.ENGLISH);
         try {
             if (value.endsWith("KB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * 1024;
+                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT;
                 return ConversionService.SHARED.convert(size, targetType);
             }
             if (value.endsWith("MB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * 1024 * 1024;
+                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT * KB_UNIT;
                 return ConversionService.SHARED.convert(size, targetType);
             }
             if (value.endsWith("GB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * 1024 * 1024 * 1024;
+                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT * KB_UNIT * KB_UNIT;
                 return ConversionService.SHARED.convert(size, targetType);
             }
             Long size = Long.valueOf(value);

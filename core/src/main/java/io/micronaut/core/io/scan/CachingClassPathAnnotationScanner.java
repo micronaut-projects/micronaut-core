@@ -31,15 +31,23 @@ import java.util.concurrent.TimeUnit;
  */
 public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanner {
 
+    private static final int CACHE_MAX = 5;
     private final Cache<CacheKey, List<Class>> initializedObjectsByType = Caffeine.newBuilder()
-                                                                                  .maximumSize(5)
+                                                                                  .maximumSize(CACHE_MAX)
                                                                                   .expireAfterAccess(2, TimeUnit.MINUTES)
                                                                                   .build();
 
+    /**
+     * Constructor.
+     * @param classLoader classLoader
+     */
     public CachingClassPathAnnotationScanner(ClassLoader classLoader) {
         super(classLoader);
     }
 
+    /**
+     * Default Constructor.
+     */
     public CachingClassPathAnnotationScanner() {
     }
 
@@ -48,6 +56,9 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
         return initializedObjectsByType.get(new CacheKey(annotation, pkg), (key) -> super.doScan(annotation, pkg));
     }
 
+    /**
+     * Inner class CacheKey
+     */
     private final class CacheKey implements Serializable {
         final String annotation;
         final String pkg;

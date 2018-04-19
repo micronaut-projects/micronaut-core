@@ -109,8 +109,9 @@ public class StringUtils {
             return Collections.emptyMap();
         }
         int len = values.length;
-        if (len % 2 != 0)
+        if (len % 2 != 0) {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
 
         Map<String, Object> answer = new HashMap<>(len / 2);
         int i = 0;

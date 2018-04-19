@@ -21,6 +21,7 @@ import io.micronaut.core.type.Argument;
 /**
  * A subscriber that is aware of the target type.
  *
+ * @param <T> Type of TypedSubscriber
  * @author graemerocher
  * @since 1.0
  */

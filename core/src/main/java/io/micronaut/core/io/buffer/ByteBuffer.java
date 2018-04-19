@@ -16,7 +16,6 @@
 
 package io.micronaut.core.io.buffer;
 
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
@@ -24,6 +23,7 @@ import java.nio.charset.Charset;
 /**
  * Interface to allow interfacing with different byte buffer implementations, primarily as an abstraction over Netty.
  *
+ * @param <T> buffer type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -43,6 +43,7 @@ public interface ByteBuffer<T> {
     /**
      * Returns the number of writable bytes which is equal to
      * {@code (this.capacity - this.writerIndex)}.
+     * @return The bytes
      */
     int writableBytes();
 
@@ -50,6 +51,7 @@ public interface ByteBuffer<T> {
      * Returns the maximum allowed capacity of this buffer.  If a user attempts to increase the
      * capacity of this buffer beyond the maximum capacity using {@link #capacity(int)} or
      * {@link IllegalArgumentException}.
+     * @return The max capacity
      */
     int maxCapacity();
 
@@ -58,17 +60,19 @@ public interface ByteBuffer<T> {
      * capacity, the content of this buffer is truncated.  If the {@code newCapacity} is greater
      * than the current capacity, the buffer is appended with unspecified data whose length is
      * {@code (newCapacity - currentCapacity)}.
+     * @return The bytebuffer
      */
     ByteBuffer capacity(int capacity);
 
     /**
      * Returns the {@code readerIndex} of this buffer.
+     * @return The index
      */
     int readerIndex();
 
     /**
      * Sets the {@code readerIndex} of this buffer.
-     *
+     * @return The buffer
      * @throws IndexOutOfBoundsException if the specified {@code readerIndex} is
      *                                   less than {@code 0} or
      *                                   greater than {@code this.writerIndex}
@@ -77,6 +81,7 @@ public interface ByteBuffer<T> {
 
     /**
      * Returns the {@code writerIndex} of this buffer.
+     * @return The index
      */
     int writerIndex();
 
@@ -87,6 +92,7 @@ public interface ByteBuffer<T> {
      * @throws IndexOutOfBoundsException if the specified {@code writerIndex} is
      *                                   less than {@code this.readerIndex} or
      *                                   greater than {@code this.capacity}
+     * @return The index as buffer
      */
     ByteBuffer writerIndex(int position);
 
@@ -179,7 +185,7 @@ public interface ByteBuffer<T> {
     ByteBuffer write(byte[] source, int offset, int length);
 
     /**
-     * Write the given {@link ByteBuffer} instances to this buffer
+     * Write the given {@link ByteBuffer} instances to this buffer.
      *
      * @param buffers The buffers to write
      * @return this buffer
@@ -187,7 +193,7 @@ public interface ByteBuffer<T> {
     ByteBuffer write(ByteBuffer... buffers);
 
     /**
-     * Write the given {@link java.nio.ByteBuffer} instances to this buffer
+     * Write the given {@link java.nio.ByteBuffer} instances to this buffer.
      *
      * @param buffers The buffers to write
      * @return this buffer
@@ -215,6 +221,7 @@ public interface ByteBuffer<T> {
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer and it adjusted its capacity.
      *
+     * @return byteBuffer
      * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
      *                                       that shares the content with itself
      */
@@ -227,7 +234,7 @@ public interface ByteBuffer<T> {
      * modify {@code readerIndex} or {@code writerIndex} of this buffer.  Please note that the
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer and it adjusted its capacity.
-     *
+     * @return byteBuffer
      * @param index  The index
      * @param length The length
      * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
@@ -236,14 +243,14 @@ public interface ByteBuffer<T> {
     java.nio.ByteBuffer asNioBuffer(int index, int length);
 
     /**
-     * Convert the {@link ByteBuffer} into an input stream
+     * Convert the {@link ByteBuffer} into an input stream.
      *
      * @return this buffer as an input stream
      */
     InputStream toInputStream();
 
     /**
-     * Convert the {@link ByteBuffer} into an output stream
+     * Convert the {@link ByteBuffer} into an output stream.
      *
      * @return this buffer as an input stream
      */
@@ -252,8 +259,14 @@ public interface ByteBuffer<T> {
     /**
      * Create a copy of the underlying storage from {@code buf} into a byte array.
      * The copy will start at {@link ByteBuffer#readerIndex()} and copy {@link ByteBuffer#readableBytes()} bytes.
+     * @return byte array
      */
     byte[] toByteArray();
 
+    /**
+     * To string
+     * @param charset converted charset
+     * @return string
+     */
     String toString(Charset charset);
 }

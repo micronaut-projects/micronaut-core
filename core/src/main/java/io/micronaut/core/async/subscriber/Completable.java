@@ -16,8 +16,6 @@
 
 package io.micronaut.core.async.subscriber;
 
-import org.reactivestreams.Subscriber;
-
 /**
  * Interface that exposes a callback to indicate when an operation has been completed.
  *
@@ -29,7 +27,7 @@ public interface Completable {
     /**
      * * Successful terminal state. To be called when the operation is complete.
      *
-     * @see Subscriber#onComplete()
+     * @see org.reactivestreams.Subscriber#onComplete()
      */
     void onComplete();
 }

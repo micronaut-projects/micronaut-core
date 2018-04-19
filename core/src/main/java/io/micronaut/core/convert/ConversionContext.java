@@ -79,6 +79,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Augment this context with data for the given argument.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -138,6 +139,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -148,6 +150,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -158,6 +161,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @param locale   The locale
      * @return The conversion context
@@ -169,6 +173,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @param locale   The locale
      * @param charset  The charset

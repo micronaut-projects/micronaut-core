@@ -20,7 +20,7 @@ import java.util.Map;
 
 /**
  * Simple class that provides a map interface over a bean.
- *
+ * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,7 +35,7 @@ public interface BeanMap<T> extends Map<String, Object> {
      * Creates a {@link BeanMap} for the given bean.
      *
      * @param bean The bean
-     * @param <B>
+     * @param <B> type Generic
      * @return The bean map
      */
     static <B> BeanMap<B> of(B bean) {

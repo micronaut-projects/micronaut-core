@@ -54,6 +54,10 @@ class SimpleBeanInfo implements BeanInfo {
     private final Class<?> beanClass;
     private final Map<String, PropertyDescriptor> properties;
 
+    /**
+     * Constructor.
+     * @param beanClass beanClass
+     */
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
         List<PropertyDescriptor> propertyList = introspectProperties(introspectMethods(beanClass));
@@ -80,7 +84,7 @@ class SimpleBeanInfo implements BeanInfo {
 
     /**
      * Introspects the supplied class and returns a list of the Properties of
-     * the class
+     * the class.
      *
      * @param methodDescriptors the method descriptors
      * @return The list of Properties as an array of PropertyDescriptors

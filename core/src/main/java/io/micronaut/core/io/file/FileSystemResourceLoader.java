@@ -23,10 +23,20 @@ import io.micronaut.core.io.ResourceLoader;
  */
 public interface FileSystemResourceLoader extends ResourceLoader {
 
+    /**
+     * Creation method.
+     * @return loader
+     */
     static FileSystemResourceLoader defaultLoader() {
         return new DefaultFileSystemResourceLoader();
     }
 
+    /**
+     * Does the loader support a prefix.
+     * @param path The path to a resource including a prefix
+     *             appended by a colon. Ex (classpath:, file:)
+     * @return boolean
+     */
     default boolean supportsPrefix(String path) {
         return path.startsWith("file:");
     }

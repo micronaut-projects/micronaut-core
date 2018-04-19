@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 
 /**
  * Simple reflection based BeanMap implementation.
- *
+ * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -39,6 +39,10 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
     private final Map<String, PropertyDescriptor> propertyDescriptors;
     private final T bean;
 
+    /**
+     * Constructor.
+     * @param bean bean
+     */
     @SuppressWarnings("unchecked")
     ReflectionBeanMap(T bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");

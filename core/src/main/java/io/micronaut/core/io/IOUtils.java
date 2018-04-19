@@ -33,6 +33,7 @@ import java.io.Reader;
 public class IOUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
+    private static final int BUFFER_MAX = 8192;
 
     /**
      * Read the content of the BufferedReader and return it as a String in a blocking manner.
@@ -51,7 +52,7 @@ public class IOUtils {
         }
         // reading the content of the file within a char buffer
         // allow to keep the correct line endings
-        char[] charBuffer = new char[8192];
+        char[] charBuffer = new char[BUFFER_MAX];
         int nbCharRead /* = 0*/;
         try {
             while ((nbCharRead = reader.read(charBuffer)) != -1) {

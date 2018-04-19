@@ -58,6 +58,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      *
      * @param name The name of the attribute
      * @param type The required type
+     * @param <T> type Generic
      * @return An {@link Optional} value
      */
     default <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {

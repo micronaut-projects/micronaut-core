@@ -24,6 +24,11 @@ package io.micronaut.core.value;
  */
 public class PropertyNotFoundException extends ValueException {
 
+    /**
+     * Constructor.
+     * @param name name
+     * @param type type
+     */
     public PropertyNotFoundException(String name, Class type) {
         super("No property found for name [" + name + "] and type [" + type.getName() + "]");
     }
