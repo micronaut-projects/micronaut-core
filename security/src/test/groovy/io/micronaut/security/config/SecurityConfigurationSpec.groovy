@@ -20,7 +20,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.http.HttpMethod
-import io.micronaut.security.token.generator.TokenConfigurationProperties
 import spock.lang.Specification
 
 class SecurityConfigurationSpec extends Specification {

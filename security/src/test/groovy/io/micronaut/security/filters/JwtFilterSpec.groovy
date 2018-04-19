@@ -37,59 +37,9 @@ import spock.lang.Specification
  */
 class JwtFilterSpec extends Specification {
 
-    def "if both login and refresh endpoints are enabled, two whitelisted InterceptUrlMapPattern are returned"() {
-        given:
-        SecurityEndpointsConfiguration securityEndpointsConfiguration = Stub(SecurityEndpointsConfiguration) {
-            isLogin() >> true
-            isRefresh() >> true
-        }
-
-        when:
-        List<InterceptUrlMapPattern> results = JwtFilter.interceptUrlMapPatternsOfSecurityControllers(securityEndpointsConfiguration)
-
-        then:
-        results
-        results.size() == 2
-        results*.pattern.contains("/login".toString())
-        results.find { it.pattern == "/login".toString() }.httpMethod == HttpMethod.POST
-        results.find { it.pattern == "/login".toString() }.access == [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY]
-
-        results*.pattern.contains("/oauth/access_token".toString())
-        results.find { it.pattern == "/oauth/access_token".toString() }.httpMethod == HttpMethod.POST
-        results.find { it.pattern == "/oauth/access_token".toString() }.access == [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY]
-    }
-
-    def "if only login is enabled, one whitelisted InterceptUrlMapPattern are returned"() {
-        given:
-        SecurityEndpointsConfiguration securityEndpointsConfiguration = Stub(SecurityEndpointsConfiguration) {
-            isLogin() >> true
-            isRefresh() >> false
-        }
-
-        when:
-        List<InterceptUrlMapPattern> results = JwtFilter.interceptUrlMapPatternsOfSecurityControllers(securityEndpointsConfiguration)
-
-        then:
-        results
-        results.size() == 1
-
-        results*.pattern.contains("/login".toString())
-        results.find { it.pattern == "/login".toString() }.httpMethod == HttpMethod.POST
-        results.find { it.pattern == "/login".toString() }.access == [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY]
-    }
-
-    def "endpoint pattern adds / preffix to endpoint id"() {
-        expect:
-        '/health' == JwtFilter.endpointPattern(new EndpointConfiguration('health', null))
-    }
-
     def "if any pattern matches TOKEN_IS_AUTHENTICATED_ANONYMOUSLY, OK is returned"() {
         expect:
-        HttpStatus.OK == JwtFilter.filterRequest(null,
-                [new InterceptUrlMapPattern('/health', [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY], HttpMethod.GET)],
-                null,
-                null,
-                null)
+        HttpStatus.OK == new JwtFilter(null, null, null, null).filterRequest(null, [new InterceptUrlMapPattern('/health', [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY], HttpMethod.GET)],)
     }
 
     def "if tokenReader returns Optional.empty, UNAUTHORIZED is returned"() {
@@ -103,11 +53,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.UNAUTHORIZED == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)],
-                tokenReader,
-                null,
-                null)
+        HttpStatus.UNAUTHORIZED == new JwtFilter(null, null,tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)])
     }
 
     def "if tokenValidator.validateTokenAndGetClaims is not present, UNAUTHORIZED is returned"() {
@@ -124,11 +71,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.UNAUTHORIZED == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                null)
+        HttpStatus.UNAUTHORIZED == new JwtFilter(null, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)])
     }
 
     def "if valid token, return OK if pattern contains IS_AUTHENTICATED"() {
@@ -145,11 +89,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.OK == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                null)
+        HttpStatus.OK == new JwtFilter(null, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED], HttpMethod.GET)])
     }
 
     def "if valid token, return UNAUTHORIZED if roles claims not present"() {
@@ -169,11 +110,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.UNAUTHORIZED == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                tokenConfiguration)
+        HttpStatus.UNAUTHORIZED == new JwtFilter(tokenConfiguration, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)])
     }
 
     def "if valid token, return UNAUTHORIZED if roles claims is not a list of strings"() {
@@ -194,11 +132,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.UNAUTHORIZED == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                tokenConfiguration)
+        HttpStatus.UNAUTHORIZED == new JwtFilter(tokenConfiguration, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)])
     }
 
     def "if valid token, return FORBIDDEN if roles do not match"() {
@@ -219,67 +154,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.FORBIDDEN == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                tokenConfiguration)
-    }
-
-    def "findAllPatternsForRequest matches exactly by pattern and httpMethod"() {
-        given:
-        def req = Stub(HttpRequest) {
-            getUri() >> new URI('/books')
-            getMethod() >> HttpMethod.GET
-        }
-        List<InterceptUrlMapPattern> endpointsInterceptUrlMappings = []
-        SecurityEndpointsConfiguration securityEndpointsConfiguration = Stub(SecurityEndpointsConfiguration) {
-            isLogin() >> false
-            isRefresh() >> false
-        }
-        SecurityConfiguration securityConfiguration = Stub(SecurityConfiguration) {
-            getSecurityConfigType() >> SecurityConfigType.INTERCEPT_URL_MAP
-            getInterceptUrlMap() >> [new InterceptUrlMapPattern('/books', ['ROLE_USER'], HttpMethod.GET)]
-        }
-
-        when:
-        List<InterceptUrlMapPattern> result = JwtFilter.findAllPatternsForRequest(req,
-                endpointsInterceptUrlMappings,
-                securityConfiguration,
-                securityEndpointsConfiguration)
-
-        then:
-        result
-        result.size() == 1
-        result[0].access == ['ROLE_USER']
-        result[0].httpMethod == HttpMethod.GET
-        result[0].pattern == '/books'
-
-    }
-
-    def "findAllPatternsForRequest do not match if httpMethod is not the same"() {
-        given:
-        def req = Stub(HttpRequest) {
-            getUri() >> new URI('/books')
-            getMethod() >> HttpMethod.GET
-        }
-        List<InterceptUrlMapPattern> endpointsInterceptUrlMappings = []
-        SecurityEndpointsConfiguration securityEndpointsConfiguration = Stub(SecurityEndpointsConfiguration) {
-            isLogin() >> false
-            isRefresh() >> false
-        }
-        SecurityConfiguration securityConfiguration = Stub(SecurityConfiguration) {
-            getSecurityConfigType() >> SecurityConfigType.INTERCEPT_URL_MAP
-            getInterceptUrlMap() >> [new InterceptUrlMapPattern('/books', ['ROLE_USER'], HttpMethod.POST)]
-        }
-        when:
-        List<InterceptUrlMapPattern> result = JwtFilter.findAllPatternsForRequest(req,
-                endpointsInterceptUrlMappings,
-                securityConfiguration,
-                securityEndpointsConfiguration)
-
-        then:
-        !result
+        HttpStatus.FORBIDDEN == new JwtFilter(tokenConfiguration, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)])
     }
 
     def "if valid token, return OK if roles present in claim match roles present in intercept url map"() {
@@ -300,11 +176,8 @@ class JwtFilterSpec extends Specification {
         }
 
         expect:
-        HttpStatus.OK == JwtFilter.filterRequest(req,
-                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)],
-                tokenReader ,
-                tokenValidator,
-                tokenConfiguration)
+        HttpStatus.OK == new JwtFilter(tokenConfiguration, tokenValidator, tokenReader, null).filterRequest(req,
+                [new InterceptUrlMapPattern('/health', ['ROLE_USER'], HttpMethod.GET)])
     }
 
     def "verifies matchesAccess returns true if any of the access levels is present in a InterceptUrlMap list"() {
@@ -335,37 +208,4 @@ class JwtFilterSpec extends Specification {
         JwtFilter.areRolesListOfStrings(['1'])
     }
 
-    def "patternsForRequest filters a list of pattersn given a particular request"() {
-        given:
-        def req = Stub(HttpRequest) {
-            getUri() >> new URI('/health')
-            getMethod() >> HttpMethod.GET
-        }
-        expect:
-        JwtFilter.patternsForRequest(req, [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)])
-
-        and:
-        !JwtFilter.patternsForRequest(req, [new InterceptUrlMapPattern('/health', [], HttpMethod.POST)])
-
-        !JwtFilter.patternsForRequest(req, [new InterceptUrlMapPattern('/foo', [], HttpMethod.GET)])
-    }
-
-    def "if only refresh is enabled, one whitelisted InterceptUrlMapPattern are returned"() {
-        given:
-        SecurityEndpointsConfiguration securityEndpointsConfiguration = Stub(SecurityEndpointsConfiguration) {
-            isLogin() >> false
-            isRefresh() >> true
-        }
-
-        when:
-        List<InterceptUrlMapPattern> results = JwtFilter.interceptUrlMapPatternsOfSecurityControllers(securityEndpointsConfiguration)
-
-        then:
-        results
-        results.size() == 1
-
-        results*.pattern.contains("/oauth/access_token".toString())
-        results.find { it.pattern == "/oauth/access_token".toString() }.httpMethod == HttpMethod.POST
-        results.find { it.pattern == "/oauth/access_token".toString() }.access == [InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED_ANONYMOUSLY]
-    }
 }
