@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -50,8 +51,11 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
     }
 
-    protected AbstractParametrizedBeanDefinition(Class<T> type, Constructor<T> constructor, Argument[] arguments) {
-        super(type, constructor, arguments);
+    protected AbstractParametrizedBeanDefinition(Class<T> type,
+                                                 AnnotationMetadata annotationMetadata,
+                                                 boolean requiresReflection,
+                                                 Argument... arguments) {
+        super(type, annotationMetadata,requiresReflection, arguments);
         this.requiredArguments = resolveRequiredArguments();
     }
 

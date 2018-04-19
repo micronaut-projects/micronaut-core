@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 
@@ -59,6 +60,19 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameterArray = genericTypes;
     }
 
+
+    DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
+        this.type = type;
+        this.name = name;
+        this.annotatedElement = annotationMetadata != null ? annotationMetadata : AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
+        if(annotationMetadata != null) {
+            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
+                                               .map(annotationMetadata::getAnnotation)
+                                               .orElse(null);
+        }
+        this.typeParameters = initializeTypeParameters(genericTypes);
+        this.typeParameterArray = genericTypes;
+    }
     @Override
     public Optional<Argument<?>> getFirstTypeVariable() {
         if (!typeParameters.isEmpty()) {

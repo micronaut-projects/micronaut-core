@@ -28,6 +28,7 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -37,12 +38,16 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodInjectionPoint {
+class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     private final BeanDefinition declaringBean;
     private final boolean requiresReflection;
     private final AnnotationMetadata annotationMetadata;
     private final AnnotatedElement[] annotatedElements;
+    private final Class<?> declaringType;
+    private final String methodName;
+    private final Class[] argTypes;
+    private final Argument[] arguments;
 
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}
@@ -77,8 +82,11 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
             @Nullable Argument[] arguments,
             @Nullable AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
-        super(declaringType, methodName, arguments);
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
+        this.declaringType = declaringType;
+        this.methodName = methodName;
+        this.arguments = arguments;
+        this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.requiresReflection = requiresReflection;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
@@ -94,7 +102,8 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
 
     @Override
     public Method getMethod() {
-        return getTargetMethod();
+        return ReflectionUtils.getMethod(declaringType, methodName, argTypes)
+                 .orElseThrow(()-> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
     }
 
     @Override
@@ -114,7 +123,7 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
 
     @Override
     public Object invoke(Object instance, Object... args) {
-        Method targetMethod = getTargetMethod();
+        Method targetMethod = getMethod();
         return ReflectionUtils.invokeMethod(instance, targetMethod, args);
     }
 
@@ -136,5 +145,28 @@ class DefaultMethodInjectionPoint extends AbstractExecutable implements MethodIn
     @Override
     public boolean requiresReflection() {
         return requiresReflection;
+    }
+
+    @Override
+    public Argument<?>[] getArguments() {
+        return arguments;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DefaultMethodInjectionPoint that = (DefaultMethodInjectionPoint) o;
+        return Objects.equals(declaringType, that.declaringType) &&
+                Objects.equals(methodName, that.methodName) &&
+                Arrays.equals(argTypes, that.argTypes);
+    }
+
+    @Override
+    public int hashCode() {
+
+        int result = Objects.hash(declaringType, methodName);
+        result = 31 * result + Arrays.hashCode(argTypes);
+        return result;
     }
 }

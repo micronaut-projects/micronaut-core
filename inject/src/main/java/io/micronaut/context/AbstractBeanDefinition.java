@@ -124,14 +124,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final boolean isProvided;
     private final boolean isConfigurationProperties;
     private final Class<?> declaringType;
-    private boolean hasPreDestroyMethods = false;
-    private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
     private Map<Class, String> valuePrefixes;
 
     /**
-     * Constructs a bean definition that is produced from a method call on another type
+     * Constructs a bean definition that is produced from a method call on another type ( factory bean )
      *
      * @param method    The method to call
      * @param arguments The arguments
@@ -153,18 +151,40 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.addRequiredComponents(arguments);
     }
 
+    /**
+     * Constructs a bean for the given type
+     * @param type The type
+     * @param annotationMetadata The annotation metadata
+     * @param requiresReflection Whether reflection is required
+     * @param arguments The constructor arguments used to build the bean
+     */
     @Internal
     protected AbstractBeanDefinition(Class<T> type,
-                                     Constructor<T> constructor,
+                                     AnnotationMetadata annotationMetadata,
+                                     boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        AnnotationMetadata beanMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
-        this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
-        this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
+        this.isProvided = beanMetadata.hasDeclaredStereotype(Provided.class);
+        this.singleton = beanMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
-        this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
+        if(requiresReflection) {
+            this.constructor = new ReflectionConstructorInjectionPoint<>(
+                    this,
+                    type,
+                    annotationMetadata,
+                    arguments);
+        }
+        else {
+            this.constructor = new DefaultConstructorInjectionPoint<>(
+                    this,
+                    type,
+                    annotationMetadata,
+                    arguments
+            );
+        }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
         this.addRequiredComponents(arguments);
@@ -438,7 +458,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
 
-        return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.methodInjectionPoints);
+        return addInjectionPointInternal(
+                declaringType,
+                method,
+                arguments,
+                annotationMetadata,
+                requiresReflection,
+                this.methodInjectionPoints
+        );
     }
 
     /**
@@ -1334,14 +1361,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private AbstractBeanDefinition addInjectionPointInternal(Class declaringType, String method, Argument[] arguments, AnnotationMetadata annotationMetadata, boolean requiresReflection, List<MethodInjectionPoint> targetInjectionPoints) {
         boolean isPreDestroy = targetInjectionPoints == this.preDestroyMethods;
-        if(isPreDestroy) {
-            hasPreDestroyMethods = true;
-        }
-
         boolean isPostConstruct = targetInjectionPoints == this.postConstructMethods;
-        if(isPostConstruct) {
-            hasPostConstructMethods = true;
-        }
 
         MethodInjectionPoint injectionPoint;
         if(requiresReflection) {
