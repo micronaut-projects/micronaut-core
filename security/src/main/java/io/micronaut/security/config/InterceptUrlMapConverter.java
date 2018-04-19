@@ -16,6 +16,7 @@
 
 package io.micronaut.security.config;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -86,21 +87,13 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
                 if (httpMethod.isPresent()) {
                     return Optional.of(new InterceptUrlMapPattern(optionalPattern.get(), optionalAccessList.get(), httpMethod.get()));
                 } else {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to invalid %s key.", m.toString(), HTTP_METHOD));
-                    }
+                    throw new ConfigurationException(String.format("interceptUrlMap configuration record %s rejected due to invalid %s key.", m.toString(), HTTP_METHOD));
                 }
             } else {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to missing or empty %s key.", m.toString(), ACCESS));
-                }
+                throw new ConfigurationException(String.format("interceptUrlMap configuration record %s rejected due to missing or empty %s key.", m.toString(), ACCESS));
             }
         } else {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to missing %s key.", m.toString(), PATTERN));
-            }
+            throw new ConfigurationException(String.format("interceptUrlMap configuration record %s rejected due to missing %s key.", m.toString(), PATTERN));
         }
-
-        return Optional.empty();
     }
 }

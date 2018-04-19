@@ -17,24 +17,81 @@
 package io.micronaut.security.config
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.http.HttpMethod
 import io.micronaut.security.token.generator.TokenConfigurationProperties
 import spock.lang.Specification
 
 class SecurityConfigurationSpec extends Specification {
 
-    void "test configuring security"() {
+    void "test configuring security with missing access key"() {
         given:
         def ctx = ApplicationContext.run([
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
-                        [pattern: '/health'],
+                        [pattern: '/health']
+        ]], "test")
+
+        when:
+        ctx.getBean(SecurityConfiguration)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.cause instanceof ConfigurationException
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test configuring security with invalid method"() {
+        given:
+        def ctx = ApplicationContext.run([
+                "micronaut.security.enabled": true,
+                "micronaut.security.interceptUrlMap": [
+                        [httpMethod: 'FOO', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
+                ]], "test")
+
+        when:
+        ctx.getBean(SecurityConfiguration)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.cause instanceof ConfigurationException
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test configuring security with missing pattern"() {
+        given:
+        def ctx = ApplicationContext.run([
+                "micronaut.security.enabled": true,
+                "micronaut.security.interceptUrlMap": [
+                        [httpMethod: 'POST', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
+                ]], "test")
+
+        when:
+        ctx.getBean(SecurityConfiguration)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.cause instanceof ConfigurationException
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test configuring valid security"() {
+        given:
+        def ctx = ApplicationContext.run([
+                "micronaut.security.enabled": true,
+                "micronaut.security.interceptUrlMap": [
                         [pattern: '/health', access: 'foo'],
-                        [httpMethod: 'FOO', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']],
                         [pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']],
                         [httpMethod: 'POST', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']],
                         [httpMethod: 'post', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
-        ]], "test")
+                ]], "test")
 
         when:
         SecurityConfiguration config = ctx.getBean(SecurityConfiguration)
@@ -53,5 +110,8 @@ class SecurityConfigurationSpec extends Specification {
         config.interceptUrlMap[3].pattern == '/health'
         config.interceptUrlMap[3].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
         config.interceptUrlMap[3].httpMethod == HttpMethod.POST
+
+        cleanup:
+        ctx.stop()
     }
 }
