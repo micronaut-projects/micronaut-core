@@ -21,9 +21,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.client.Client;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.endpoints.LoginController;
-import io.micronaut.security.endpoints.LoginControllerApi;
-import io.micronaut.security.token.render.AccessRefreshToken;
-import io.micronaut.security.token.render.BearerTokenAccessRefreshToken;
+import io.micronaut.security.token.render.BearerAccessRefreshToken;
 
 /**
  * @author Sergio del Amo
@@ -33,5 +31,5 @@ import io.micronaut.security.token.render.BearerTokenAccessRefreshToken;
 public interface LoginClient {
 
     @Post(LoginController.LOGIN_PATH)
-    HttpResponse<BearerTokenAccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials);
+    HttpResponse<BearerAccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials);
 }

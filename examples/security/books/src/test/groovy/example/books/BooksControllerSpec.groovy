@@ -63,7 +63,7 @@ class BooksControllerSpec extends Specification {
 
     void 'a user granted ROLE_GROOVY is able to access /books/groovy'() {
         given:
-        String accessToken = accessToken('euler', ['ROLE_GROOVY']).get()
+        String accessToken = accessToken('euler', ['ROLE_GROOVY'])
 
         when:
         HttpResponse<List> booksRsp = client.toBlocking().exchange(HttpRequest.create(HttpMethod.GET, '/books/groovy')
@@ -87,7 +87,7 @@ class BooksControllerSpec extends Specification {
 
     void 'a user granted ROLE_GRAILS is able to access /books/grails'() {
         given:
-        String accessToken = accessToken('newton', ['ROLE_GRAILS']).get()
+        String accessToken = accessToken('newton', ['ROLE_GRAILS'])
 
         when:
         HttpResponse<List> booksRsp = client.toBlocking().exchange(HttpRequest.create(HttpMethod.GET, '/books/grails')
@@ -109,7 +109,7 @@ class BooksControllerSpec extends Specification {
         e.status.code == 403
     }
 
-    protected Optional<String> accessToken(String username, List<String> roles) {
+    protected String accessToken(String username, List<String> roles) {
         TokenGenerator tokenGenerator = embeddedServer.applicationContext.getBean(SignedJwtTokenGenerator.class)
         tokenGenerator.generateToken(new UserDetails(username, roles), 3600)
     }

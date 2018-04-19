@@ -34,7 +34,7 @@
         <label for="password">Password</label>
         <input type="password" class="form-control" id="password" placeholder="Password">
     </div>
-    <button type="submit" class="btn btn-primary" onclick="javascript:login();">Login</button>
+    <button id="submit-btn" type="submit" class="btn btn-primary" onclick="javascript:login();">Login</button>
     <div id="loginFormErrors"></div>
     <div class="alert alert-primary" role="alert">
         Login with LDAP usernames: riemann, gauss, euler, euclid - password: password<br/>
@@ -225,6 +225,12 @@
 
     $(document).ready(function() {
         console.log("on document ready");
+        $("#password").keyup(function(event){
+            if(event.keyCode == 13){
+                $("#submit-btn").click();
+            }
+        });
+
         var accessToken = getAccessToken()
         if (typeof(accessToken) != 'undefined' && accessToken != null) {
             loadBooks();

@@ -30,6 +30,6 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 @Client(id = "security")
 public interface OauthClient extends OauthControllerApi {
 
-    @Post(OauthController.CONTROLLER_PATH+""+OauthController.ACCESSTOKEN_PATH)
+    @Post(OauthController.CONTROLLER_PATH+""+OauthController.ACCESS_TOKEN_PATH)
     HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest);
 }

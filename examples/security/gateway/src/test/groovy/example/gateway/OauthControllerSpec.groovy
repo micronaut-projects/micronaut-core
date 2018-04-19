@@ -57,13 +57,13 @@ class OauthControllerSpec extends Specification {
 
         when:
         TokenValidator tokenValidator = getTokenValidator()
-        Map<String, Object> claims = tokenValidator.validateTokenAndGetClaims(accessToken)
+        Optional<Map<String, Object>> claims = tokenValidator.validateTokenAndGetClaims(accessToken)
 
         then:
-        claims
+        claims.isPresent()
 
         and:
-        claims.get(JwtClaims.EXPIRATION_TIME)
+        claims.get().get(JwtClaims.EXPIRATION_TIME)
     }
 
     void 'refresh token does not contain expiration date'() {
@@ -84,13 +84,13 @@ class OauthControllerSpec extends Specification {
 
         when:
         TokenValidator tokenValidator = getTokenValidator()
-        Map<String, Object> claims = tokenValidator.validateTokenAndGetClaims(refreshToken)
+        Optional<Map<String, Object>> claims = tokenValidator.validateTokenAndGetClaims(refreshToken)
 
         then:
-        claims
+        claims.isPresent()
 
         and:
-        !claims.get(JwtClaims.EXPIRATION_TIME)
+        !claims.get().get(JwtClaims.EXPIRATION_TIME)
     }
 
     @Ignore
