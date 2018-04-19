@@ -28,12 +28,13 @@ import java.util.List;
  */
 @Immutable
 public class InterceptUrlMapPattern {
+
     public static final String TOKEN_IS_AUTHENTICATED_ANONYMOUSLY = "IS_AUTHENTICATED_ANONYMOUSLY";
     public static final String TOKEN_IS_AUTHENTICATED = "IS_AUTHENTICATED";
 
-    private String pattern;
-    private List<String> access;
-    private HttpMethod httpMethod;
+    private final String pattern;
+    private final List<String> access;
+    private final HttpMethod httpMethod;
 
     /**
      *

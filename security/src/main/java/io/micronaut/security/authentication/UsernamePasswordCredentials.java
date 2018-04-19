@@ -25,6 +25,7 @@ import java.util.Objects;
  * @since 1.0
  */
 public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest<String, String> {
+
     private String username;
     private String password;
 
