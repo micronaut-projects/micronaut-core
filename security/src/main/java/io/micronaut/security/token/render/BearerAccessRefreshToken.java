@@ -15,6 +15,8 @@
  */
 package io.micronaut.security.token.render;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.Collection;
 import java.util.List;
 
@@ -27,8 +29,12 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
 
     private String username;
     private Collection<String> roles;
-    private String token_type = "Bearer";
-    private Integer expires_in;
+
+    @JsonProperty("expires_in")
+    private Integer expiresIn;
+
+    @JsonProperty("token_type")
+    private String tokenType = "Bearer";
 
     /**
      *
@@ -45,7 +51,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
         super(accessToken, refreshToken);
         this.username = username;
         this.roles = roles;
-        this.expires_in = expiresIn;
+        this.expiresIn = expiresIn;
     }
 
     /**
@@ -80,19 +86,19 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
         this.roles = roles;
     }
 
-    public String getToken_type() {
-        return token_type;
+    public String getTokenType() {
+        return tokenType;
     }
 
-    public void setToken_type(String token_type) {
-        this.token_type = token_type;
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
     }
 
-    public Integer getExpires_in() {
-        return expires_in;
+    public Integer getExpiresIn() {
+        return expiresIn;
     }
 
-    public void setExpires_in(Integer expires_in) {
-        this.expires_in = expires_in;
+    public void setExpiresIn(Integer expiresIn) {
+        this.expiresIn = expiresIn;
     }
 }
