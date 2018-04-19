@@ -129,7 +129,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private Map<Class, String> valuePrefixes;
 
     /**
-     * Constructs a bean definition that is produced from a method call on another type
+     * Constructs a bean definition that is produced from a method call on another type ( factory bean )
      *
      * @param method    The method to call
      * @param arguments The arguments
@@ -151,6 +151,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.addRequiredComponents(arguments);
     }
 
+    /**
+     * Constructs a bean for the given type
+     * @param type The type
+     * @param constructor
+     * @param arguments The constructor arguments used to build the bean
+     */
     @Internal
     protected AbstractBeanDefinition(Class<T> type,
                                      Constructor<T> constructor,
