@@ -31,64 +31,23 @@ import java.util.Optional;
 @ConfigurationProperties(SecurityConfiguration.PREFIX)
 public class SecurityConfiguration implements Toggleable {
 
-    protected InterceptUrlMapConverter interceptUrlMapConverter;
-
     public static final String PREFIX = "micronaut.security";
 
-    private boolean enabled = false;
+    protected boolean enabled = false;
+    protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
+    protected List<InterceptUrlMapPattern> interceptUrlMap;
 
-    private SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
-
-    public SecurityConfigType getSecurityConfigType() {
-        return this.securityConfigType;
-    }
-
-    public void setSecurityConfigType(SecurityConfigType securityConfigType) {
-        this.securityConfigType = securityConfigType;
-    }
-
-    public SecurityConfiguration(InterceptUrlMapConverter interceptUrlMapConverter) {
-        this.interceptUrlMapConverter = interceptUrlMapConverter;
-    }
 
     @Override
     public boolean isEnabled() {
         return this.enabled;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public SecurityConfigType getSecurityConfigType() {
+        return this.securityConfigType;
     }
-
-    private List interceptUrlMap;
 
     public List<InterceptUrlMapPattern> getInterceptUrlMap() {
         return interceptUrlMap;
-    }
-
-    public void setInterceptUrlMap(List interceptUrlMap) {
-        if ( interceptUrlMap != null ) {
-            this.interceptUrlMap = new ArrayList();
-            for ( Object obj : interceptUrlMap ) {
-                if ( obj instanceof Map) {
-                    Map m = (Map) obj;
-                    Optional<InterceptUrlMapPattern> i = interceptUrlMapConverter.convert(m,
-                            InterceptUrlMapPattern.class, null);
-                    if ( i.isPresent() ) {
-                        this.interceptUrlMap.add(i.get());
-                    } else {
-                        throw new IllegalArgumentException(invalidInterceptUrlMapPatternMessage(m));
-                    }
-                }
-            }
-        }
-    }
-
-
-    private static String invalidInterceptUrlMapPatternMessage(Map m) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Invalid intercept Url Map configuration");
-        sb.append(m.toString());
-        return sb.toString();
     }
 }

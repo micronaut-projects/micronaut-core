@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.http.HttpResponse;
@@ -22,6 +23,8 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 import java.util.Map;
 
 /**
+ * Generates http responses with access and refresh
+ * tokens as the body of the response.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -29,17 +32,21 @@ import java.util.Map;
 public interface AccessRefreshTokenGenerator {
 
     /**
+     * Generate an {@link AccessRefreshToken} response for the given
+     * user details.
      *
-     * @param userDetails
-     * @return HTTP Response with {@link AccessRefreshToken}
+     * @param userDetails The user details
+     * @return The http response
      */
     HttpResponse<AccessRefreshToken> generate(UserDetails userDetails);
 
     /**
+     * Generate an {@link AccessRefreshToken} response for the given
+     * refresh token and claims.
      *
-     * @param refreshToken
-     * @param claims
-     * @return HTTP Response with {@link AccessRefreshToken}
+     * @param refreshToken The refresh token
+     * @param claims The claims to generate the access token
+     * @return The http response
      */
     HttpResponse<AccessRefreshToken> generate(String refreshToken, Map<String, Object> claims);
 }

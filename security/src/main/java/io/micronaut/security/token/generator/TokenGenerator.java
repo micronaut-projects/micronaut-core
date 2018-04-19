@@ -18,9 +18,9 @@ package io.micronaut.security.token.generator;
 import io.micronaut.security.authentication.UserDetails;
 
 import java.util.Map;
-import java.util.Optional;
 
 /**
+ * Responsible for generating token strings.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -29,16 +29,16 @@ public interface TokenGenerator {
 
     /**
      *
-     * @param userDetails Authenticated user's representation
-     * @param expiration JWT token expiration time in milliseconds
-     * @return a JSON Web Token ( JWT )
+     * @param userDetails The user details
+     * @param expiration The amount of time in milliseconds until the token expires
+     * @return An optional JWT string
      */
-    Optional<String> generateToken(UserDetails userDetails, Integer expiration);
+    String generateToken(UserDetails userDetails, Integer expiration) throws Exception;
 
     /**
      *
      * @param claims Claims to be included in the JWT token to be generated
      * @return a JSON Web Token ( JWT )
      */
-    Optional<String> generateToken(Map<String, Object> claims);
+    String generateToken(Map<String, Object> claims) throws Exception;
 }

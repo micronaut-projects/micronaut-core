@@ -11,6 +11,8 @@ dependencies {
     compile project(":management")
     compile project(":http")
     compile "org.pac4j:pac4j-jwt:$pac4jVersion"
+
+    testCompile project(":http-client")
 }
 shadowJar {
     dependencies {

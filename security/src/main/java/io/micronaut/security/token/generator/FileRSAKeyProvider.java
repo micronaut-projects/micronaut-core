@@ -26,8 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -40,7 +38,7 @@ import java.security.spec.X509EncodedKeySpec;
  * @since 1.0
  */
 @Singleton
-public class FileRSAKeyProvider implements RSAKeyProvider {
+public class FileRSAKeyProvider implements EncryptionKeyProvider {
     private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
 
     protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
@@ -60,13 +58,13 @@ public class FileRSAKeyProvider implements RSAKeyProvider {
             try {
                 KeyFactory kf = KeyFactory.getInstance("RSA");
 
-                Path publicKeyPath = Paths.get(tokenEncryptionConfiguration.getPublicKeyPath());
+                Path publicKeyPath = tokenEncryptionConfiguration.getPublicKeyPath().toPath();
                 byte[] keyBytes = Files.readAllBytes(publicKeyPath);
                 X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
 
                 publicKey = (RSAPublicKey) kf.generatePublic(spec);
 
-                Path privateKeyPath = Paths.get(tokenEncryptionConfiguration.getPrivateKeyPath());
+                Path privateKeyPath = tokenEncryptionConfiguration.getPrivateKeyPath().toPath();
                 byte[] privateKeyBytes = Files.readAllBytes(privateKeyPath);
                 PKCS8EncodedKeySpec privateSpec = new PKCS8EncodedKeySpec(privateKeyBytes);
 

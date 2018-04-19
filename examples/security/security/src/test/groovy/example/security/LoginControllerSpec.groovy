@@ -37,7 +37,7 @@ class LoginControllerSpec extends Specification {
         e.status.code == 400
     }
 
-    void '/login without valid credentials returns 200 and access token and refresh token'() {
+    void '/login with valid credentials returns 200 and access token and refresh token'() {
         when:
         HttpResponse<AccessRefreshToken> rsp = client.toBlocking().exchange(HttpRequest.create(HttpMethod.POST, '/login')
                 .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -50,11 +50,11 @@ class LoginControllerSpec extends Specification {
         rsp.body.get().refreshToken
     }
 
-    void '/login without valid credentials for a database user returns 200 and access token and refresh token'() {
+    void '/login with valid credentials for a database user returns 200 and access token and refresh token'() {
         when:
         HttpResponse<AccessRefreshToken> rsp = client.toBlocking().exchange(HttpRequest.create(HttpMethod.POST, '/login')
                 .accept(MediaType.APPLICATION_JSON_TYPE)
-                .body(new UsernamePasswordCredentials('admin', 'admin')), AccessRefreshToken)
+                .body(new UsernamePasswordCredentials('user', 'user')), AccessRefreshToken)
 
         then:
         rsp.status.code == 200
@@ -91,13 +91,13 @@ class LoginControllerSpec extends Specification {
         accessToken
 
         when:
-        Map<String, Object> claims = getTokenValidator().validateTokenAndGetClaims(accessToken)
+        Optional<Map<String, Object>> claims = getTokenValidator().validateTokenAndGetClaims(accessToken)
 
         then:
-        claims
+        claims.isPresent()
 
         and:
-        claims.get(JwtClaims.EXPIRATION_TIME)
+        claims.get().get(JwtClaims.EXPIRATION_TIME)
     }
 
     void 'refresh token does not contain expiration date'() {
@@ -117,13 +117,13 @@ class LoginControllerSpec extends Specification {
         refreshToken
 
         when:
-        Map<String, Object> claims = getTokenValidator().validateTokenAndGetClaims(refreshToken)
+        Optional<Map<String, Object>> claims = getTokenValidator().validateTokenAndGetClaims(refreshToken)
 
         then:
-        claims
+        claims.isPresent()
 
         and:
-        !claims.get(JwtClaims.EXPIRATION_TIME)
+        !claims.get().get(JwtClaims.EXPIRATION_TIME)
     }
 
     TokenValidator getTokenValidator() {

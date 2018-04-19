@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains classes specific to Security capabilities within Micronaut
+ * Contains classes specific to security capabilities within Micronaut
  *
  * @author Sergio del Amo
  * @since 1.0

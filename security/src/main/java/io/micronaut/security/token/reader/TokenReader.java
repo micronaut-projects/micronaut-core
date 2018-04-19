@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.http.HttpRequest;
@@ -20,6 +21,7 @@ import io.micronaut.http.HttpRequest;
 import java.util.Optional;
 
 /**
+ * Responsible for reading the token data from a request.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -27,9 +29,10 @@ import java.util.Optional;
 public interface TokenReader {
 
     /**
-     * Attempts to retrieve a JWT token in a request
-     * @param request HTTP Request
-     * @return JWT token if found, {@code Optional.empty} if not found
+     * Attempts to retrieve a token in a request
+     *
+     * @param request The request to look for the token in
+     * @return An optional token string
      */
     Optional<String> findToken(HttpRequest<?> request);
 }

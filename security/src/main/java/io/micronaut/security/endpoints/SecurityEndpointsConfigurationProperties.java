@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
 
 /**
+ * Retrieves configuration for the security endpoints
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -28,17 +30,12 @@ public class SecurityEndpointsConfigurationProperties implements SecurityEndpoin
 
     public static final String PREFIX = SecurityConfiguration.PREFIX + ".endpoints";
 
-    private boolean login = false;
-
-    private boolean refresh = false;
+    protected boolean login = false;
+    protected boolean refresh = false;
 
     @Override
     public boolean isLogin() {
         return login;
-    }
-
-    public void setLogin(boolean login) {
-        this.login = login;
     }
 
     @Override
@@ -46,7 +43,4 @@ public class SecurityEndpointsConfigurationProperties implements SecurityEndpoin
         return refresh;
     }
 
-    public void setRefresh(boolean refresh) {
-        this.refresh = refresh;
-    }
 }

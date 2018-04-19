@@ -15,7 +15,13 @@
  */
 package io.micronaut.security.token.generator;
 
+import com.nimbusds.jose.EncryptionMethod;
+import com.nimbusds.jose.JWEAlgorithm;
+
+import java.io.File;
+
 /**
+ * Represents configuration of the JWT encryption mechanism
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -28,23 +34,22 @@ public interface TokenEncryptionConfiguration {
     boolean isEnabled();
 
     /**
-     * Full path to the public key so that {@code new File(getPublicKeyPath()).exists() == true}
+     * @return The path to the public key
      */
-    String getPublicKeyPath();
+    File getPublicKeyPath();
 
     /**
-     * Full path to the private key so that {@code new File(getPrivateKeyPath()).exists() == true}
+     * @return The path to the private key
      */
-    String getPrivateKeyPath();
+    File getPrivateKeyPath();
 
     /**
-     *
-     * @return Any of RSA1_5, RSA-OAEP, RSA-OAEP-256, A128KW, A192KW, A256KW, dir, ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW, A128GCMKW, A192GCMKW, A256GCMKW, PBES2-HS256+A128KW, PBES2-HS384+A192KW, PBES2-HS512+A256KW
+     * @return The JWE algorithm
      */
-    String getJweAlgorithm();
+    JWEAlgorithm getJweAlgorithm();
 
     /**
-     * @return Any of A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, A128CBC+HS256, A256CBC+HS512, A128GCM, A192GCM, A256GCM
+     * @return The encryption method
      */
-    String getEncryptionMethod();
+    EncryptionMethod getEncryptionMethod();
 }

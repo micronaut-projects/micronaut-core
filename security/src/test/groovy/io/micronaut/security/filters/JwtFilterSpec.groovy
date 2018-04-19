@@ -109,7 +109,7 @@ class JwtFilterSpec extends Specification {
                 null)
     }
 
-    def "if tokenValidator.validateTokenAndGetClaims return null, UNAUTHORIZED is returned"() {
+    def "if tokenValidator.validateTokenAndGetClaims is not present, UNAUTHORIZED is returned"() {
         given:
         def req = Stub(HttpRequest) {
             getUri() >> new URI('/health')
@@ -118,12 +118,15 @@ class JwtFilterSpec extends Specification {
         def tokenReader = Stub(TokenReader) {
             findToken(_) >> Optional.of('XXXX')
         }
+        def tokenValidator = Stub(TokenValidator) {
+            validateTokenAndGetClaims('XXXX') >> Optional.empty()
+        }
 
         expect:
         HttpStatus.UNAUTHORIZED == JwtFilter.filterRequest(req,
                 [new InterceptUrlMapPattern('/health', [], HttpMethod.GET)],
                 tokenReader ,
-                Mock(TokenValidator),
+                tokenValidator,
                 null)
     }
 

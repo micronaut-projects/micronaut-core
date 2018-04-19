@@ -35,9 +35,8 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Singleton
 @Controller("/")
-@Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".login", value = "true")
+@Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".login")
 public class LoginController implements LoginControllerApi {
 
     public static final String LOGIN_PATH = "/login";

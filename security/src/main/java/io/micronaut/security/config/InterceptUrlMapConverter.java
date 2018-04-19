@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.config;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -28,14 +29,18 @@ import java.util.Optional;
 @Singleton
 public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrlMapPattern> {
 
+    private static final String PATTERN = "pattern";
+    private static final String ACCESS = "access";
+    private static final String HTTP_METHOD = "httpMethod";
+
     @Override
     public Optional<InterceptUrlMapPattern> convert(Map m, Class<InterceptUrlMapPattern> targetType, ConversionContext context) {
         if ( m == null ) {
             return Optional.empty();
         }
         String pattern = null;
-        if ( m.containsKey("pattern") ) {
-            Object patternObj = m.get("pattern");
+        if ( m.containsKey(PATTERN) ) {
+            Object patternObj = m.get(PATTERN);
             if (patternObj instanceof String) {
                 pattern = (String) patternObj;
             }
@@ -44,8 +49,8 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
             return Optional.empty();
         }
         List<String> access = new ArrayList<>();
-        if ( m.containsKey("access") ) {
-            Object accessObj = m.get("access");
+        if ( m.containsKey(ACCESS) ) {
+            Object accessObj = m.get(ACCESS);
             if (accessObj instanceof List) {
                 for ( Object accessEntryObj : (List) accessObj ) {
                     if ( accessEntryObj instanceof String ) {
@@ -60,8 +65,8 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
             return Optional.empty();
         }
         HttpMethod httpMethod = HttpMethod.GET;
-        if ( m.containsKey("httpMethod") ) {
-            Object httpMethodObj = m.get("httpMethod");
+        if ( m.containsKey(HTTP_METHOD) ) {
+            Object httpMethodObj = m.get(HTTP_METHOD);
             if ( httpMethodObj instanceof String ) {
                 try {
                     httpMethod =  HttpMethod.valueOf(((String) httpMethodObj).toUpperCase());

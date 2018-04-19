@@ -13,11 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.validator;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
+ * Responsible for token validation and claims retrieval.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -25,9 +28,10 @@ import java.util.Map;
 public interface TokenValidator {
 
     /**
+     * Validates the provided token and returns the claims.
      *
-     * @param token Json Web Token ( JWT ) string
-     * @return Map containing the claims contained in the token or {@code null} if the validation fails
+     * @param token The JWT string
+     * @return The claims contained in the token or {@link Optional#empty} if the validation fails
      */
-    Map<String, Object> validateTokenAndGetClaims(String token);
+    Optional<Map<String, Object>> validateTokenAndGetClaims(String token);
 }

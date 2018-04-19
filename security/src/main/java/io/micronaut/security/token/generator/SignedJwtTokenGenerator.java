@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.exceptions.BeanInstantiationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Singleton
+@Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled", notEquals = "true")
 public class SignedJwtTokenGenerator extends AbstractTokenGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(SignedJwtTokenGenerator.class);
@@ -39,30 +40,21 @@ public class SignedJwtTokenGenerator extends AbstractTokenGenerator {
     private JWSSigner signer;
 
     public SignedJwtTokenGenerator(TokenConfiguration tokenConfiguration,
-                                   ClaimsGenerator claimsGenerator,
-                                   JWTClaimsSetConverter jwtClaimsSetConverter) {
-        super(tokenConfiguration, claimsGenerator, jwtClaimsSetConverter);
+                                   JWTClaimsSetGenerator claimsGenerator) throws KeyLengthException {
+        super(tokenConfiguration, claimsGenerator);
+        signer = createSigner(tokenConfiguration);
     }
 
-    @PostConstruct
-    void initialize() throws Exception {
-        signer = new MACSigner(tokenConfiguration.getSecret());
+    protected JWSSigner createSigner(TokenConfiguration tokenConfiguration) throws KeyLengthException {
+        return new MACSigner(tokenConfiguration.getSecret());
     }
 
     @Override
-    protected Optional<JWT> generate(Map<String, Object> claims) {
-        Optional<JWTClaimsSet> claimsSet = jwtClaimsSetConverter.convert(claims, JWTClaimsSet.class, null);
-        if (claimsSet.isPresent()) {
-            final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(tokenConfiguration.getJwsAlgorithm());
-            SignedJWT signedJWT = new SignedJWT(new JWSHeader(jwsAlgorithm), claimsSet.get());
-            try {
-                signedJWT.sign(signer);
-            } catch (JOSEException e) {
-                log.error("JOSEException signing JWT");
-                return Optional.empty();
-            }
-            return Optional.of(signedJWT);
-        }
-        return Optional.empty();
+    protected JWT generate(Map<String, Object> claims) throws JOSEException {
+        JWTClaimsSet claimsSet = claimsGenerator.generateClaimsSet(claims);
+        final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(tokenConfiguration.getJwsAlgorithm());
+        SignedJWT signedJWT = new SignedJWT(new JWSHeader(jwsAlgorithm), claimsSet);
+        signedJWT.sign(signer);
+        return signedJWT;
     }
 }

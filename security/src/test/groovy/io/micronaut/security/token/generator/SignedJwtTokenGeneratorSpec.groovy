@@ -38,27 +38,24 @@ class SignedJwtTokenGeneratorSpec extends Specification {
             getRefreshTokenExpiration() >> null
         }
         TokenGenerator generator = new SignedJwtTokenGenerator(tokenConfiguration,
-                new DefaultClaimsGenerator(),
-                new JWTClaimsSetConverter(),
+                new JWTClaimsSetGenerator()
         )
-        generator.initialize()
         UserDetails userDetails = new UserDetails(username: 'sherlock', roles: ['ROLE_DETECTIVE'])
 
         when:
-        Optional<String> jwtToken = generator.generateToken(userDetails, defaultExpiration)
+        String jwtToken = generator.generateToken(userDetails, defaultExpiration)
         println jwtToken
 
         then:
-        jwtToken.isPresent()
+        noExceptionThrown()
 
         when:
         SignedJwtTokenValidator tokenValidator = new SignedJwtTokenValidator(tokenConfiguration)
-        tokenValidator.initialize()
-        Map<String,Object> claims = tokenValidator.validateTokenAndGetClaims(jwtToken.get())
+        Optional<Map<String,Object>> claims = tokenValidator.validateTokenAndGetClaims(jwtToken)
 
         then:
-        claims
-        claims.get('roles') == ['ROLE_DETECTIVE']
-        claims.get(JwtClaims.SUBJECT) == 'sherlock'
+        claims.isPresent()
+        claims.get().get('roles') == ['ROLE_DETECTIVE']
+        claims.get().get(JwtClaims.SUBJECT) == 'sherlock'
     }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.security.token.render;
 
 /**
+ * Stores the combination of access and refresh tokens
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -25,6 +26,9 @@ public class AccessRefreshToken {
     private String accessToken;
     private String refreshToken;
 
+    /**
+     * Necessary for JSON serialization
+     */
     public AccessRefreshToken() {}
 
     public AccessRefreshToken(String accessToken, String refreshToken) {
@@ -33,16 +37,14 @@ public class AccessRefreshToken {
     }
 
     /**
-     *
-     * @return JWT token
+     * @return The access token
      */
     public String getAccessToken() {
         return accessToken;
     }
 
     /**
-     *
-     * @return JWT token
+     * @return The refresh token
      */
     public String getRefreshToken() {
         return refreshToken;

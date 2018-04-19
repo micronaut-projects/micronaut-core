@@ -15,9 +15,9 @@
  */
 package io.micronaut.security.authentication;
 
-import io.micronaut.context.BeanContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Optional;
@@ -29,18 +29,12 @@ import java.util.Optional;
  */
 @Singleton
 public class Authenticator {
-
-    protected final BeanContext beanContext;
+    private static final Logger log = LoggerFactory.getLogger(Authenticator.class);
 
     private Collection<AuthenticationProvider> authenticationProviders;
 
-    public Authenticator(BeanContext beanContext) {
-        this.beanContext = beanContext;
-    }
-
-    @PostConstruct
-    protected void initialize() {
-        authenticationProviders = beanContext.getBeansOfType(AuthenticationProvider.class);
+    public Authenticator(Collection<AuthenticationProvider> authenticationProviders) {
+        this.authenticationProviders = authenticationProviders;
     }
 
     /**
@@ -51,9 +45,15 @@ public class Authenticator {
     public Optional<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
         if ( authenticationProviders != null ) {
             for ( AuthenticationProvider authenticationProvider : authenticationProviders ) {
-                AuthenticationResponse rsp = authenticationProvider.authenticate(credentials);
-                if ( rsp.isAuthenticated() ) {
-                    return Optional.of(rsp);
+                try {
+                    AuthenticationResponse rsp = authenticationProvider.authenticate(credentials);
+                    if ( rsp.isAuthenticated() ) {
+                        return Optional.of(rsp);
+                    }
+                } catch (Exception e) {
+                    if (log.isErrorEnabled()) {
+                        log.error("Authentication provider threw exception", e);
+                    }
                 }
             }
         }

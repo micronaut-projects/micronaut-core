@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,6 +26,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
+ * Reads the token from the configured cookie.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -44,10 +46,6 @@ public class CookieTokenReader implements TokenReader {
     @Override
     public Optional<String> findToken(HttpRequest<?> request) {
         Optional<Cookie> optionalCookie = request.getCookies().findCookie(cookieTokenReaderConfiguration.getCookieName());
-        if ( optionalCookie.isPresent() ) {
-            Cookie cookie = optionalCookie.get();
-            Optional.of(cookie.getValue());
-        }
-        return Optional.empty();
+        return optionalCookie.map(Cookie::getValue);
     }
 }

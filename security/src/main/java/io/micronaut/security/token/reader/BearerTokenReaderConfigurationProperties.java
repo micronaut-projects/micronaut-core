@@ -13,20 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.generator.TokenConfigurationProperties;
 
+/**
+ * Default implementation of {@link BearerTokenReaderConfiguration}
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @ConfigurationProperties(BearerTokenReaderConfigurationProperties.PREFIX)
 public class BearerTokenReaderConfigurationProperties implements BearerTokenReaderConfiguration {
+
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".bearer";
 
-    private boolean enabled = true;
-
-    private String headerName = "Authorization";
-
-    private String prefix = "Bearer";
+    protected boolean enabled = true;
+    protected String headerName = "Authorization";
+    protected String prefix = "Bearer";
 
     @Override
     public boolean isEnabled() {
@@ -41,17 +47,5 @@ public class BearerTokenReaderConfigurationProperties implements BearerTokenRead
     @Override
     public String getHeaderName() {
         return headerName;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public void setHeaderName(String headerName) {
-        this.headerName = headerName;
-    }
-
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
     }
 }

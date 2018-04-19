@@ -18,6 +18,7 @@ package io.micronaut.security.token.render;
 import io.micronaut.security.authentication.UserDetails;
 
 /**
+ * Responsible for converting token information to an {@link AccessRefreshToken}
  *
  * @author Sergio del Amo
  * @since 1.0

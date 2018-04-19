@@ -48,13 +48,16 @@ import io.micronaut.core.util.PathMatcher;
  */
 @Filter("/**")
 public class JwtFilter extends OncePerRequestHttpServerFilter {
+
     private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
+
     protected final SecurityConfiguration securityConfiguration;
     protected final TokenConfiguration tokenConfiguration;
     protected final SecurityEndpointsConfiguration securityEndpointsConfiguration;
     protected final TokenReader tokenReader;
     protected final BeanContext beanContext;
     protected final TokenValidator tokenValidator;
+
     /**
      * @param beanContext {@link BeanContext}
      * @param securityConfiguration {@link SecurityConfiguration}
@@ -128,11 +131,12 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         Optional<String> token = tokenReader.findToken(request);
         if (token.isPresent() ) {
             log.debug("Token {} found in request {} {}", token, request.getMethod().toString(), request.getPath());
-            Map<String, Object> claims = tokenValidator.validateTokenAndGetClaims(token.get());
-            if ( claims == null ) {
+            Optional<Map<String, Object>> optionalClaims = tokenValidator.validateTokenAndGetClaims(token.get());
+            if ( !optionalClaims.isPresent() ) {
                 log.debug("Unauthorized request {} {}. Fetched claims null. Token validation failed.", request.getMethod().toString(), request.getPath(), token);
                 return HttpStatus.UNAUTHORIZED;
             }
+            Map<String, Object> claims = optionalClaims.get();
             log.debug("Claims: {}", claims.keySet().stream().reduce((a, b) -> a + "=>" + claims.get(a) + ", " + b + "=>" + claims.get(b)).get());
             if (matchesAccess(patternsForRequest, Collections.singletonList(InterceptUrlMapPattern.TOKEN_IS_AUTHENTICATED))) {
                 log.debug("Proceed since the user is authenticated and access list in intercept url map allows access to authenticated users.");
@@ -147,8 +151,7 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
                 log.debug("Unauthorized request {} {}. roles not instance of List<String> {}", request.getMethod().toString(), request.getPath(), rolesObj.toString());
                 return HttpStatus.UNAUTHORIZED;
             }
-            List<String> roles = (List<String>) rolesObj;
-            if (matchesAccess(patternsForRequest, roles)) {
+            if (matchesAccess(patternsForRequest, (List<String>) rolesObj)) {
                 log.debug("Proceed since the user is authenticated and a role matches the access list in intercept url map.");
                 return HttpStatus.OK;
             }
@@ -233,7 +236,7 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
             if ( securityEndpointsConfiguration.isRefresh() ) {
                 final StringBuilder sb = new StringBuilder();
                 sb.append(OauthController.CONTROLLER_PATH);
-                sb.append(OauthController.ACCESSTOKEN_PATH);
+                sb.append(OauthController.ACCESS_TOKEN_PATH);
                 final String pattern = sb.toString();
                 results.add(new InterceptUrlMapPattern(pattern, access, HttpMethod.POST));
             }

@@ -33,7 +33,6 @@ public class JWTClaimsSetConverter implements TypeConverter<Map<String, Object>,
 
     @Override
     public Optional<JWTClaimsSet> convert(Map<String, Object> claims, Class<JWTClaimsSet> targetType, ConversionContext context) {
-
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
         for ( String k : claims.keySet() ) {
             builder.claim(k, claims.get(k));

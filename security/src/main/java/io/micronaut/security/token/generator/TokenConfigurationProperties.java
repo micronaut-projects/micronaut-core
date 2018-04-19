@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.config.SecurityConfiguration;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
 import java.util.Arrays;
 import java.util.List;
 
@@ -34,21 +37,17 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     public static final String PREFIX = SecurityConfiguration.PREFIX + ".token";
 
     private static final String DEFAULT_ROLES_CLAIM_NAME = "roles";
-
-    private String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
-
     private static final String DEFAULT_JWSALGORITHM = "HS256";
+    private static final Integer DEFAULT_EXPIRATION = 3600;
 
+    protected Integer refreshTokenExpiration = null;
+    protected Integer defaultExpiration = DEFAULT_EXPIRATION;
+    protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
+
+
+    @NotBlank @Size()
+    protected String secret;
     private String jwsAlgorithm = DEFAULT_JWSALGORITHM;
-
-    private Integer DEFAULT_EXPIRATION = 3600;
-
-    Integer defaultExpiration = DEFAULT_EXPIRATION;
-
-    Integer refreshTokenExpiration = null;
-
-    @NotBlank
-    private String secret;
 
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
@@ -66,10 +65,6 @@ public class TokenConfigurationProperties implements TokenConfiguration {
         return this.secret;
     }
 
-    public void setSecret(String secret) {
-        this.secret = secret;
-    }
-
     /**
      * @return The JWS Algorithm
      */
@@ -80,12 +75,12 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     /**
      * @return The JWS Algorithm
      */
-    public void setJwsAlgorithm(@Nullable String jwsAlgorithm) {
+    protected void setJwsAlgorithm(@Nullable String jwsAlgorithm) {
         if ( jwsAlgorithm == null ) {
             this.jwsAlgorithm = DEFAULT_JWSALGORITHM;
         } else {
             if ( !validJwsAlgorithms().contains(jwsAlgorithm) ) {
-                throw new IllegalArgumentException(invalidJwsMessage(jwsAlgorithm));
+                throw new ConfigurationException(invalidJwsMessage(jwsAlgorithm));
             }
             this.jwsAlgorithm = jwsAlgorithm;
         }

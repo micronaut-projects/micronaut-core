@@ -29,7 +29,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-public class DefaultClaimsGenerator implements ClaimsGenerator {
+public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
     private static final Logger log = LoggerFactory.getLogger(AbstractTokenGenerator.class);
 
     /**
@@ -40,18 +40,10 @@ public class DefaultClaimsGenerator implements ClaimsGenerator {
      */
     @Override
     public Map<String, Object> generateClaims(UserDetails userDetails, Integer expiration) {
-        JWTClaimsSet.Builder builder = generateClaimsBuilder(userDetails, expiration);
-        JWTClaimsSet claimsSet = builder.build();
-        return claimsSet.getClaims();
+        return generateClaimsSet(userDetails, expiration).getClaims();
     }
 
-    /**
-     *
-     * @param userDetails
-     * @param expiration expiration time in seconds
-     * @return
-     */
-    JWTClaimsSet.Builder generateClaimsBuilder(UserDetails userDetails, Integer expiration) {
+    private JWTClaimsSet generateClaimsSet(UserDetails userDetails, Integer expiration) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
         builder.subject(userDetails.getUsername());
 
@@ -67,6 +59,16 @@ public class DefaultClaimsGenerator implements ClaimsGenerator {
         builder.claim("roles", userDetails.getRoles());
 
         log.debug("Generated claim set: {}",builder.build().toJSONObject().toString());
-        return builder;
+
+        return builder.build();
+    }
+
+    @Override
+    public JWTClaimsSet generateClaimsSet(Map<String, ?> claims) {
+        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
+        for ( String k : claims.keySet() ) {
+            builder.claim(k, claims.get(k));
+        }
+        return builder.build();
     }
 }

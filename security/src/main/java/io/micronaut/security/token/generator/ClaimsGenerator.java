@@ -24,7 +24,7 @@ import java.util.Map;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface ClaimsGenerator {
+public interface ClaimsGenerator<T> {
 
     /**
      *
@@ -32,5 +32,13 @@ public interface ClaimsGenerator {
      * @param expiration JWT token expiration time in milliseconds
      * @return JWT Claims Map
      */
-    Map<String, Object> generateClaims(UserDetails userDetails, Integer expiration);
+    Map<String, ?> generateClaims(UserDetails userDetails, Integer expiration);
+
+    /**
+     * Generate a claims set based on claims
+     *
+     * @param claims The claims
+     * @return The claims set
+     */
+    T generateClaimsSet(Map<String, ?> claims);
 }

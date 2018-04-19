@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import java.security.interfaces.RSAPrivateKey;
@@ -24,7 +25,7 @@ import java.security.interfaces.RSAPublicKey;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface RSAKeyProvider {
+public interface EncryptionKeyProvider {
 
     RSAPublicKey getPublicKey();
 

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.render;
 
 import io.micronaut.security.authentication.UserDetails;
@@ -33,6 +34,6 @@ public class BearerTokenRenderer implements TokenRenderer {
 
     @Override
     public AccessRefreshToken render(UserDetails userDetails, Integer expiresIn, String accessToken, String refreshToken) {
-        return new BearerTokenAccessRefreshToken(userDetails.getUsername(), userDetails.getRoles(), expiresIn, accessToken, refreshToken);
+        return new BearerAccessRefreshToken(userDetails.getUsername(), userDetails.getRoles(), expiresIn, accessToken, refreshToken);
     }
 }

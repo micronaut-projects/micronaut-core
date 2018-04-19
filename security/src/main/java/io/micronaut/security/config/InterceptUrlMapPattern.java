@@ -16,6 +16,8 @@
 package io.micronaut.security.config;
 
 import io.micronaut.http.HttpMethod;
+
+import javax.annotation.concurrent.Immutable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,7 @@ import java.util.Map;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Immutable
 public class InterceptUrlMapPattern {
     public static final String TOKEN_IS_AUTHENTICATED_ANONYMOUSLY = "IS_AUTHENTICATED_ANONYMOUSLY";
     public static final String TOKEN_IS_AUTHENTICATED = "IS_AUTHENTICATED";
@@ -33,33 +36,21 @@ public class InterceptUrlMapPattern {
     private List<String> access;
     private HttpMethod httpMethod;
 
-    public String getPattern() {
-        return pattern;
+    public InterceptUrlMapPattern(String pattern, List<String> access, HttpMethod httpMethod) {
+        this.pattern = pattern;
+        this.access = access;
+        this.httpMethod = httpMethod;
     }
 
-    public void setPattern(String pattern) {
-        this.pattern = pattern;
+    public String getPattern() {
+        return pattern;
     }
 
     public List<String> getAccess() {
         return access;
     }
 
-    public void setAccess(List<String> access) {
-        this.access = access;
-    }
-
     public HttpMethod getHttpMethod() {
         return httpMethod;
-    }
-
-    public void setHttpMethod(HttpMethod httpMethod) {
-        this.httpMethod = httpMethod;
-    }
-
-    public InterceptUrlMapPattern(String pattern, List<String> access, HttpMethod httpMethod) {
-        this.pattern = pattern;
-        this.access = access;
-        this.httpMethod = httpMethod;
     }
 }

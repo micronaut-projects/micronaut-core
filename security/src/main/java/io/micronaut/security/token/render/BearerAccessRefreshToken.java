@@ -23,17 +23,12 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class BearerTokenAccessRefreshToken extends AccessRefreshToken {
+public class BearerAccessRefreshToken extends AccessRefreshToken {
 
     private String username;
     private Collection<String> roles;
     private String token_type = "Bearer";
     private Integer expires_in;
-
-    /**
-     * Empty constructor.
-     */
-    public BearerTokenAccessRefreshToken() {}
 
     /**
      *
@@ -42,11 +37,11 @@ public class BearerTokenAccessRefreshToken extends AccessRefreshToken {
      * @param accessToken JWT token
      * @param refreshToken  JWT token
      */
-    public BearerTokenAccessRefreshToken(String username,
-                                         Collection<String> roles,
-                                         Integer expiresIn,
-                                         String accessToken,
-                                         String refreshToken) {
+    public BearerAccessRefreshToken(String username,
+                                    Collection<String> roles,
+                                    Integer expiresIn,
+                                    String accessToken,
+                                    String refreshToken) {
         super(accessToken, refreshToken);
         this.username = username;
         this.roles = roles;

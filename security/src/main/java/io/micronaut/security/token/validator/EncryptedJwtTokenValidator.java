@@ -21,16 +21,15 @@ import com.nimbusds.jwt.EncryptedJWT;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.token.generator.RSAKeyProvider;
-import io.micronaut.security.token.generator.TokenConfiguration;
-import io.micronaut.security.token.generator.TokenEncryptionConfiguration;
+import io.micronaut.security.token.generator.EncryptionKeyProvider;
 import io.micronaut.security.token.generator.TokenEncryptionConfigurationProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import javax.annotation.PostConstruct;
+
 import javax.inject.Singleton;
 import java.text.ParseException;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  *
@@ -39,46 +38,31 @@ import java.util.Map;
  */
 @Singleton
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled")
-public class EncryptedJwtTokenValidator extends AbstractTokenValidator {
+public class EncryptedJwtTokenValidator implements TokenValidator {
 
     private static final Logger log = LoggerFactory.getLogger(EncryptedJwtTokenValidator.class);
 
-    protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
-    protected final RSAKeyProvider rsaKeyProvider;
+    private final RSADecrypter rsaDecrypter;
 
-    public EncryptedJwtTokenValidator(TokenConfiguration tokenConfiguration,
-                               TokenEncryptionConfiguration tokenEncryptionConfiguration,
-                                RSAKeyProvider rsaKeyProvider) {
-        super(tokenConfiguration);
-        this.tokenEncryptionConfiguration = tokenEncryptionConfiguration;
-        this.rsaKeyProvider = rsaKeyProvider;
-    }
-
-    private RSADecrypter rsaDecrypter;
-
-    @PostConstruct
-    public void initialize() {
-        rsaDecrypter = new RSADecrypter(rsaKeyProvider.getPrivateKey());
+    public EncryptedJwtTokenValidator(EncryptionKeyProvider rsaKeyProvider) {
+        this.rsaDecrypter = new RSADecrypter(rsaKeyProvider.getPrivateKey());
     }
 
     @Override
-    public Map<String, Object> validateTokenAndGetClaims(String token) {
+    public Optional<Map<String, Object>> validateTokenAndGetClaims(String token) {
         try {
             JWT jwt = JWTParser.parse(token);
             if (jwt instanceof EncryptedJWT) {
                 EncryptedJWT encryptedJWT = (EncryptedJWT) jwt;
                 encryptedJWT.decrypt(rsaDecrypter);
-                return encryptedJWT.getJWTClaimsSet().getClaims();
-            } else {
-                return null;
+                return Optional.of(encryptedJWT.getJWTClaimsSet().getClaims());
             }
-
         } catch(ParseException e) {
             log.warn("ParseException parsing token: {}", token);
 
         } catch (JOSEException e) {
             log.warn("JOSEException while decrypting {}", token);
         }
-        return null;
+        return Optional.empty();
     }
 }

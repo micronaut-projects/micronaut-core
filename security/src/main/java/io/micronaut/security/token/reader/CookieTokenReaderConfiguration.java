@@ -13,11 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.core.util.Toggleable;
 
+/**
+ * Configuration for the {@link CookieTokenReader}
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 public interface CookieTokenReaderConfiguration extends Toggleable {
+
     boolean isEnabled();
 
     String getCookieName();

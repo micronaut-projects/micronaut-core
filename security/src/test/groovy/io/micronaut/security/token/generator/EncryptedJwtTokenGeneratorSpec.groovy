@@ -1,5 +1,7 @@
 package io.micronaut.security.token.generator
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.token.validator.EncryptedJwtTokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
@@ -21,22 +23,20 @@ class EncryptedJwtTokenGeneratorSpec extends Specification {
         }
         TokenEncryptionConfiguration tokenEncryptionConfiguration = Stub(TokenEncryptionConfiguration) {
             isEnabled() >> true
-            getPublicKeyPath() >> publicKey.absolutePath
-            getPrivateKeyPath() >> privateKey.absolutePath
-            getEncryptionMethod() >> TokenEncryptionConfigurationProperties.DEFAULT_ENCRYPTIONMETHOD
-            getJweAlgorithm() >> TokenEncryptionConfigurationProperties.DEFAULT_JWEALGORITHM
+            getPublicKeyPath() >> publicKey
+            getPrivateKeyPath() >> privateKey
+            getEncryptionMethod() >> EncryptionMethod.A128GCM
+            getJweAlgorithm() >> JWEAlgorithm.RSA_OAEP_256
         }
 
-        RSAKeyProvider rsaKeyProvider = new FileRSAKeyProvider(tokenEncryptionConfiguration)
+        EncryptionKeyProvider rsaKeyProvider = new FileRSAKeyProvider(tokenEncryptionConfiguration)
         rsaKeyProvider.init()
 
         TokenGenerator generator = new EncryptedJwtTokenGenerator(tokenConfiguration,
-                new DefaultClaimsGenerator(),
-                new JWTClaimsSetConverter(),
+                new JWTClaimsSetGenerator(),
                 tokenEncryptionConfiguration,
                 rsaKeyProvider
         )
-        generator.initialize()
 
         UserDetails userDetails = new UserDetails(username: 'sherlock', roles: ['ROLE_DETECTIVE'])
 
@@ -45,19 +45,18 @@ class EncryptedJwtTokenGeneratorSpec extends Specification {
         privateKey.exists()
 
         when:
-        Optional<String> jwtToken = generator.generateToken(userDetails, defaultExpiration)
+        String jwtToken = generator.generateToken(userDetails, defaultExpiration)
 
         then:
-        jwtToken.isPresent()
+        noExceptionThrown()
 
         when:
-        EncryptedJwtTokenValidator tokenValidator = new EncryptedJwtTokenValidator(tokenConfiguration, tokenEncryptionConfiguration, rsaKeyProvider)
-        tokenValidator.initialize()
-        Map<String,Object> claims = tokenValidator.validateTokenAndGetClaims(jwtToken.get())
+        EncryptedJwtTokenValidator tokenValidator = new EncryptedJwtTokenValidator(rsaKeyProvider)
+        Optional<Map<String,Object>> claims = tokenValidator.validateTokenAndGetClaims(jwtToken)
 
         then:
-        claims
-        claims.get('roles') == ['ROLE_DETECTIVE']
-        claims.get(JwtClaims.SUBJECT) == 'sherlock'
+        claims.isPresent()
+        claims.get().get('roles') == ['ROLE_DETECTIVE']
+        claims.get().get(JwtClaims.SUBJECT) == 'sherlock'
     }
 }

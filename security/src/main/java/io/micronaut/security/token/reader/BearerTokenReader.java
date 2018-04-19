@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.token.generator.TokenConfiguration;
-import io.micronaut.security.token.generator.TokenConfigurationProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
@@ -49,17 +46,7 @@ public class BearerTokenReader implements TokenReader {
         log.debug("Looking for bearer token in Authorization header");
         HttpHeaders headers = request.getHeaders();
         Optional<String> authorizationHeader = headers.findFirst(bearerTokenReaderConfiguration.getHeaderName());
-        return findTokenAtAuthorizationHeader(authorizationHeader);
-    }
-
-    public Optional<String> findTokenAtAuthorizationHeader(Optional<String> authorizationHeader) {
-        if ( authorizationHeader.isPresent() ) {
-            String authorization = authorizationHeader.get();
-            log.debug("Authorization header: {}", authorization);
-            return extractTokenFromAuthorization(authorization);
-        } else {
-            return Optional.empty();
-        }
+        return authorizationHeader.flatMap(this::extractTokenFromAuthorization);
     }
 
     public Optional<String> extractTokenFromAuthorization(String authorization) {

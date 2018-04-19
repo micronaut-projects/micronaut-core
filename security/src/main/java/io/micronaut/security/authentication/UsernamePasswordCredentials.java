@@ -23,7 +23,7 @@ import java.util.Objects;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class UsernamePasswordCredentials implements Serializable {
+public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest {
     private String username;
     private String password;
 

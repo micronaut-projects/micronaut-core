@@ -23,6 +23,7 @@ import java.util.Objects;
  * @since 1.0
  */
 public class AuthenticationFailed implements AuthenticationResponse {
+
     private AuthenticationFailure authenticationFailure = AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH;
 
     public AuthenticationFailed() {}

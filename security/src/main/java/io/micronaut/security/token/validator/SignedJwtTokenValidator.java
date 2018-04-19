@@ -30,6 +30,7 @@ import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  *
@@ -38,18 +39,12 @@ import java.util.Map;
  */
 @Singleton
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled", notEquals = "true")
-public class SignedJwtTokenValidator extends AbstractTokenValidator {
+public class SignedJwtTokenValidator implements TokenValidator {
 
     private static final Logger log = LoggerFactory.getLogger(SignedJwtTokenValidator.class);
+    private final JwtAuthenticator jwtAuthenticator;
 
     public SignedJwtTokenValidator(TokenConfiguration tokenConfiguration) {
-        super(tokenConfiguration);
-    }
-
-    JwtAuthenticator jwtAuthenticator;
-
-    @PostConstruct
-    public void initialize() {
         final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(tokenConfiguration.getJwsAlgorithm());
         final String secret = tokenConfiguration.getSecret();
         final SecretSignatureConfiguration signatureConfiguration = new SecretSignatureConfiguration(secret, jwsAlgorithm);
@@ -58,18 +53,19 @@ public class SignedJwtTokenValidator extends AbstractTokenValidator {
     }
 
     @Override
-    public Map<String, Object> validateTokenAndGetClaims(String token) {
+    public Optional<Map<String, Object>> validateTokenAndGetClaims(String token) {
         CommonProfile profile = jwtAuthenticator.validateToken(token);
         if ( profile != null && profile.getAttributes() != null) {
-            return claimsOfProfile(profile);
+            return Optional.of(claimsOfProfile(profile));
         }
-        return null;
+        return Optional.empty();
     }
 
     protected Map<String, Object> claimsOfProfile(CommonProfile profile) {
         Map<String, Object> claims = new HashMap<>();
-        if ( profile.getAttributes() != null) {
-            claims.putAll(new HashMap(profile.getAttributes()));
+        Map<String, Object> attributes = profile.getAttributes();
+        if (attributes != null) {
+            claims.putAll(new HashMap<>(attributes));
         }
         claims.put(JwtClaims.SUBJECT, profile.getId());
         return claims;

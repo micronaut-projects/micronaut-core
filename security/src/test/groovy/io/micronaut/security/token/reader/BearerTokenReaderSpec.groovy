@@ -1,8 +1,9 @@
 package io.micronaut.security.token.reader
 
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Subject
 
 class BearerTokenReaderSpec extends Specification {
 
@@ -13,28 +14,33 @@ class BearerTokenReaderSpec extends Specification {
         getPrefix() >> 'Bearer'
     }
 
-    @Subject
     @Shared
     BearerTokenReader bearerTokenReader = new BearerTokenReader(config)
 
     def extractTokenFromAuthorization() {
         expect:
-        Optional.of('XXX') == bearerTokenReader.extractTokenFromAuthorization('Bearer XXX')
+        bearerTokenReader.extractTokenFromAuthorization('Bearer XXX').get() == 'XXX'
 
         and:
-        Optional.empty() == bearerTokenReader.extractTokenFromAuthorization('BearerXXX')
+        !bearerTokenReader.extractTokenFromAuthorization('BearerXXX').isPresent()
 
         and:
-        Optional.empty() == bearerTokenReader.extractTokenFromAuthorization('XXX')
+        !bearerTokenReader.extractTokenFromAuthorization('XXX').isPresent()
     }
 
     def "if authorization header not present returns null"() {
+        given:
+        def request = HttpRequest.create(HttpMethod.GET, '/')
+
         expect:
-        Optional.empty() == bearerTokenReader.findTokenAtAuthorizationHeader(Optional.empty())
+        !bearerTokenReader.findToken(request).isPresent()
     }
 
     def "findTokenAtAuthorizationHeader parses header correctly"() {
+        given:
+        def request = HttpRequest.create(HttpMethod.GET, '/').header('Authorization', 'Bearer XXX')
+
         expect:
-        Optional.of('XXX') == bearerTokenReader.findTokenAtAuthorizationHeader(Optional.of('Bearer XXX'))
+        bearerTokenReader.findToken(request).get() == 'XXX'
     }
 }

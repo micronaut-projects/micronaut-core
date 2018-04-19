@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.render.AccessRefreshToken;
 import io.micronaut.security.token.render.TokenRenderer;
-import io.micronaut.security.token.validator.EncryptedJwtTokenValidator;
-import io.micronaut.security.token.validator.SignedJwtTokenValidator;
-import io.micronaut.security.token.validator.TokenValidator;
 import org.pac4j.core.profile.jwt.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.util.Date;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  *
@@ -45,21 +41,18 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
     protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
     protected final BeanContext beanContext;
     protected final TokenRenderer tokenRenderer;
+    private final TokenGenerator tokenGenerator;
 
     public DefaultAccessRefreshTokenGenerator(BeanContext beanContext,
                                               TokenConfiguration tokenConfiguration,
                                               TokenEncryptionConfiguration tokenEncryptionConfiguration,
-                                              TokenRenderer tokenRenderer) {
+                                              TokenRenderer tokenRenderer,
+                                              TokenGenerator tokenGenerator) {
         this.beanContext = beanContext;
         this.tokenConfiguration = tokenConfiguration;
         this.tokenEncryptionConfiguration = tokenEncryptionConfiguration;
         this.tokenRenderer = tokenRenderer;
-    }
-
-    TokenGenerator tokenGenerator() {
-        return tokenEncryptionConfiguration.isEnabled() ?
-                beanContext.getBean(EncryptedJwtTokenGenerator.class) :
-                beanContext.getBean(SignedJwtTokenGenerator.class);
+        this.tokenGenerator = tokenGenerator;
     }
 
     protected HttpResponse<AccessRefreshToken> httpResponseWithAccessRefreshToken(AccessRefreshToken accessRefreshToken) {
@@ -68,24 +61,26 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
 
     @Override
     public HttpResponse<AccessRefreshToken> generate(UserDetails userDetails) {
-        Optional<String> accessToken = tokenGenerator().generateToken(userDetails, tokenConfiguration.getDefaultExpiration());
-        Optional<String> refreshToken = tokenGenerator().generateToken(userDetails, tokenConfiguration.getRefreshTokenExpiration());
-        if ( !accessToken.isPresent() || !refreshToken.isPresent() ) {
-            return HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR);
+        try {
+            String accessToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getDefaultExpiration());
+            String refreshToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getRefreshTokenExpiration());
+            AccessRefreshToken accessRefreshToken = tokenRenderer.render(userDetails, tokenConfiguration.getDefaultExpiration(), accessToken, refreshToken);
+            return httpResponseWithAccessRefreshToken(accessRefreshToken);
+        } catch (Exception e) {
+            return HttpResponse.serverError();
         }
-        AccessRefreshToken accessRefreshToken = tokenRenderer.render(userDetails, tokenConfiguration.getDefaultExpiration(), accessToken.get(), refreshToken.get());
-        return httpResponseWithAccessRefreshToken(accessRefreshToken);
     }
 
     @Override
     public HttpResponse<AccessRefreshToken> generate(String refreshToken, Map<String, Object> claims) {
         claims.put(JwtClaims.EXPIRATION_TIME, expirationDate());
-        Optional<String> accessToken = tokenGenerator().generateToken(claims);
-        if ( !accessToken.isPresent() ) {
-            return HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR);
+        try {
+            String accessToken = tokenGenerator.generateToken(claims);
+            AccessRefreshToken accessRefreshToken = tokenRenderer.render(tokenConfiguration.getDefaultExpiration(), accessToken, refreshToken);
+            return httpResponseWithAccessRefreshToken(accessRefreshToken);
+        } catch (Exception e) {
+            return HttpResponse.serverError();
         }
-        AccessRefreshToken accessRefreshToken = tokenRenderer.render(tokenConfiguration.getDefaultExpiration(), accessToken.get(), refreshToken);
-        return httpResponseWithAccessRefreshToken(accessRefreshToken);
     }
 
     protected Date expirationDate() {

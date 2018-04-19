@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 /**
+ * Represents configuration of the JWT token.
  *
  * @author Sergio del Amo
  * @since 1.0

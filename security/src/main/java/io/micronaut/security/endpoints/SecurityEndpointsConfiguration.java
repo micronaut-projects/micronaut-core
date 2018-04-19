@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.endpoints;
 
 /**
+ * Configuration for the security endpoints
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -23,14 +25,12 @@ package io.micronaut.security.endpoints;
 public interface SecurityEndpointsConfiguration {
 
     /**
-     *
-     * @return true if you want to enable {@link LoginController}
+     * @return true if you want to enable the {@link LoginController}
      */
     boolean isLogin();
 
     /**
-     *
-     * @return true if you want to enable {@link OauthController}
+     * @return true if you want to enable the {@link OauthController}
      */
     boolean isRefresh();
 }

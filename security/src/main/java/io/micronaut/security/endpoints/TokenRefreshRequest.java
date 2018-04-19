@@ -15,35 +15,38 @@
  */
 package io.micronaut.security.endpoints;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
+ * Stores the response of a token refresh request
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 public class TokenRefreshRequest {
-    private String grant_type;
-    private String refresh_token;
 
+    @JsonProperty("grant_type")
+    private String grantType;
+
+    @JsonProperty("refresh_token")
+    private String refreshToken;
+
+    /**
+     * Used for JSON serialization
+     */
     public TokenRefreshRequest() {}
 
-    public TokenRefreshRequest(String grant_type, String refresh_token) {
-        this.grant_type = grant_type;
-        this.refresh_token = refresh_token;
+    public TokenRefreshRequest(String grantType, String refreshToken) {
+        this.grantType = grantType;
+        this.refreshToken = refreshToken;
     }
 
-    public String getGrant_type() {
-        return grant_type;
+    public String getGrantType() {
+        return grantType;
     }
 
-    public void setGrant_type(String grant_type) {
-        this.grant_type = grant_type;
+    public String getRefreshToken() {
+        return refreshToken;
     }
 
-    public String getRefresh_token() {
-        return refresh_token;
-    }
-
-    public void setRefresh_token(String refresh_token) {
-        this.refresh_token = refresh_token;
-    }
 }

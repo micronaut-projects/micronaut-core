@@ -20,6 +20,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.security.token.render.AccessRefreshToken;
 
 /**
+ * API for
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -27,10 +28,11 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 public interface OauthControllerApi {
 
     /**
+     * Submits a request to refresh the given token
      *
-     * @param tokenRefreshRequest An instance of {@link TokenRefreshRequest}
-     * @return An HTTP response containing an instance of {@link AccessRefreshToken}
+     * @param tokenRefreshRequest The request body
+     * @return The response containing the new access token
      */
-    @Post(OauthController.ACCESSTOKEN_PATH)
+    @Post(OauthController.ACCESS_TOKEN_PATH)
     HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest);
 }

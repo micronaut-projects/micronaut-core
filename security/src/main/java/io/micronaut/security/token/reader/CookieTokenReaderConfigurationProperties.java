@@ -13,18 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.generator.TokenConfigurationProperties;
 
+/**
+ * Default implementation of {@link CookieTokenReaderConfiguration}
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @ConfigurationProperties(CookieTokenReaderConfigurationProperties.PREFIX)
 public class CookieTokenReaderConfigurationProperties implements CookieTokenReaderConfiguration {
+
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".cookie";
 
-    private boolean enabled = false;
-
-    private String cookieName = "JWT";
+    protected boolean enabled = false;
+    protected String cookieName = "JWT";
 
     @Override
     public boolean isEnabled() {
@@ -34,13 +41,5 @@ public class CookieTokenReaderConfigurationProperties implements CookieTokenRead
     @Override
     public String getCookieName() {
         return cookieName;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public void setCookieName(String cookieName) {
-        this.cookieName = cookieName;
     }
 }
