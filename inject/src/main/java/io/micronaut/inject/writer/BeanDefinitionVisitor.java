@@ -200,7 +200,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a setter.
      *
      * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
+     * @param methodMetadata     The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param valueType          The field type
      * @param setterName         The setter name
@@ -208,11 +208,12 @@ public interface BeanDefinitionVisitor {
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
-                          Object qualifierType,
+                          AnnotationMetadata methodMetadata,
                           boolean requiresReflection,
                           Object valueType,
                           String setterName,
                           Map<String, Object> genericTypes,
+                          AnnotationMetadata setterArgumentMetadata,
                           boolean isOptional);
 
     /**

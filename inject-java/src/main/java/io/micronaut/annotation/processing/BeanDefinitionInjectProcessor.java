@@ -474,7 +474,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
                 writer.setValidated(true);
             }
-            String qualifierRef = annotationUtils.resolveQualifier(method);
+            AnnotationMetadata setterMetadata = annotationUtils.getAnnotationMetadata(
+                    method
+            );
             TypeMirror valueType = method.getParameters().get(0).asType();
             Object fieldType = modelUtils.resolveTypeReference(valueType);
             Map<String, Object> genericTypes = Collections.emptyMap();
@@ -496,11 +498,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             writer.visitSetterValue(
                 modelUtils.resolveTypeReference(declaringClass),
-                qualifierRef,
+                setterMetadata,
                 modelUtils.requiresReflection(method),
                 fieldType,
                 setterName,
                 genericTypes,
+                annotationUtils.getAnnotationMetadata(method.getParameters().get(0)),
                 true);
         }
 

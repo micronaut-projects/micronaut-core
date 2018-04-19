@@ -168,7 +168,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
         this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
-        this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
+        this.constructor = new ReflectionConstructorInjectionPoint<>(this, constructor, arguments);
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
         this.addRequiredComponents(arguments);

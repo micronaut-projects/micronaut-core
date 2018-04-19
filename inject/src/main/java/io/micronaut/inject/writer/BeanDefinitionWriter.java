@@ -651,11 +651,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitSetterValue(
             Object declaringType,
-            Object qualifierType,
+            AnnotationMetadata annotationMetadata,
             boolean requiresReflection,
             Object valueType,
             String setterName,
             Map<String, Object> genericTypes,
+            AnnotationMetadata setterArgumentMetadata,
             boolean isOptional) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
@@ -670,17 +671,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // 3rd argument: the argument types
         String propertyName = NameUtils.getPropertyNameForSetter(setterName);
-        buildTypeArguments(
+        pushBuildArgumentsForMethod(
                 constructorVisitor,
-                Collections.singletonMap(propertyName, Collections.singletonMap(
-                        valueType,
-                        genericTypes
-                ))
+                Collections.singletonMap(propertyName, valueType),
+                Collections.singletonMap(propertyName, setterArgumentMetadata),
+                Collections.singletonMap(propertyName, genericTypes)
         );
 
         // 4th argument: The annotation metadata
-        // TODO: annotation metadata
-        constructorVisitor.visitInsn(ACONST_NULL);
+        if(annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+            constructorVisitor.visitInsn(ACONST_NULL);
+        }
+        else {
+            AnnotationMetadataWriter.instantiateNewMetadata(constructorVisitor, (DefaultAnnotationMetadata) annotationMetadata);
+        }
 
         // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
@@ -706,7 +710,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                          AnnotationMetadata annotationMetadata) {
         visitPostConstructMethodDefinition();
 
-        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes, this.annotationMetadata, constructorVisitor, postConstructMethodVisitor, postConstructInstanceIndex, ADD_POST_CONSTRUCT_METHOD);
+        visitMethodInjectionPointInternal(
+                declaringType,
+                requiresReflection,
+                returnType,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                this.annotationMetadata,
+                constructorVisitor,
+                postConstructMethodVisitor,
+                postConstructInstanceIndex,
+                ADD_POST_CONSTRUCT_METHOD);
     }
 
 

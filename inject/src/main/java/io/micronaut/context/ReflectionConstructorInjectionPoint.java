@@ -34,7 +34,7 @@ import java.lang.reflect.Modifier;
  * @since 1.0
  */
 @Internal
-class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, AnnotationSource {
+class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, AnnotationSource {
 
     private final Constructor<T> constructor;
     private final Argument[] arguments;
@@ -46,7 +46,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
      * @param constructor    The constructor used to construct the object
      * @param arguments      The arguments to the constructor
      */
-    DefaultConstructorInjectionPoint(
+    ReflectionConstructorInjectionPoint(
         BeanDefinition beanDefinition,
         Constructor<T> constructor,
         Argument... arguments) {
