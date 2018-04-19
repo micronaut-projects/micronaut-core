@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -23,7 +24,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a ByteBuf to a string
+ * Converts a ByteBuf to a string.
  *
  * @author Graeme Rocher
  * @since 1.0
