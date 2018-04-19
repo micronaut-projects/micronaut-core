@@ -16,6 +16,8 @@
 
 package io.micronaut.security.token.generator;
 
+import com.nimbusds.jose.JWSAlgorithm;
+
 /**
  * Represents configuration of the JWT token.
  *
@@ -32,9 +34,9 @@ public interface TokenConfiguration {
 
     /**
      *
-     * @return a value within [HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512]
+     * @return The JWS Algorithm
      */
-    String getJwsAlgorithm();
+    JWSAlgorithm getJwsAlgorithm();
 
     /**
      *

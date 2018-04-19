@@ -2,6 +2,7 @@ package io.micronaut.security.token.generator
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.token.validator.EncryptedJwtTokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
@@ -16,7 +17,7 @@ class EncryptedJwtTokenGeneratorSpec extends Specification {
         final Integer defaultExpiration = 3600
         TokenConfiguration tokenConfiguration = Stub(TokenConfiguration) {
             getRolesClaimName() >> ['roles']
-            getJwsAlgorithm() >> 'HS256'
+            getJwsAlgorithm() >> JWSAlgorithm.HS256
             getSecret() >> 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             getDefaultExpiration() >> 3600
             getRefreshTokenExpiration() >> null

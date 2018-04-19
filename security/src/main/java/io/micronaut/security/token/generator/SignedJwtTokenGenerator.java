@@ -52,7 +52,7 @@ public class SignedJwtTokenGenerator extends AbstractTokenGenerator {
     @Override
     protected JWT generate(Map<String, Object> claims) throws JOSEException {
         JWTClaimsSet claimsSet = claimsGenerator.generateClaimsSet(claims);
-        final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(tokenConfiguration.getJwsAlgorithm());
+        final JWSAlgorithm jwsAlgorithm = tokenConfiguration.getJwsAlgorithm();
         SignedJWT signedJWT = new SignedJWT(new JWSHeader(jwsAlgorithm), claimsSet);
         signedJWT.sign(signer);
         return signedJWT;

@@ -45,7 +45,7 @@ public class SignedJwtTokenValidator implements TokenValidator {
     private final JwtAuthenticator jwtAuthenticator;
 
     public SignedJwtTokenValidator(TokenConfiguration tokenConfiguration) {
-        final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(tokenConfiguration.getJwsAlgorithm());
+        final JWSAlgorithm jwsAlgorithm = tokenConfiguration.getJwsAlgorithm();
         final String secret = tokenConfiguration.getSecret();
         final SecretSignatureConfiguration signatureConfiguration = new SecretSignatureConfiguration(secret, jwsAlgorithm);
         jwtAuthenticator = new JwtAuthenticator();

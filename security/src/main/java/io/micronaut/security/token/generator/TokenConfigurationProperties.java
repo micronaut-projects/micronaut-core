@@ -16,6 +16,7 @@
 
 package io.micronaut.security.token.generator;
 
+import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.config.SecurityConfiguration;
@@ -37,17 +38,15 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     public static final String PREFIX = SecurityConfiguration.PREFIX + ".token";
 
     private static final String DEFAULT_ROLES_CLAIM_NAME = "roles";
-    private static final String DEFAULT_JWSALGORITHM = "HS256";
     private static final Integer DEFAULT_EXPIRATION = 3600;
 
     protected Integer refreshTokenExpiration = null;
     protected Integer defaultExpiration = DEFAULT_EXPIRATION;
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
-
+    private JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
 
     @NotBlank @Size()
     protected String secret;
-    private String jwsAlgorithm = DEFAULT_JWSALGORITHM;
 
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
@@ -65,48 +64,5 @@ public class TokenConfigurationProperties implements TokenConfiguration {
         return this.secret;
     }
 
-    /**
-     * @return The JWS Algorithm
-     */
-    public String getJwsAlgorithm() {
-        return jwsAlgorithm;
-    }
-
-    /**
-     * @return The JWS Algorithm
-     */
-    protected void setJwsAlgorithm(@Nullable String jwsAlgorithm) {
-        if ( jwsAlgorithm == null ) {
-            this.jwsAlgorithm = DEFAULT_JWSALGORITHM;
-        } else {
-            if ( !validJwsAlgorithms().contains(jwsAlgorithm) ) {
-                throw new ConfigurationException(invalidJwsMessage(jwsAlgorithm));
-            }
-            this.jwsAlgorithm = jwsAlgorithm;
-        }
-    }
-
-    protected String invalidJwsMessage(String jwsAlgorithm) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("JWS Algorithm: ");
-        sb.append(jwsAlgorithm);
-        sb.append("not allowed. Valid values: ");
-        sb.append(validJwsAlgorithms().stream().reduce((a, b) -> a + "," + b).get());
-        return sb.toString();
-    }
-
-    protected List<String> validJwsAlgorithms() {
-        return Arrays.asList(DEFAULT_JWSALGORITHM,
-                "HS384",
-                "HS512",
-                "RS256",
-                "RS384",
-                "RS512",
-                "ES256",
-                "ES384",
-                "ES512",
-                "PS256",
-                "PS384",
-                "PS512");
-    }
+    public JWSAlgorithm getJwsAlgorithm() { return jwsAlgorithm; }
 }
