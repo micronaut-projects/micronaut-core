@@ -19,6 +19,8 @@ package io.micronaut.security.authentication;
 /**
  * Represents a request to authenticate.
  *
+ * @param <T> The type of the identity
+ * @param <S> The type of the secret
  * @author Sergio del Amo
  * @since 1.0
  */

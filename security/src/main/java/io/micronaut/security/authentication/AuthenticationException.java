@@ -13,18 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
+/**
+ * A runtime exception thrown when authentication fails.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 public class AuthenticationException extends RuntimeException {
 
+    /**
+     * Sets the message based on the response.
+     *
+     * @param response The authentication response
+     */
     public AuthenticationException(AuthenticationResponse response) {
         super(response.getMessage().orElse(null));
     }
 
+    /**
+     * No message
+     */
     public AuthenticationException() {
         super();
     }
 
+    /**
+     * @param message A custom message
+     */
     public AuthenticationException(String message) {
         super(message);
     }

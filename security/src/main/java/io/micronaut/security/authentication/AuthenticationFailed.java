@@ -81,5 +81,4 @@ public class AuthenticationFailed implements AuthenticationResponse {
         return Objects.hash(authenticationFailure);
     }
 
-
 }

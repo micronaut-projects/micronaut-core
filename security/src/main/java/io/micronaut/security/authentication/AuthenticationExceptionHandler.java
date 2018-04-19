@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import io.micronaut.context.annotation.Primary;
@@ -25,6 +26,13 @@ import io.micronaut.http.server.exceptions.ExceptionHandler;
 
 import javax.inject.Singleton;
 
+
+/**
+ * Handles the server response when an {@link AuthenticationException} is thrown
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
 @Primary
 @Produces

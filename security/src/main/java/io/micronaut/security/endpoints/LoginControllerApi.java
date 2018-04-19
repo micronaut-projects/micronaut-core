@@ -20,7 +20,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
-import io.micronaut.security.token.render.AccessRefreshToken;
 
 /**
  *
@@ -30,9 +29,10 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 public interface LoginControllerApi {
 
     /**
+     * Attempts to authenticate the with the supplied credentials.
      *
      * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
-     * @return An HTTP response containing an instance of {@link AccessRefreshToken}
+     * @return An Http response
      */
     @Post(LoginController.LOGIN_PATH)
     HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials);

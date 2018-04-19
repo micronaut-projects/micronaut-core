@@ -72,7 +72,6 @@ public class UserDetails implements AuthenticationResponse {
         this.roles = roles;
     }
 
-
     @Override
     public boolean isAuthenticated() {
         return true;
