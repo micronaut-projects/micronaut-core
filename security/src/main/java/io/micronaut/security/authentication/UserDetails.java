@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import java.util.Collection;
 import java.util.Objects;
 
 /**
- * Authenticated user's representation
+ * Authenticated user's representation.
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -27,8 +28,17 @@ public class UserDetails implements AuthenticationResponse {
     private String username;
     private Collection<String> roles;
 
+    /**
+     * Empty constructor.
+     *
+     */
     public UserDetails() {}
 
+    /**
+     *
+     * @param username e.g. admin
+     * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
+     */
     public UserDetails(String username, Collection<String> roles) {
         this.username = username;
         this.roles = roles;
@@ -39,18 +49,34 @@ public class UserDetails implements AuthenticationResponse {
         return true;
     }
 
+    /**
+     * username getter.
+     * @return e.g. admin
+     */
     public String getUsername() {
         return username;
     }
 
+    /**
+     * username setter.
+     * @param username e.g. admin
+     */
     public void setUsername(String username) {
         this.username = username;
     }
 
+    /**
+     * roles getter.
+     * @return e.g. ['ROLE_USER', 'ROLE_ADMIN']
+     */
     public Collection<String> getRoles() {
         return roles;
     }
 
+    /**
+     * roles setter.
+     * @param roles e.g. ['ROLE_USER', 'ROLE_ADMIN']
+     */
     public void setRoles(Collection<String> roles) {
         this.roles = roles;
     }

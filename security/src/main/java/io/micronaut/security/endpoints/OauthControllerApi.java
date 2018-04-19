@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.endpoints;
 
 import io.micronaut.http.HttpResponse;
@@ -20,7 +21,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.security.token.render.AccessRefreshToken;
 
 /**
- * API for
+ * API for {@link OauthController}.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -28,7 +29,7 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 public interface OauthControllerApi {
 
     /**
-     * Submits a request to refresh the given token
+     * Submits a request to refresh the given token.
      *
      * @param tokenRefreshRequest The request body
      * @return The response containing the new access token

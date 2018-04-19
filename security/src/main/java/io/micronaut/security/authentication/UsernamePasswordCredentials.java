@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import java.io.Serializable;
@@ -27,25 +28,49 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
     private String username;
     private String password;
 
+    /**
+     * Empty constructor.
+     */
     public UsernamePasswordCredentials() {}
 
+    /**
+     *
+     * @param username e.g. admin
+     * @param password raw password
+     */
     public UsernamePasswordCredentials(String username, String password) {
         this.username = username;
         this.password = password;
     }
 
+    /**
+     * username getter.
+     * @return e.g. admin
+     */
     public String getUsername() {
         return username;
     }
 
+    /**
+     * username setter.
+     * @param username e.g. admin
+     */
     public void setUsername(String username) {
         this.username = username;
     }
 
+    /**
+     * password getter.
+     * @return raw password
+     */
     public String getPassword() {
         return password;
     }
 
+    /**
+     * password setter.
+     * @param password raw password
+     */
     public void setPassword(String password) {
         this.password = password;
     }

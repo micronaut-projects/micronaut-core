@@ -35,7 +35,7 @@ public interface AccessRefreshTokenGenerator {
      * Generate an {@link AccessRefreshToken} response for the given
      * user details.
      *
-     * @param userDetails The user details
+     * @param userDetails Authenticated user's representation.
      * @return The http response
      */
     HttpResponse<AccessRefreshToken> generate(UserDetails userDetails);

@@ -41,23 +41,33 @@ public class OauthController implements OauthControllerApi {
     public static final String CONTROLLER_PATH = "/oauth";
     public static final String ACCESS_TOKEN_PATH = "/access_token";
 
-    private static final Logger log = LoggerFactory.getLogger(OauthController.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OauthController.class);
     protected final TokenValidator tokenValidator;
     protected final AccessRefreshTokenGenerator accessRefreshTokenGenerator;
 
+    /**
+     *
+     * @param tokenValidator An instance of {@link TokenValidator}
+     * @param accessRefreshTokenGenerator An instance of {@link AccessRefreshTokenGenerator}
+     */
     public OauthController(TokenValidator tokenValidator,
                            AccessRefreshTokenGenerator accessRefreshTokenGenerator) {
         this.tokenValidator = tokenValidator;
         this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
     }
 
+    /**
+     *
+     * @param tokenRefreshRequest An instance of {@link TokenRefreshRequest} present in the request
+     * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
+     */
     @Override
     @Post(OauthController.ACCESS_TOKEN_PATH)
     public HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest) {
         if ( !validateTokenRefreshRequest(tokenRefreshRequest) ) {
             return HttpResponse.status(HttpStatus.BAD_REQUEST);
         }
-        log.info("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
+        LOG.info("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
 
         Optional<Map<String, Object>> claims = tokenValidator.validateTokenAndGetClaims(tokenRefreshRequest.getRefreshToken());
 
@@ -68,6 +78,11 @@ public class OauthController implements OauthControllerApi {
         }
     }
 
+    /**
+     *
+     * @param tokenRefreshRequest An instance of {@link TokenRefreshRequest}
+     * @return true if the object is valid
+     */
     protected boolean validateTokenRefreshRequest(TokenRefreshRequest tokenRefreshRequest) {
         return !( tokenRefreshRequest.getGrantType() == null ||
                 tokenRefreshRequest.getRefreshToken() == null ||

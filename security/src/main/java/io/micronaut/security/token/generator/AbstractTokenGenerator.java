@@ -20,7 +20,6 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.JWT;
 import io.micronaut.security.authentication.UserDetails;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  *
@@ -32,20 +31,44 @@ abstract class AbstractTokenGenerator implements TokenGenerator {
     protected final TokenConfiguration tokenConfiguration;
     protected final JWTClaimsSetGenerator claimsGenerator;
 
-    public AbstractTokenGenerator(TokenConfiguration tokenConfiguration,
+    /**
+     *
+     * @param tokenConfiguration Instance of {@link TokenConfiguration}
+     * @param claimsGenerator Instance of {@link JWTClaimsSetGenerator}
+     */
+    AbstractTokenGenerator(TokenConfiguration tokenConfiguration,
                                   JWTClaimsSetGenerator claimsGenerator) {
         this.tokenConfiguration = tokenConfiguration;
         this.claimsGenerator = claimsGenerator;
     }
 
+    /**
+     *
+     * @param claims Claims to be included in the JWT
+     * @return a JWT token
+     * @throws JOSEException a {@link JOSEException}
+     */
     protected abstract JWT generate(Map<String, Object> claims) throws JOSEException;
 
+    /**
+     *
+     * @param userDetails Authenticated user's representation.
+     * @param expiration The amount of time in milliseconds until the token expires
+     * @return
+     * @throws JOSEException
+     */
     @Override
     public String generateToken(UserDetails userDetails, Integer expiration) throws JOSEException {
         Map<String, Object> claims = claimsGenerator.generateClaims(userDetails, expiration);
         return generateToken(claims);
     }
 
+    /**
+     *
+     * @param claims Claims to be included in the JWT token to be generated
+     * @return
+     * @throws JOSEException
+     */
     @Override
     public String generateToken(Map<String, Object> claims) throws JOSEException {
         JWT jwt = generate(claims);

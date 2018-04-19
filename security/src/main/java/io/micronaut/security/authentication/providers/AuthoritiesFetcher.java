@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication.providers;
 
 import java.util.List;
@@ -25,7 +26,7 @@ import java.util.List;
 public interface AuthoritiesFetcher {
 
     /**
-     * Fetches User authorities
+     * Fetches User authorities.
      * @param username e.g. admin
      * @return a list of string containing user authorities e.g. ['ROLE_ADMIN', 'ROLE_USER']
      */

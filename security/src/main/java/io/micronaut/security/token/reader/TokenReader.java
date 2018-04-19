@@ -29,7 +29,7 @@ import java.util.Optional;
 public interface TokenReader {
 
     /**
-     * Attempts to retrieve a token in a request
+     * Attempts to retrieve a token in a request.
      *
      * @param request The request to look for the token in
      * @return An optional token string

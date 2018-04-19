@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.generator.TokenConfigurationProperties;
 
 /**
- * Default implementation of {@link CookieTokenReaderConfiguration}
+ * Default implementation of {@link CookieTokenReaderConfiguration}.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -33,11 +33,19 @@ public class CookieTokenReaderConfigurationProperties implements CookieTokenRead
     protected boolean enabled = false;
     protected String cookieName = "JWT";
 
+    /**
+     * enabled getter.
+     * @return a boolean flag indicating wether the feature is enabled or not
+     */
     @Override
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * cookieName getter.
+     * @return a String with the Cookie Name
+     */
     @Override
     public String getCookieName() {
         return cookieName;

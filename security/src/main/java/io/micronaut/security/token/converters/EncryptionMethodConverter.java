@@ -30,6 +30,13 @@ import java.util.Optional;
 @Singleton
 public class EncryptionMethodConverter implements TypeConverter<CharSequence, EncryptionMethod> {
 
+    /**
+     *
+     * @param object     e.g. A128CBC-HS256
+     * @param targetType The target type being converted to {@link EncryptionMethod}
+     * @param context    The {@link ConversionContext}
+     * @return
+     */
     @Override
     public Optional<EncryptionMethod> convert(CharSequence object, Class<EncryptionMethod> targetType, ConversionContext context) {
         if ( object == null ) {

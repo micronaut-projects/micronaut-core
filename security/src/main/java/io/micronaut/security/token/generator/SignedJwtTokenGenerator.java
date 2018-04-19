@@ -22,33 +22,46 @@ import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 import java.util.Map;
-import java.util.Optional;
 
+/**
+ * Generates a Signed JWT token.
+ */
 @Singleton
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled", notEquals = "true")
 public class SignedJwtTokenGenerator extends AbstractTokenGenerator {
 
-    private static final Logger log = LoggerFactory.getLogger(SignedJwtTokenGenerator.class);
-
     private JWSSigner signer;
 
+    /**
+     *
+     * @param tokenConfiguration encapsulate configuration used by the generator
+     * @param claimsGenerator collaborator to generate keys
+     * @throws KeyLengthException thrown if secret is not long enough
+     */
     public SignedJwtTokenGenerator(TokenConfiguration tokenConfiguration,
                                    JWTClaimsSetGenerator claimsGenerator) throws KeyLengthException {
         super(tokenConfiguration, claimsGenerator);
         signer = createSigner(tokenConfiguration);
     }
 
+    /**
+     * Instantiates a {@link JWSSigner} using the supplied {@link TokenConfiguration}.
+     * @param tokenConfiguration Instance of {@link TokenConfiguration}
+     * @return Instance of {@link JWSSigner}
+     * @throws KeyLengthException thrown if secret is not long enough
+     */
     protected JWSSigner createSigner(TokenConfiguration tokenConfiguration) throws KeyLengthException {
         return new MACSigner(tokenConfiguration.getSecret());
     }
 
+    /**
+     *
+     * @param claims Claims to be included in the JWT
+     * @return a JWT token
+     * @throws JOSEException
+     */
     @Override
     protected JWT generate(Map<String, Object> claims) throws JOSEException {
         JWTClaimsSet claimsSet = claimsGenerator.generateClaimsSet(claims);

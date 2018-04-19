@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.security.token.reader.BearerTokenReader;
@@ -23,7 +24,6 @@ import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
@@ -39,7 +39,7 @@ import java.security.spec.X509EncodedKeySpec;
  */
 @Singleton
 public class FileRSAKeyProvider implements EncryptionKeyProvider {
-    private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
 
     protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
 
@@ -47,14 +47,21 @@ public class FileRSAKeyProvider implements EncryptionKeyProvider {
 
     private RSAPrivateKey privateKey;
 
+    /**
+     *
+     * @param tokenEncryptionConfiguration {@link TokenEncryptionConfiguration}
+     */
     public FileRSAKeyProvider(TokenEncryptionConfiguration tokenEncryptionConfiguration) {
         this.tokenEncryptionConfiguration = tokenEncryptionConfiguration;
     }
 
+    /**
+     * Populates publicKey and privateKey.
+     */
     @PostConstruct
-    void init() {
+    void initialize() {
         if ( tokenEncryptionConfiguration.getPublicKeyPath() != null && tokenEncryptionConfiguration.getPrivateKeyPath() != null) {
-            log.debug("Loading public/private key from DER files");
+            LOG.debug("Loading public/private key from DER files");
             try {
                 KeyFactory kf = KeyFactory.getInstance("RSA");
 
@@ -71,26 +78,34 @@ public class FileRSAKeyProvider implements EncryptionKeyProvider {
                 privateKey = (RSAPrivateKey) kf.generatePrivate(privateSpec);
 
             } catch (InvalidKeySpecException e) {
-                log.warn("InvalidKeySpecException while loading public/private key from DER files");
+                LOG.warn("InvalidKeySpecException while loading public/private key from DER files");
 
             } catch (NoSuchAlgorithmException e) {
-                log.warn("NoSuchAlgorithmException while loading public/private key from DER files");
+                LOG.warn("NoSuchAlgorithmException while loading public/private key from DER files");
 
             } catch (IOException e) {
-                log.warn("IOException while loading public/private key from DER files");
+                LOG.warn("IOException while loading public/private key from DER files");
             }
         } else if ( tokenEncryptionConfiguration.getPublicKeyPath() == null ) {
-            log.warn("public key path is null");
+            LOG.warn("public key path is null");
         } else if ( tokenEncryptionConfiguration.getPrivateKeyPath() == null) {
-            log.warn("private key path is null");
+            LOG.warn("private key path is null");
         }
     }
 
+    /**
+     * publicKey getter.
+     * @return {@link RSAPublicKey}
+     */
     @Override
     public RSAPublicKey getPublicKey() {
         return publicKey;
     }
 
+    /**
+     * privateKey getter.
+     * @return {@link RSAPrivateKey}
+     */
     @Override
     public RSAPrivateKey getPrivateKey() {
         return privateKey;

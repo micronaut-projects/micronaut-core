@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.render;
 
 /**
- * Stores the combination of access and refresh tokens
+ * Stores the combination of access and refresh tokens.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -27,16 +28,22 @@ public class AccessRefreshToken {
     private String refreshToken;
 
     /**
-     * Necessary for JSON serialization
+     * Necessary for JSON serialization.
      */
     public AccessRefreshToken() {}
 
+    /**
+     *
+     * @param accessToken JWT token
+     * @param refreshToken JWT token
+     */
     public AccessRefreshToken(String accessToken, String refreshToken) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
     }
 
     /**
+     * accesToken getter.
      * @return The access token
      */
     public String getAccessToken() {
@@ -44,6 +51,7 @@ public class AccessRefreshToken {
     }
 
     /**
+     * accesToken setter.
      * @return The refresh token
      */
     public String getRefreshToken() {

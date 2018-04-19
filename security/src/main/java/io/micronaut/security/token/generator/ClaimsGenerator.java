@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.security.authentication.UserDetails;
@@ -23,19 +24,20 @@ import java.util.Map;
  *
  * @author Sergio del Amo
  * @since 1.0
+ * @param <T> claim object
  */
 public interface ClaimsGenerator<T> {
 
     /**
      *
-     * @param userDetails
+     * @param userDetails Authenticated user's representation.
      * @param expiration JWT token expiration time in milliseconds
      * @return JWT Claims Map
      */
     Map<String, ?> generateClaims(UserDetails userDetails, Integer expiration);
 
     /**
-     * Generate a claims set based on claims
+     * Generate a claims set based on claims.
      *
      * @param claims The claims
      * @return The claims set

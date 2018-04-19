@@ -28,6 +28,13 @@ import java.util.Optional;
  */
 public class JWSAlgorithmConverter  implements TypeConverter<CharSequence, JWSAlgorithm> {
 
+    /**
+     *
+     * @param object     e.g. HS256
+     * @param targetType The target type being converted to {@link JWSAlgorithm}
+     * @param context    The {@link ConversionContext}
+     * @return
+     */
     @Override
     public Optional<JWSAlgorithm> convert(CharSequence object, Class<JWSAlgorithm> targetType, ConversionContext context) {
         if ( object == null ) {

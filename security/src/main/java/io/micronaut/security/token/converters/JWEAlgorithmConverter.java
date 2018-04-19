@@ -31,6 +31,13 @@ import java.util.Optional;
 @Singleton
 public class JWEAlgorithmConverter implements TypeConverter<CharSequence, JWEAlgorithm> {
 
+    /**
+     *
+     * @param object     e.g. RSA-OAEP
+     * @param targetType The target type being converted to {@link JWEAlgorithm}
+     * @param context    The {@link ConversionContext}
+     * @return
+     */
     @Override
     public Optional<JWEAlgorithm> convert(CharSequence object, Class<JWEAlgorithm> targetType, ConversionContext context) {
         if ( object == null ) {

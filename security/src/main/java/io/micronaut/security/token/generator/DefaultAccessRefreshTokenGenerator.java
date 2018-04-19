@@ -35,14 +35,24 @@ import java.util.Map;
  */
 @Singleton
 public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGenerator {
-    private static final Logger log = LoggerFactory.getLogger(DefaultAccessRefreshTokenGenerator.class);
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultAccessRefreshTokenGenerator.class);
+    private static final int MILLISECONDS_IN_A_SECOND = 1000;
 
     protected final TokenConfiguration tokenConfiguration;
     protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
     protected final BeanContext beanContext;
     protected final TokenRenderer tokenRenderer;
-    private final TokenGenerator tokenGenerator;
+    protected final TokenGenerator tokenGenerator;
 
+    /**
+     *
+     * @param beanContext Instance of {@link BeanContext}
+     * @param tokenConfiguration Instance of {@link TokenConfiguration}
+     * @param tokenEncryptionConfiguration Instance of {@link TokenEncryptionConfiguration}
+     * @param tokenRenderer Instance of {@link TokenRenderer}
+     * @param tokenGenerator Intance of {@link TokenGenerator}
+     */
     public DefaultAccessRefreshTokenGenerator(BeanContext beanContext,
                                               TokenConfiguration tokenConfiguration,
                                               TokenEncryptionConfiguration tokenEncryptionConfiguration,
@@ -55,10 +65,20 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
         this.tokenGenerator = tokenGenerator;
     }
 
+    /**
+     * Wraps {@link AccessRefreshToken} in an HTTP Response.
+     * @param accessRefreshToken {@link AccessRefreshToken}
+     * @return HTTPResponse warpping {@link AccessRefreshToken}
+     */
     protected HttpResponse<AccessRefreshToken> httpResponseWithAccessRefreshToken(AccessRefreshToken accessRefreshToken) {
         return HttpResponse.ok(accessRefreshToken);
     }
 
+    /**
+     *
+     * @param userDetails Authenticated user's representation.
+     * @return
+     */
     @Override
     public HttpResponse<AccessRefreshToken> generate(UserDetails userDetails) {
         try {
@@ -71,6 +91,12 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
         }
     }
 
+    /**
+     *
+     * @param refreshToken The refresh token - a JWT token
+     * @param claims The claims to generate the access token
+     * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
+     */
     @Override
     public HttpResponse<AccessRefreshToken> generate(String refreshToken, Map<String, Object> claims) {
         claims.put(JwtClaims.EXPIRATION_TIME, expirationDate());
@@ -83,10 +109,14 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
         }
     }
 
+    /**
+     * An expiration Date built with current date + default expiration.
+     * @return java.util.Date
+     */
     protected Date expirationDate() {
         Integer expiration = tokenConfiguration.getDefaultExpiration();
         Date now = new Date();
-        log.debug("Setting expiration to {}", expiration.toString());
-        return new Date(now.getTime() + (expiration * 1000));
+        LOG.debug("Setting expiration to {}", expiration.toString());
+        return new Date(now.getTime() + (expiration * MILLISECONDS_IN_A_SECOND));
     }
 }

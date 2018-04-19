@@ -19,9 +19,6 @@ package io.micronaut.security.token.reader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookie;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -37,6 +34,10 @@ public class CookieTokenReader implements TokenReader {
 
     protected final CookieTokenReaderConfiguration cookieTokenReaderConfiguration;
 
+    /**
+     *
+     * @param cookieTokenReaderConfiguration Configuration properties for CookieTokenReader
+     */
     public CookieTokenReader(CookieTokenReaderConfiguration cookieTokenReaderConfiguration) {
         this.cookieTokenReaderConfiguration = cookieTokenReaderConfiguration;
     }

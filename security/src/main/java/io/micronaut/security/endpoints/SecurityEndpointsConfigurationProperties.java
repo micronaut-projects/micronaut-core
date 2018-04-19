@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
 
 /**
- * Retrieves configuration for the security endpoints
+ * Retrieves configuration for the security endpoints.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -33,11 +33,19 @@ public class SecurityEndpointsConfigurationProperties implements SecurityEndpoin
     protected boolean login = false;
     protected boolean refresh = false;
 
+    /**
+     * login getter.
+     * @return boolean flag to indicate if {@link LoginController} should be enabled.
+     */
     @Override
     public boolean isLogin() {
         return login;
     }
 
+    /**
+     * refresh getter.
+     * @return boolean flag to indicate if {@link OauthController} should be enabled.
+     */
     @Override
     public boolean isRefresh() {
         return refresh;

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication.providers;
 
 /**
@@ -24,7 +25,7 @@ public interface PasswordEncoder {
 
     /**
      *
-     * @param rawPassword
+     * @param rawPassword Raw password.
      * @return an encoded string
      */
     String encode(String rawPassword);

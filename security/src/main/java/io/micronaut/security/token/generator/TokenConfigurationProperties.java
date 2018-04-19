@@ -18,16 +18,12 @@ package io.micronaut.security.token.generator;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.config.SecurityConfiguration;
-import javax.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
-import java.util.Arrays;
-import java.util.List;
 
 /**
- * Stores configuration for JWT
+ * Stores configuration for JWT.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -43,26 +39,48 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     protected Integer refreshTokenExpiration = null;
     protected Integer defaultExpiration = DEFAULT_EXPIRATION;
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
-    private JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
+    protected JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
 
     @NotBlank @Size()
     protected String secret;
 
+    /**
+     * refreshTokenExpiration getter.
+     * @return expiration time in milliseconds
+     */
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
     }
 
+    /**
+     * defaultExpiration getter.
+     * @return expiration time in milliseconds
+     */
     public Integer getDefaultExpiration() {
         return defaultExpiration;
     }
 
+    /**
+     * rolesClaimName getter.
+     * @return e.g. roles
+     */
     public String getRolesClaimName() {
         return rolesClaimName;
     }
 
+    /**
+     * secret getter.
+     * @return secret used to sign the JWT
+     */
     public String getSecret() {
         return this.secret;
     }
 
-    public JWSAlgorithm getJwsAlgorithm() { return jwsAlgorithm; }
+    /**
+     * jwsAlgorithm getter.
+     * @return a JWSAlgorithm
+     */
+    public JWSAlgorithm getJwsAlgorithm() {
+        return jwsAlgorithm;
+    }
 }

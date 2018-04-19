@@ -20,15 +20,23 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 /**
- * Implementations of this interface must take care of providing a pair of RSA private/public keys
+ * Implementations of this interface must take care of providing a pair of RSA private/public keys.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface EncryptionKeyProvider {
 
+    /**
+     * Public Key.
+     * @return {@link RSAPublicKey}
+     */
     RSAPublicKey getPublicKey();
 
+    /**
+     * Private Key.
+     * @return {@link RSAPrivateKey}
+     */
     RSAPrivateKey getPrivateKey();
 
 }

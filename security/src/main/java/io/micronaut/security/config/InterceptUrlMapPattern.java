@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.config;
 
 import io.micronaut.http.HttpMethod;
 
 import javax.annotation.concurrent.Immutable;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  *
@@ -36,20 +35,38 @@ public class InterceptUrlMapPattern {
     private List<String> access;
     private HttpMethod httpMethod;
 
+    /**
+     *
+     * @param pattern e.g. /health
+     * @param access e.g. ['ROLE_USER', 'ROLE_ADMIN']
+     * @param httpMethod e.g. HttpMethod.GET
+     */
     public InterceptUrlMapPattern(String pattern, List<String> access, HttpMethod httpMethod) {
         this.pattern = pattern;
         this.access = access;
         this.httpMethod = httpMethod;
     }
 
+    /**
+     * pattern getter.
+     * @return string e.g. /health
+     */
     public String getPattern() {
         return pattern;
     }
 
+    /**
+     * access getter.
+     * @return e.g. ['ROLE_USER', 'ROLE_ADMIN']
+     */
     public List<String> getAccess() {
         return access;
     }
 
+    /**
+     * httpMethod getter.
+     * @return e.g. HttpMethod.GET
+     */
     public HttpMethod getHttpMethod() {
         return httpMethod;
     }

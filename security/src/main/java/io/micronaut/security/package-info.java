@@ -15,11 +15,12 @@
  */
 
 /**
- * Contains classes specific to security capabilities within Micronaut
+ * Contains classes specific to security capabilities within Micronaut.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
+
 @Configuration
 @Requires(property = SecurityConfiguration.PREFIX + ".enabled", value = "true")
 package io.micronaut.security;

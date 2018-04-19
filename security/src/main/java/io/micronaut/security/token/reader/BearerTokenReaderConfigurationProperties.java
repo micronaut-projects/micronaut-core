@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.generator.TokenConfigurationProperties;
 
 /**
- * Default implementation of {@link BearerTokenReaderConfiguration}
+ * Default implementation of {@link BearerTokenReaderConfiguration}.
  *
  * @author Sergio del Amo
  * @since 1.0

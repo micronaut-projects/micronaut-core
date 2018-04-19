@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.validator;
 
 import com.nimbusds.jose.JOSEException;
@@ -40,10 +41,14 @@ import java.util.Optional;
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled")
 public class EncryptedJwtTokenValidator implements TokenValidator {
 
-    private static final Logger log = LoggerFactory.getLogger(EncryptedJwtTokenValidator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(EncryptedJwtTokenValidator.class);
 
     private final RSADecrypter rsaDecrypter;
 
+    /**
+     *
+     * @param rsaKeyProvider Provider of public and private keys
+     */
     public EncryptedJwtTokenValidator(EncryptionKeyProvider rsaKeyProvider) {
         this.rsaDecrypter = new RSADecrypter(rsaKeyProvider.getPrivateKey());
     }
@@ -58,10 +63,10 @@ public class EncryptedJwtTokenValidator implements TokenValidator {
                 return Optional.of(encryptedJWT.getJWTClaimsSet().getClaims());
             }
         } catch(ParseException e) {
-            log.warn("ParseException parsing token: {}", token);
+            LOG.warn("ParseException parsing token: {}", token);
 
         } catch (JOSEException e) {
-            log.warn("JOSEException while decrypting {}", token);
+            LOG.warn("JOSEException while decrypting {}", token);
         }
         return Optional.empty();
     }

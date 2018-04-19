@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import io.micronaut.security.authentication.UserDetails;
@@ -28,15 +29,15 @@ import java.util.Map;
 public interface TokenGenerator {
 
     /**
-     *
-     * @param userDetails The user details
+     * @throws Exception exception thrown if the JWT generation fails
+     * @param userDetails Authenticated user's representation.
      * @param expiration The amount of time in milliseconds until the token expires
      * @return An optional JWT string
      */
     String generateToken(UserDetails userDetails, Integer expiration) throws Exception;
 
     /**
-     *
+     * @throws Exception exception thrown if the JWT generation fails
      * @param claims Claims to be included in the JWT token to be generated
      * @return a JSON Web Token ( JWT )
      */

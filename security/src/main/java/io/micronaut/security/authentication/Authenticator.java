@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import org.slf4j.Logger;
@@ -29,10 +30,14 @@ import java.util.Optional;
  */
 @Singleton
 public class Authenticator {
-    private static final Logger log = LoggerFactory.getLogger(Authenticator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Authenticator.class);
 
     private Collection<AuthenticationProvider> authenticationProviders;
 
+    /**
+     *
+     * @param authenticationProviders a List of availabble authentication providers
+     */
     public Authenticator(Collection<AuthenticationProvider> authenticationProviders) {
         this.authenticationProviders = authenticationProviders;
     }
@@ -51,8 +56,8 @@ public class Authenticator {
                         return Optional.of(rsp);
                     }
                 } catch (Exception e) {
-                    if (log.isErrorEnabled()) {
-                        log.error("Authentication provider threw exception", e);
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Authentication provider threw exception", e);
                     }
                 }
             }

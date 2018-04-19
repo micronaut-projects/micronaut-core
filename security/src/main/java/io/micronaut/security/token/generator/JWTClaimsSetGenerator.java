@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -30,11 +31,12 @@ import java.util.Map;
  */
 @Singleton
 public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
-    private static final Logger log = LoggerFactory.getLogger(AbstractTokenGenerator.class);
+    private static final int MILLISECONDS_IN_A_SECOND = 1000;
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractTokenGenerator.class);
 
     /**
      *
-     * @param userDetails
+     * @param userDetails Authenticated user's representation.
      * @param expiration expiration time in seconds
      * @return
      */
@@ -51,18 +53,23 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
         builder.issueTime(now);
 
         if ( expiration != null ) {
-            log.debug("Setting expiration to {}", expiration.toString());
-            Date expirationTime = new Date(now.getTime() + (expiration * 1000));
+            LOG.debug("Setting expiration to {}", expiration.toString());
+            Date expirationTime = new Date(now.getTime() + (expiration * MILLISECONDS_IN_A_SECOND));
             builder.expirationTime(expirationTime);
         }
 
         builder.claim("roles", userDetails.getRoles());
 
-        log.debug("Generated claim set: {}",builder.build().toJSONObject().toString());
+        LOG.debug("Generated claim set: {}",builder.build().toJSONObject().toString());
 
         return builder.build();
     }
 
+    /**
+     *
+     * @param claims The claims to be included in the JWT
+     * @return Instance of {@link JWTClaimsSet}
+     */
     @Override
     public JWTClaimsSet generateClaimsSet(Map<String, ?> claims) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();

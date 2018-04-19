@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication.providers;
 
 import java.util.Optional;
@@ -25,7 +26,7 @@ import java.util.Optional;
 public interface UserFetcher {
 
     /**
-     * Fetches a user from a persistence mechanism based on the username
+     * Fetches a user from a persistence mechanism based on the username.
      * @param username e.g. admin
      * @return An implementation of {@link UserState}
      */

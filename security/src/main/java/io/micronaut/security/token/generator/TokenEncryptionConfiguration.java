@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import com.nimbusds.jose.EncryptionMethod;
@@ -21,7 +22,7 @@ import com.nimbusds.jose.JWEAlgorithm;
 import java.io.File;
 
 /**
- * Represents configuration of the JWT encryption mechanism
+ * Represents configuration of the JWT encryption mechanism.
  *
  * @author Sergio del Amo
  * @since 1.0

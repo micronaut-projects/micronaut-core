@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.endpoints;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Encapsulate the request to get a new access token
+ * Encapsulate the request to get a new access token.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -32,19 +33,32 @@ public class TokenRefreshRequest {
     private String refreshToken;
 
     /**
-     * Used for JSON serialization
+     * Used for JSON serialization.
      */
     public TokenRefreshRequest() {}
 
+    /**
+     *
+     * @param grantType e.g refresh_token
+     * @param refreshToken e.g. XXXXX
+     */
     public TokenRefreshRequest(String grantType, String refreshToken) {
         this.grantType = grantType;
         this.refreshToken = refreshToken;
     }
 
+    /**
+     * grantType getter.
+     * @return e.g refresh_token
+     */
     public String getGrantType() {
         return grantType;
     }
 
+    /**
+     * refreshToken getter.
+     * @return e.g. XXXXX
+     */
     public String getRefreshToken() {
         return refreshToken;
     }

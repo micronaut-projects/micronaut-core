@@ -26,6 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Singleton
 public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrlMapPattern> {
 
@@ -33,6 +38,13 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
     private static final String ACCESS = "access";
     private static final String HTTP_METHOD = "httpMethod";
 
+    /**
+     *
+     * @param m a Map in the configuration
+     * @param targetType The target type being converted to
+     * @param context    The {@link ConversionContext}
+     * @return
+     */
     @Override
     public Optional<InterceptUrlMapPattern> convert(Map m, Class<InterceptUrlMapPattern> targetType, ConversionContext context) {
         if ( m == null ) {

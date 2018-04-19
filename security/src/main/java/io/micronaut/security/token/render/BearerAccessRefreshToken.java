@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.render;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -37,7 +38,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
     private String tokenType = "Bearer";
 
     /**
-     * Necessary for JSON serialization
+     * Necessary for JSON serialization.
      */
     public BearerAccessRefreshToken() {}
 
@@ -45,6 +46,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
      *
      * @param username a string e.g. admin
      * @param roles Collection of Strings e.g. ( [ROLE_USER, ROLE_ADMIN] )
+     * @param expiresIn Acccess Token expiration
      * @param accessToken JWT token
      * @param refreshToken  JWT token
      */
@@ -91,18 +93,34 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
         this.roles = roles;
     }
 
+    /**
+     *
+     * @return TokenType e.g. Bearer
+     */
     public String getTokenType() {
         return tokenType;
     }
 
+    /**
+     * token type setter.
+     * @param tokenType e.g. Bearer
+     */
     public void setTokenType(String tokenType) {
         this.tokenType = tokenType;
     }
 
+    /**
+     *
+     * @return expiration time
+     */
     public Integer getExpiresIn() {
         return expiresIn;
     }
 
+    /**
+     *
+     * @param expiresIn expiration time
+     */
     public void setExpiresIn(Integer expiresIn) {
         this.expiresIn = expiresIn;
     }

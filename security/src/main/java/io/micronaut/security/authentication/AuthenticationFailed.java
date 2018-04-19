@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import java.util.Objects;
 
 /**
- *
+ * Signalises an authentication failure and stores the failure reason.
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -26,16 +27,31 @@ public class AuthenticationFailed implements AuthenticationResponse {
 
     private AuthenticationFailure authenticationFailure = AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH;
 
+    /**
+     * Empty Constructor.
+     */
     public AuthenticationFailed() {}
 
+    /**
+     *
+     * @param authenticationFailure AuthenticationFailure enum which represents the failure reason
+     */
     public AuthenticationFailed(AuthenticationFailure authenticationFailure) {
         this.authenticationFailure = authenticationFailure;
     }
 
+    /**
+     * authenticationFailure getter.
+     * @return Instance of {@link AuthenticationFailure}
+     */
     public AuthenticationFailure getAuthenticationFailure() {
         return authenticationFailure;
     }
 
+    /**
+     * authenticationFailure setter.
+     * @param authenticationFailure Instance of {@link AuthenticationFailure}
+     */
     public void setAuthenticationFailure(AuthenticationFailure authenticationFailure) {
         this.authenticationFailure = authenticationFailure;
     }

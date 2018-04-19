@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.Requires;
@@ -27,7 +28,6 @@ import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.token.generator.TokenConfiguration;
 import io.micronaut.security.token.render.AccessRefreshToken;
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -45,12 +45,23 @@ public class LoginController implements LoginControllerApi {
     protected final TokenConfiguration tokenConfiguration;
     protected final Authenticator authenticator;
 
+    /**
+     *
+     * @param accessRefreshTokenGenerator AccessRefresh Token generator
+     * @param tokenConfiguration Token configuration
+     * @param authenticator {@link Authenticator} collaborator
+     */
     public LoginController(AccessRefreshTokenGenerator accessRefreshTokenGenerator, TokenConfiguration tokenConfiguration, Authenticator authenticator) {
         this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
         this.tokenConfiguration = tokenConfiguration;
         this.authenticator = authenticator;
     }
 
+    /**
+     *
+     * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
+     * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
+     */
     @Override
     public HttpResponse<AccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
         Optional<UserDetails> userDetails = authenticate(usernamePasswordCredentials);
@@ -60,6 +71,11 @@ public class LoginController implements LoginControllerApi {
         return HttpResponse.status(HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     *
+     * @param usernamePasswordCredentials User creds being authenticated
+     * @return Empty if the authentication fails. User details if authentication is successful.
+     */
     protected Optional<UserDetails> authenticate(UsernamePasswordCredentials usernamePasswordCredentials) {
         Optional<AuthenticationResponse> authenticationResponse = authenticator.authenticate(usernamePasswordCredentials);
         if ( authenticationResponse.isPresent() && authenticationResponse.get() instanceof UserDetails) {

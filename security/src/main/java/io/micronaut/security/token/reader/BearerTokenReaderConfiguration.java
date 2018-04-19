@@ -19,16 +19,28 @@ package io.micronaut.security.token.reader;
 import io.micronaut.core.util.Toggleable;
 
 /**
- * Configuration for the {@link BearerTokenReader}
+ * Configuration for the {@link BearerTokenReader}.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface BearerTokenReaderConfiguration extends Toggleable {
 
+    /**
+     *
+     * @return a boolean flag indicating whether BearerTokenReader bean should be enabled or not
+     */
     boolean isEnabled();
 
+    /**
+     *
+     * @return a Prefix before the token in the header value. E.g. Bearer
+     */
     String getPrefix();
 
+    /**
+     *
+     * @return an HTTP Header name. e.g. Authorization
+     */
     String getHeaderName();
 }

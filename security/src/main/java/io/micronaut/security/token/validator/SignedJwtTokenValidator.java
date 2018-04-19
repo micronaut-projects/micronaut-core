@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.validator;
 
 import com.nimbusds.jose.JWSAlgorithm;
@@ -23,10 +24,6 @@ import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.core.profile.jwt.JwtClaims;
 import org.pac4j.jwt.config.signature.SecretSignatureConfiguration;
 import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.PostConstruct;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,6 +40,10 @@ public class SignedJwtTokenValidator implements TokenValidator {
 
     private final JwtAuthenticator jwtAuthenticator;
 
+    /**
+     *
+     * @param tokenConfiguration ConfigurationProperties file for token settings
+     */
     public SignedJwtTokenValidator(TokenConfiguration tokenConfiguration) {
         final JWSAlgorithm jwsAlgorithm = tokenConfiguration.getJwsAlgorithm();
         final String secret = tokenConfiguration.getSecret();
@@ -60,6 +61,11 @@ public class SignedJwtTokenValidator implements TokenValidator {
         return Optional.empty();
     }
 
+    /**
+     *
+     * @param profile a Pac4j CommonProfile
+     * @return a Map containing the JWT Claims
+     */
     protected Map<String, Object> claimsOfProfile(CommonProfile profile) {
         Map<String, Object> claims = new HashMap<>();
         Map<String, Object> attributes = profile.getAttributes();

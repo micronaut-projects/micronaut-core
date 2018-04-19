@@ -33,23 +33,37 @@ import java.util.Optional;
 @Singleton
 public class BearerTokenReader implements TokenReader {
 
-    private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
 
     protected final BearerTokenReaderConfiguration bearerTokenReaderConfiguration;
 
+    /**
+     *
+     * @param bearerTokenReaderConfiguration Instance of {@link BearerTokenReaderConfiguration}
+     */
     public BearerTokenReader(BearerTokenReaderConfiguration bearerTokenReaderConfiguration) {
         this.bearerTokenReaderConfiguration = bearerTokenReaderConfiguration;
     }
 
+    /**
+     * Search for a JWT token in a HTTP request.
+     * @param request The request to look for the token in
+     * @return if the JWT token is found it is returned, empty if not
+     */
     @Override
     public Optional<String> findToken(HttpRequest<?> request) {
-        log.debug("Looking for bearer token in Authorization header");
+        LOG.debug("Looking for bearer token in Authorization header");
         HttpHeaders headers = request.getHeaders();
         Optional<String> authorizationHeader = headers.findFirst(bearerTokenReaderConfiguration.getHeaderName());
         return authorizationHeader.flatMap(this::extractTokenFromAuthorization);
     }
 
-    public Optional<String> extractTokenFromAuthorization(String authorization) {
+    /**
+     *
+     * @param authorization Authorization header value
+     * @return If prefix is 'Bearer' for 'Bearer XXX' it returns 'XXX'
+     */
+    protected Optional<String> extractTokenFromAuthorization(String authorization) {
         StringBuilder sb = new StringBuilder();
         final String prefix = bearerTokenReaderConfiguration.getPrefix();
         if ( prefix != null && !prefix.isEmpty() ) {
@@ -60,7 +74,7 @@ public class BearerTokenReader implements TokenReader {
         if ( authorization.startsWith(str) ) {
             return Optional.of(authorization.substring(str.length(), authorization.length()));
         } else {
-            log.debug("{} does not start with {}", authorization, str);
+            LOG.debug("{} does not start with {}", authorization, str);
             return Optional.empty();
         }
     }

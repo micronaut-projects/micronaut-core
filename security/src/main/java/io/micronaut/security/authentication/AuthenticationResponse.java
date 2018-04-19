@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication;
 
 import java.io.Serializable;
@@ -25,7 +26,7 @@ import java.io.Serializable;
 public interface AuthenticationResponse extends Serializable {
 
     /**
-     * Defaults to false
+     * Defaults to false.
      * @return true or false depending on whether the user is authenticated
      */
     default boolean isAuthenticated() {

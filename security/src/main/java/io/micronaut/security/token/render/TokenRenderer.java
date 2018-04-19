@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.render;
 
 import io.micronaut.security.authentication.UserDetails;
 
 /**
- * Responsible for converting token information to an {@link AccessRefreshToken}
+ * Responsible for converting token information to an {@link AccessRefreshToken}.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -35,7 +36,7 @@ public interface TokenRenderer {
 
     /**
      *
-     * @param userDetails User details of the user authenticated
+     * @param userDetails Authenticated user's representation.
      * @param expiresIn In milliseconds
      * @param accessToken  JWT token
      * @param refreshToken JWT token

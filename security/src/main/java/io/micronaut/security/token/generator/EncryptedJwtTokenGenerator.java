@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token.generator;
 
 import com.nimbusds.jose.*;
@@ -21,21 +22,28 @@ import com.nimbusds.jwt.EncryptedJWT;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.context.annotation.Requires;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.inject.Singleton;
 import java.util.Map;
 
+/**
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Singleton
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled")
 public class EncryptedJwtTokenGenerator extends AbstractTokenGenerator {
 
-    private static final Logger log = LoggerFactory.getLogger(EncryptedJwtTokenGenerator.class);
-
     private JWEEncrypter encrypter;
     private JWEHeader header;
 
+    /**
+     *
+     * @param tokenConfiguration Instance of {@link TokenConfiguration}
+     * @param claimsGenerator Instance of {@link JWTClaimsSetGenerator}
+     * @param tokenEncryptionConfiguration Instance of {@link TokenEncryptionConfiguration}
+     * @param keyProvider Instance of {@link EncryptionKeyProvider}
+     */
     public EncryptedJwtTokenGenerator(TokenConfiguration tokenConfiguration,
                                       JWTClaimsSetGenerator claimsGenerator,
                                       TokenEncryptionConfiguration tokenEncryptionConfiguration,
@@ -45,16 +53,32 @@ public class EncryptedJwtTokenGenerator extends AbstractTokenGenerator {
         this.encrypter = createEncrypter(keyProvider);
     }
 
+    /**
+     * Instantiates a {@link JWEHeader}.
+     * @param tokenEncryptionConfiguration {@link TokenEncryptionConfiguration}
+     * @return a {@link JWEHeader}.
+     */
     protected JWEHeader createHeader(TokenEncryptionConfiguration tokenEncryptionConfiguration) {
         final JWEAlgorithm jweAlgorithm = tokenEncryptionConfiguration.getJweAlgorithm();
         EncryptionMethod encryptionMethod = tokenEncryptionConfiguration.getEncryptionMethod();
         return new JWEHeader(jweAlgorithm, encryptionMethod);
     }
 
+    /**
+     *
+     * @param keyProvider a public / private key provider
+     * @return {@link JWEEncrypter}
+     */
     protected JWEEncrypter createEncrypter(EncryptionKeyProvider keyProvider) {
         return new RSAEncrypter(keyProvider.getPublicKey());
     }
 
+    /**
+     *
+     * @param claims Claims to be included in the JWT
+     * @return
+     * @throws JOSEException
+     */
     @Override
     protected JWT generate(Map<String, Object> claims) throws JOSEException {
         // Create the encrypted JWT object

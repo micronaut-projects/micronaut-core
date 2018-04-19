@@ -17,7 +17,7 @@
 package io.micronaut.security.endpoints;
 
 /**
- * Configuration for the security endpoints
+ * Configuration for the security endpoints.
  *
  * @author Sergio del Amo
  * @since 1.0

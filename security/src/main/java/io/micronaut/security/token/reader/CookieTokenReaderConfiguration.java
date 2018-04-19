@@ -19,14 +19,22 @@ package io.micronaut.security.token.reader;
 import io.micronaut.core.util.Toggleable;
 
 /**
- * Configuration for the {@link CookieTokenReader}
+ * Configuration for the {@link CookieTokenReader}.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface CookieTokenReaderConfiguration extends Toggleable {
 
+    /**
+     *
+     * @return a boolean flag indicating wether the CookieTokenReader shoudl be enabled or not
+     */
     boolean isEnabled();
 
+    /**
+     *
+     * @return Cookie name where the token could be found
+     */
     String getCookieName();
 }

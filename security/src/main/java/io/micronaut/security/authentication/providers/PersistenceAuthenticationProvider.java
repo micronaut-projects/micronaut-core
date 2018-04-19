@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.authentication.providers;
 
 import io.micronaut.context.annotation.Requires;
@@ -27,6 +28,11 @@ import javax.inject.Singleton;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * AuthenticationProvider typically used with a persistence mechanism such as a DB.
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Requires(beans = {UserFetcher.class, PasswordEncoder.class, AuthoritiesFetcher.class})
 @Singleton
 public class PersistenceAuthenticationProvider implements AuthenticationProvider {
@@ -35,6 +41,12 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
     protected final PasswordEncoder passwordEncoder;
     protected final AuthoritiesFetcher authoritiesFetcher;
 
+    /**
+     *
+     * @param userFetcher Fetches users from persistence
+     * @param passwordEncoder Collaborator which checks if a raw password matches an encoded password
+     * @param authoritiesFetcher Fetches authorities for a particular user
+     */
     public PersistenceAuthenticationProvider(UserFetcher userFetcher,
                                              PasswordEncoder passwordEncoder,
                                              AuthoritiesFetcher authoritiesFetcher) {
@@ -43,6 +55,11 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
         this.authoritiesFetcher = authoritiesFetcher;
     }
 
+    /**
+     * Attempts to authenticate a user.
+     * @param creds username/password credentials
+     * @return An AuthenticationResponse object which encapsulates the authentication result.
+     */
     @Override
     public AuthenticationResponse authenticate(UsernamePasswordCredentials creds) {
         final String username = creds.getUsername();
