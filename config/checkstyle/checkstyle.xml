@@ -72,7 +72,14 @@
         <property name="message" value="Line has trailing spaces."/>
     </module> -->
 
+    <!-- Be able to ignore violations with @SuppressWarnings -->
+    <!-- See http://checkstyle.sf.net/config_filters.html#SuppressWarningsFilter -->
+    <module name="SuppressWarningsFilter"/>
+
     <module name="TreeWalker">
+
+        <!-- Needed for SuppressWarningsFilter -->
+        <module name="SuppressWarningsHolder"/>
 
         <!-- Checks for Javadoc comments.                     -->
         <!-- See http://checkstyle.sf.net/config_javadoc.html -->

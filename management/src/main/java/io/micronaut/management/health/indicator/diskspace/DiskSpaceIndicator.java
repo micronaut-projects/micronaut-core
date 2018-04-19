@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator.diskspace;
 
 import io.micronaut.context.annotation.Requires;
@@ -26,9 +27,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display
- * information about the disk space of the server. Returns {@link HealthStatus#DOWN} if the free space
- * is less than the configured threshold.</p>
+ * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the disk
+ * space of the server. Returns {@link HealthStatus#DOWN} if the free space is less than the configured threshold.</p>
  *
  * @author James Kleeh
  * @see DiskSpaceIndicatorConfiguration#threshold
@@ -43,6 +43,9 @@ public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Obje
 
     private final DiskSpaceIndicatorConfiguration configuration;
 
+    /**
+     * @param configuration The disk space indicator configuration
+     */
     DiskSpaceIndicator(DiskSpaceIndicatorConfiguration configuration) {
         this.configuration = configuration;
     }
@@ -52,6 +55,7 @@ public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Obje
         return NAME;
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     protected Map<String, Object> getHealthInformation() {
         File path = configuration.getPath();
