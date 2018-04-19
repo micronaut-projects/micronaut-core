@@ -16,6 +16,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named {
+public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named, AnnotationMetadataProvider {
 
     /**
      * Constant representing zero arguments

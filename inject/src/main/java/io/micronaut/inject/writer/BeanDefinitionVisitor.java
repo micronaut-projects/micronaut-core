@@ -158,25 +158,6 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a field and setter pairing.
      *
      * @param declaringType      The declaring type
-     * @param fieldMetadata      The qualifier type
-     * @param requiresReflection Whether the setter requires reflection
-     * @param fieldType          The field type
-     * @param fieldName          The field name
-     * @param setterName         The setter name
-     * @param genericTypes       The generic types
-     */
-    void visitSetterInjectionPoint(Object declaringType,
-                                   AnnotationMetadata fieldMetadata,
-                                   boolean requiresReflection,
-                                   Object fieldType,
-                                   String fieldName,
-                                   String setterName,
-                                   Map<String, Object> genericTypes);
-
-    /**
-     * Visits an injection point for a field and setter pairing.
-     *
-     * @param declaringType      The declaring type
      * @param annotationMetadata      The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type

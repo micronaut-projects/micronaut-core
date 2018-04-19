@@ -844,6 +844,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
             boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && fieldNode != null && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
+            String propertyName = propertyNode.name
             if (!propertyNode.isStatic() && (isInject || isValue)) {
                 defineBeanDefinition(concreteClass)
                 ClassNode fieldType = fieldNode.type
@@ -863,15 +864,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
 
+                Object fieldTypeReference = AstGenericUtils.resolveTypeReference(fieldType)
                 if (isInject) {
-                    getBeanWriter().visitSetterInjectionPoint(
+                    getBeanWriter().visitMethodInjectionPoint(
                         AstGenericUtils.resolveTypeReference(declaringClass),
-                        fieldAnnotationMetadata,
                         false,
-                        AstGenericUtils.resolveTypeReference(fieldType),
-                        fieldNode.name,
-                        getSetterName(propertyNode.name),
-                        genericTypeList
+                        void.class,
+                        getSetterName(propertyName),
+                        Collections.singletonMap(propertyName, fieldTypeReference),
+                        Collections.singletonMap(propertyName, fieldAnnotationMetadata),
+                        Collections.singletonMap(propertyName, genericTypeList),
+                        fieldAnnotationMetadata
                     )
                 } else if (isValue) {
                     if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -891,9 +894,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             AstGenericUtils.resolveTypeReference(declaringClass),
                             fieldAnnotationMetadata,
                             false,
-                            AstGenericUtils.resolveTypeReference(fieldType),
+                                fieldTypeReference,
                             fieldNode.name,
-                            getSetterName(propertyNode.name),
+                            getSetterName(propertyName),
                             genericTypeList,
                             isConfigurationProperties
                         )
@@ -903,15 +906,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 AopProxyWriter aopWriter = (AopProxyWriter) aopProxyWriter
                 if (aopProxyWriter != null) {
                     Map<String, Map<String, Object>> resolvedGenericTypes =
-                            [(propertyNode.name): AstGenericUtils.extractPlaceholders(propertyNode.type)]
+                            [(propertyName): AstGenericUtils.extractPlaceholders(propertyNode.type)]
                     Map<String, Object> resolvedArguments =
-                            [(propertyNode.name): AstGenericUtils.resolveTypeReference(propertyNode.type)]
+                            [(propertyName): AstGenericUtils.resolveTypeReference(propertyNode.type)]
 
                     AnnotationMetadata fieldMetadata = AstAnnotationUtils.getAnnotationMetadata(propertyNode.field)
 
                     Map<String, AnnotationMetadata> resolvedAnnotationMetadata
                     if (fieldMetadata != null) {
-                        resolvedAnnotationMetadata = [(propertyNode.name): fieldMetadata]
+                        resolvedAnnotationMetadata = [(propertyName): fieldMetadata]
                     } else {
                         resolvedAnnotationMetadata = Collections.emptyMap()
                     }
@@ -920,7 +923,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         void.class,
                         void.class,
                         Collections.emptyMap(),
-                        getSetterName(propertyNode.name),
+                        getSetterName(propertyName),
                         resolvedArguments,
                         resolvedAnnotationMetadata,
                         resolvedGenericTypes,

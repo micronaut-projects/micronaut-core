@@ -73,6 +73,15 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameters = initializeTypeParameters(genericTypes);
         this.typeParameterArray = genericTypes;
     }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if(annotatedElement instanceof AnnotationMetadata) {
+            return (AnnotationMetadata) annotatedElement;
+        }
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
     @Override
     public Optional<Argument<?>> getFirstTypeVariable() {
         if (!typeParameters.isEmpty()) {

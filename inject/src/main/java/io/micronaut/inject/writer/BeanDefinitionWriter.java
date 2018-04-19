@@ -263,7 +263,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ConfigBuilderState currentConfigBuilderState;
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
-    private GeneratorAdapter staticInit;
 
     /**
      * Creates a bean definition writer
@@ -511,11 +510,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             requiresMethodProcessing.visitEnd();
         }
 
-        if (staticInit != null) {
-            staticInit.visitInsn(RETURN);
-            staticInit.visitMaxs(1, 1);
-            staticInit.visitEnd();
-        }
         constructorVisitor.visitInsn(RETURN);
         constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
         if (buildMethodVisitor != null) {
@@ -578,25 +572,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             out.write(toByteArray());
         }
-    }
-
-    @Override
-    public void visitSetterInjectionPoint(Object declaringType,
-                                          AnnotationMetadata fieldMetadata,
-                                          boolean requiresReflection,
-                                          Object fieldType,
-                                          String fieldName,
-                                          String setterName,
-                                          Map<String, Object> genericTypes) {
-        Type declaringTypeRef = getTypeReference(declaringType);
-
-        addInjectionPointForSetterInternal(fieldMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
-
-        if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT, false);
-
-        }
-        currentMethodIndex++;
     }
 
     @Override
@@ -920,34 +895,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public boolean requiresMethodProcessing() {
         return this.preprocessMethods;
-    }
-
-    /**
-     * Visits a field injection point
-     *
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
-    public void visitFieldInjectionPoint(Object qualifierType,
-                                         boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
-        visitFieldInjectionPoint(beanFullClassName, qualifierType, requiresReflection, fieldType, fieldName);
-    }
-
-    /**
-     * Visits a field injection point
-     *
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
-    public void visitFieldInjectionPoint(boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
-        visitFieldInjectionPoint(beanFullClassName, null, requiresReflection, fieldType, fieldName);
     }
 
     @Override
@@ -2161,60 +2108,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // invoke Reflectionutils.getRequiredMethod(..)
         methodVisitor.invokeStatic(Type.getType(ReflectionUtils.class), METHOD_GET_REQUIRED_METHOD);
-    }
-
-    static void pushGetConstructorForType(GeneratorAdapter methodVisitor, Type beanType, Collection<Object> argumentClassNames) {
-        methodVisitor.visitLdcInsn(beanType);
-
-        int argCount = argumentClassNames.size();
-        Object[] argumentTypeArray = argumentClassNames.toArray(new Object[argCount]);
-        methodVisitor.push(argCount);
-        methodVisitor.newArray(TYPE_CLASS);
-        if (argCount > 0) {
-
-            methodVisitor.dup();
-            for (int i = 0; i < argCount; i++) {
-                pushStoreTypeInArray(methodVisitor, i, argCount, argumentTypeArray[i]);
-            }
-        }
-
-        // invoke Class.getConstructor()
-        String getDeclaredConstructorMethod = "getDeclaredConstructor";
-        Method getConstructorMethod = ReflectionUtils.getDeclaredMethod(Class.class, getDeclaredConstructorMethod, Class[].class)
-                .orElseThrow(() ->
-                        new IllegalStateException("Class.getConstructor(..) method not found")
-                );
-        methodVisitor.visitMethodInsn(
-                INVOKEVIRTUAL,
-                Type.getInternalName(Class.class),
-                getDeclaredConstructorMethod,
-                Type.getType(getConstructorMethod).getDescriptor(),
-                false);
-    }
-
-    /**
-     * Adds a method call to get the given annotation of the given type to tye stack
-     *
-     * @param targetClass    The target class
-     * @param annotationType The annotation type
-     */
-    private void pushGetAnnotationForType(MethodVisitor methodVisitor, Type targetClass, Type annotationType) {
-        methodVisitor.visitLdcInsn(targetClass);
-        pushGetAnnotationCall(methodVisitor, annotationType);
-    }
-
-    private void pushGetAnnotationCall(MethodVisitor methodVisitor, Type annotationType) {
-        methodVisitor.visitLdcInsn(annotationType);
-        Method method = ReflectionUtils.getDeclaredMethod(Class.class, "getAnnotation", Class.class)
-                .orElseThrow(() ->
-                        new IllegalStateException("Class.getAnnotation(..) method not found")
-                );
-        String descriptor = Type.getType(method).getDescriptor();
-        methodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                Type.getInternalName(Class.class),
-                "getAnnotation",
-                descriptor,
-                false);
     }
 
     /**
