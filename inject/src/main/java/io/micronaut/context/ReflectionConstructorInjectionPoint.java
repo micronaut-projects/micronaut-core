@@ -16,8 +16,10 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
@@ -34,27 +36,36 @@ import java.lang.reflect.Modifier;
  * @since 1.0
  */
 @Internal
-class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, AnnotationSource {
+class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
 
-    private final Constructor<T> constructor;
+    private final Class<T> declaringType;
     private final Argument[] arguments;
     private final BeanDefinition declaringComponent;
-    private final boolean requiresReflection;
+    private final AnnotationMetadata annotationMetadata;
+    private Constructor<T> constructor;
 
     /**
      * @param beanDefinition The bean definition
-     * @param constructor    The constructor used to construct the object
+     * @param declaringType The declaring type
+     * @param annotationMetadata The annotation metadata
      * @param arguments      The arguments to the constructor
      */
     ReflectionConstructorInjectionPoint(
         BeanDefinition beanDefinition,
-        Constructor<T> constructor,
+        Class<T> declaringType,
+        AnnotationMetadata annotationMetadata,
         Argument... arguments) {
 
+        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
         this.declaringComponent = beanDefinition;
-        this.constructor = constructor;
-        this.requiresReflection = Modifier.isPrivate(constructor.getModifiers());
+        this.declaringType = declaringType;
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+    }
+
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
     }
 
     @Override
@@ -64,7 +75,7 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
 
     @Override
     public boolean requiresReflection() {
-        return requiresReflection;
+        return true;
     }
 
 
@@ -75,49 +86,53 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
 
     @Override
     public T invoke(Object... args) {
-        this.constructor.setAccessible(true);
-        Argument[] componentTypes = getArguments();
-        if (componentTypes.length == 0) {
+        return invokeConstructor(resolveConstructor(), getArguments(), args);
+    }
+
+    private Constructor<T> resolveConstructor() {
+        Constructor<T> constructor = this.constructor;
+        if (constructor == null) {
+            synchronized (this) { // double check
+                constructor = this.constructor;
+                if (constructor == null) {
+                    this.constructor = constructor = ReflectionUtils.findConstructor(declaringType, Argument.toClassArray(arguments))
+                                                                    .orElseThrow(()->
+                                                                        new BeanInstantiationException(
+                                                                                declaringComponent,
+                                                                               "No constructor found for arguments: " + Argument.toString(arguments)
+                    )
+                                                                    );
+                }
+            }
+        }
+        return constructor;
+    }
+
+    static <T> T invokeConstructor(Constructor<T> theConstructor, Argument[] argumentTypes, Object... args) {
+        theConstructor.setAccessible(true);
+        if (argumentTypes.length == 0) {
             try {
-                return constructor.newInstance();
+                return theConstructor.newInstance();
             } catch (Throwable e) {
-                throw new BeanInstantiationException("Cannot instantiate bean of type [" + constructor.getDeclaringClass().getName() + "] using constructor [" + constructor + "]:" + e.getMessage(), e);
+                throw new BeanInstantiationException("Cannot instantiate bean of type [" + theConstructor.getDeclaringClass().getName() + "] using constructor [" + theConstructor + "]:" + e.getMessage(), e);
             }
         } else {
-            if (componentTypes.length != args.length) {
-                throw new BeanInstantiationException("Invalid bean argument count specified. Required: " + componentTypes.length + " . Received: " + args.length);
+            if (argumentTypes.length != args.length) {
+                throw new BeanInstantiationException("Invalid bean argument count specified. Required: " + argumentTypes.length + " . Received: " + args.length);
             }
 
-            for (int i = 0; i < componentTypes.length; i++) {
-                Argument componentType = componentTypes[i];
+            for (int i = 0; i < argumentTypes.length; i++) {
+                Argument componentType = argumentTypes[i];
                 if (!componentType.getType().isInstance(args[i])) {
                     throw new BeanInstantiationException("Invalid bean argument received [" + args[i] + "] at position [" + i + "]. Required type is: " + componentType.getName());
                 }
             }
             try {
-                return constructor.newInstance(args);
+                return theConstructor.newInstance(args);
             } catch (Throwable e) {
-                throw new BeanInstantiationException("Cannot instantiate bean of type [" + constructor.getDeclaringClass().getName() + "] using constructor [" + constructor + "]:" + e.getMessage(), e);
+                throw new BeanInstantiationException("Cannot instantiate bean of type [" + theConstructor.getDeclaringClass().getName() + "] using constructor [" + theConstructor + "]:" + e.getMessage(), e);
             }
         }
     }
 
-    public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[]{constructor, constructor.getDeclaringClass()};
-    }
-
-    @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return constructor.getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return constructor.getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return constructor.getDeclaredAnnotations();
-    }
 }

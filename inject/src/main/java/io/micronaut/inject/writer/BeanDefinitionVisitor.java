@@ -44,10 +44,46 @@ public interface BeanDefinitionVisitor {
     String PROXY_SUFFIX = "$Intercepted";
 
     /**
-     * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(Map, Map, Map)} should be called at least once
+     * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean, Map, Map, Map)} should be called at least once
+     *
+     * @param annotationMetadata The annotation metadata for the constructor
+     * @param requiresReflection Whether invoking the constructor requires reflection
      */
-    void visitBeanDefinitionConstructor();
+    void visitBeanDefinitionConstructor(
+            AnnotationMetadata annotationMetadata,
+            boolean requiresReflection
+    );
 
+    /**
+     * Visits the constructor used to create the bean definition.
+     *
+     * @param annotationMetadata The annotation metadata for the constructor
+     * @param requiresReflection Whether invoking the constructor requires reflection
+     * @param argumentTypes  The argument type names for each parameter
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes   The generic types for each parameter
+     */
+    void visitBeanDefinitionConstructor(            AnnotationMetadata annotationMetadata,
+                                                    boolean requiresReflection,
+
+                                        Map<String, Object> argumentTypes,
+                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+                                        Map<String, Map<String, Object>> genericTypes);
+
+
+    /**
+     * Visits the constructor of the parent class used in the case a proxied bean definition
+     *
+     * @param argumentTypes  The argument type names for each parameter
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes   The generic types for each parameter
+     */
+    void visitProxiedBeanDefinitionConstructor(
+            Object declaringType,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes
+    );
     /**
      * @return Whether the provided type an interface
      */
@@ -109,30 +145,6 @@ public interface BeanDefinitionVisitor {
      */
     String getBeanDefinitionName();
 
-    /**
-     * Visits the constructor used to create the bean definition.
-     *
-     * @param argumentTypes  The argument type names for each parameter
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes   The generic types for each parameter
-     */
-    void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes,
-                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                                        Map<String, Map<String, Object>> genericTypes);
-
-    /**
-     * Visits the constructor of the parent class used in the case a proxied bean definition
-     *
-     * @param argumentTypes  The argument type names for each parameter
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes   The generic types for each parameter
-     */
-    void visitProxiedBeanDefinitionConstructor(
-        Object declaringType,
-        Map<String, Object> argumentTypes,
-        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-        Map<String, Map<String, Object>> genericTypes
-    );
 
     /**
      * Finalize the bean definition to the given output stream

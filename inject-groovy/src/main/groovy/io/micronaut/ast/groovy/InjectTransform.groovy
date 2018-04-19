@@ -462,7 +462,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         OptionalValues.of(Boolean.class, finalSettings),
                         interceptorTypeReferences)
                     if (producedType.isInterface()) {
-                        proxyWriter.visitBeanDefinitionConstructor()
+                        proxyWriter.visitBeanDefinitionConstructor(
+                                AnnotationMetadata.EMPTY_METADATA,
+                                false
+                        )
                     } else {
                         populateProxyWriterConstructor(producedType, proxyWriter)
                     }
@@ -717,7 +720,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         protected void populateProxyWriterConstructor(ClassNode targetClass, AopProxyWriter proxyWriter) {
             List<ConstructorNode> constructors = targetClass.getDeclaredConstructors()
             if (constructors.isEmpty()) {
-                proxyWriter.visitBeanDefinitionConstructor()
+                proxyWriter.visitBeanDefinitionConstructor(
+                        AnnotationMetadata.EMPTY_METADATA,
+                        false
+                )
             } else {
                 ConstructorNode constructorNode = findConcreteConstructor(constructors)
 
@@ -730,7 +736,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                           constructorParamsToType,
                                           constructorArgumentMetadata,
                                           constructorGenericTypeMap)
-                    proxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorArgumentMetadata, constructorGenericTypeMap)
+                    proxyWriter.visitBeanDefinitionConstructor(
+                            AstAnnotationUtils.getAnnotationMetadata(constructorNode),
+                            constructorNode.isPrivate(),
+                            constructorParamsToType,
+                            constructorArgumentMetadata,
+                            constructorGenericTypeMap
+                    )
                 } else {
                     addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
                 }
@@ -954,7 +966,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
 
                 if (constructors.isEmpty()) {
-                    beanWriter.visitBeanDefinitionConstructor(Collections.emptyMap(), null, null)
+                    beanWriter.visitBeanDefinitionConstructor(
+                            AnnotationMetadata.EMPTY_METADATA,
+                            false,
+                            Collections.emptyMap(),
+                            null,
+                            null
+                    )
 
                 } else {
                     ConstructorNode constructorNode = findConcreteConstructor(constructors)
@@ -964,7 +982,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         Parameter[] parameters = constructorNode.parameters
                         populateParameterData(parameters, paramsToType, qualifierTypes, genericTypeMap)
-                        beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
+                        beanWriter.visitBeanDefinitionConstructor(
+                                AstAnnotationUtils.getAnnotationMetadata(constructorNode),
+                                constructorNode.isPrivate(),
+                                paramsToType,
+                                qualifierTypes,
+                                genericTypeMap
+                        )
                     } else {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
                     }

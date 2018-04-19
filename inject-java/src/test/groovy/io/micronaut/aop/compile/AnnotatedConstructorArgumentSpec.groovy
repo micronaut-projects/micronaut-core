@@ -15,7 +15,9 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.aop.simple.Mutating
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Type
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
@@ -62,6 +64,11 @@ class MyBean {
         !beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
+        beanDefinition.constructor.arguments.size() == 3
+        beanDefinition.constructor.arguments[0].name == 'val'
+        beanDefinition.constructor.arguments[1].name == 'beanContext'
+        beanDefinition.constructor.arguments[2].name == 'interceptors'
+        beanDefinition.constructor.arguments[2].getAnnotation(Type.class).value()[0] == Mutating
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')

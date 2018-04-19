@@ -154,21 +154,37 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     /**
      * Constructs a bean for the given type
      * @param type The type
-     * @param constructor
+     * @param annotationMetadata The annotation metadata
+     * @param requiresReflection Whether reflection is required
      * @param arguments The constructor arguments used to build the bean
      */
     @Internal
     protected AbstractBeanDefinition(Class<T> type,
-                                     Constructor<T> constructor,
+                                     AnnotationMetadata annotationMetadata,
+                                     boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        AnnotationMetadata beanMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
-        this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
-        this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
+        this.isProvided = beanMetadata.hasDeclaredStereotype(Provided.class);
+        this.singleton = beanMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
-        this.constructor = new ReflectionConstructorInjectionPoint<>(this, constructor, arguments);
+        if(requiresReflection) {
+            this.constructor = new ReflectionConstructorInjectionPoint<>(
+                    this,
+                    type,
+                    annotationMetadata,
+                    arguments);
+        }
+        else {
+            this.constructor = new DefaultConstructorInjectionPoint<>(
+                    this,
+                    type,
+                    annotationMetadata,
+                    arguments
+            );
+        }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
         this.addRequiredComponents(arguments);

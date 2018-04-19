@@ -201,6 +201,7 @@ public class HttpClientConfiguration {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotations().size() == 1
         beanDefinition.injectedMethods[0].arguments[0].getAnnotation(ReadableBytes)
     }
 
