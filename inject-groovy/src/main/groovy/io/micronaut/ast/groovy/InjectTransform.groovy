@@ -677,6 +677,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             resolveParameterType(parameter),
                             methodNode.name,
                             resolveGenericTypes(parameter),
+                            AstAnnotationUtils.getAnnotationMetadata(parameter),
                             true
                         )
                     }
