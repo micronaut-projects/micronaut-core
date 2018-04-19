@@ -467,6 +467,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             tokens = new MavenBuildTokens().getTokens(profile, features)
         }
 
+        //MicronautConsole.instance.info("-------------------------------------")
+        //MicronautConsole.instance.info("${targetDirectory}")
+        //MicronautConsole.instance.info("------------------------------------")
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
                 replacefilter {
