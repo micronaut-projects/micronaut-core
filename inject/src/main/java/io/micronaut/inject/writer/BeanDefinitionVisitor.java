@@ -72,19 +72,6 @@ public interface BeanDefinitionVisitor {
 
 
     /**
-     * Visits the constructor of the parent class used in the case a proxied bean definition
-     *
-     * @param argumentTypes  The argument type names for each parameter
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes   The generic types for each parameter
-     */
-    void visitProxiedBeanDefinitionConstructor(
-            Object declaringType,
-            Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes
-    );
-    /**
      * @return Whether the provided type an interface
      */
     boolean isInterface();
