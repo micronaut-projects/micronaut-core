@@ -52,7 +52,7 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
         Date now = new Date();
         builder.issueTime(now);
 
-        if ( expiration != null ) {
+        if (expiration != null) {
             LOG.debug("Setting expiration to {}", expiration.toString());
             Date expirationTime = new Date(now.getTime() + (expiration * MILLISECONDS_IN_A_SECOND));
             builder.expirationTime(expirationTime);
@@ -60,7 +60,7 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
 
         builder.claim("roles", userDetails.getRoles());
 
-        LOG.debug("Generated claim set: {}",builder.build().toJSONObject().toString());
+        LOG.debug("Generated claim set: {}", builder.build().toJSONObject().toString());
 
         return builder.build();
     }
@@ -73,7 +73,7 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
     @Override
     public JWTClaimsSet generateClaimsSet(Map<String, ?> claims) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
-        for ( String k : claims.keySet() ) {
+        for (String k : claims.keySet()) {
             builder.claim(k, claims.get(k));
         }
         return builder.build();

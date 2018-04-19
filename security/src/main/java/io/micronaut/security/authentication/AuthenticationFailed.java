@@ -30,7 +30,7 @@ public class AuthenticationFailed implements AuthenticationResponse {
     /**
      * Empty Constructor.
      */
-    public AuthenticationFailed() {}
+    public AuthenticationFailed() { }
 
     /**
      *

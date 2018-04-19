@@ -37,7 +37,7 @@ public class JWSAlgorithmConverter  implements TypeConverter<CharSequence, JWSAl
      */
     @Override
     public Optional<JWSAlgorithm> convert(CharSequence object, Class<JWSAlgorithm> targetType, ConversionContext context) {
-        if ( object == null ) {
+        if (object == null) {
             return Optional.empty();
         }
         String value = object.toString();

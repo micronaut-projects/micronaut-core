@@ -18,6 +18,7 @@ package io.micronaut.security.config
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpMethod
+import io.micronaut.security.token.generator.TokenConfigurationProperties
 import spock.lang.Specification
 
 class SecurityConfigurationSpec extends Specification {
@@ -39,15 +40,18 @@ class SecurityConfigurationSpec extends Specification {
         SecurityConfiguration config = ctx.getBean(SecurityConfiguration)
 
         then:
-        config.interceptUrlMap.size() == 3
+        config.interceptUrlMap.size() == 4
         config.interceptUrlMap[0].pattern == '/health'
-        config.interceptUrlMap[0].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
+        config.interceptUrlMap[0].access == ['foo']
         config.interceptUrlMap[0].httpMethod == HttpMethod.GET
         config.interceptUrlMap[1].pattern == '/health'
         config.interceptUrlMap[1].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
-        config.interceptUrlMap[1].httpMethod == HttpMethod.POST
+        config.interceptUrlMap[1].httpMethod == HttpMethod.GET
         config.interceptUrlMap[2].pattern == '/health'
         config.interceptUrlMap[2].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
         config.interceptUrlMap[2].httpMethod == HttpMethod.POST
+        config.interceptUrlMap[3].pattern == '/health'
+        config.interceptUrlMap[3].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
+        config.interceptUrlMap[3].httpMethod == HttpMethod.POST
     }
 }

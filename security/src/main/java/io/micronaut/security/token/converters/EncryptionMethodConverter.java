@@ -39,7 +39,7 @@ public class EncryptionMethodConverter implements TypeConverter<CharSequence, En
      */
     @Override
     public Optional<EncryptionMethod> convert(CharSequence object, Class<EncryptionMethod> targetType, ConversionContext context) {
-        if ( object == null ) {
+        if (object == null) {
             return Optional.empty();
         }
         String value = object.toString();

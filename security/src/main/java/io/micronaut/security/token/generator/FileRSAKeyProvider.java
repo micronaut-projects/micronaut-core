@@ -60,7 +60,7 @@ public class FileRSAKeyProvider implements EncryptionKeyProvider {
      */
     @PostConstruct
     void initialize() {
-        if ( tokenEncryptionConfiguration.getPublicKeyPath() != null && tokenEncryptionConfiguration.getPrivateKeyPath() != null) {
+        if (tokenEncryptionConfiguration.getPublicKeyPath() != null && tokenEncryptionConfiguration.getPrivateKeyPath() != null) {
             LOG.debug("Loading public/private key from DER files");
             try {
                 KeyFactory kf = KeyFactory.getInstance("RSA");
@@ -86,9 +86,9 @@ public class FileRSAKeyProvider implements EncryptionKeyProvider {
             } catch (IOException e) {
                 LOG.warn("IOException while loading public/private key from DER files");
             }
-        } else if ( tokenEncryptionConfiguration.getPublicKeyPath() == null ) {
+        } else if (tokenEncryptionConfiguration.getPublicKeyPath() == null) {
             LOG.warn("public key path is null");
-        } else if ( tokenEncryptionConfiguration.getPrivateKeyPath() == null) {
+        } else if (tokenEncryptionConfiguration.getPrivateKeyPath() == null) {
             LOG.warn("private key path is null");
         }
     }

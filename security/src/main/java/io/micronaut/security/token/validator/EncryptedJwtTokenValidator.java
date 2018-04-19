@@ -62,7 +62,7 @@ public class EncryptedJwtTokenValidator implements TokenValidator {
                 encryptedJWT.decrypt(rsaDecrypter);
                 return Optional.of(encryptedJWT.getJWTClaimsSet().getClaims());
             }
-        } catch(ParseException e) {
+        } catch (ParseException e) {
             LOG.warn("ParseException parsing token: {}", token);
 
         } catch (JOSEException e) {

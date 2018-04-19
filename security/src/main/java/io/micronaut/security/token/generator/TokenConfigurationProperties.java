@@ -19,8 +19,8 @@ package io.micronaut.security.token.generator;
 import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+
+import javax.validation.constraints.NotNull;
 
 /**
  * Stores configuration for JWT.
@@ -28,6 +28,7 @@ import javax.validation.constraints.Size;
  * @author Sergio del Amo
  * @since 1.0
  */
+
 @ConfigurationProperties(TokenConfigurationProperties.PREFIX)
 public class TokenConfigurationProperties implements TokenConfiguration {
 
@@ -41,7 +42,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
     protected JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
 
-    @NotBlank @Size()
+    @NotNull
     protected String secret;
 
     /**

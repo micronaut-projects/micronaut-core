@@ -35,7 +35,7 @@ public class TokenRefreshRequest {
     /**
      * Used for JSON serialization.
      */
-    public TokenRefreshRequest() {}
+    public TokenRefreshRequest() { }
 
     /**
      *

@@ -65,23 +65,23 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
         final String username = creds.getUsername();
         Optional<UserState> optionalUserState = userFetcher.findByUsername(username);
 
-        if ( !optionalUserState.isPresent()) {
+        if (!optionalUserState.isPresent()) {
             return new AuthenticationFailed(AuthenticationFailure.USER_NOT_FOUND);
         }
         UserState user = optionalUserState.get();
-        if (!user.isEnabled() ) {
+        if (!user.isEnabled()) {
             return new AuthenticationFailed(AuthenticationFailure.USER_DISABLED);
         }
-        if ( user.isAccountExpired() ) {
+        if (user.isAccountExpired()) {
             return new AuthenticationFailed(AuthenticationFailure.ACCOUNT_EXPIRED);
         }
-        if ( user.isAccountLocked() ) {
+        if (user.isAccountLocked()) {
             return new AuthenticationFailed(AuthenticationFailure.ACCOUNT_LOCKED);
         }
-        if ( user.isPasswordExpired() ) {
+        if (user.isPasswordExpired()) {
             return new AuthenticationFailed(AuthenticationFailure.PASSWORD_EXPIRED);
         }
-        if ( !passwordEncoder.matches(creds.getPassword(), user.getPassword()) ) {
+        if (!passwordEncoder.matches(creds.getPassword(), user.getPassword())) {
             return new AuthenticationFailed(AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH);
         }
         List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(username);

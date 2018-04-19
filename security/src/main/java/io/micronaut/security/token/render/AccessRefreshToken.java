@@ -30,7 +30,7 @@ public class AccessRefreshToken {
     /**
      * Necessary for JSON serialization.
      */
-    public AccessRefreshToken() {}
+    public AccessRefreshToken() { }
 
     /**
      *

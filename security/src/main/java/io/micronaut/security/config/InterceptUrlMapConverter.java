@@ -17,14 +17,17 @@
 package io.micronaut.security.config;
 
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.HttpMethod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -34,9 +37,20 @@ import java.util.Optional;
 @Singleton
 public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrlMapPattern> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(InterceptUrlMapConverter.class);
+
     private static final String PATTERN = "pattern";
     private static final String ACCESS = "access";
     private static final String HTTP_METHOD = "httpMethod";
+
+    private final ConversionService conversionService;
+
+    /**
+     * @param conversionService The conversion service
+     */
+    InterceptUrlMapConverter(ConversionService conversionService) {
+        this.conversionService = conversionService;
+    }
 
     /**
      *
@@ -47,46 +61,46 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
      */
     @Override
     public Optional<InterceptUrlMapPattern> convert(Map m, Class<InterceptUrlMapPattern> targetType, ConversionContext context) {
-        if ( m == null ) {
+        if (m == null) {
             return Optional.empty();
         }
-        String pattern = null;
-        if ( m.containsKey(PATTERN) ) {
-            Object patternObj = m.get(PATTERN);
-            if (patternObj instanceof String) {
-                pattern = (String) patternObj;
-            }
-        }
-        if ( pattern == null ) {
-            return Optional.empty();
-        }
-        List<String> access = new ArrayList<>();
-        if ( m.containsKey(ACCESS) ) {
-            Object accessObj = m.get(ACCESS);
-            if (accessObj instanceof List) {
-                for ( Object accessEntryObj : (List) accessObj ) {
-                    if ( accessEntryObj instanceof String ) {
-                        access.add((String) accessEntryObj);
-                    } else {
-                        return Optional.empty();
+        Optional<String> optionalPattern = conversionService.convert(m.get(PATTERN), String.class);
+        if (optionalPattern.isPresent()) {
+            Optional<List<String>> optionalAccessList = conversionService.convert(m.get(ACCESS), List.class);
+            optionalAccessList = optionalAccessList.map((list) -> {
+                return list.stream()
+                        .map((o) -> conversionService.convert(o, String.class))
+                        .filter(Optional::isPresent)
+                        .map(Optional::get)
+                        .map(String.class::cast)
+                        .collect(Collectors.toList());
+            });
+            if (optionalAccessList.isPresent()) {
+                Optional<HttpMethod> httpMethod;
+                if (m.containsKey(HTTP_METHOD)) {
+                    httpMethod = conversionService.convert(m.get(HTTP_METHOD), HttpMethod.class);
+                } else {
+                    httpMethod = Optional.of(HttpMethod.GET);
+                }
+
+                if (httpMethod.isPresent()) {
+                    return Optional.of(new InterceptUrlMapPattern(optionalPattern.get(), optionalAccessList.get(), httpMethod.get()));
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to invalid %s key.", m.toString(), HTTP_METHOD));
                     }
                 }
-            }
-        }
-        if ( access.isEmpty() ) {
-            return Optional.empty();
-        }
-        HttpMethod httpMethod = HttpMethod.GET;
-        if ( m.containsKey(HTTP_METHOD) ) {
-            Object httpMethodObj = m.get(HTTP_METHOD);
-            if ( httpMethodObj instanceof String ) {
-                try {
-                    httpMethod =  HttpMethod.valueOf(((String) httpMethodObj).toUpperCase());
-                } catch(IllegalArgumentException e) {
-                    return Optional.empty();
+            } else {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to missing or empty %s key.", m.toString(), ACCESS));
                 }
             }
+        } else {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn(String.format("interceptUrlMap configuration record (%s) rejected due to missing %s key.", m.toString(), PATTERN));
+            }
         }
-        return Optional.of(new InterceptUrlMapPattern(pattern, access, httpMethod));
+
+        return Optional.empty();
     }
 }

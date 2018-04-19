@@ -66,12 +66,12 @@ public class BearerTokenReader implements TokenReader {
     protected Optional<String> extractTokenFromAuthorization(String authorization) {
         StringBuilder sb = new StringBuilder();
         final String prefix = bearerTokenReaderConfiguration.getPrefix();
-        if ( prefix != null && !prefix.isEmpty() ) {
+        if (prefix != null && !prefix.isEmpty()) {
             sb.append(prefix);
             sb.append(" ");
         }
         String str = sb.toString();
-        if ( authorization.startsWith(str) ) {
+        if (authorization.startsWith(str)) {
             return Optional.of(authorization.substring(str.length(), authorization.length()));
         } else {
             LOG.debug("{} does not start with {}", authorization, str);

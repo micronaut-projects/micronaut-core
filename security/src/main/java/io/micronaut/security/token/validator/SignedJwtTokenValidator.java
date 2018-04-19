@@ -55,7 +55,7 @@ public class SignedJwtTokenValidator implements TokenValidator {
     @Override
     public Optional<Map<String, Object>> validateTokenAndGetClaims(String token) {
         CommonProfile profile = jwtAuthenticator.validateToken(token);
-        if ( profile != null && profile.getAttributes() != null) {
+        if (profile != null && profile.getAttributes() != null) {
             return Optional.of(claimsOfProfile(profile));
         }
         return Optional.empty();

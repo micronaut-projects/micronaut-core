@@ -64,7 +64,7 @@ public class OauthController implements OauthControllerApi {
     @Override
     @Post(OauthController.ACCESS_TOKEN_PATH)
     public HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest) {
-        if ( !validateTokenRefreshRequest(tokenRefreshRequest) ) {
+        if (!validateTokenRefreshRequest(tokenRefreshRequest)) {
             return HttpResponse.status(HttpStatus.BAD_REQUEST);
         }
         LOG.info("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
@@ -84,8 +84,8 @@ public class OauthController implements OauthControllerApi {
      * @return true if the object is valid
      */
     protected boolean validateTokenRefreshRequest(TokenRefreshRequest tokenRefreshRequest) {
-        return !( tokenRefreshRequest.getGrantType() == null ||
+        return !(tokenRefreshRequest.getGrantType() == null ||
                 tokenRefreshRequest.getRefreshToken() == null ||
-                !tokenRefreshRequest.getGrantType().equals("refresh_token") );
+                !tokenRefreshRequest.getGrantType().equals("refresh_token"));
     }
 }

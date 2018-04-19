@@ -31,7 +31,7 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
     /**
      * Empty constructor.
      */
-    public UsernamePasswordCredentials() {}
+    public UsernamePasswordCredentials() { }
 
     /**
      *

@@ -32,7 +32,7 @@ public class UserDetails implements AuthenticationResponse {
      * Empty constructor.
      *
      */
-    public UserDetails() {}
+    public UserDetails() { }
 
     /**
      *

@@ -48,11 +48,11 @@ public class Authenticator {
      * @return Empty optional if authentication failed. If any {@link AuthenticationProvider} authenticates, that {@link AuthenticationResponse} is sent.
      */
     public Optional<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
-        if ( authenticationProviders != null ) {
-            for ( AuthenticationProvider authenticationProvider : authenticationProviders ) {
+        if (authenticationProviders != null) {
+            for (AuthenticationProvider authenticationProvider : authenticationProviders) {
                 try {
                     AuthenticationResponse rsp = authenticationProvider.authenticate(credentials);
-                    if ( rsp.isAuthenticated() ) {
+                    if (rsp.isAuthenticated()) {
                         return Optional.of(rsp);
                     }
                 } catch (Exception e) {

@@ -40,7 +40,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
     /**
      * Necessary for JSON serialization.
      */
-    public BearerAccessRefreshToken() {}
+    public BearerAccessRefreshToken() { }
 
     /**
      *
