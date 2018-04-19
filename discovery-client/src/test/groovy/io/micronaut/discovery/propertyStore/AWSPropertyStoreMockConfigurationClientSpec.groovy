@@ -17,6 +17,8 @@ package io.micronaut.discovery.propertyStore
 
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync
+import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
+import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersRequest
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersResult
 import com.amazonaws.services.simplesystemsmanagement.model.Parameter
@@ -35,6 +37,9 @@ import spock.lang.Specification
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 
+/**
+ * @author RVanderwerf
+ */
 class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
@@ -61,6 +66,27 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     void "test discovery property sources from AWS Systems Manager Parameter Store - StringList"() {
 
         given:
+
+        client.client.getParametersByPathAsync(_) >> { GetParametersByPathRequest getRequest ->
+
+            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            futureTask.isDone() >> { return true }
+            futureTask.get() >> {
+                GetParametersByPathResult result = new GetParametersByPathResult()
+                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+                if (getRequest.path == "/config/application") {
+                    Parameter parameter = new Parameter()
+                    parameter.name = "/config/application"
+                    parameter.value = "encryptedValue=true"
+                    parameter.type = "StringList"
+                    parameters.add(parameter)
+                }
+                result.setParameters(parameters)
+                result;
+            }
+            return futureTask;
+
+        }
 
         client.client.getParametersAsync(_) >> { GetParametersRequest getRequest->
 
@@ -105,7 +131,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         propertySources[0].name == 'route53-application'
         propertySources[0].get('datasource.url') == "mysql://blah"
         propertySources[0].get('datasource.driver') == "java.SomeDriver"
-        propertySources[0].toList().size() == 2
+        propertySources[0].get('encryptedValue') == "true"
+        propertySources[0].toList().size() == 3
         propertySources[1].name == 'route53-application[test]'
         propertySources[1].get("foo") == "bar"
         propertySources[1].order > propertySources[0].order
@@ -116,6 +143,27 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     void "test discovery property sources from AWS Systems Manager Parameter Store - String"() {
 
         given:
+
+        client.client.getParametersByPathAsync(_) >> { GetParametersByPathRequest getRequest ->
+
+            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            futureTask.isDone() >> { return true }
+            futureTask.get() >> {
+                GetParametersByPathResult result = new GetParametersByPathResult()
+                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+                if (getRequest.path == "/config/application") {
+                    Parameter parameter = new Parameter()
+                    parameter.name = "/config/application"
+                    parameter.value = "encryptedValue=true"
+                    parameter.type = "String"
+                    parameters.add(parameter)
+                }
+                result.setParameters(parameters)
+                result;
+            }
+            return futureTask;
+
+        }
 
         client.client.getParametersAsync(_) >> {  GetParametersRequest getRequest->
 
@@ -158,6 +206,7 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         propertySources[0].order > EnvironmentPropertySource.POSITION
         propertySources[0].name == 'route53-application'
         propertySources[0].get('datasource.url') == "mysql://blah"
+        propertySources[0].size() == 2
         propertySources[1].name == 'route53-application[test]'
         propertySources[1].get("foo") == "bar"
         propertySources[1].order > propertySources[0].order
@@ -168,6 +217,27 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     void "test discovery property sources from AWS Systems Manager Parameter Store - SecureString"() {
 
         given:
+
+        client.client.getParametersByPathAsync(_) >> { GetParametersByPathRequest getRequest ->
+
+            FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+            futureTask.isDone() >> { return true }
+            futureTask.get() >> {
+                GetParametersByPathResult result = new GetParametersByPathResult()
+                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+                if (getRequest.path == "/config/application") {
+                    Parameter parameter = new Parameter()
+                    parameter.name = "/config/application"
+                    parameter.value = "encryptedValue=true"
+                    parameter.type = "SecureString"
+                    parameters.add(parameter)
+                }
+                result.setParameters(parameters)
+                result;
+            }
+            return futureTask;
+
+        }
 
         client.client.getParametersAsync(_) >> {  GetParametersRequest getRequest->
 
@@ -199,8 +269,6 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         }
 
 
-
-
         when:
         def env = Mock(Environment)
         env.getActiveNames() >> (['test'] as Set)
@@ -211,6 +279,7 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         propertySources[0].order > EnvironmentPropertySource.POSITION
         propertySources[0].name == 'route53-application'
         propertySources[0].get('datasource.url') == "mysql://blah"
+        propertySources[0].size() == 2
         propertySources[1].name == 'route53-application[test]'
         propertySources[1].get("foo") == "bar"
         propertySources[1].order > propertySources[0].order

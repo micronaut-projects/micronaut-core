@@ -15,46 +15,29 @@
  */
 package io.micronaut.discovery.propertyStore
 
-import com.amazonaws.services.ec2.AmazonEC2Client
-import com.amazonaws.services.ec2.model.*
+
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
-import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClient
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClientBuilder
 import com.amazonaws.services.simplesystemsmanagement.model.DeleteParametersRequest
 import com.amazonaws.services.simplesystemsmanagement.model.DeleteParametersResult
-import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
-import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersRequest
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersResult
-import com.amazonaws.services.simplesystemsmanagement.model.Parameter
 import com.amazonaws.services.simplesystemsmanagement.model.PutParameterRequest
 import com.amazonaws.services.simplesystemsmanagement.model.PutParameterResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
-import io.micronaut.discovery.CompositeDiscoveryClient
-import io.micronaut.discovery.DiscoveryClient
-import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.aws.parameterStore.AWSParameterStoreConfigClient
-import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient
-import io.micronaut.discovery.aws.route53.registration.Route53AutoNamingRegistrationClient
-import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration
-import io.micronaut.discovery.cloud.NetworkInterface
-import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
-import spock.util.concurrent.PollingConditions
-
-import java.util.concurrent.FutureTask
 
 /**
  * @author Rvanderwerf
@@ -81,7 +64,6 @@ class AWSParameterStoreClientSpec extends Specification {
 
     def setupSpec() {
         createTestData()
-
     }
 
     void "test is a configuration client"() {
@@ -91,14 +73,11 @@ class AWSParameterStoreClientSpec extends Specification {
     }
 
 
-    void "test discovery property sources from AWS Systems Manager Parameter Store - StringList"() {
-
+    void "test discovery property sources from AWS Systems Manager Parameter Store - StringList, String, and SecureString"() {
 
         given:
 
         Environment environment = embeddedServer.environment
-
-
 
         when:
 
@@ -107,13 +86,13 @@ class AWSParameterStoreClientSpec extends Specification {
 
         then: "verify property source characteristics"
 
-            def propertySources = Flowable.fromPublisher(propertySourcesPublisher).blockingFirst()
+            List<PropertySource> propertySources = Flowable.fromPublisher(propertySourcesPublisher).toList().blockingGet()
             propertySources.size() == 2
             propertySources[0].order > EnvironmentPropertySource.POSITION
             propertySources[0].name == 'route53-application'
             propertySources[0].get('datasource.url') == "mysql://blah"
             propertySources[0].get('datasource.driver') == "java.SomeDriver"
-            propertySources[0].toList().size() == 2
+            propertySources[0].toList().size() == 3
             propertySources[1].name == 'route53-application[test]'
             propertySources[1].get("foo") == "bar"
             propertySources[1].order > propertySources[0].order
@@ -127,7 +106,7 @@ class AWSParameterStoreClientSpec extends Specification {
 
 
     private createTestData() {
-        //AWSSimpleSystemsManagement awsSimpleSystemsManagement = AWSSimpleSystemsManagementClientBuilder.standard().withClientConfiguration(client.awsConfiguration.clientConfiguration).build()
+
         PutParameterRequest putParameterRequest = new PutParameterRequest()
         putParameterRequest.type = "StringList"
         putParameterRequest.name = "/config/application"
@@ -137,9 +116,17 @@ class AWSParameterStoreClientSpec extends Specification {
         assert result.version > 0
 
         putParameterRequest = new PutParameterRequest()
-        putParameterRequest.type = "StringList"
+        putParameterRequest.type = "String"
         putParameterRequest.name = "/config/application_test"
         putParameterRequest.value = "foo=bar"
+        putParameterRequest.overwrite = true
+        result = awsSimpleSystemsManagement.putParameter(putParameterRequest)
+        assert result.version > 0
+
+        putParameterRequest = new PutParameterRequest()
+        putParameterRequest.type = "SecureString"
+        putParameterRequest.name = "/config/application/encryptedStuff"
+        putParameterRequest.value = "encryptedValue=true"
         putParameterRequest.overwrite = true
         result = awsSimpleSystemsManagement.putParameter(putParameterRequest)
         assert result.version > 0
@@ -154,14 +141,12 @@ class AWSParameterStoreClientSpec extends Specification {
         pathResult = awsSimpleSystemsManagement.getParameters(request)
         assert pathResult.parameters
         assert pathResult.parameters.size() > 0
-
     }
 
     private deleteTestData() {
-        def params = ["/config/application", "/config/application_test"]
+        def params = ["/config/application", "/config/application_test","/config/application/encryptedStuff"]
         DeleteParametersRequest deleteParametersRequest = new DeleteParametersRequest().withNames(params)
         DeleteParametersResult result = awsSimpleSystemsManagement.deleteParameters(deleteParametersRequest)
         assert result.deletedParameters.containsAll(params)
-
     }
 }
