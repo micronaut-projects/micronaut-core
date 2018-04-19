@@ -18,16 +18,12 @@ package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
-import io.micronaut.security.authentication.AuthenticationResponse;
-import io.micronaut.security.authentication.Authenticator;
-import io.micronaut.security.authentication.UserDetails;
-import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.authentication.*;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.token.configuration.TokenConfiguration;
-import io.micronaut.security.token.render.AccessRefreshToken;
+
 import java.util.Optional;
 
 /**
@@ -63,24 +59,11 @@ public class LoginController implements LoginControllerApi {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Override
-    public HttpResponse<AccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
-        Optional<UserDetails> userDetails = authenticate(usernamePasswordCredentials);
-        if (userDetails.isPresent()) {
-            return accessRefreshTokenGenerator.generate(userDetails.get());
+    public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
+        Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
+        if (response.map(AuthenticationResponse::isAuthenticated).orElse(false)) {
+            return accessRefreshTokenGenerator.generate((AuthenticationSuccess) response.get());
         }
-        return HttpResponse.status(HttpStatus.UNAUTHORIZED);
-    }
-
-    /**
-     *
-     * @param usernamePasswordCredentials User creds being authenticated
-     * @return Empty if the authentication fails. User details if authentication is successful.
-     */
-    protected Optional<UserDetails> authenticate(UsernamePasswordCredentials usernamePasswordCredentials) {
-        Optional<AuthenticationResponse> authenticationResponse = authenticator.authenticate(usernamePasswordCredentials);
-        if (authenticationResponse.isPresent() && authenticationResponse.get() instanceof UserDetails) {
-            return Optional.of((UserDetails) authenticationResponse.get());
-        }
-        return Optional.empty();
+        throw new AuthenticationException(response.flatMap(AuthenticationResponse::getMessage).orElse(null));
     }
 }

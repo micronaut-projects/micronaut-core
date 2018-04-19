@@ -21,11 +21,12 @@ package io.micronaut.security.authentication;
  * @author Sergio del Amo
  * @since 1.0
  */
-public enum AuthenticationFailure {
+public enum AuthenticationFailureReason {
     USER_NOT_FOUND,
     CREDENTIALS_DO_NOT_MATCH,
     USER_DISABLED,
     ACCOUNT_EXPIRED,
     ACCOUNT_LOCKED,
-    PASSWORD_EXPIRED
+    PASSWORD_EXPIRED,
+    UNKNOWN
 }

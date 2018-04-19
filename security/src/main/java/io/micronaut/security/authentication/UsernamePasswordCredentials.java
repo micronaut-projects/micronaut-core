@@ -24,7 +24,7 @@ import java.util.Objects;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest {
+public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest<String, String> {
     private String username;
     private String password;
 
@@ -76,16 +76,24 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
     }
 
     @Override
+    public String getIdentity() {
+        return getUsername();
+    }
+
+    @Override
+    public String getSecret() {
+        return getPassword();
+    }
+
+    @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (o instanceof UsernamePasswordCredentials) {
+            UsernamePasswordCredentials that = (UsernamePasswordCredentials) o;
+            return username.equals(that.username) &&
+                    password.equals(that.password);
+        } else {
             return false;
         }
-        UsernamePasswordCredentials that = (UsernamePasswordCredentials) o;
-        return Objects.equals(username, that.username) &&
-                Objects.equals(password, that.password);
     }
 
     @Override

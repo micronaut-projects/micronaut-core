@@ -16,7 +16,7 @@
 
 package io.micronaut.security.token.generator
 
-import io.micronaut.security.authentication.UserDetails
+import io.micronaut.security.authentication.AuthenticationSuccess
 import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.Specification
 
@@ -27,7 +27,7 @@ class JWTClaimsSetGeneratorSpec extends Specification {
         JWTClaimsSetGenerator generator = new JWTClaimsSetGenerator()
 
         when:
-        Map<String, Object> claims = generator.generateClaims(new UserDetails('admin', ['ROLE_USER', 'ROLE_ADMIN']), 3600)
+        Map<String, Object> claims = generator.generateClaims(new AuthenticationSuccess('admin', ['ROLE_USER', 'ROLE_ADMIN']), 3600)
 
         then:
         claims

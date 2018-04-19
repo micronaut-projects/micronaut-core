@@ -8,8 +8,7 @@ dependencies {
     compile project(":management")
     compile project(":http")
     compile "org.pac4j:pac4j-jwt:$pac4jVersion"
-
-    compile project(":validation")
+    compile project(":http-server")
     testCompile project(":http-client")
 
     testCompile project(":inject-groovy")

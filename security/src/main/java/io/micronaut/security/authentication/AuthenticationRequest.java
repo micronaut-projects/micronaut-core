@@ -17,9 +17,20 @@
 package io.micronaut.security.authentication;
 
 /**
+ * Represents a request to authenticate.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface AuthenticationRequest {
+public interface AuthenticationRequest<T, S> {
+
+    /**
+     * @return The token in the request
+     */
+    T getIdentity();
+
+    /**
+     * @return The secret in the request
+     */
+    S getSecret();
 }

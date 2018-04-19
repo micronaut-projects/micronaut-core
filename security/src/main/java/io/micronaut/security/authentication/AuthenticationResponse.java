@@ -17,6 +17,7 @@
 package io.micronaut.security.authentication;
 
 import java.io.Serializable;
+import java.util.Optional;
 
 /**
  *
@@ -32,4 +33,10 @@ public interface AuthenticationResponse extends Serializable {
     default boolean isAuthenticated() {
         return false;
     }
+
+    /**
+     * @return A message if the response chose to include one
+     */
+    Optional<String> getMessage();
+
 }

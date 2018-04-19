@@ -35,5 +35,5 @@ public interface LoginControllerApi {
      * @return An HTTP response containing an instance of {@link AccessRefreshToken}
      */
     @Post(LoginController.LOGIN_PATH)
-    HttpResponse<AccessRefreshToken> login(@Body UsernamePasswordCredentials usernamePasswordCredentials);
+    HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials);
 }

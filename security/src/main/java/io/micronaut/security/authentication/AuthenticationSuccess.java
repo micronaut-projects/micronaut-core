@@ -18,35 +18,26 @@ package io.micronaut.security.authentication;
 
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Authenticated user's representation.
  * @author Sergio del Amo
  * @since 1.0
  */
-public class UserDetails implements AuthenticationResponse {
+public class AuthenticationSuccess implements AuthenticationResponse {
+
     private String username;
     private Collection<String> roles;
-
-    /**
-     * Empty constructor.
-     *
-     */
-    public UserDetails() { }
 
     /**
      *
      * @param username e.g. admin
      * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
      */
-    public UserDetails(String username, Collection<String> roles) {
+    public AuthenticationSuccess(String username, Collection<String> roles) {
         this.username = username;
         this.roles = roles;
-    }
-
-    @Override
-    public boolean isAuthenticated() {
-        return true;
     }
 
     /**
@@ -81,6 +72,17 @@ public class UserDetails implements AuthenticationResponse {
         this.roles = roles;
     }
 
+
+    @Override
+    public boolean isAuthenticated() {
+        return true;
+    }
+
+    @Override
+    public Optional<String> getMessage() {
+        return Optional.empty();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -89,7 +91,7 @@ public class UserDetails implements AuthenticationResponse {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        UserDetails that = (UserDetails) o;
+        AuthenticationSuccess that = (AuthenticationSuccess) o;
         return Objects.equals(username, that.username) &&
                 Objects.equals(roles, that.roles);
     }
@@ -98,4 +100,5 @@ public class UserDetails implements AuthenticationResponse {
     public int hashCode() {
         return Objects.hash(username, roles);
     }
+
 }

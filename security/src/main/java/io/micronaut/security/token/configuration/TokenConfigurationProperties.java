@@ -18,7 +18,6 @@ package io.micronaut.security.token.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.validation.Validated;
 
 /**
  * Stores configuration for JWT.
@@ -26,7 +25,6 @@ import io.micronaut.validation.Validated;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Validated
 @ConfigurationProperties(TokenConfigurationProperties.PREFIX)
 public class TokenConfigurationProperties implements TokenConfiguration {
 

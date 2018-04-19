@@ -17,6 +17,7 @@
 package io.micronaut.security.authentication;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Signalises an authentication failure and stores the failure reason.
@@ -25,35 +26,42 @@ import java.util.Objects;
  */
 public class AuthenticationFailed implements AuthenticationResponse {
 
-    private AuthenticationFailure authenticationFailure = AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH;
+    private final AuthenticationFailureReason authenticationFailure;
+    private String message;
 
     /**
      * Empty Constructor.
      */
-    public AuthenticationFailed() { }
+    public AuthenticationFailed() {
+        this(AuthenticationFailureReason.UNKNOWN);
+    }
 
     /**
-     *
      * @param authenticationFailure AuthenticationFailure enum which represents the failure reason
      */
-    public AuthenticationFailed(AuthenticationFailure authenticationFailure) {
+    public AuthenticationFailed(AuthenticationFailureReason authenticationFailure) {
         this.authenticationFailure = authenticationFailure;
+        this.message = createMessage(authenticationFailure);
     }
 
-    /**
-     * authenticationFailure getter.
-     * @return Instance of {@link AuthenticationFailure}
-     */
-    public AuthenticationFailure getAuthenticationFailure() {
-        return authenticationFailure;
+    private String createMessage(AuthenticationFailureReason authenticationFailure) {
+        StringBuilder sb = new StringBuilder(authenticationFailure.name().toLowerCase());
+        for (int i = 0; i < sb.length(); i++) {
+            int end = i+1;
+            if (i == 0) {
+                sb.replace(i, end, String.valueOf(Character.toUpperCase(sb.charAt(i))));
+            }
+            if (sb.charAt(i) == '_') {
+                sb.replace(i, end, " ");
+                sb.replace(end, end+1, String.valueOf(Character.toUpperCase(sb.charAt(i+1))));
+            }
+        }
+        return sb.toString();
     }
 
-    /**
-     * authenticationFailure setter.
-     * @param authenticationFailure Instance of {@link AuthenticationFailure}
-     */
-    public void setAuthenticationFailure(AuthenticationFailure authenticationFailure) {
-        this.authenticationFailure = authenticationFailure;
+    @Override
+    public Optional<String> getMessage() {
+        return Optional.of(message);
     }
 
     @Override
@@ -72,4 +80,6 @@ public class AuthenticationFailed implements AuthenticationResponse {
     public int hashCode() {
         return Objects.hash(authenticationFailure);
     }
+
+
 }

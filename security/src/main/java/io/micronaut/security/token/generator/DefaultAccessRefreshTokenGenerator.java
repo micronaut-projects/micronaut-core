@@ -18,7 +18,7 @@ package io.micronaut.security.token.generator;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.authentication.AuthenticationSuccess;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.configuration.TokenEncryptionConfiguration;
 import io.micronaut.security.token.render.AccessRefreshToken;
@@ -82,7 +82,7 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
      * @return
      */
     @Override
-    public HttpResponse<AccessRefreshToken> generate(UserDetails userDetails) {
+    public HttpResponse<AccessRefreshToken> generate(AuthenticationSuccess userDetails) {
         try {
             String accessToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getDefaultExpiration());
             String refreshToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getRefreshTokenExpiration());

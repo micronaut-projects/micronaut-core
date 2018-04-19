@@ -1,15 +1,17 @@
 package io.micronaut.security.endpoints
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.security.authentication.AuthenticationProvider
+import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
-import io.micronaut.security.authentication.UsernamePasswordCredentials
 
 import javax.inject.Singleton
 
 @Singleton
+@Requires(property = 'spec.name', value = 'endpoints')
 class AuthenticationProviderThrowingException implements AuthenticationProvider {
     @Override
-    AuthenticationResponse authenticate(UsernamePasswordCredentials usernamePasswordCredentials) {
+    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
         throw new Exception()
     }
 }

@@ -33,6 +33,7 @@ class OauthControllerSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             [
+                    "spec.name": "endpoints",
                     "micronaut.security.enabled": true,
                     "micronaut.security.endpoints.login": true,
                     "micronaut.security.endpoints.refresh": true,
@@ -43,10 +44,6 @@ class OauthControllerSpec extends Specification {
     @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     def "can obtain a new access token using the refresh token"() {
-        expect:
-        context.getBean(AuthenticationProviderThrowingException.class)
-        context.getBean(AuthenticationProviderUserPassword.class)
-
         when:
         def creds = new UsernamePasswordCredentials('user', 'password')
         HttpResponse rsp = client.toBlocking().exchange(HttpRequest.POST('/login', creds), BearerAccessRefreshToken)

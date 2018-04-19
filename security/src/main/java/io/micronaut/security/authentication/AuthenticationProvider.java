@@ -24,9 +24,8 @@ package io.micronaut.security.authentication;
 public interface AuthenticationProvider {
 
     /**
-     *
-     * @param usernamePasswordCredentials instance of {@link UsernamePasswordCredentials}
-     * @return instance of {@link AuthenticationResponse}
+     * @param authenticationRequest The request
+     * @return The response
      */
-    AuthenticationResponse authenticate(UsernamePasswordCredentials usernamePasswordCredentials);
+    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest);
 }

@@ -17,12 +17,7 @@
 package io.micronaut.security.authentication.providers;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.authentication.AuthenticationFailed;
-import io.micronaut.security.authentication.AuthenticationFailure;
-import io.micronaut.security.authentication.AuthenticationProvider;
-import io.micronaut.security.authentication.AuthenticationResponse;
-import io.micronaut.security.authentication.UserDetails;
-import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.authentication.*;
 
 import javax.inject.Singleton;
 import java.util.List;
@@ -35,7 +30,7 @@ import java.util.Optional;
  */
 @Requires(beans = {UserFetcher.class, PasswordEncoder.class, AuthoritiesFetcher.class})
 @Singleton
-public class PersistenceAuthenticationProvider implements AuthenticationProvider {
+public class DelegatingAuthenticationProvider implements AuthenticationProvider {
 
     protected final UserFetcher userFetcher;
     protected final PasswordEncoder passwordEncoder;
@@ -47,9 +42,9 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
      * @param passwordEncoder Collaborator which checks if a raw password matches an encoded password
      * @param authoritiesFetcher Fetches authorities for a particular user
      */
-    public PersistenceAuthenticationProvider(UserFetcher userFetcher,
-                                             PasswordEncoder passwordEncoder,
-                                             AuthoritiesFetcher authoritiesFetcher) {
+    public DelegatingAuthenticationProvider(UserFetcher userFetcher,
+                                            PasswordEncoder passwordEncoder,
+                                            AuthoritiesFetcher authoritiesFetcher) {
         this.userFetcher = userFetcher;
         this.passwordEncoder = passwordEncoder;
         this.authoritiesFetcher = authoritiesFetcher;
@@ -57,34 +52,34 @@ public class PersistenceAuthenticationProvider implements AuthenticationProvider
 
     /**
      * Attempts to authenticate a user.
-     * @param creds username/password credentials
+     * @param authenticationRequest The authentication request data
      * @return An AuthenticationResponse object which encapsulates the authentication result.
      */
     @Override
-    public AuthenticationResponse authenticate(UsernamePasswordCredentials creds) {
-        final String username = creds.getUsername();
+    public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
+        final String username = authenticationRequest.getIdentity().toString();
         Optional<UserState> optionalUserState = userFetcher.findByUsername(username);
 
         if (!optionalUserState.isPresent()) {
-            return new AuthenticationFailed(AuthenticationFailure.USER_NOT_FOUND);
+            return new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND);
         }
         UserState user = optionalUserState.get();
         if (!user.isEnabled()) {
-            return new AuthenticationFailed(AuthenticationFailure.USER_DISABLED);
+            return new AuthenticationFailed(AuthenticationFailureReason.USER_DISABLED);
         }
         if (user.isAccountExpired()) {
-            return new AuthenticationFailed(AuthenticationFailure.ACCOUNT_EXPIRED);
+            return new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_EXPIRED);
         }
         if (user.isAccountLocked()) {
-            return new AuthenticationFailed(AuthenticationFailure.ACCOUNT_LOCKED);
+            return new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_LOCKED);
         }
         if (user.isPasswordExpired()) {
-            return new AuthenticationFailed(AuthenticationFailure.PASSWORD_EXPIRED);
+            return new AuthenticationFailed(AuthenticationFailureReason.PASSWORD_EXPIRED);
         }
-        if (!passwordEncoder.matches(creds.getPassword(), user.getPassword())) {
-            return new AuthenticationFailed(AuthenticationFailure.CREDENTIALS_DO_NOT_MATCH);
+        if (!passwordEncoder.matches(authenticationRequest.getSecret().toString(), user.getPassword())) {
+            return new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
         }
         List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(username);
-        return new UserDetails(username, authorities);
+        return new AuthenticationSuccess(username, authorities);
     }
 }

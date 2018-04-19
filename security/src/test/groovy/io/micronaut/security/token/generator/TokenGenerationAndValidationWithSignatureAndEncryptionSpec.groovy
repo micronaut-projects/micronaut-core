@@ -19,12 +19,11 @@ package io.micronaut.security.token.generator
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import io.micronaut.security.authentication.UserDetails
+import io.micronaut.security.authentication.AuthenticationSuccess
 import io.micronaut.security.token.configuration.EncryptionConfiguration
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator
 import io.micronaut.security.token.configuration.SignatureConfiguration
 import io.micronaut.security.token.configuration.SignatureConfigurationGenerator
-import io.micronaut.security.token.configuration.TokenConfiguration
 import io.micronaut.security.token.configuration.TokenEncryptionConfiguration
 import io.micronaut.security.token.configuration.TokenSignatureConfiguration
 import io.micronaut.security.token.validator.JwtTokenValidator
@@ -63,7 +62,7 @@ class TokenGenerationAndValidationWithSignatureAndEncryptionSpec extends Specifi
                 new JWTClaimsSetGenerator()
         )
 
-        UserDetails userDetails = new UserDetails(username: 'sherlock', roles: ['ROLE_DETECTIVE'])
+        AuthenticationSuccess userDetails = new AuthenticationSuccess('sherlock', ['ROLE_DETECTIVE'])
 
         expect:
         publicKey.exists()
