@@ -777,8 +777,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
-                    // TODO: remove this, should pass annotation metadata
-                    Object qualifierRef = fieldAnnotationMetadata.getAnnotationNameByStereotype(Qualifier.class).orElse(null)
 
                     boolean isPrivate = Modifier.isPrivate(modifiers)
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
@@ -787,9 +785,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getBeanWriter().setValidated(true)
                         }
                     }
+                    String fieldName = fieldNode.name
+                    Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
                     if (isValue) {
-                        String fieldName = fieldNode.name
-                        Object fieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
 
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                             getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
@@ -800,19 +798,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         } else {
                             getBeanWriter().visitFieldValue(
-                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
-                                requiresReflection,
+                                AstGenericUtils.resolveTypeReference(declaringClass),
                                 fieldType,
                                 fieldName,
+                                requiresReflection,
+                                fieldAnnotationMetadata,
+                                AstGenericUtils.buildGenericTypeInfo(fieldNode.type, Collections.emptyMap()),
                                 isConfigurationProperties
                             )
                         }
                     } else {
                         getBeanWriter().visitFieldInjectionPoint(
-                            declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
-                            requiresReflection,
-                            fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
-                            fieldNode.name
+                                AstGenericUtils.resolveTypeReference(declaringClass),
+                                fieldType,
+                                fieldName,
+                                requiresReflection,
+                                fieldAnnotationMetadata,
+                                AstGenericUtils.buildGenericTypeInfo(fieldNode.type, Collections.emptyMap())
                         )
                     }
                 }

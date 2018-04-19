@@ -49,13 +49,12 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 
+import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Arrays;
@@ -64,7 +63,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -152,7 +150,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Annotation.class, boolean.class);
+    private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Class.class, Class.class, String.class, AnnotationMetadata.class, Argument[].class, boolean.class);
 
     private static final Method ADD_METHOD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Class.class, String.class, Argument[].class, AnnotationMetadata.class, boolean.class);
 
@@ -214,7 +212,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private GeneratorAdapter preDestroyMethodVisitor;
     private GeneratorAdapter postConstructMethodVisitor;
     private int methodExecutorIndex = 0;
-    private int constructorLocalVariableCount = 1;
     private int currentFieldIndex = 0;
     private int currentMethodIndex = 0;
 
@@ -525,7 +522,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanFinalized = true;
     }
 
-    protected void finalizeAnnotationMetadata() {
+    private void finalizeAnnotationMetadata() {
         if (annotationMetadata != null) {
             GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
             annotationMetadataMethod.loadThis();
@@ -889,32 +886,53 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitFieldInjectionPoint(Object declaringType,
-                                         Object qualifierType,
-                                         boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName) {
+    public void visitFieldInjectionPoint(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD, false);
+        visitFieldInjectionPointInternal(
+                declaringType,
+                annotationMetadata,
+                typeArguments,
+                requiresReflection,
+                fieldType,
+                fieldName,
+                GET_BEAN_FOR_FIELD,
+                false);
+
     }
 
     @Override
-    public void visitFieldValue(Object declaringType,
-                                Object qualifierType,
-                                boolean requiresReflection,
-                                Object fieldType,
-                                String fieldName,
-                                boolean isOptional) {
+    public void visitFieldValue(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments,
+            boolean isOptional) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD, isOptional);
+        visitFieldInjectionPointInternal(
+                declaringType,
+                annotationMetadata,
+                typeArguments,
+                requiresReflection,
+                fieldType,
+                fieldName,
+                GET_VALUE_FOR_FIELD,
+                isOptional);
     }
 
     private void visitConfigBuilderMethodInternal(
@@ -1140,32 +1158,47 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         defaultConstructor.visitEnd();
     }
 
-    private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isValueOptional) {
+    private void visitFieldInjectionPointInternal(
+            Object declaringType,
+            AnnotationMetadata annotationMetadata,
+            Map<String, Object> typeArguments,
+            boolean requiresReflection,
+            Object fieldType,
+            String fieldName,
+            Method methodToInvoke,
+            boolean isValueOptional) {
         // ready this
         GeneratorAdapter constructorVisitor = this.constructorVisitor;
 
         constructorVisitor.loadThis();
 
-        // lookup the Field instance from the declaring type
+        // 1st argument: The declaring type
         Type declaringTypeRef = getTypeReference(declaringType);
-        int fieldVarIndex = pushGetFieldFromTypeLocalVariable(constructorVisitor, declaringTypeRef, fieldName);
+        constructorVisitor.push(declaringTypeRef);
 
-        // first argument to the method is the Field reference
-        // load the first argument. The field.
-        constructorVisitor.visitVarInsn(ALOAD, fieldVarIndex);
+        // 2nd argument: The field type
+        constructorVisitor.push(getTypeReference(fieldType));
 
-        // second argument is the annotation or null
-        // pass the qualifier type if present
-        if (qualifierType != null) {
+        // 3rd argument: The field name
+        constructorVisitor.push(fieldName);
 
-            constructorVisitor.visitVarInsn(ALOAD, fieldVarIndex);
-            pushGetAnnotationForField(constructorVisitor, getTypeReference(qualifierType));
+        // 4th argument: The annotation metadata
+        if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
+            constructorVisitor.visitInsn(ACONST_NULL);
         } else {
+            AnnotationMetadataWriter.instantiateNewMetadata(constructorVisitor, (DefaultAnnotationMetadata) annotationMetadata);
+        }
+
+        // 5th argument: The type arguments
+        if(CollectionUtils.isNotEmpty(typeArguments)) {
+            buildTypeArguments(constructorVisitor, typeArguments);
+        }
+        else {
             constructorVisitor.visitInsn(ACONST_NULL);
         }
 
-        // third argument is whether it requires reflection
-        constructorVisitor.push(requiresReflection);
+        // 6th argument: is reflection required?
+        constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
 
         // invoke addInjectionPoint method
         pushInvokeMethodOnSuperClass(constructorVisitor, ADD_FIELD_INJECTION_POINT_METHOD);
@@ -1219,16 +1252,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitLabel(falseCondition);
         }
         currentFieldIndex++;
-    }
-
-    private int pushGetFieldFromTypeLocalVariable(MethodVisitor methodVisitor, Type declaringType, String fieldName) {
-        methodVisitor.visitLdcInsn(declaringType);
-        // and the field name
-        methodVisitor.visitLdcInsn(fieldName);
-        pushInvokeMethodOnClass(methodVisitor, "getDeclaredField", String.class);
-
-        // store the field within using the field index. A pre-increment is used because 0 contains "this"
-        return pushNewConstructorLocalVariable();
     }
 
     private void addInjectionPointForSetterInternal(
@@ -1319,13 +1342,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // 4th argument: the annotation metadata
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+        if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             constructorVisitor.visitInsn(ACONST_NULL);
         } else {
             AnnotationMetadataWriter.instantiateNewMetadata(constructorVisitor, (DefaultAnnotationMetadata) annotationMetadata);
         }
         // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
+
+
         Collection<Object> argumentTypeClasses = hasArguments ? argumentTypes.values() : Collections.emptyList();
 
         // invoke add injection point method
@@ -1555,18 +1580,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (falseCondition != null) {
             injectVisitor.visitLabel(falseCondition);
         }
-    }
-
-    static void pushInvokeMethodOnClass(MethodVisitor methodVisitor, String classMethodName, Class... classMethodArgs) {
-        Method method = ReflectionUtils
-                .getDeclaredMethod(Class.class, classMethodName, classMethodArgs)
-                .orElseThrow(() -> new IllegalStateException("Class." + classMethodName + "(..) method not found"));
-
-        methodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                Type.getInternalName(Class.class),
-                classMethodName,
-                Type.getMethodDescriptor(method),
-                false);
     }
 
     private void visitInjectMethodDefinition() {
@@ -1901,11 +1914,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return buildMethodLocalCount++;
     }
 
-    private int pushNewConstructorLocalVariable() {
-        constructorVisitor.visitVarInsn(ASTORE, constructorLocalVariableCount);
-        return constructorLocalVariableCount++;
-    }
-
     private int pushNewInjectLocalVariable() {
         injectMethodVisitor.visitVarInsn(ASTORE, injectMethodLocalCount);
         return injectMethodLocalCount++;
@@ -1994,7 +2002,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
+    private static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
         if (types == null || types.isEmpty()) {
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
@@ -2040,7 +2048,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
         Map nestedTypes = null;
-        Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
+        @SuppressWarnings("unchecked") Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
         Object objectType;
         if (nestedEntry.isPresent()) {
             Map.Entry data = nestedEntry.get();
@@ -2092,25 +2100,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             protectedConstructor.invokeConstructor(superType, constructorType);
         }
         return protectedConstructor;
-    }
-
-    /**
-     * Adds a method call to get the given annotation of the given type to tye stack
-     *
-     * @param annotationType The annotation type
-     */
-    private void pushGetAnnotationForField(MethodVisitor methodVisitor, Type annotationType) {
-        methodVisitor.visitLdcInsn(annotationType);
-        Method method = ReflectionUtils.getDeclaredMethod(Field.class, "getAnnotation", Class.class)
-                .orElseThrow(() ->
-                        new IllegalStateException("Field.getAnnotation(..) method not found. Incompatible JVM?")
-                );
-        String descriptor = Type.getType(method).getDescriptor();
-        methodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                Type.getInternalName(Field.class),
-                "getAnnotation",
-                descriptor,
-                false);
     }
 
     private String generateBeanDefSig(String typeParameter) {
