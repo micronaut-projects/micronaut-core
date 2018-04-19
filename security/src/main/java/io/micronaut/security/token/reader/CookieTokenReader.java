@@ -35,8 +35,6 @@ import java.util.Optional;
 @Singleton
 public class CookieTokenReader implements TokenReader {
 
-    private static final Logger log = LoggerFactory.getLogger(BearerTokenReader.class);
-
     protected final CookieTokenReaderConfiguration cookieTokenReaderConfiguration;
 
     public CookieTokenReader(CookieTokenReaderConfiguration cookieTokenReaderConfiguration) {

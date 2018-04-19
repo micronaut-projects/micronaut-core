@@ -41,7 +41,6 @@ import java.util.Optional;
 @Requires(property = TokenEncryptionConfigurationProperties.PREFIX + ".enabled", notEquals = "true")
 public class SignedJwtTokenValidator implements TokenValidator {
 
-    private static final Logger log = LoggerFactory.getLogger(SignedJwtTokenValidator.class);
     private final JwtAuthenticator jwtAuthenticator;
 
     public SignedJwtTokenValidator(TokenConfiguration tokenConfiguration) {
