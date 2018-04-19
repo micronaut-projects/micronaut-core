@@ -612,7 +612,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitSetterInjectionPoint(Object declaringType,
-                                          AnnotationValue qualifierType,
+                                          AnnotationMetadata fieldMetadata,
                                           boolean requiresReflection,
                                           Object fieldType,
                                           String fieldName,
@@ -620,7 +620,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                           Map<String, Object> genericTypes) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
-        addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
+        addInjectionPointForSetterInternal(fieldMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
             resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT, false);
@@ -631,7 +631,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitSetterValue(Object declaringType,
-                                 Object qualifierType,
+                                 AnnotationMetadata annotationMetadata,
                                  boolean requiresReflection,
                                  Object fieldType,
                                  String fieldName,
@@ -640,7 +640,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                  boolean isOptional) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
-        addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
+        addInjectionPointForSetterInternal(annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
             resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
@@ -1298,7 +1298,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void addInjectionPointForSetterInternal(
-        Object qualifierType,
+        AnnotationMetadata fieldAnnotationMetadata,
         boolean requiresReflection,
         Object fieldType,
         String fieldName,
@@ -1324,8 +1324,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 2nd argument: The argument name
         generatorAdapter.push(fieldName);
         // 3rd argument:  The qualifier type
-        if (qualifierType != null) {
-            generatorAdapter.push(getTypeReference(qualifierType));
+        if (fieldAnnotationMetadata != null) {
+            // TODO: replace write metadata
+            Optional<String> qualifier = fieldAnnotationMetadata.getAnnotationNameByStereotype(Qualifier.class);
+            if(qualifier.isPresent()) {
+                generatorAdapter.push(getTypeReference(qualifier.get()));
+            }
+            else {
+                generatorAdapter.visitInsn(ACONST_NULL);
+            }
         } else {
             generatorAdapter.visitInsn(ACONST_NULL);
         }

@@ -801,14 +801,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitSetterInjectionPoint(
         Object declaringType,
-        io.micronaut.inject.annotation.AnnotationValue qualifierType,
+        AnnotationMetadata fieldMetadata,
         boolean requiresReflection,
         Object fieldType,
         String fieldName,
         String setterName,
         Map<String, Object> genericTypes) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterInjectionPoint(
-            declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
+            declaringType, fieldMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes
         ));
     }
 
@@ -825,7 +825,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitSetterValue(
         Object declaringType,
-        Object qualifierType,
+        AnnotationMetadata annotationMetadata,
         boolean requiresReflection,
         Object fieldType,
         String fieldName,
@@ -833,7 +833,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Map<String, Object> genericTypes,
         boolean isOptional) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(
-            declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
+            declaringType, annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
         ));
     }
 
