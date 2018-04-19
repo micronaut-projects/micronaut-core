@@ -37,6 +37,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import javax.lang.model.element.AnnotationValue;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -127,7 +128,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int interceptorArgumentIndex;
     private int beanContextArgumentIndex = -1;
     private Map<String, Object> constructorArgumentTypes;
-    private Map<String, Object> constructorQualfierTypes;
+    private Map<String, AnnotationMetadata> constructorQualfierTypes;
     private Map<String, Map<String, Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
     private List<Runnable> deferredInjectionPoints = new ArrayList<>();
@@ -281,12 +282,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor()} should be called at least once
      *
      * @param argumentTypes  The argument names and types. Should be an ordered map should as {@link LinkedHashMap}
-     * @param qualifierTypes The argument names and qualifier types. Should be an ordered map should as {@link LinkedHashMap}
+     * @param argumentAnnotationMetadata The argument names and metadata
      * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
-    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
+    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata, Map<String, Map<String, Object>> genericTypes) {
         this.constructorArgumentTypes = argumentTypes;
-        this.constructorQualfierTypes = qualifierTypes;
+        this.constructorQualfierTypes = argumentAnnotationMetadata;
         this.constructorGenericTypes = genericTypes;
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
         this.beanContextArgumentIndex = argumentTypes.size();
@@ -296,8 +297,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, qualifierTypes, genericTypes);
+    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, AnnotationMetadata> argumentAnnotationMetadata, Map<String, Map<String, Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, argumentAnnotationMetadata, genericTypes);
     }
 
     /**
@@ -309,7 +310,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param returnTypeGenericTypes Map containing the return generic types
      * @param methodName     The method name
      * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes   The generic types of each argument. Can be null.
      * @param annotationMetadata metadata
      */
@@ -319,12 +320,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
-                                  Map<String, Object> qualifierTypes,
+                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata) {
 
         // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
-        visitExecutableMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
+        visitExecutableMethod(
+                declaringType,
+                returnType,
+                genericReturnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -382,7 +392,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
+            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes);
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
@@ -791,7 +801,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitSetterInjectionPoint(
         Object declaringType,
-        Object qualifierType,
+        io.micronaut.inject.annotation.AnnotationValue qualifierType,
         boolean requiresReflection,
         Object fieldType,
         String fieldName,
@@ -839,7 +849,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Object returnType,
             String methodName,
             Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPostConstructMethod(
                 declaringType,
@@ -847,7 +857,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 returnType,
                 methodName,
                 argumentTypes,
-                qualifierTypes,
+                argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata));
     }
@@ -859,7 +869,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Object returnType,
             String methodName,
             Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitPreDestroyMethod(
@@ -868,7 +878,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         returnType,
                         methodName,
                         argumentTypes,
-                        qualifierTypes,
+                        argumentAnnotationMetadata,
                         genericTypes,
                         annotationMetadata)
         );
@@ -881,7 +891,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Object returnType,
             String methodName,
             Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitMethodInjectionPoint(
@@ -890,7 +900,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         returnType,
                         methodName,
                         argumentTypes,
-                        qualifierTypes,
+                        argumentAnnotationMetadata,
                         genericTypes,
                         annotationMetadata)
         );
@@ -904,7 +914,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Map<String, Object> returnTypeGenericTypes,
         String methodName,
         Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
         Map<String, Map<String, Object>> genericTypes,
         AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() ->
@@ -915,7 +925,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
-                qualifierTypes,
+                argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata
             )

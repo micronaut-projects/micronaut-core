@@ -157,6 +157,11 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     @Override
+    public boolean isEmpty() {
+        return allAnnotations == null || allAnnotations.isEmpty();
+    }
+
+    @Override
     public boolean hasDeclaredAnnotation(String annotation) {
         return declaredAnnotations != null && StringUtils.isNotEmpty(annotation) && declaredAnnotations.containsKey(annotation);
     }

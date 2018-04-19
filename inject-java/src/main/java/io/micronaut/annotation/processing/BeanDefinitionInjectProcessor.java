@@ -36,6 +36,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -56,6 +57,7 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.inject.Qualifier;
 import javax.inject.Scope;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
@@ -270,7 +272,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (constructorData != null) {
                     aopProxyWriter.visitBeanDefinitionConstructor(
                         constructorData.getParameters(),
-                        constructorData.getQualifierTypes(),
+                        constructorData.getAnnotationMetadata(),
                         constructorData.getGenericTypes()
                     );
                 } else {
@@ -311,13 +313,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         if (proxyWriter != null) {
                             proxyWriter.visitBeanDefinitionConstructor(
                                 constructorParamterInfo.getParameters(),
-                                constructorParamterInfo.getQualifierTypes(),
+                                constructorParamterInfo.getAnnotationMetadata(),
                                 constructorParamterInfo.getGenericTypes());
 
                         }
                         beanDefinitionWriter.visitBeanDefinitionConstructor(
                             constructorParamterInfo.getParameters(),
-                            constructorParamterInfo.getQualifierTypes(),
+                            constructorParamterInfo.getAnnotationMetadata(),
                             constructorParamterInfo.getGenericTypes());
 
                         if (isAopProxyType) {
@@ -393,7 +395,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     String methodName = method.getSimpleName().toString();
                     Map<String, Object> methodParameters = params.getParameters();
-                    Map<String, Object> methodQualifier = params.getQualifierTypes();
+                    Map<String, AnnotationMetadata> methodQualifier = params.getAnnotationMetadata();
                     Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
                     AnnotationMetadata annotationMetadata;
                     if (annotationUtils.isAnnotated(method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
@@ -516,7 +518,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 beanMethodDeclaringType,
                 beanMethodName,
                 beanMethodParameters,
-                beanMethodParams.getQualifierTypes(),
+                beanMethodParams.getAnnotationMetadata(),
                 beanMethodParams.getGenericTypes()
             );
 
@@ -558,7 +560,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
                         String methodName = method.getSimpleName().toString();
                         Map<String, Object> methodParameters = params.getParameters();
-                        Map<String, Object> methodQualifier = params.getQualifierTypes();
+                        Map<String, AnnotationMetadata> methodQualifier = params.getAnnotationMetadata();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         AnnotationMetadata annotationMetadata;
@@ -641,7 +643,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 returnTypeGenerics,
                 method.getSimpleName().toString(),
                 params.getParameters(),
-                params.getQualifierTypes(),
+                params.getAnnotationMetadata(),
                 params.getGenericTypes(), methodAnnotationMetadata);
 
             // shouldn't visit around advice on an introduction advice instance
@@ -677,7 +679,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         returnTypeGenerics,
                         method.getSimpleName().toString(),
                         params.getParameters(),
-                        params.getQualifierTypes(),
+                        params.getAnnotationMetadata(),
                         params.getGenericTypes(), !isAnnotationReference && executableMethodWriter != null ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata) : methodAnnotationMetadata);
                 }
             }
@@ -704,7 +706,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (constructorParameterInfo != null) {
                     aopProxyWriter.visitBeanDefinitionConstructor(
                         constructorParameterInfo.getParameters(),
-                        constructorParameterInfo.getQualifierTypes(),
+                        constructorParameterInfo.getAnnotationMetadata(),
                         constructorParameterInfo.getGenericTypes()
                     );
                 } else {
@@ -776,7 +778,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
-                    params.getQualifierTypes(),
+                    params.getAnnotationMetadata(),
                     params.getGenericTypes(),
                     annotationMetadata
                 );
@@ -787,7 +789,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
-                    params.getQualifierTypes(),
+                    params.getAnnotationMetadata(),
                     params.getGenericTypes(),
                     annotationMetadata
                 );
@@ -798,7 +800,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
-                    params.getQualifierTypes(),
+                    params.getAnnotationMetadata(),
                     params.getGenericTypes(),
                     annotationMetadata
                 );
@@ -1171,10 +1173,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 String argName = paramElement.getSimpleName().toString();
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
-                String qualifier = annotationUtils.resolveQualifier(paramElement);
-                if (qualifier != null) {
-                    params.addQualifierType(argName, qualifier);
-                }
+                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(paramElement);
+                params.addAnnotationMetadata(argName,annotationMetadata);
 
                 switch (kind) {
                     case ARRAY:
