@@ -157,6 +157,11 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     @Override
+    public boolean isEmpty() {
+        return allAnnotations == null || allAnnotations.isEmpty();
+    }
+
+    @Override
     public boolean hasDeclaredAnnotation(String annotation) {
         return declaredAnnotations != null && StringUtils.isNotEmpty(annotation) && declaredAnnotations.containsKey(annotation);
     }
@@ -272,7 +277,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param annotation The annotation
      * @param values     The values
      */
-    void addAnnotation(String annotation, Map<CharSequence, Object> values) {
+    protected void addAnnotation(String annotation, Map<CharSequence, Object> values) {
         if (annotation != null) {
             Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
             addAnnotation(annotation, values, null, allAnnotations, false);
@@ -285,7 +290,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param stereotype The annotation
      * @param values     The values
      */
-    void addStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+    protected void addStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
             getAnnotationsByStereotypeInternal(stereotype).addAll(parentAnnotations);
@@ -299,7 +304,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param stereotype The annotation
      * @param values     The values
      */
-    void addDeclaredStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+    protected void addDeclaredStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
             Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
@@ -314,7 +319,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param annotation The annotation
      * @param values     The values
      */
-    void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
+    protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
         if (annotation != null) {
             Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
             Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();

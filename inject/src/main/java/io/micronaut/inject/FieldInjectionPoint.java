@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 
 import java.lang.annotation.Annotation;
@@ -28,7 +29,7 @@ import java.lang.reflect.Field;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement {
+public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement, AnnotationMetadataProvider {
 
     /**
      * @return The name of the field
@@ -51,9 +52,10 @@ public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement
     Annotation getQualifier();
 
     /**
+     * @param  instance the instance
      * @param object The the field on the target object
      */
-    void set(Object object, T instance);
+    void set(T instance, Object object);
 
     /**
      * Convert this field to an {@link Argument} reference
