@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.annotation.AnnotationValue;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -43,10 +44,46 @@ public interface BeanDefinitionVisitor {
     String PROXY_SUFFIX = "$Intercepted";
 
     /**
-     * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(Map, Map, Map)} should be called at least once
+     * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean, Map, Map, Map)} should be called at least once
+     *
+     * @param annotationMetadata The annotation metadata for the constructor
+     * @param requiresReflection Whether invoking the constructor requires reflection
      */
-    void visitBeanDefinitionConstructor();
+    void visitBeanDefinitionConstructor(
+            AnnotationMetadata annotationMetadata,
+            boolean requiresReflection
+    );
 
+    /**
+     * Visits the constructor used to create the bean definition.
+     *
+     * @param annotationMetadata The annotation metadata for the constructor
+     * @param requiresReflection Whether invoking the constructor requires reflection
+     * @param argumentTypes  The argument type names for each parameter
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes   The generic types for each parameter
+     */
+    void visitBeanDefinitionConstructor(            AnnotationMetadata annotationMetadata,
+                                                    boolean requiresReflection,
+
+                                        Map<String, Object> argumentTypes,
+                                        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+                                        Map<String, Map<String, Object>> genericTypes);
+
+
+    /**
+     * Visits the constructor of the parent class used in the case a proxied bean definition
+     *
+     * @param argumentTypes  The argument type names for each parameter
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes   The generic types for each parameter
+     */
+    void visitProxiedBeanDefinitionConstructor(
+            Object declaringType,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes
+    );
     /**
      * @return Whether the provided type an interface
      */
@@ -108,30 +145,6 @@ public interface BeanDefinitionVisitor {
      */
     String getBeanDefinitionName();
 
-    /**
-     * Visits the constructor used to create the bean definition.
-     *
-     * @param argumentTypes  The argument type names for each parameter
-     * @param qualifierTypes The qualifier type names for each parameter
-     * @param genericTypes   The generic types for each parameter
-     */
-    void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes,
-                                        Map<String, Object> qualifierTypes,
-                                        Map<String, Map<String, Object>> genericTypes);
-
-    /**
-     * Visits the constructor of the parent class used in the case a proxied bean definition
-     *
-     * @param argumentTypes  The argument type names for each parameter
-     * @param qualifierTypes The qualifier type names for each parameter
-     * @param genericTypes   The generic types for each parameter
-     */
-    void visitProxiedBeanDefinitionConstructor(
-        Object declaringType,
-        Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
-        Map<String, Map<String, Object>> genericTypes
-    );
 
     /**
      * Finalize the bean definition to the given output stream
@@ -158,7 +171,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a field and setter pairing.
      *
      * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
+     * @param fieldMetadata      The qualifier type
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
      * @param fieldName          The field name
@@ -166,7 +179,7 @@ public interface BeanDefinitionVisitor {
      * @param genericTypes       The generic types
      */
     void visitSetterInjectionPoint(Object declaringType,
-                                   Object qualifierType,
+                                   AnnotationMetadata fieldMetadata,
                                    boolean requiresReflection,
                                    Object fieldType,
                                    String fieldName,
@@ -177,7 +190,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a field and setter pairing.
      *
      * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
+     * @param annotationMetadata      The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
      * @param fieldName          The field name
@@ -186,7 +199,7 @@ public interface BeanDefinitionVisitor {
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
-                          Object qualifierType,
+                          AnnotationMetadata annotationMetadata,
                           boolean requiresReflection,
                           Object fieldType,
                           String fieldName,
@@ -199,7 +212,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a setter.
      *
      * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
+     * @param methodMetadata     The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param valueType          The field type
      * @param setterName         The setter name
@@ -207,11 +220,12 @@ public interface BeanDefinitionVisitor {
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
-                          Object qualifierType,
+                          AnnotationMetadata methodMetadata,
                           boolean requiresReflection,
                           Object valueType,
                           String setterName,
                           Map<String, Object> genericTypes,
+                          AnnotationMetadata setterArgumentMetadata,
                           boolean isOptional);
 
     /**
@@ -221,17 +235,18 @@ public interface BeanDefinitionVisitor {
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata     The argument annotation metadata
      * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata
+     * @param annotationMetadata The annotation metadata
      */
     void visitPostConstructMethod(Object declaringType,
                                   boolean requiresReflection,
                                   Object returnType,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
-                                  Map<String, Object> qualifierTypes,
-                                  Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
+                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+                                  Map<String, Map<String, Object>> genericTypes,
+                                  AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a method injection point
@@ -240,7 +255,7 @@ public interface BeanDefinitionVisitor {
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata     The argument annotation metadata
      * @param genericTypes       The generic types of each argument. Can be null.
      * @param annotationMetadata The annotation metadata
      */
@@ -249,7 +264,7 @@ public interface BeanDefinitionVisitor {
                                Object returnType,
                                String methodName,
                                Map<String, Object> argumentTypes,
-                               Map<String, Object> qualifierTypes,
+                               Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
 
     /**
@@ -259,7 +274,7 @@ public interface BeanDefinitionVisitor {
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata     The argument annotation metadata
      * @param genericTypes       The generic types of each argument. Can be null.
      * @param annotationMetadata The annotation metadata
      */
@@ -268,7 +283,7 @@ public interface BeanDefinitionVisitor {
                                    Object returnType,
                                    String methodName,
                                    Map<String, Object> argumentTypes,
-                                   Map<String, Object> qualifierTypes,
+                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                    Map<String, Map<String, Object>> genericTypes,
                                    AnnotationMetadata annotationMetadata);
 
@@ -279,7 +294,7 @@ public interface BeanDefinitionVisitor {
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata     The argument annotation metadata
      * @param genericTypes       The generic types of each argument. Can be null.
      * @param annotationMetadata The annotation metadata for the method
      * @return The {@link ExecutableMethodWriter}.
@@ -290,7 +305,7 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> returnTypeGenericTypes,
                                                  String methodName,
                                                  Map<String, Object> argumentTypes,
-                                                 Map<String, Object> qualifierTypes,
+                                                 Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
                                                  AnnotationMetadata annotationMetadata);
 
