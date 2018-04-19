@@ -18,7 +18,7 @@ package io.micronaut.security.endpoints;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Stores the response of a token refresh request
+ * Encapsulate the request to get a new access token
  *
  * @author Sergio del Amo
  * @since 1.0
