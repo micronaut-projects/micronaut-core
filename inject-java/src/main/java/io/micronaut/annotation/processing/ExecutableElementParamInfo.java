@@ -27,6 +27,8 @@ import java.util.Map;
  */
 class ExecutableElementParamInfo {
 
+    boolean requiresReflection = false;
+    AnnotationMetadata metadata = AnnotationMetadata.EMPTY_METADATA;
     Map<String, Object> parameters = new LinkedHashMap<>();
     Map<String, AnnotationMetadata> annotationMetadata = new LinkedHashMap<>();
     Map<String, Map<String, Object>> genericTypes = new LinkedHashMap<>();
@@ -47,11 +49,19 @@ class ExecutableElementParamInfo {
         return Collections.unmodifiableMap(parameters);
     }
 
-    Map<String, AnnotationMetadata> getAnnotationMetadata() {
+    Map<String, AnnotationMetadata> getParameterMetadata() {
         return Collections.unmodifiableMap(annotationMetadata);
     }
 
     Map<String, Map<String, Object>> getGenericTypes() {
         return Collections.unmodifiableMap(genericTypes);
+    }
+
+    public boolean isRequiresReflection() {
+        return requiresReflection;
+    }
+
+    public AnnotationMetadata getAnnotationMetadata() {
+        return metadata;
     }
 }

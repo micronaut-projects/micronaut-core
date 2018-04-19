@@ -101,6 +101,23 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             return types;
         }
     }
+
+    /**
+     * Convert the arguments to a string representation
+     * @param arguments The arguments
+     * @return The String representation
+     */
+    static String toString(Argument...arguments) {
+        StringBuilder baseString = new StringBuilder();
+        for (int i = 0; i < arguments.length; i++) {
+            Argument argument = arguments[i];
+            baseString.append(argument.toString());
+            if (i != arguments.length - 1) {
+                baseString.append(',');
+            }
+        }
+        return baseString.toString();
+    }
      /**
      * Creates a new argument for the given type, name and qualifier
      *
