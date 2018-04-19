@@ -513,7 +513,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
         this.constructArgumentMetadata = new LinkedHashMap<>( this.constructArgumentMetadata );
         this.constructArgumentMetadata.put("interceptors", new DefaultAnnotationMetadata() {{
-            addAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
+            addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
                     "value", Arrays.stream(interceptorTypes).map(Type::getClassName).toArray()
             ));
         }});
@@ -811,20 +811,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 method.accept(visitor);
             }
         }
-    }
-
-    @Override
-    public void visitSetterInjectionPoint(
-        Object declaringType,
-        AnnotationMetadata fieldMetadata,
-        boolean requiresReflection,
-        Object fieldType,
-        String fieldName,
-        String setterName,
-        Map<String, Object> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterInjectionPoint(
-            declaringType, fieldMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes
-        ));
     }
 
     @Override

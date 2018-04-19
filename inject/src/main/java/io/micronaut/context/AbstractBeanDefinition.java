@@ -1674,7 +1674,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
 
         if (qualifier == null) {
-            io.micronaut.context.annotation.Type typeAnn = argument.getAnnotation(io.micronaut.context.annotation.Type.class);
+            io.micronaut.context.annotation.Type typeAnn = argument.getDeclaredAnnotation(io.micronaut.context.annotation.Type.class);
             if (typeAnn != null) {
                 qualifier = Qualifiers.byAnnotation(typeAnn);
             } else {
