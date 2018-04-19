@@ -20,7 +20,8 @@ micronaut:
   security:
     enabled: true
     token:
-      secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+      signature:
+        secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
     interceptUrlMap:
       -
         pattern: /

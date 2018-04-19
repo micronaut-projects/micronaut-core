@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.generator;
+package io.micronaut.security.token.configuration;
 
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
+import io.micronaut.core.util.Toggleable;
 
 import java.io.File;
 
@@ -27,12 +28,18 @@ import java.io.File;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenEncryptionConfiguration {
+public interface TokenEncryptionConfiguration extends Toggleable {
 
    /**
     * @return true if an encrypted JWT should be used
     */
     boolean isEnabled();
+
+   /**
+    *
+    * @return a value of {@link EncryptionConfiguration}
+    */
+    EncryptionConfiguration getType();
 
     /**
      * @return The path to the public key
@@ -53,4 +60,10 @@ public interface TokenEncryptionConfiguration {
      * @return The encryption method
      */
     EncryptionMethod getEncryptionMethod();
+
+    /**
+     *
+     * @return Secret's length must be at least 256 bits. it is used to sign JWT.
+     */
+     String getSecret();
 }

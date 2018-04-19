@@ -19,6 +19,8 @@ package io.micronaut.security.token.converters;
 import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
+
+import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -26,6 +28,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Singleton
 public class JWSAlgorithmConverter  implements TypeConverter<CharSequence, JWSAlgorithm> {
 
     /**

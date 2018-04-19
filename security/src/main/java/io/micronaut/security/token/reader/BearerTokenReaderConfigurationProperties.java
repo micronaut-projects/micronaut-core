@@ -17,7 +17,7 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.security.token.generator.TokenConfigurationProperties;
+import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 
 /**
  * Default implementation of {@link BearerTokenReaderConfiguration}.

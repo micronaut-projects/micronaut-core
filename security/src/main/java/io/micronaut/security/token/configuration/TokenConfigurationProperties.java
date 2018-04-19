@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.generator;
+package io.micronaut.security.token.configuration;
 
-import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
-
-import javax.validation.constraints.NotNull;
+import io.micronaut.validation.Validated;
 
 /**
  * Stores configuration for JWT.
@@ -28,7 +26,7 @@ import javax.validation.constraints.NotNull;
  * @author Sergio del Amo
  * @since 1.0
  */
-
+@Validated
 @ConfigurationProperties(TokenConfigurationProperties.PREFIX)
 public class TokenConfigurationProperties implements TokenConfiguration {
 
@@ -40,15 +38,12 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     protected Integer refreshTokenExpiration = null;
     protected Integer defaultExpiration = DEFAULT_EXPIRATION;
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
-    protected JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
-
-    @NotNull
-    protected String secret;
 
     /**
      * refreshTokenExpiration getter.
      * @return expiration time in milliseconds
      */
+    @Override
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
     }
@@ -57,6 +52,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
      * defaultExpiration getter.
      * @return expiration time in milliseconds
      */
+    @Override
     public Integer getDefaultExpiration() {
         return defaultExpiration;
     }
@@ -65,23 +61,8 @@ public class TokenConfigurationProperties implements TokenConfiguration {
      * rolesClaimName getter.
      * @return e.g. roles
      */
+    @Override
     public String getRolesClaimName() {
         return rolesClaimName;
-    }
-
-    /**
-     * secret getter.
-     * @return secret used to sign the JWT
-     */
-    public String getSecret() {
-        return this.secret;
-    }
-
-    /**
-     * jwsAlgorithm getter.
-     * @return a JWSAlgorithm
-     */
-    public JWSAlgorithm getJwsAlgorithm() {
-        return jwsAlgorithm;
     }
 }

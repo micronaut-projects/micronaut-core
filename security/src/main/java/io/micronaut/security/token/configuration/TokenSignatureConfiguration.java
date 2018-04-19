@@ -14,30 +14,33 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.generator;
+package io.micronaut.security.token.configuration;
 
-import io.micronaut.security.authentication.UserDetails;
-
-import java.util.Map;
+import com.nimbusds.jose.JWSAlgorithm;
+import io.micronaut.core.util.Toggleable;
 
 /**
- * Responsible for generating token strings.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenGenerator {
+public interface
+TokenSignatureConfiguration extends Toggleable {
+    /**
+     *
+     * @return The JWS Algorithm
+     */
+    JWSAlgorithm getJwsAlgorithm();
 
     /**
-     * @param userDetails Authenticated user's representation.
-     * @param expiration The amount of time in milliseconds until the token expires
-     * @return An optional JWT string
+     *
+     * @return Secret's length must be at least 256 bits. it is used to sign JWT.
      */
-    String generateToken(UserDetails userDetails, Integer expiration);
+    String getSecret();
 
     /**
-     * @param claims Claims to be included in the JWT token to be generated
-     * @return a JSON Web Token ( JWT )
+     *
+     * @return a value of {@link SignatureConfiguration}
      */
-    String generateToken(Map<String, Object> claims);
+    SignatureConfiguration getType();
 }

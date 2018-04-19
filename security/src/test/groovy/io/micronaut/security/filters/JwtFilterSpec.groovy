@@ -24,7 +24,7 @@ import io.micronaut.security.config.InterceptUrlMapPattern
 import io.micronaut.security.config.SecurityConfigType
 import io.micronaut.security.config.SecurityConfiguration
 import io.micronaut.security.endpoints.SecurityEndpointsConfiguration
-import io.micronaut.security.token.generator.TokenConfiguration
+import io.micronaut.security.token.configuration.TokenConfiguration
 import io.micronaut.security.token.reader.TokenReader
 import io.micronaut.security.token.validator.TokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims

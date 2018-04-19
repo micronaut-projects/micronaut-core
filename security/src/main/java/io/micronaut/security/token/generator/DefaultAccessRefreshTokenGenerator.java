@@ -19,6 +19,8 @@ package io.micronaut.security.token.generator;
 import io.micronaut.context.BeanContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.token.configuration.TokenEncryptionConfiguration;
 import io.micronaut.security.token.render.AccessRefreshToken;
 import io.micronaut.security.token.render.TokenRenderer;
 import org.pac4j.core.profile.jwt.JwtClaims;

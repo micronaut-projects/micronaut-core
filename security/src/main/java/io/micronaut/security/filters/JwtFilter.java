@@ -29,7 +29,7 @@ import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.endpoints.LoginController;
 import io.micronaut.security.endpoints.OauthController;
 import io.micronaut.security.endpoints.SecurityEndpointsConfiguration;
-import io.micronaut.security.token.generator.TokenConfiguration;
+import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.reader.BearerTokenReader;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;

@@ -9,7 +9,11 @@ dependencies {
     compile project(":http")
     compile "org.pac4j:pac4j-jwt:$pac4jVersion"
 
+    compile project(":validation")
     testCompile project(":http-client")
+
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
 }
 
 

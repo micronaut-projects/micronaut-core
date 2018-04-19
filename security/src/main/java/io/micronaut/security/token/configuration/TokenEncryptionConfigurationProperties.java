@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.generator;
+package io.micronaut.security.token.configuration;
 
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
@@ -36,8 +36,21 @@ public class TokenEncryptionConfigurationProperties implements TokenEncryptionCo
     protected boolean enabled = false;
     protected EncryptionMethod encryptionMethod = EncryptionMethod.A128GCM;
     protected JWEAlgorithm jweAlgorithm = JWEAlgorithm.RSA_OAEP_256;
-    @Nullable protected File publicKeyPath;
-    @Nullable protected File privateKeyPath;
+    protected EncryptionConfiguration type = EncryptionConfiguration.RSA;
+
+    @Nullable
+    protected String secret;
+
+    @Nullable
+    protected File publicKeyPath;
+
+    @Nullable
+    protected File privateKeyPath;
+
+    @Override
+    public EncryptionConfiguration getType() {
+        return this.type;
+    }
 
     @Override
     public boolean isEnabled() {
@@ -47,6 +60,11 @@ public class TokenEncryptionConfigurationProperties implements TokenEncryptionCo
     @Override
     public EncryptionMethod getEncryptionMethod() {
         return encryptionMethod;
+    }
+
+    @Override
+    public String getSecret() {
+        return secret;
     }
 
     @Override

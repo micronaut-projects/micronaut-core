@@ -8,13 +8,12 @@ micronaut:
     name: security
   security:
     enabled: true
-    passwordencoder:
-      enabled: true
     endpoints:
       login: true
       refresh: true
     token:
-      secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+      signature:
+        secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
       defaultExpiration: 30
 endpoints:
   health:

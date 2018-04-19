@@ -32,7 +32,7 @@ import java.util.Map;
 @Singleton
 public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
     private static final int MILLISECONDS_IN_A_SECOND = 1000;
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractTokenGenerator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JWTClaimsSetGenerator.class);
 
     /**
      *

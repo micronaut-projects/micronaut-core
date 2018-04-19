@@ -20,55 +20,60 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import io.micronaut.security.authentication.UserDetails
-import io.micronaut.security.token.validator.EncryptedJwtTokenValidator
+import io.micronaut.security.token.configuration.EncryptionConfiguration
+import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator
+import io.micronaut.security.token.configuration.SignatureConfiguration
+import io.micronaut.security.token.configuration.SignatureConfigurationGenerator
+import io.micronaut.security.token.configuration.TokenConfiguration
+import io.micronaut.security.token.configuration.TokenEncryptionConfiguration
+import io.micronaut.security.token.configuration.TokenSignatureConfiguration
+import io.micronaut.security.token.validator.JwtTokenValidator
+import io.micronaut.security.token.validator.TokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.Specification
 
-class EncryptedJwtTokenGeneratorSpec extends Specification {
+/**
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
+class TokenGenerationAndValidationOnlyWithSignatureSpec extends Specification {
 
-    def "Encrypted JWT is generated and validated"() {
+    def "JWT Token is generated and validated"() {
         given:
-        File publicKey = new File('src/test/resources/public_key.der')
-        File privateKey = new File('src/test/resources/private_key.der')
         final Integer defaultExpiration = 3600
-        TokenConfiguration tokenConfiguration = Stub(TokenConfiguration) {
-            getRolesClaimName() >> ['roles']
+        TokenSignatureConfiguration tokenSignatureConfiguration = Stub(TokenSignatureConfiguration) {
+            isEnabled() >> true
+            getType() >> SignatureConfiguration.SECRET
             getJwsAlgorithm() >> JWSAlgorithm.HS256
             getSecret() >> 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
-            getDefaultExpiration() >> 3600
-            getRefreshTokenExpiration() >> null
         }
+
         TokenEncryptionConfiguration tokenEncryptionConfiguration = Stub(TokenEncryptionConfiguration) {
-            isEnabled() >> true
-            getPublicKeyPath() >> publicKey
-            getPrivateKeyPath() >> privateKey
+            isEnabled() >> false
             getEncryptionMethod() >> EncryptionMethod.A128GCM
             getJweAlgorithm() >> JWEAlgorithm.RSA_OAEP_256
+            getType() >> EncryptionConfiguration.RSA
         }
 
-        EncryptionKeyProvider rsaKeyProvider = new FileRSAKeyProvider(tokenEncryptionConfiguration)
-        rsaKeyProvider.initialize()
 
-        TokenGenerator generator = new EncryptedJwtTokenGenerator(tokenConfiguration,
-                new JWTClaimsSetGenerator(),
-                tokenEncryptionConfiguration,
-                rsaKeyProvider
+        TokenGenerator generator = new JwtTokenGenerator(new SignatureConfigurationGenerator(tokenSignatureConfiguration),
+                new EncryptionConfigurationGenerator(tokenEncryptionConfiguration, null),
+                new JWTClaimsSetGenerator()
         )
-
         UserDetails userDetails = new UserDetails(username: 'sherlock', roles: ['ROLE_DETECTIVE'])
-
-        expect:
-        publicKey.exists()
-        privateKey.exists()
 
         when:
         String jwtToken = generator.generateToken(userDetails, defaultExpiration)
+        println jwtToken
 
         then:
         noExceptionThrown()
 
         when:
-        EncryptedJwtTokenValidator tokenValidator = new EncryptedJwtTokenValidator(rsaKeyProvider)
+        TokenValidator tokenValidator = new JwtTokenValidator(new SignatureConfigurationGenerator(tokenSignatureConfiguration),
+                new EncryptionConfigurationGenerator(tokenEncryptionConfiguration, null)
+        )
         Optional<Map<String,Object>> claims = tokenValidator.validateTokenAndGetClaims(jwtToken)
 
         then:

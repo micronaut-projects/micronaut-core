@@ -10,7 +10,6 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UserDetails
-import io.micronaut.security.token.generator.SignedJwtTokenGenerator
 import io.micronaut.security.token.generator.TokenGenerator
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -110,7 +109,7 @@ class BooksControllerSpec extends Specification {
     }
 
     protected String accessToken(String username, List<String> roles) {
-        TokenGenerator tokenGenerator = embeddedServer.applicationContext.getBean(SignedJwtTokenGenerator.class)
+        TokenGenerator tokenGenerator = embeddedServer.applicationContext.getBean(TokenGenerator.class)
         tokenGenerator.generateToken(new UserDetails(username, roles), 3600)
     }
 }

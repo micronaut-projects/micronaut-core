@@ -32,7 +32,7 @@ import java.util.Optional;
 public class Authenticator {
     private static final Logger LOG = LoggerFactory.getLogger(Authenticator.class);
 
-    private Collection<AuthenticationProvider> authenticationProviders;
+    protected final Collection<AuthenticationProvider> authenticationProviders;
 
     /**
      *

@@ -97,7 +97,8 @@ security:
     title: Token Render
   generation:
     title: Token Generation
-    token: Signed JWTs
+    token: JWT configuration
+    signature: JWT Signature
     encryption: Encrypted JWTs
   endpoints:
     title: Built-In Security Controllers

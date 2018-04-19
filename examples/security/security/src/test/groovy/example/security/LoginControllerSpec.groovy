@@ -10,7 +10,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.render.AccessRefreshToken
-import io.micronaut.security.token.validator.SignedJwtTokenValidator
 import io.micronaut.security.token.validator.TokenValidator
 import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.AutoCleanup
@@ -127,6 +126,6 @@ class LoginControllerSpec extends Specification {
     }
 
     TokenValidator getTokenValidator() {
-        embeddedServer.applicationContext.getBean(SignedJwtTokenValidator.class)
+        embeddedServer.applicationContext.getBean(TokenValidator.class)
     }
 }

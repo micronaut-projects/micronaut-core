@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.generator;
-
-import com.nimbusds.jose.JWSAlgorithm;
+package io.micronaut.security.token.configuration;
 
 /**
  * Represents configuration of the JWT token.
@@ -31,18 +29,6 @@ public interface TokenConfiguration {
      * @return JWT Claims key for user roles.
      */
     String getRolesClaimName();
-
-    /**
-     *
-     * @return The JWS Algorithm
-     */
-    JWSAlgorithm getJwsAlgorithm();
-
-    /**
-     *
-     * @return Secret's length must be at least 256 bits. it is used to sign JWT.
-     */
-    String getSecret();
 
     /**
      *

@@ -26,7 +26,7 @@ import io.micronaut.security.authentication.Authenticator;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
-import io.micronaut.security.token.generator.TokenConfiguration;
+import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.render.AccessRefreshToken;
 import java.util.Optional;
 
