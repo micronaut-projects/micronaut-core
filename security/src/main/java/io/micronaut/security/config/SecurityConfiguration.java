@@ -37,7 +37,6 @@ public class SecurityConfiguration implements Toggleable {
     protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
     protected List<InterceptUrlMapPattern> interceptUrlMap;
 
-
     @Override
     public boolean isEnabled() {
         return this.enabled;
