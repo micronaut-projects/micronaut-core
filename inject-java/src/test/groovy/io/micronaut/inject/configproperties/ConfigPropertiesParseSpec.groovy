@@ -16,6 +16,8 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.inject.AbstractTypeElementSpec
@@ -32,6 +34,54 @@ import io.micronaut.inject.BeanFactory
  * @since 1.0
  */
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    void "test inner class paths - pojo inheritance"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$ChildConfig', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    String host;
+
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+    
+    @ConfigurationProperties("baz")
+    static class ChildConfig extends ParentConfig {
+        protected String stuff;
+    }
+}
+
+class ParentConfig {
+    private String foo;
+    
+    public void setFoo(String foo) {
+        this.foo = foo;
+    }
+}
+''')
+        then:
+        beanDefinition.getAnnotation(ConfigurationReader).prefix() == 'foo.bar.baz'
+        beanDefinition.injectedFields.size() == 1
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedFields[0].getAnnotationMetadata().hasAnnotation(Property)
+        beanDefinition.injectedFields[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'
+        beanDefinition.injectedFields[0].name == 'stuff'
+
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.foo'
+        beanDefinition.injectedMethods[0].name == 'setFoo'
+    }
 
     void "test inner class paths - fields"() {
         when:
@@ -61,6 +111,7 @@ class MyConfig {
 }
 ''')
         then:
+        beanDefinition.getAnnotation(ConfigurationReader).prefix() == 'foo.bar.baz'
         beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedMethods.size() == 0
         beanDefinition.injectedFields[0].getAnnotationMetadata().hasAnnotation(Property)
@@ -296,6 +347,7 @@ import java.time.Duration;
 
 @ConfigurationProperties("foo.bar")
 class MyConfig {
+    protected int port;
     String host;
 
 
@@ -326,8 +378,10 @@ class ChildConfig extends MyConfig {
 
 ''')
         then:
-        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedFields[0].name == 'port'
+        beanDefinition.injectedFields[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.port'
         beanDefinition.injectedMethods[1].name == 'setStuff'
         beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
         beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'

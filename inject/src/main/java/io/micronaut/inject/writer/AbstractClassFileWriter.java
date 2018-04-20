@@ -50,9 +50,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
     protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     protected static final Type TYPE_OBJECT = Type.getType(Object.class);
-    protected static final Type TYPE_METHOD = Type.getType(java.lang.reflect.Method.class);
-    protected static final int ACC_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
-    protected static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
 

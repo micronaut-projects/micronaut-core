@@ -62,65 +62,77 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
 
     @Override
     protected String buildTypePath(TypeElement owningType, TypeElement declaringType) {
-        return typePaths.computeIfAbsent(declaringType.getQualifiedName().toString(), s -> {
-            String initialPath = calculateInitialPath(owningType, declaringType);
-            StringBuilder path = new StringBuilder(initialPath);
+        String initialPath = calculateInitialPath(owningType, declaringType);
+        StringBuilder path = new StringBuilder(initialPath);
 
-            prependSuperclasses(declaringType, path);
-            if (declaringType.getNestingKind() == NestingKind.MEMBER) {
-                // we have an inner class, so prepend inner class
-                Element enclosingElement = declaringType.getEnclosingElement();
-                if (enclosingElement instanceof TypeElement) {
-                    TypeElement enclosingType = (TypeElement) enclosingElement;
-                    while (true) {
-                        AnnotationMetadata enclosingTypeMetadata = annotationUtils.getAnnotationMetadata(enclosingType);
-                        Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
-                        if (parentConfig.isPresent()) {
-                            String parentPath = parentConfig.get();
-                            if(enclosingTypeMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-                                path.insert(0, parentPath + ".*.");
-                            }
-                            else {
-                                path.insert(0, parentPath + '.');
-                            }
-                            prependSuperclasses(enclosingType, path);
-                            if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
-                                Element el = enclosingType.getEnclosingElement();
-                                if (el instanceof TypeElement) {
-                                    enclosingType = (TypeElement) el;
-                                } else {
-                                    break;
-                                }
+        prependSuperclasses(declaringType, path);
+        if (owningType.getNestingKind() == NestingKind.MEMBER) {
+            // we have an inner class, so prepend inner class
+            Element enclosingElement = owningType.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement enclosingType = (TypeElement) enclosingElement;
+                while (true) {
+                    AnnotationMetadata enclosingTypeMetadata = annotationUtils.getAnnotationMetadata(enclosingType);
+                    Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
+                    if (parentConfig.isPresent()) {
+                        String parentPath = parentConfig.get();
+                        if(enclosingTypeMetadata.hasDeclaredAnnotation(EachProperty.class)) {
+                            path.insert(0, parentPath + ".*.");
+                        }
+                        else {
+                            path.insert(0, parentPath + '.');
+                        }
+                        prependSuperclasses(enclosingType, path);
+                        if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
+                            Element el = enclosingType.getEnclosingElement();
+                            if (el instanceof TypeElement) {
+                                enclosingType = (TypeElement) el;
                             } else {
                                 break;
                             }
                         } else {
                             break;
                         }
+                    } else {
+                        break;
                     }
                 }
             }
-            return path.toString();
-        });
+        }
+        return path.toString();
     }
 
     private String calculateInitialPath(TypeElement owningType, TypeElement declaringType) {
         AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(declaringType);
+        Function<String, String> evaluatePathFunction = pathEvaluationFunctionForMetadata(annotationMetadata);
         return annotationMetadata.getValue(ConfigurationReader.class, String.class)
-                        .map(path -> {
-                            if(annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-                                return path + ".*";
-                            }
-                            return path;
-                        })
+                        .map(evaluatePathFunction)
                         .orElseGet(() -> {
                                     AnnotationMetadata ownerMetadata = annotationUtils.getAnnotationMetadata(owningType);
-                                    return ownerMetadata.getValue(ConfigurationReader.class, String.class).orElseThrow(() ->
+                                    return ownerMetadata
+                                                .getValue(ConfigurationReader.class, String.class)
+                                                .map(pathEvaluationFunctionForMetadata(ownerMetadata))
+                                            .orElseThrow(() ->
                                             new IllegalStateException("Non @ConfigurationProperties type visited")
                                     );
                                 }
 
                         );
+    }
+
+    private Function<String, String> pathEvaluationFunctionForMetadata(AnnotationMetadata annotationMetadata) {
+        return path -> {
+                if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
+                    return path + ".*";
+                }
+                String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class)
+                        .orElse(null);
+                if (prefix != null) {
+                    return prefix + "." + path;
+                } else {
+                    return path;
+                }
+            };
     }
 
     @Override

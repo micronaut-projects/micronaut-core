@@ -52,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement {
+public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement, Cloneable {
 
     static {
         ConversionService.SHARED.addConverter(AnnotationValue.class, Annotation.class, (TypeConverter<AnnotationValue, Annotation>) (object, targetType, context) -> {
@@ -332,6 +332,17 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         return annotations;
     }
 
+    @Override
+    protected AnnotationMetadata clone() throws CloneNotSupportedException {
+        return new DefaultAnnotationMetadata(
+                declaredAnnotations != null ? new LinkedHashMap<>(declaredAnnotations) : null,
+                declaredStereotypes != null ? new LinkedHashMap<>(declaredStereotypes) : null,
+                allStereotypes != null ? new LinkedHashMap<>(allStereotypes) : null,
+                allAnnotations != null ? new LinkedHashMap<>(allAnnotations) : null,
+                annotationsByStereotype != null ? new LinkedHashMap<>(annotationsByStereotype) : null
+        );
+    }
+
     /**
      * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing values replaced
      *
@@ -507,36 +518,56 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * Creates an {@link AnnotationMetadata} for the given property containing a {@link Property} annotation with the name member set to the value of the property.
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without mutating the existing.</p>
      *
-     * @param property The property
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param annotationMetadata The metadata
+     * @param annotationName The annotation name
+     * @param member The member
+     * @param value The value
+     *
      * @return The metadata
      */
-    public static AnnotationMetadata addProperty(AnnotationMetadata annotationMetadata, String property) {
-        if(StringUtils.isEmpty(property)) {
-            throw new IllegalArgumentException("Property argument cannot be blank");
+    @Internal
+    public static AnnotationMetadata mutateMember(
+            AnnotationMetadata annotationMetadata,
+            String annotationName,
+            String member,
+            Object value) {
+        if(StringUtils.isEmpty(annotationName)) {
+            throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
+        }
+        if(StringUtils.isEmpty(member)) {
+            throw new IllegalArgumentException("Argument [member] cannot be blank");
+        }
+        if(value == null) {
+            throw new IllegalArgumentException("Argument [value] cannot be null");
         }
         if(!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
-            return forProperty(property);
+            return new DefaultAnnotationMetadata() {{
+                addDeclaredAnnotation(annotationName, Collections.singletonMap(
+                        member, value
+                ));
+            }};
         }
         else {
-            ((DefaultAnnotationMetadata)annotationMetadata)
-                    .addDeclaredAnnotation(Property.class.getName(), Collections.singletonMap(
-                    "name", property
+            DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
+
+
+            try {
+                defaultMetadata = (DefaultAnnotationMetadata) defaultMetadata.clone();
+
+            } catch (CloneNotSupportedException e) {
+                throw new IllegalStateException("Couldn't clone annotation metadata");
+            }
+            defaultMetadata
+                    .addDeclaredAnnotation(annotationName, Collections.singletonMap(
+                    member, value
             ));
 
-            return annotationMetadata;
+            return defaultMetadata;
         }
     }
 
-    private static AnnotationMetadata forProperty(String property) {
-        if(StringUtils.isEmpty(property)) {
-            throw new IllegalArgumentException("Property argument cannot be blank");
-        }
-        return new DefaultAnnotationMetadata() {{
-            addDeclaredAnnotation(Property.class.getName(), Collections.singletonMap(
-                    "name", property
-            ));
-        }};
-    }
 }
