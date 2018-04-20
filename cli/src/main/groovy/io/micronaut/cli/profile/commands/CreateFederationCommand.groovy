@@ -18,19 +18,15 @@ package io.micronaut.cli.profile.commands
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
+import groovy.xml.MarkupBuilder
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.GradleBuildTokens
-import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.profile.ExecutionContext
-import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
-
-import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
@@ -49,7 +45,7 @@ class CreateFederationCommand extends CreateServiceCommand {
         description.description = "Creates a federation of services"
         description.usage = "create-federation [NAME] --services [SERVICE_NAME,SERVICE_NAME,...]"
 
-        List<String> flags = getFlags()
+        final List<String> flags = getFlags()
         if (flags.contains(SERVICES_FLAG)) {
             description.flag(name: SERVICES_FLAG, description: "The names of the services to create")
         }
@@ -57,13 +53,9 @@ class CreateFederationCommand extends CreateServiceCommand {
 
     @Override
     boolean handle(ExecutionContext executionContext) {
-        if (profileRepository == null) throw new IllegalStateException("Property 'profileRepository' must be set")
+        final CommandLine commandLine = executionContext.commandLine
 
-        CommandLine commandLine = executionContext.commandLine
-
-        String profileName = evaluateProfileName(commandLine)
-
-        List<String> validFlags = getFlags()
+        final List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
             if (!validFlags.contains(key)) {
                 List possibleSolutions = validFlags.findAll { it.substring(0, 2) == key.substring(0, 2) }
@@ -76,56 +68,36 @@ class CreateFederationCommand extends CreateServiceCommand {
             }
         }
 
-        String federationName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
-        File federationDir = new File(executionContext.baseDir.absoluteFile, federationName)
+        final String federationName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
+        final File federationDir = new File(executionContext.baseDir.absoluteFile, federationName)
+        final List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        final List<String> services = commandLine.optionValue(SERVICES_FLAG)?.toString()?.split(',')?.toList()
+        final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
+        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        final String micronautVersion = MicronautCli.getPackage().getImplementationVersion()
+        final String profileName = evaluateProfileName(commandLine)
 
-        List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        List<String> services = commandLine.optionValue(SERVICES_FLAG)?.toString()?.split(',')?.toList()
-        String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
-        boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        final CreateServiceCommandObject parent = new CreateServiceCommandObject(
+                appName: federationDir.name,
+                baseDir: federationDir.parentFile,
+                profileName: 'federation',
+                micronautVersion: micronautVersion,
+                features: features,
+                services: services,
+                inplace: inPlace,
+                build: build,
+                console: executionContext.console
+        )
+        super.handle(parent)
 
-        AntBuilder ant = new ConsoleAntBuilder()
-        makeDir(ant, federationDir)
-
-        //---------------------
-        Profile profileInstance = profileRepository.getProfile(profileName)
-        if (!validateProfile(profileInstance, profileName)) {
-            return false
-        }
-
-        if (profileInstance) {
-            def profiles = profileRepository.getProfileAndDependencies(profileInstance)
-
-            Path appFullDirectory = Paths.get(federationDir.path)
-
-            File projectTargetDirectory = inPlace ? new File(".").canonicalFile : appFullDirectory.toAbsolutePath().normalize().toFile()
-
-
-            Map<Profile, File> targetDirs = [:]
-            buildTargetFolders(profileInstance, targetDirs, projectTargetDirectory)
-
-            for(Profile p : profiles) {
-                targetDirectory = targetDirs[p]
-
-                copySkeletonSettings(ant, profileInstance, p, build)
-            }
-
-            replaceBuildTokens(ant, build, profileInstance, services, targetDirectory)
-        }
-
-        //---------------------
-
-        //copySettingsFile(ant, new File(skeletonDir, build + "-settings"), build, false)
-
-        String micronautVersion = MicronautCli.getPackage().getImplementationVersion()
         for(String service: services) {
-            CreateServiceCommandObject cmd = new CreateServiceCommandObject(
+            final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                     appName: service,
                     baseDir: federationDir,
                     profileName: profileName,
                     micronautVersion: micronautVersion,
                     features: features,
-                    inplace: false,  //false for sercies
+                    inplace: false,
                     build: build,
                     console: executionContext.console
             )
@@ -142,6 +114,7 @@ class CreateFederationCommand extends CreateServiceCommand {
         description.argument(name: "Federation Name", description: "The name of the federation to create.", required: false)
     }
 
+    @Override
     protected List<String> getFlags() {
         [BUILD_FLAG, FEATURES_FLAG, INPLACE_FLAG, SERVICES_FLAG, PROFILE_FLAG]
     }
@@ -190,58 +163,77 @@ class CreateFederationCommand extends CreateServiceCommand {
         }
     }
 
-
-    //protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
+    @Override
     @CompileDynamic
-    protected void replaceBuildTokens(ConsoleAntBuilder ant, String build, Profile profile, List<String> services, File targetDirectory) {
-        Map tokens
-        //MicronautConsole.instance.info("${build}")
-        //MicronautConsole.instance.info("${services}")
-        //MicronautConsole.instance.info("${targetDirectory}")
-
-        if (build == "gradle") {
-            final servicesList = services.collect { String name ->
-                "include \"$name\""
-            }.join(System.getProperty("line.separator"))
-
-            tokens = ["services":servicesList]
-        }
-        if (build == "maven") {
-            final servicesList = services.collect { String name ->
-                "<module>$name</module>"
-            }.join(System.getProperty("line.separator"))
-
-            tokens = ["services":servicesList]
+    protected void replaceBuildTokens(String build, Profile profile, List services, File targetDirectory) {
+        if(profile.name == 'base') {
+            super.replaceBuildTokens(build, profile, services, targetDirectory)
         }
 
-        ant.replace(dir: targetDirectory) {
-            tokens.each { k, v ->
-                replacefilter {
-                    replacetoken("@${k}@".toString())
-                    replacevalue(v)
+        if(profile.name == 'federation') {
+            Map tokens
+            if (build == "gradle") {
+                final servicesList = services.collect { String name ->
+                    "include \'$name\'"
+                }.join(System.getProperty("line.separator"))
+
+                tokens = ["services": servicesList]
+            }
+            if (build == "maven") {
+                final StringWriter modulesWriter = new StringWriter()
+                MarkupBuilder modulesXml = new MarkupBuilder(modulesWriter)
+
+                services.each { String name ->
+                    modulesXml.module(name)
+                }
+                tokens = ["services": prettyPrint(modulesWriter.toString(), 8)]
+            }
+
+            final AntBuilder ant = new ConsoleAntBuilder()
+
+            ant.replace(dir: targetDirectory) {
+                tokens.each { k, v ->
+                    replacefilter {
+                        replacetoken("@${k}@".toString())
+                        replacevalue(v)
+                    }
+                }
+                variables.each { k, v ->
+                    replacefilter {
+                        replacetoken("@${k}@".toString())
+                        replacevalue(v)
+                    }
                 }
             }
         }
     }
 
+    @Override
     @CompileStatic(TypeCheckingMode.SKIP)
-    private void copySkeletonSettings(ConsoleAntBuilder ant, Profile profile, Profile participatingProfile, String build) {
-        def skeletonResource = participatingProfile.profileDir.createRelative("skeleton")
-        File skeletonDir
-        if(skeletonResource instanceof FileSystemResource) {
-            skeletonDir = skeletonResource.file
-        } else {
-            // establish the JAR file name and extract
-            def tmpDir = unzipProfile(ant, skeletonResource)
-            skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
+    protected void copySkeleton(Profile profile, Profile participatingProfile, String build) {
+        if(profile.name == 'base') {
+            super.copySkeleton(profile, participatingProfile, build)
         }
-        copySettingsFile(ant, new File(skeletonDir.path), build, false)
 
-        ant.chmod(dir: targetDirectory, includes: profile.executablePatterns.join(' '), perm: 'u+x')
+        if(profile.name == 'federation') {
+            final AntBuilder ant = new ConsoleAntBuilder()
+            final skeletonResource = participatingProfile.profileDir.createRelative("skeleton")
+
+            File skeletonDir
+            if (skeletonResource instanceof FileSystemResource) {
+                skeletonDir = skeletonResource.file
+            } else {
+                // establish the JAR file name and extract
+                def tmpDir = unzipProfile(ant, skeletonResource)
+                skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
+            }
+            copySettingsFile(ant, new File(skeletonDir.path, build + "-build"), build, false)
+
+            ant.chmod(dir: targetDirectory, includes: profile.executablePatterns.join(' '), perm: 'u+x')
+        }
     }
 
-    @CompileDynamic
-    private void makeDir(AntBuilder ant, File file) {
-        ant.mkdir(dir: file)
+    private String prettyPrint(String xml, int spaces) {
+        xml.replaceAll("(?m)^", " " * spaces)
     }
 }
