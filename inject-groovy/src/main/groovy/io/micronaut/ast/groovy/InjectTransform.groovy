@@ -15,6 +15,11 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata
+import io.micronaut.inject.configuration.ConfigurationMetadata
+import io.micronaut.inject.configuration.PropertyMetadata
+
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
@@ -233,6 +238,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isAopProxyType
         final OptionalValues<Boolean> aopSettings
         final ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
+        ConfigurationMetadata configurationMetadata
 
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         private BeanDefinitionVisitor beanWriter
@@ -253,6 +259,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
             this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
             this.isConfigurationProperties = configurationProperties != null ? configurationProperties : isConfigurationProperties(this.annotationMetadata)
+            if(isConfigurationProperties) {
+                this.configurationMetadata = configurationMetadataBuilder.visitProperties(
+                        concreteClass,
+                        null
+                )
+            }
             if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -677,9 +689,26 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
                 if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
-                    if (declaringClass.getField(NameUtils.getPropertyNameForSetter(methodNode.name)) == null) {
+                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
+                    if (declaringClass.getField(propertyName) == null) {
 
                         Parameter parameter = methodNode.parameters[0]
+
+                        PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                concreteClass,
+                                declaringClass,
+                                parameter.type.name,
+                                propertyName,
+                                null,
+                                null
+                        );
+
+                        methodAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                methodAnnotationMetadata,
+                                Property.name,
+                                "name",
+                                propertyMetadata.path
+                        )
 
                         getBeanWriter().visitSetterValue(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
@@ -797,6 +826,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
                         } else {
+                            if(isConfigurationProperties) {
+                                PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                        concreteClass,
+                                        declaringClass,
+                                        fieldNode.type.name,
+                                        fieldName,
+                                        null, // TODO: fix groovy doc support
+                                        null
+                                )
+                                fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                        fieldAnnotationMetadata,
+                                        Property.name,
+                                        "name",
+                                        propertyMetadata.path
+                                )
+                            }
                             getBeanWriter().visitFieldValue(
                                 AstGenericUtils.resolveTypeReference(declaringClass),
                                 fieldType,
@@ -900,6 +945,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getBeanWriter().visitConfigBuilderEnd()
                         }
                     } else {
+                        if(isConfigurationProperties) {
+                            PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                    concreteClass,
+                                    declaringClass,
+                                    propertyNode.type.name,
+                                    propertyNode.name,
+                                    null, // TODO: fix groovy doc support
+                                    null
+                            )
+                            fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                    fieldAnnotationMetadata,
+                                    Property.name,
+                                    "name",
+                                    propertyMetadata.path
+                            )
+                        }
                         getBeanWriter().visitSetterValue(
                             AstGenericUtils.resolveTypeReference(declaringClass),
                             fieldAnnotationMetadata,
@@ -959,7 +1020,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
                 AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
-
+                if(configurationMetadata != null) {
+                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                            annotationMetadata,
+                            ConfigurationReader.class.getName(),
+                            "prefix",
+                            configurationMetadata.getName()
+                    )
+                }
                 if (isProvider) {
                     beanWriter = new BeanDefinitionWriter(
                         classNode.packageName,

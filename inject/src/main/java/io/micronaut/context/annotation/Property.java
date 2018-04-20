@@ -39,5 +39,5 @@ public @interface Property {
     /**
      * @return The value of the property
      */
-    String value();
+    String value() default "";
 }
