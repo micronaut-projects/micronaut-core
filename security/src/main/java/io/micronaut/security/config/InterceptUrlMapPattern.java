@@ -18,8 +18,11 @@ package io.micronaut.security.config;
 
 import io.micronaut.http.HttpMethod;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -34,18 +37,19 @@ public class InterceptUrlMapPattern {
 
     private final String pattern;
     private final List<String> access;
-    private final HttpMethod httpMethod;
+    private final Optional<HttpMethod> httpMethod;
 
     /**
+     * If the provided http method is null, the pattern will match all methods.
      *
      * @param pattern e.g. /health
      * @param access e.g. ['ROLE_USER', 'ROLE_ADMIN']
      * @param httpMethod e.g. HttpMethod.GET
      */
-    public InterceptUrlMapPattern(String pattern, List<String> access, HttpMethod httpMethod) {
+    public InterceptUrlMapPattern(String pattern, List<String> access, @Nullable HttpMethod httpMethod) {
         this.pattern = pattern;
         this.access = access;
-        this.httpMethod = httpMethod;
+        this.httpMethod = Optional.ofNullable(httpMethod);
     }
 
     /**
@@ -61,14 +65,14 @@ public class InterceptUrlMapPattern {
      * @return e.g. ['ROLE_USER', 'ROLE_ADMIN']
      */
     public List<String> getAccess() {
-        return access;
+        return new ArrayList<>(access);
     }
 
     /**
      * httpMethod getter.
      * @return e.g. HttpMethod.GET
      */
-    public HttpMethod getHttpMethod() {
+    public Optional<HttpMethod> getHttpMethod() {
         return httpMethod;
     }
 }

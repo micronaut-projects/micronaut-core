@@ -199,6 +199,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else if (uriRoutes.size() == 1) {
             UriRouteMatch<Object> establishedRoute = uriRoutes.get(0);
             request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
+            request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
             request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
             routeMatch = Optional.of(establishedRoute);
         }
