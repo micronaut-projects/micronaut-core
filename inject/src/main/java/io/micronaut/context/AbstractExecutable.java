@@ -41,7 +41,6 @@ abstract class AbstractExecutable implements Executable {
     protected final Class[] argTypes;
 
     private Argument[] arguments;
-    private boolean argumentsInitialized = false;
     private Method method;
 
     AbstractExecutable(Class declaringType, String methodName, Argument[] arguments) {
@@ -86,24 +85,6 @@ abstract class AbstractExecutable implements Executable {
         return method;
     }
 
-    private void initializeArguments(Method method) {
-        if(!argumentsInitialized) {
-
-            Argument[] newArguments = new Argument[arguments.length];
-            for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
-                newArguments[i] = Argument.of(
-                        method,
-                        argument.getName(),
-                        i,
-                        null,
-                        argument.getTypeParameters()
-                );
-            }
-            this.arguments = newArguments;
-            argumentsInitialized = true;
-        }
-    }
 
     private Method initialize() {
         if(method == null) {
@@ -112,7 +93,6 @@ abstract class AbstractExecutable implements Executable {
 
                 // instrument the arguments with annotation data from the method
                 method.setAccessible(true);
-                initializeArguments(method);
                 this.method = method;
                 return method;
             }
