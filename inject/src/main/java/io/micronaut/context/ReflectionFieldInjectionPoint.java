@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,21 +23,21 @@ import io.micronaut.inject.BeanDefinition;
 import javax.annotation.Nullable;
 
 /**
- * Represents an injection point for a method that requires reflection
+ * A field injection point invoked via reflection
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
 @Internal
-class ReflectionMethodInjectionPoint extends DefaultMethodInjectionPoint {
-
-    ReflectionMethodInjectionPoint(
+class ReflectionFieldInjectionPoint<T> extends DefaultFieldInjectionPoint<T> {
+    ReflectionFieldInjectionPoint(
             BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata) {
-        super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
+            Class declaringType,
+            Class<T> fieldType,
+            String field,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument[] typeArguments) {
+        super(declaringBean, declaringType, fieldType, field, annotationMetadata, typeArguments);
     }
 
     @Override

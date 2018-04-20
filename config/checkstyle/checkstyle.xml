@@ -116,10 +116,10 @@
         <!-- <module name="NoWhitespaceAfter"/> -->
         <!-- <module name="NoWhitespaceBefore"/> -->
         <!-- <module name="OperatorWrap"/> -->
-        <!-- <module name="ParenPad"/> -->
+        <module name="ParenPad"/>
         <!-- <module name="TypecastParenPad"/> -->
-        <!-- <module name="WhitespaceAfter"/> -->
-        <!-- <module name="WhitespaceAround"/> -->
+        <module name="WhitespaceAfter"/>
+        <module name="WhitespaceAround"/>
         <module name="EmptyLineSeparator">
             <property name="allowNoEmptyLineBetweenFields" value="true"/>
             <property name="allowMultipleEmptyLines" value="false"/>
