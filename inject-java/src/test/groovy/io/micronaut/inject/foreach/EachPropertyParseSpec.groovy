@@ -15,17 +15,59 @@
  */
 package io.micronaut.inject.foreach
 
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 class EachPropertyParseSpec extends AbstractTypeElementSpec {
+    void "test configuration properties inheritance from non-configuration properties"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
 
+import io.micronaut.context.annotation.*;
+
+@EachProperty("foo")
+class MyProperties extends Parent {
+    protected String fieldTest = "unconfigured";
+    private final boolean privateFinal = true;
+    protected final boolean protectedFinal = true;
+    private boolean anotherField;
+    private String internalField = "unconfigured";
+    public void setSetterTest(String s) {
+        this.internalField = s;
+    }
+    
+    public String getSetter() { return this.internalField; } 
+}
+
+class Parent {
+    private String parentField;
+    
+    public void setParentTest(String s) {
+        this.parentField = s;
+    }
+    
+    public String getParentTest() { return this.parentField; } 
+}
+''')
+        then:
+        beanDefinition.injectedFields.size() == 1
+        beanDefinition.injectedFields.first().name == 'fieldTest'
+        beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedMethods[0].name == 'setParentTest'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.parentTest'
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.setterTest'
+        beanDefinition.injectedMethods[1].name == 'setSetterTest'
+
+    }
     void "test inner class paths - one level"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$ChildConfig', '''
@@ -37,6 +79,7 @@ import java.time.Duration;
 @EachProperty("foo.bar")
 class MyConfig {
     String host;
+    
 
 
     public String getHost() {
@@ -62,6 +105,7 @@ class MyConfig {
 }
 ''')
         then:
+        beanDefinition.getAnnotation(ConfigurationReader).prefix() == 'foo.bar.*.baz'
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
