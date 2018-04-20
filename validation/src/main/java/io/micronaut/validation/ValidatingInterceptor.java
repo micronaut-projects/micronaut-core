@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation;
 
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.core.order.Ordered;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link MethodInterceptor} that validates method invocations
+ * A {@link MethodInterceptor} that validates method invocations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,29 +40,34 @@ import java.util.Set;
 @Singleton
 public class ValidatingInterceptor implements MethodInterceptor {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
-
     /**
-     * The position of the interceptor. See {@link Ordered}
+     * The position of the interceptor. See {@link io.micronaut.core.order.Ordered}
      */
     public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
 
-    @Override
-    public int getOrder() {
-        return POSITION;
-    }
+    private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
 
     private final ExecutableValidator executableValidator;
 
+    /**
+     * Creates ValidatingInterceptor from the validatorFactory.
+     *
+     * @param validatorFactory Factory returning initialized {@code Validator} instances
+     */
     public ValidatingInterceptor(Optional<ValidatorFactory> validatorFactory) {
 
         executableValidator = validatorFactory
-            .map(factory -> factory.getValidator().forExecutables())
-            .orElse(null);
+                .map(factory -> factory.getValidator().forExecutables())
+                .orElse(null);
 
         if (executableValidator == null && LOG.isWarnEnabled()) {
             LOG.warn("Beans requiring validation present, but no implementation of javax.validation configuration. Add an implementation (such as hibernate-validator) to prevent this error.");
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return POSITION;
     }
 
     @Override

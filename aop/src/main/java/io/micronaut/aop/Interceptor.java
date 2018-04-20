@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 import io.micronaut.core.order.Ordered;
@@ -39,17 +40,17 @@ import io.micronaut.core.order.Ordered;
 public interface Interceptor<T, R> extends Ordered {
 
     /**
-     * The {@link Around#proxyTarget()} setting
+     * The {@link Around#proxyTarget()} setting.
      */
     CharSequence PROXY_TARGET = "proxyTarget";
 
     /**
-     * The {@link Around#hotswap()}  setting
+     * The {@link Around#hotswap()}  setting.
      */
     CharSequence HOTSWAP = "hotswap";
 
     /**
-     * The {@link Around#lazy()}   setting
+     * The {@link Around#lazy()}   setting.
      */
     CharSequence LAZY = "lazy";
 
@@ -57,6 +58,7 @@ public interface Interceptor<T, R> extends Ordered {
      * Intercepts an execution from a declared {@link Around} advice. The implementation can either call {@link InvocationContext#proceed()} to return the original value or provide a replacement value
      *
      * @param context The interception context
+     * @return result type
      */
     R intercept(InvocationContext<T, R> context);
 }

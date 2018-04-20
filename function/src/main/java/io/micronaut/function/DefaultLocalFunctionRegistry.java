@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
@@ -38,7 +39,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * <p>Default implementation of the {@link LocalFunctionRegistry} interface</p>
+ * <p>Default implementation of the {@link LocalFunctionRegistry} interface</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -51,11 +52,20 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     private final Map<String, ExecutableMethod<?, ?>> suppliers = new LinkedHashMap<>(1);
     private final MediaTypeCodecRegistry decoderRegistry;
 
+
+    /**
+     * Constructor.
+     * @param decoders decoders
+     */
     @Inject
     public DefaultLocalFunctionRegistry(MediaTypeCodec... decoders) {
         this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
     }
 
+    /**
+     * Constructor.
+     * @param codecRegistry codecRegistry
+     */
     public DefaultLocalFunctionRegistry(MediaTypeCodecRegistry codecRegistry) {
         this.decoderRegistry = codecRegistry;
     }

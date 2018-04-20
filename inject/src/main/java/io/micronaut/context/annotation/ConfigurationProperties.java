@@ -17,6 +17,7 @@ package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.value.PropertyResolver;
 
 import javax.inject.Singleton;
@@ -62,4 +63,5 @@ public @interface ConfigurationProperties {
      * @return The CLI prefix of the configuration. If a blank string is used then no prefix is appended
      */
     String[] cliPrefix() default {};
+
 }

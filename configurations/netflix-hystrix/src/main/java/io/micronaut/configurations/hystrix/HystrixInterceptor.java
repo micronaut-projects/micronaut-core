@@ -56,6 +56,16 @@ import java.util.concurrent.ExecutionException;
 @Singleton
 public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
+    /**
+     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}
+     */
+    public static final String ATTRIBUTE_COMMAND = "hystrix.command";
+
+    /**
+     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}
+     */
+    public static final String ATTRIBUTE_GROUP = "hystrix.group";
+
     public static final int POSITION = InterceptPhase.RETRY.getPosition() + 10;
 
     private final Map<Method, HystrixCommand.Setter> setterMap = new ConcurrentHashMap<>();
@@ -92,6 +102,8 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
             ReturnType<Object> returnType = context.getReturnType();
             Class<Object> javaReturnType = returnType.getType();
+            context.setAttribute(ATTRIBUTE_GROUP, hystrixGroup);
+            context.setAttribute(ATTRIBUTE_COMMAND, commandName);
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {

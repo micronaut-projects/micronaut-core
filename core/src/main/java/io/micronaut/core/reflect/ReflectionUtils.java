@@ -146,6 +146,21 @@ public class ReflectionUtils {
     }
 
     /**
+     * Obtains a method
+     *
+     * @param type       The type
+     * @param methodName The method name
+     * @param argTypes   The argument types
+     * @return An optional {@link Method}
+     */
+    public static Optional<Method> getMethod(Class type, String methodName, Class... argTypes) {
+        try {
+            return Optional.of(type.getMethod(methodName, argTypes));
+        } catch (NoSuchMethodException e) {
+            return findMethod(type, methodName, argTypes);
+        }
+    }
+    /**
      * Obtains a declared method
      *
      * @param type     The type

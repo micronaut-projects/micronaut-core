@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariDataSource;
@@ -21,7 +22,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 
 /**
- * Creates a Hikari data source for each configuration bean
+ * Creates a Hikari data source for each configuration bean.
  *
  * @author James Kleeh
  * @since 1.0

@@ -13,30 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 /**
- * Settings for session configuration
+ * Settings for session configuration.
  */
 public interface SessionSettings {
 
     /**
-     * The prefix to use for all session configuation
+     * The prefix to use for all session configuration.
      */
     String PREFIX = "micronaut.session";
 
     /**
-     * The property name for HTTP session configuration
+     * The property name for HTTP session configuration.
      */
     String HTTP = PREFIX + ".http";
 
     /**
-     * The property name for HTTP session cookie configuration
+     * The property name for HTTP session cookie configuration.
      */
     String HTTP_COOKIE_STRATEGY = HTTP + ".cookie";
 
     /**
-     * The property name for HTTP session header configuration
+     * The property name for HTTP session header configuration.
      */
     String HTTP_HEADER_STRATEGY = HTTP + ".header";
 }

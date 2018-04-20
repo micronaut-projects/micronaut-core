@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.hibernate.validator;
 
 import io.micronaut.context.BeanContext;
@@ -33,7 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Default implementation of the {@link ParameterNameProvider} interface that
+ * Default implementation of the {@link ParameterNameProvider} interface that.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -44,6 +45,10 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
     private static final Set<String> INTERNAL_CLASS_NAMES = CollectionUtils.setOf(Object.class.getName(), "groovy.lang.GroovyObject");
     private final BeanContext beanContext;
 
+    /**
+     * Constructor.
+     * @param beanContext beanContext
+     */
     public DefaultParameterNameProvider(BeanContext beanContext) {
         this.beanContext = beanContext;
     }
@@ -73,6 +78,11 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
         return executableMethod.map(m -> Arrays.asList(m.getArgumentNames())).orElse(defaultParameterTypes(parameterTypes));
     }
 
+    /**
+     * Add the parameter types to a list of names.
+     * @param parameterTypes parameterTypes
+     * @return list of strings
+     */
     protected List<String> defaultParameterTypes(Class<?>[] parameterTypes) {
         List<String> names = new ArrayList<>();
         for (int i = 0; i < parameterTypes.length; i++) {

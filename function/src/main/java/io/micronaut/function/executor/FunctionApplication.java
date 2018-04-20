@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
 import io.micronaut.core.cli.CommandLine;
@@ -22,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.BiConsumer;
 
 /**
- * Allows executing functions from the CLI
+ * Allows executing functions from the CLI.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,17 +31,17 @@ import java.util.function.BiConsumer;
 public class FunctionApplication extends StreamFunctionExecutor {
 
     /**
-     * The data option
+     * The data option.
      */
     public static final String DATA_OPTION = "d";
 
     /**
-     * The debug option
+     * The debug option.
      */
     public static final String DEBUG_OPTIONS = "x";
 
     /**
-     * The main method which is the entry point
+     * The main method which is the entry point.
      *
      * @param args The arguments
      */
@@ -50,7 +51,7 @@ public class FunctionApplication extends StreamFunctionExecutor {
     }
 
     /**
-     * Run the given {@link StreamFunctionExecutor} for the given arguments
+     * Run the given {@link StreamFunctionExecutor} for the given arguments.
      *
      * @param functionExecutor The function executor
      * @param args             The arguments
@@ -66,6 +67,12 @@ public class FunctionApplication extends StreamFunctionExecutor {
         });
     }
 
+    /**
+     * Exit and print an error message if debug flag set.
+     *
+     * @param isDebug flag for print error
+     * @param e exception passed in
+     */
     static void exitWithError(Boolean isDebug, Exception e) {
         System.err.println("Error executing function (Use -x for more information): " + e.getMessage());
         if (isDebug) {
@@ -77,6 +84,12 @@ public class FunctionApplication extends StreamFunctionExecutor {
         System.exit(1);
     }
 
+    /**
+     * Parse entries.
+     *
+     * @param args command line options
+     * @param data data
+     */
     static void parseData(String[] args, BiConsumer<String, Boolean> data) {
         CommandLine commandLine = parseCommandLine(args);
         Object value = commandLine.optionValue("d");
@@ -87,11 +100,20 @@ public class FunctionApplication extends StreamFunctionExecutor {
         }
     }
 
+    /**
+     * Exit.
+     */
     static void exitWithNoData() {
         System.err.println("No data specified. Use -d to specify the data");
         System.exit(1);
     }
 
+    /**
+     * Parse command line entries.
+     *
+     * @param args command line options
+     * @return command line built with options
+     */
     static CommandLine parseCommandLine(String[] args) {
         return CommandLine.build()
             .addOption(DATA_OPTION, "For passing the data")

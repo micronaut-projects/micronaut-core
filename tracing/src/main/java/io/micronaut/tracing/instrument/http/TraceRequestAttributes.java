@@ -21,23 +21,44 @@ package io.micronaut.tracing.instrument.http;
  * @author graemerocher
  * @since 1.0
  */
-public interface TraceRequestAttributes {
-
-    /**
-     * The prefix used for Micronaut tracing request attributes
-     */
-    String PREFIX = "micronaut.tracing";
+public enum TraceRequestAttributes implements CharSequence {
     /**
      * The attribute used to store the current span
      */
-    String CURRENT_SPAN = PREFIX + ".currentSpan";
-
-    /**
-     * The attribute used to store the current span context
-     */
-    String CURRENT_SPAN_CONTEXT = PREFIX + ".currentSpanContext";
+    CURRENT_SPAN("micronaut.tracing.currentSpan"),
     /**
      * The attribute used to store the current scope
      */
-    String CURRENT_SCOPE = PREFIX + ".currentScope";
+    CURRENT_SCOPE("micronaut.tracing.currentScope"),
+    /**
+     * The attribute used to store the current span context
+     */
+    CURRENT_SPAN_CONTEXT("micronaut.tracing.currentSpanContext");
+
+    private final String attr;
+
+    TraceRequestAttributes(java.lang.String attr) {
+        this.attr = attr;
+    }
+
+    @Override
+    public int length() {
+        return attr.length();
+    }
+
+    @Override
+    public char charAt(int index) {
+        return attr.charAt(index);
+    }
+
+    @Override
+    public CharSequence subSequence(int start, int end) {
+        return attr.subSequence(start,end);
+    }
+
+    @SuppressWarnings("NullableProblems")
+    @Override
+    public String toString() {
+        return attr;
+    }
 }
