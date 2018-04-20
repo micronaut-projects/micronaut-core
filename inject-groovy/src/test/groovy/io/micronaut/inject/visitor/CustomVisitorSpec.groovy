@@ -49,9 +49,9 @@ class TestController {
 ''')
         expect:
         ControllerGetVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        AllElementsVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
+        AllElementsVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "property", "setterMethod"].toSet()
+        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod"].toSet()
     }
 
     void "test non controller class is not visited by custom visitor"() {
@@ -92,6 +92,6 @@ public class TestController {
         ControllerGetVisitor.VISITED_ELEMENTS == []
         AllElementsVisitor.VISITED_ELEMENTS == []
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "property", "setterMethod"].toSet()
+        InjectVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod"].toSet()
     }
 }
