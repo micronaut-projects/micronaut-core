@@ -80,7 +80,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
      */
     public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
-    
+
     protected static String getTypeDescriptor(Object type) {
         if (type instanceof Class) {
             return Type.getDescriptor((Class) type);
