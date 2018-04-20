@@ -41,8 +41,10 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
+import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.ProcessedTypes;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -494,16 +496,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             String docComment = elementUtils.getDocComment(method);
             String setterName = method.getSimpleName().toString();
-            metadataBuilder.visitProperty(
+            PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
                     concreteClass,
+                    declaringClass,
                     getPropertyMetadataTypeReference(valueType),
                     NameUtils.getPropertyNameForSetter(setterName),
-                    docComment, null
+                    docComment,
+                    null
             );
 
+            AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.addProperty(
+                    AnnotationMetadata.EMPTY_METADATA,
+                    propertyMetadata.getPath()
+            );
             writer.visitSetterValue(
                     modelUtils.resolveTypeReference(declaringClass),
-                    AnnotationMetadata.EMPTY_METADATA,
+                    annotationMetadata,
                     modelUtils.requiresReflection(method),
                     fieldType,
                     setterName,
@@ -905,7 +913,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
-
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);
                     } finally {
@@ -919,9 +926,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String docComment = elementUtils.getDocComment(method);
                         metadataBuilder.visitProperty(
                                 concreteClass,
+                                declaringClass,
                                 getPropertyMetadataTypeReference(fieldTypeMirror),
                                 fieldName,
-                                docComment, null
+                                docComment,
+                                null
                         );
                     } else {
                         boolean isPrivate = modelUtils.isPrivate(field);
@@ -931,11 +940,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             Object declaringType = modelUtils.resolveTypeReference(declaringClass);
                             String docComment = elementUtils.getDocComment(field);
 
-                            metadataBuilder.visitProperty(
+                            PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
                                     concreteClass,
+                                    declaringClass,
                                     getPropertyMetadataTypeReference(fieldTypeMirror),
                                     fieldName,
-                                    docComment, null
+                                    docComment,
+                                    null
+                            );
+                            fieldAnnotationMetadata = DefaultAnnotationMetadata.addProperty(
+                                    fieldAnnotationMetadata,
+                                    propertyMetadata.getPath()
                             );
                             writer.visitFieldValue(
                                     declaringType,

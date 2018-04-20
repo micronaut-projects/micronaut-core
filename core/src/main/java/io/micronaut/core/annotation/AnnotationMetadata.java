@@ -624,4 +624,5 @@ public interface AnnotationMetadata extends AnnotatedElement {
     default boolean isEmpty() {
         return this == AnnotationMetadata.EMPTY_METADATA;
     }
+
 }
