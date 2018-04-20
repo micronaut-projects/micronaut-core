@@ -102,17 +102,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
 
-    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Method.class,
-                    String.class,
-                    int.class,
-                    Class.class,
-                    Argument[].class
-            )
-    );
 
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_SIMPLE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
@@ -1401,72 +1390,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // increment the method index
         currentMethodIndex++;
-    }
-
-    static void pushBuildArgumentsForMethod(
-            GeneratorAdapter generatorAdapter,
-            Consumer<GeneratorAdapter> methodSupplier,
-            Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes) {
-        int len = argumentTypes.size();
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (Map.Entry<String, Object> entry : argumentTypes.entrySet()) {
-            // the array index position
-            generatorAdapter.push(i);
-
-            String argumentName = entry.getKey();
-
-            // 1st argument: resolve the method
-            methodSupplier.accept(generatorAdapter);
-            // 2nd argument: The argument name
-            generatorAdapter.push(argumentName);
-            // 3rd argument: The index
-            generatorAdapter.push(i);
-
-            // 4th argument: The annotation metadata
-            // TODO: populate real metadata
-            AnnotationMetadata annotationMetadata = argumentAnnotationMetadata.get(argumentName);
-            if (annotationMetadata != null) {
-                Optional<String> qualifier = annotationMetadata.getAnnotationNameByStereotype(Qualifier.class);
-                if (qualifier.isPresent()) {
-                    generatorAdapter.push(getTypeReference(qualifier.get()));
-                } else {
-                    generatorAdapter.visitInsn(ACONST_NULL);
-                }
-            } else {
-                generatorAdapter.visitInsn(ACONST_NULL);
-            }
-//            if(annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-//                generatorAdapter.visitInsn(ACONST_NULL);
-//            }
-//            else {
-//                AnnotationMetadataWriter.instantiateNewMetadata(generatorAdapter, (DefaultAnnotationMetadata) annotationMetadata);
-//            }
-
-            // 5h argument: The generic types
-            if (genericTypes != null && genericTypes.containsKey(argumentName)) {
-                Map<String, Object> types = genericTypes.get(argumentName);
-                buildTypeArguments(generatorAdapter, types);
-            } else {
-                generatorAdapter.visitInsn(ACONST_NULL);
-            }
-
-            // Argument.create( .. )
-            invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_METHOD
-            );
-            // store the type reference
-            generatorAdapter.visitInsn(AASTORE);
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.visitInsn(DUP);
-            }
-            i++;
-        }
     }
 
     static void pushBuildArgumentsForMethod(
