@@ -37,6 +37,7 @@ public interface ByteBuffer<T> {
     /**
      * Returns the number of readable bytes which is equal to
      * {@code (this.writerIndex - this.readerIndex)}.
+     * @return bytes
      */
     int readableBytes();
 
@@ -60,6 +61,7 @@ public interface ByteBuffer<T> {
      * capacity, the content of this buffer is truncated.  If the {@code newCapacity} is greater
      * than the current capacity, the buffer is appended with unspecified data whose length is
      * {@code (newCapacity - currentCapacity)}.
+     * @param capacity capacity
      * @return The bytebuffer
      */
     ByteBuffer capacity(int capacity);
@@ -72,6 +74,7 @@ public interface ByteBuffer<T> {
 
     /**
      * Sets the {@code readerIndex} of this buffer.
+     * @param readPosition readPosition
      * @return The buffer
      * @throws IndexOutOfBoundsException if the specified {@code readerIndex} is
      *                                   less than {@code 0} or
@@ -99,7 +102,7 @@ public interface ByteBuffer<T> {
     /**
      * Gets a byte at the current {@code readerIndex} and increases
      * the {@code readerIndex} by {@code 1} in this buffer.
-     *
+     * @return bytes
      * @throws IndexOutOfBoundsException if {@code this.readableBytes} is less than {@code 1}
      */
     byte read();
@@ -119,7 +122,8 @@ public interface ByteBuffer<T> {
      * Transfers this buffer's data to the specified destination starting at
      * the current {@code readerIndex} and increases the {@code readerIndex}
      * by the number of the transferred bytes (= {@code dst.length}).
-     *
+     * @param destination destination
+     * @return bytesBuffer
      * @throws IndexOutOfBoundsException if {@code dst.length} is greater than {@code this.readableBytes}
      */
     ByteBuffer read(byte[] destination);
@@ -132,6 +136,7 @@ public interface ByteBuffer<T> {
      * @param destination The destination byte array
      * @param offset      the first index of the destination
      * @param length      the number of bytes to transfer
+     * @return bytesBuffer
      * @throws IndexOutOfBoundsException if the specified {@code dstIndex} is less than {@code 0},
      *                                   if {@code length} is greater than {@code this.readableBytes}, or
      *                                   if {@code dstIndex + length} is greater than {@code dst.length}
@@ -142,7 +147,7 @@ public interface ByteBuffer<T> {
      * Sets the specified byte at the current {@code writerIndex}
      * and increases the {@code writerIndex} by {@code 1} in this buffer.
      * The 24 high-order bits of the specified value are ignored.
-     *
+     * @return bytesBuffer
      * @param b The byte to write
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 1}
      */
@@ -154,6 +159,7 @@ public interface ByteBuffer<T> {
      * by the number of the transferred bytes (= {@code src.length}).
      *
      * @param source The source bytes
+     * @return bytesBuffer
      * @throws IndexOutOfBoundsException if {@code src.length} is greater than {@code this.writableBytes}
      */
     ByteBuffer write(byte[] source);
@@ -177,6 +183,7 @@ public interface ByteBuffer<T> {
      * @param source The source byte array
      * @param offset the first index of the source
      * @param length the number of bytes to transfer
+     * @return bytesBuffer
      * @throws IndexOutOfBoundsException if the specified {@code srcIndex} is less than {@code 0},
      *                                   if {@code srcIndex + length} is greater than
      *                                   {@code src.length}, or
@@ -264,7 +271,7 @@ public interface ByteBuffer<T> {
     byte[] toByteArray();
 
     /**
-     * To string
+     * To string.
      * @param charset converted charset
      * @return string
      */
