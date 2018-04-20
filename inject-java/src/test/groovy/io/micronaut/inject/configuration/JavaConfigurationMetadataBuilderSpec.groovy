@@ -58,7 +58,7 @@ class MyProperties {
         when:
         def builder = createBuilder()
         def configurationMetadata = builder.visitProperties(element, "some description")
-        def propertyMetadata = builder.visitProperty(element, "java.lang.String", "setterTest", "some description", null)
+        def propertyMetadata = builder.visitProperty(element, element, "java.lang.String", "setterTest", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -135,7 +135,7 @@ class MyProperties {
         JavaConfigurationMetadataBuilder builder = createBuilder()
         element = element.enclosedElements[0]
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "foo", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "foo", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -190,7 +190,7 @@ class MyProperties {
         JavaConfigurationMetadataBuilder builder = createBuilder()
         element = element.enclosedElements[0].enclosedElements[0]
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "foo", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "foo", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -227,7 +227,7 @@ class ParentProperties {
         when:
         def builder = createBuilder()
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "setterTest", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "setterTest", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -269,7 +269,7 @@ class GrandParentProperties {
         when:
         def builder = createBuilder()
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "setterTest", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "setterTest", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -320,7 +320,7 @@ class GrandParentProperties {
         def builder = createBuilder()
         element = element.enclosedElements[0]
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "foo", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "foo", "some description", null)
 
         then:
         builder.configurations.size() == 1
@@ -378,7 +378,7 @@ class GrandParentProperties {
         def builder = createBuilder()
         element = element.enclosedElements[0]
         builder.visitProperties(element, "some description")
-        builder.visitProperty(element, "java.lang.String", "foo", "some description", null)
+        builder.visitProperty(element, element, "java.lang.String", "foo", "some description", null)
 
         then:
         builder.configurations.size() == 1
