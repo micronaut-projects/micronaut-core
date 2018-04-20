@@ -18,12 +18,48 @@ package io.micronaut.inject.value.factorywithvalue
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.Factory
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class FactoryWithValueSpec extends Specification {
+class FactoryWithValueSpec extends AbstractTypeElementSpec {
+
+    void "test factory with value compile"() {
+        given:"A bean that is a factory with a value"
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.value.factorywithvalue.MyBean', '''
+package io.micronaut.inject.value.factorywithvalue;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Value;
+
+@Factory
+class MyBean {
+    @Bean
+    public A newA(@Value("${foo.bar}") int port) {
+        return new A(port);
+    }
+
+    @Bean
+    public B newB(A a, @Value("${foo.bar}") int port) {
+        return new B(a, port);
+    }
+}
+
+
+
+''')
+        then:"the default scope is singleton"
+        beanDefinition.hasAnnotation(Factory)
+    }
 
     void "test configuration injection with @Value"() {
         given:

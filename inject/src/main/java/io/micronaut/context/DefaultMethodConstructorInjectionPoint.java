@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,21 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ConstructorInjectionPoint;
 
 import javax.annotation.Nullable;
 
 /**
- * Represents an injection point for a method that requires reflection
+ * A {@link ConstructorInjectionPoint} that invokes a method without relying on reflection
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Internal
-class ReflectionMethodInjectionPoint extends DefaultMethodInjectionPoint {
-
-    ReflectionMethodInjectionPoint(
+class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint
+{
+    DefaultMethodConstructorInjectionPoint(
             BeanDefinition declaringBean,
             Class<?> declaringType,
             String methodName,
@@ -41,7 +40,7 @@ class ReflectionMethodInjectionPoint extends DefaultMethodInjectionPoint {
     }
 
     @Override
-    public boolean requiresReflection() {
-        return true;
+    public Object invoke(Object... args) {
+        throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
     }
 }
