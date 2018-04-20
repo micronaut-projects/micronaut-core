@@ -365,11 +365,16 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
             }
 
-            replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
+            if(cmd.services) {
+                replaceBuildTokens(cmd.build, profileInstance, cmd.services, projectTargetDirectory)
+            } else {
+                replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
-            cmd.console.addStatus(
-                "Service created at ${projectTargetDirectory.absolutePath}"
-            )
+                cmd.console.addStatus(
+                        "Service created at ${projectTargetDirectory.absolutePath}"
+                )
+            }
+
             if (profileInstance.instructions) {
                 cmd.console.addStatus(profileInstance.instructions)
             }
@@ -456,7 +461,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
+    protected void replaceBuildTokens(String build, Profile profile, List features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
 
         Map tokens
@@ -467,9 +472,6 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             tokens = new MavenBuildTokens().getTokens(profile, features)
         }
 
-        //MicronautConsole.instance.info("-------------------------------------")
-        //MicronautConsole.instance.info("${targetDirectory}")
-        //MicronautConsole.instance.info("------------------------------------")
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
                 replacefilter {
@@ -610,7 +612,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileStatic(TypeCheckingMode.SKIP)
-    private void copySkeleton(Profile profile, Profile participatingProfile, String build) {
+    protected void copySkeleton(Profile profile, Profile participatingProfile, String build) {
         def buildMergeProfileNames = profile.buildMergeProfileNames
         def excludes = profile.skeletonExcludes
         if (profile == participatingProfile) {
@@ -706,6 +708,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         String profileName
         String micronautVersion
         List<String> features
+        List<String> services
         boolean inplace = false
         String build = "gradle"
         MicronautConsole console
