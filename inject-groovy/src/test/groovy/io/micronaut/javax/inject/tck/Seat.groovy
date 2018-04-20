@@ -15,7 +15,7 @@
  */
 package io.micronaut.javax.inject.tck
 
-import io.micronaut.javax.inject.tck.accessories.Cupholder
+import groovy.transform.PackageScope
 import io.micronaut.javax.inject.tck.accessories.Cupholder
 
 /**
@@ -30,7 +30,7 @@ class Seat {
     private final Cupholder cupholder
 
     @Inject
-    Seat(Cupholder cupholder) {
+    @PackageScope Seat(Cupholder cupholder) {
         this.cupholder = cupholder
     }
 

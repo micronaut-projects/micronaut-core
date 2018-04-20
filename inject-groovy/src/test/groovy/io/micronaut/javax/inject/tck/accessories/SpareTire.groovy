@@ -23,11 +23,11 @@ import javax.inject.Inject
 
 class SpareTire extends Tire {
 
-    FuelTank constructorInjection = NEVER_INJECTED
+    @PackageScope FuelTank constructorInjection = NEVER_INJECTED
     @Inject protected FuelTank fieldInjection = NEVER_INJECTED
-    FuelTank methodInjection = NEVER_INJECTED
-    @Inject static FuelTank staticFieldInjection = NEVER_INJECTED
-    static FuelTank staticMethodInjection = NEVER_INJECTED
+    @PackageScope FuelTank methodInjection = NEVER_INJECTED
+    @Inject @PackageScope static FuelTank staticFieldInjection = NEVER_INJECTED
+    @PackageScope static FuelTank staticMethodInjection = NEVER_INJECTED
 
     @Inject
     SpareTire(FuelTank forSupertype, FuelTank forSubtype) {
@@ -35,14 +35,14 @@ class SpareTire extends Tire {
         this.constructorInjection = forSubtype
     }
 
-    @Inject void subtypeMethodInjection(FuelTank methodInjection) {
+    @Inject @PackageScope void subtypeMethodInjection(FuelTank methodInjection) {
         if (!hasSpareTireBeenFieldInjected()) {
             methodInjectedBeforeFields = true
         }
         this.methodInjection = methodInjection
     }
 
-    @Inject static void subtypeStaticMethodInjection(FuelTank methodInjection) {
+    @Inject @PackageScope static void subtypeStaticMethodInjection(FuelTank methodInjection) {
         if (!hasBeenStaticFieldInjected()) {
             staticMethodInjectedBeforeStaticFields = true
         }
