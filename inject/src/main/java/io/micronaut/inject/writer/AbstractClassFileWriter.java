@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ReflectionUtils;
 import org.objectweb.asm.ClassVisitor;
@@ -30,7 +29,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -66,6 +64,23 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("float", "F");
     }
 
+
+    /**
+     * Write the class to the target directory
+     *
+     * @param targetDir The target directory
+     */
+    public void writeTo(File targetDir) throws IOException {
+        accept(newClassWriterOutputVisitor(targetDir));
+    }
+
+    /**
+     * Accept a ClassWriterOutputVisitor to write this writer to disk
+     *
+     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     */
+    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
+    
     protected static String getTypeDescriptor(Object type) {
         if (type instanceof Class) {
             return Type.getDescriptor((Class) type);
@@ -530,53 +545,5 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             getMethodDescriptor(returnType, argumentTypes));
     }
 
-    /**
-     * Write the class to the target directory
-     *
-     * @param targetDir The target directory
-     */
-    public void writeTo(File targetDir) throws IOException {
-        accept(newClassWriterOutputVisitor(targetDir));
-    }
 
-    /**
-     * Accept a ClassWriterOutputVisitor to write this writer to disk
-     *
-     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
-     */
-    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
-
-    /**
-     * Represents a method {@link AnnotationSource} reference
-     */
-    protected class MethodAnnotationSource extends TypeAnnotationSource {
-        final String methodName;
-        final Map<String, Object> parameters;
-
-        public MethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-            super(declaringType);
-            this.methodName = methodName;
-            this.parameters = parameters;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-
-            MethodAnnotationSource that = (MethodAnnotationSource) o;
-
-            if (!methodName.equals(that.methodName)) return false;
-            return parameters.equals(that.parameters);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = super.hashCode();
-            result = 31 * result + methodName.hashCode();
-            result = 31 * result + parameters.hashCode();
-            return result;
-        }
-    }
 }
