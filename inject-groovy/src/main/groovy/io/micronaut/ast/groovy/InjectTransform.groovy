@@ -15,6 +15,9 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata
+import io.micronaut.inject.configuration.PropertyMetadata
+
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
@@ -677,9 +680,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
                 if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
-                    if (declaringClass.getField(NameUtils.getPropertyNameForSetter(methodNode.name)) == null) {
+                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
+                    if (declaringClass.getField(propertyName) == null) {
 
                         Parameter parameter = methodNode.parameters[0]
+
+                        PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                concreteClass,
+                                declaringClass,
+                                parameter.type.name,
+                                propertyName,
+                                null,
+                                null
+                        );
+
+                        methodAnnotationMetadata = DefaultAnnotationMetadata.addProperty(
+                                methodAnnotationMetadata,
+                                propertyMetadata.getPath()
+                        )
 
                         getBeanWriter().visitSetterValue(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
@@ -797,6 +815,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
                         } else {
+                            if(isConfigurationProperties) {
+                                PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                        concreteClass,
+                                        declaringClass,
+                                        fieldNode.type.name,
+                                        fieldName,
+                                        null, // TODO: fix groovy doc support
+                                        null
+                                )
+                                fieldAnnotationMetadata = DefaultAnnotationMetadata.addProperty(
+                                        fieldAnnotationMetadata,
+                                        propertyMetadata.path
+                                )
+                            }
                             getBeanWriter().visitFieldValue(
                                 AstGenericUtils.resolveTypeReference(declaringClass),
                                 fieldType,
@@ -900,6 +932,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getBeanWriter().visitConfigBuilderEnd()
                         }
                     } else {
+                        if(isConfigurationProperties) {
+                            PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                    concreteClass,
+                                    declaringClass,
+                                    propertyNode.type.name,
+                                    propertyNode.name,
+                                    null, // TODO: fix groovy doc support
+                                    null
+                            )
+                            fieldAnnotationMetadata = DefaultAnnotationMetadata.addProperty(
+                                    fieldAnnotationMetadata,
+                                    propertyMetadata.path
+                            )
+                        }
                         getBeanWriter().visitSetterValue(
                             AstGenericUtils.resolveTypeReference(declaringClass),
                             fieldAnnotationMetadata,
