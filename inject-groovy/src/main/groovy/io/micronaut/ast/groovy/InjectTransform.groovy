@@ -281,6 +281,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
             this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
             this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
+            if(isConfigurationProperties) {
+                this.configurationMetadata = configurationMetadataBuilder.visitProperties(
+                        concreteClass,
+                        null
+                )
+            }
             if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
