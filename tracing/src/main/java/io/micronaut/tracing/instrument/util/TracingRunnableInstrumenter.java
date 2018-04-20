@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument.rxjava;
+package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.tracing.instrument.scheduling.TracingRunnable;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;
@@ -30,11 +29,11 @@ import java.util.function.Function;
  */
 @Singleton
 @Requires(beans = Tracer.class)
-public class RxJavaRunnableInstrumenter implements Function<Runnable, Runnable> {
+public class TracingRunnableInstrumenter implements Function<Runnable, Runnable> {
 
     private final Tracer tracer;
 
-    public RxJavaRunnableInstrumenter(Tracer tracer) {
+    public TracingRunnableInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }
 

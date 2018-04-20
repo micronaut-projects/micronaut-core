@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger;
 
+import brave.sampler.CountingSampler;
 import io.jaegertracing.Configuration;
 import io.jaegertracing.metrics.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -179,6 +180,16 @@ public class JaegerConfiguration implements Toggleable  {
          */
         public Configuration.SamplerConfiguration getSamplerConfiguration() {
             return configuration;
+        }
+
+        /**
+         * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
+         * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         *
+         * @param probability The sampler probability
+         */
+        public void setProbability(float probability) {
+            configuration.withParam(probability);
         }
     }
 

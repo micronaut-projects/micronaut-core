@@ -70,6 +70,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
             }
 
             @Override
+            public Argument[] getTypeParameters() {
+                return typeArguments;
+            }
+
+            @Override
             public Map<String, Argument<?>> getTypeVariables() {
                 return argumentMap;
             }

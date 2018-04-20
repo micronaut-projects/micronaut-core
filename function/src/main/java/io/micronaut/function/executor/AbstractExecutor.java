@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
@@ -25,14 +26,16 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
- * An abstract executor implementation
+ * An abstract executor implementation.
+ *
+ * @param <C> Type of the context
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 class AbstractExecutor<C> {
     /**
-     * Resolve a function from the {@link LocalFunctionRegistry}
+     * Resolve a function from the {@link LocalFunctionRegistry}.
      *
      * @param localFunctionRegistry The {@link LocalFunctionRegistry}
      * @param functionName          The function name
@@ -50,7 +53,7 @@ class AbstractExecutor<C> {
     }
 
     /**
-     * Resolves the function name to execution for the environment
+     * Resolves the function name to execution for the environment.
      *
      * @param env The environment
      * @return The function name
@@ -67,6 +70,11 @@ class AbstractExecutor<C> {
         return ApplicationContext.build();
     }
 
+    /**
+     * Start the environment specified.
+     * @param applicationContext the application context with the environment
+     * @return The environment within the context
+     */
     protected Environment startEnvironment(ApplicationContext applicationContext) {
         if (this instanceof PropertySource) {
             applicationContext.getEnvironment().addPropertySource((PropertySource) this);

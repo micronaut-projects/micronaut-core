@@ -616,4 +616,13 @@ public interface AnnotationMetadata extends AnnotatedElement {
         }
         return false;
     }
+
+    /**
+     * Is the annotation metadata empty
+     * @return True if it is
+     */
+    default boolean isEmpty() {
+        return this == AnnotationMetadata.EMPTY_METADATA;
+    }
+
 }

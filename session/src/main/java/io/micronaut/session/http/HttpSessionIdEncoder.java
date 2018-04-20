@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.http.HttpRequest;
@@ -20,7 +21,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.session.Session;
 
 /**
- * Strategy interface for encoding {@link Session} IDs so they are represented in the response
+ * Strategy interface for encoding {@link Session} IDs so they are represented in the response.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,7 +30,7 @@ public interface HttpSessionIdEncoder {
 
     /**
      * Encode the given Session into the response. The strategy can choose to use headers, cookies or whatever strategy
-     * suites the use case
+     * suites the use case.
      *
      * @param request  The request
      * @param response The response

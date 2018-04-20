@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Type;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -26,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice</p>
+ * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice.</p>
  *
  * <p>Around advice decorates a method invocation such that the method can be intercepted via a {@link MethodInterceptor}</p>
  *
@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
- * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link Type} must implement {@link MethodInterceptor}</p>
+ * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link io.micronaut.context.annotation.Type} must implement {@link MethodInterceptor}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -68,7 +68,7 @@ public @interface Around {
 
     /**
      * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the of <code>hotswap</code> to true
-     * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface</p>
+     * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface.</p>
      *
      * @return True if the proxy should allow hotswap
      * @see HotSwappableInterceptedProxy

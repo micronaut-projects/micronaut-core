@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function;
 
 import io.micronaut.inject.ExecutableMethod;
@@ -34,43 +35,46 @@ import java.util.function.Supplier;
 public interface LocalFunctionRegistry {
 
     /**
-     * The name of the default function name
+     * The name of the default function name.
      */
     String FUNCTION_NAME = "micronaut.function.name";
 
     /**
-     * The name of the default function name
+     * The name of the default function name.
      */
     String FUNCTION_CHARSET = "micronaut.function.charset";
 
     /**
-     * Prefix used to identify function names
+     * Prefix used to identify function names.
      */
     String FUNCTION_PREFIX = "function:";
 
     /**
-     * A map of available functions with the key being the function name and the value being the function URI
+     * A map of available functions with the key being the function name and the value being the function URI.
      *
      * @return A map of functions
      */
     Map<String, URI> getAvailableFunctions();
 
     /**
-     * Find the first available registered function
-     *
+     * Find the first available registered function.
+     * @param <T> The declaring type
+     * @param <R> The result of the method call
      * @return The {@link ExecutableMethod} method representing the function
      */
     <T, R> Optional<? extends ExecutableMethod<T, R>> findFirst();
 
     /**
-     * Find the first available registered function
-     *
+     * Find the first available registered function.
+     * @param <T> The declaring type
+     * @param <R> The result of the method call
+     * @param name the name
      * @return The {@link ExecutableMethod} method representing the function
      */
     <T, R> Optional<? extends ExecutableMethod<T, R>> find(String name);
 
     /**
-     * Find a {@link Supplier} for the given name
+     * Find a {@link Supplier} for the given name.
      *
      * @param name The name
      * @param <T>  The type
@@ -79,7 +83,7 @@ public interface LocalFunctionRegistry {
     <T> Optional<ExecutableMethod<Supplier<T>, T>> findSupplier(String name);
 
     /**
-     * Find a {@link Consumer} for the given name
+     * Find a {@link Consumer} for the given name.
      *
      * @param name The name
      * @param <T>  The type
@@ -88,19 +92,22 @@ public interface LocalFunctionRegistry {
     <T> Optional<ExecutableMethod<Consumer<T>, Void>> findConsumer(String name);
 
     /**
-     * Find a {@link java.util.function.Function} for the given name
+     * Find a {@link java.util.function.Function} for the given name.
      *
      * @param name The name
      * @param <T>  The type
+     * @param <R> The result of the method call
      * @return An {@link Optional} of a {@link java.util.function.Function}
      */
     <T, R> Optional<ExecutableMethod<java.util.function.Function<T, R>, R>> findFunction(String name);
 
     /**
-     * Find a {@link java.util.function.BiFunction} for the given name
+     * Find a {@link java.util.function.BiFunction} for the given name.
      *
      * @param name The name
      * @param <T>  The type
+     * @param <U> the type of the second argument to the function
+     * @param <R> The result of the method call
      * @return An {@link Optional} of a {@link java.util.function.BiFunction}
      */
     <T, U, R> Optional<ExecutableMethod<java.util.function.BiFunction<T, U, R>, R>> findBiFunction(String name);

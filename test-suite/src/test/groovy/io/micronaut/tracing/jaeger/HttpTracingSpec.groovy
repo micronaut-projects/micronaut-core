@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger
 
+import io.jaegertracing.Span
 import io.jaegertracing.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
@@ -28,7 +29,9 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.opentracing.Tracer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
+import spock.lang.Ignore
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 
@@ -51,13 +54,17 @@ class HttpTracingSpec extends Specification {
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/traced/hello/John', String)
+        PollingConditions conditions = new PollingConditions()
 
         then:
         response
-        reporter.spans.size() == 2
-        reporter.spans[0].tags.get("foo") == 'bar'
-        reporter.spans[0].tags.get('http.path') == '/traced/hello/John'
-        reporter.spans[0].operationName == 'GET /traced/hello/{name}'
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.operationName == 'GET /traced/hello/{name}' }
+            span != null
+            span.tags.get("foo") == 'bar'
+            span.tags.get('http.path') == '/traced/hello/John'
+        }
 
         cleanup:
         context.close()
@@ -72,13 +79,17 @@ class HttpTracingSpec extends Specification {
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/traced/rxjava/John', String)
+        PollingConditions conditions = new PollingConditions()
 
         then:
         response
-        reporter.spans.size() == 2
-        reporter.spans[0].tags.get('http.path') == '/traced/rxjava/John'
-        reporter.spans[0].operationName == 'GET /traced/rxjava/{name}'
-        reporter.spans[0].tags.get("foo") == 'bar'
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.operationName == 'GET /traced/rxjava/{name}' }
+            span != null
+            span.tags.get("foo") == 'bar'
+            span.tags.get('http.path') == '/traced/rxjava/John'
+        }
 
         cleanup:
         context.close()
@@ -90,21 +101,27 @@ class HttpTracingSpec extends Specification {
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
 
         when:
         client.toBlocking().exchange('/traced/error/John', String)
+
 
         then:
         def e = thrown(HttpClientResponseException)
         def response = e.response
         response
-        reporter.spans.size() == 2
-        reporter.spans[0].tags.get('http.path') == '/traced/error/John'
-        reporter.spans[1].tags.get('http.path') == '/traced/error/John'
-        reporter.spans[1].tags.get('http.status_code') == 500
-        reporter.spans[1].tags.get('http.method') == 'GET'
-        reporter.spans[1].tags.get('error') == 'Internal Server Error: bad'
-        reporter.spans[1].operationName == 'GET /traced/error/John'
+        conditions.eventually {
+            reporter.spans.size() == 2
+            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/error/John'
+            span.tags.get('http.status_code') == 500
+            span.tags.get('http.method') == 'GET'
+            span.tags.get('error') == 'Internal Server Error: bad'
+            span.operationName == 'GET /traced/error/John'
+
+        }
+
 
         cleanup:
         context.close()
@@ -116,20 +133,40 @@ class HttpTracingSpec extends Specification {
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/traced/nested/John', String)
 
         then:
         response
-        reporter.spans.size() == 4
-        reporter.spans[0].tags.get("foo") == 'bar'
-        reporter.spans[0].tags.get('http.path') == '/traced/hello/John'
-        reporter.spans[0].operationName == 'GET /traced/hello/{name}'
-        reporter.spans[1].operationName == 'GET /traced/hello/{name}'
-        reporter.spans[2].tags.get("foo") == null
-        reporter.spans[2].tags.get('http.path') == '/traced/nested/John'
-        reporter.spans[2].operationName == 'GET /traced/nested/{name}'
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                it.tags.get('foo') == 'bar' &&
+                it.tags.get('http.path') == '/traced/hello/John' &&
+                it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                !it.tags.get('foo') &&
+                it.tags.get('http.path') == '/traced/hello/John' &&
+                it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/nested/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/nested/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/nested/John' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/nested/John' &&
+                        it.tags.get('http.client')
+            } != null
+        }
 
         cleanup:
         client.close()
@@ -142,18 +179,43 @@ class HttpTracingSpec extends Specification {
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
 
         when:
         client.toBlocking().exchange('/traced/nestedError/John', String)
 
         then:
         def e = thrown(HttpClientResponseException)
-        reporter.spans.size() == 4
-        reporter.spans[0].tags.get('http.path') == '/traced/error/John'
-        reporter.spans[0].operationName == 'GET /traced/error/{name}'
-        reporter.spans[1].operationName == 'GET /traced/error/{name}'
-        reporter.spans[2].tags.get('http.path') == '/traced/nestedError/John'
-        reporter.spans[2].operationName == 'GET /traced/nestedError/{name}'
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/error/{name}' &&
+                        !it.tags.containsKey("error") &&
+                        it.tags.get('http.path') == '/traced/error/John' &&
+                        it.tags.get('http.server')
+
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/error/{name}' &&
+                        it.tags.get('http.path') == '/traced/error/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/nestedError/{name}' &&
+                        !it.tags.containsKey("error") &&
+                        it.tags.get('http.path') == '/traced/nestedError/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/nestedError/John' &&
+                        it.tags.get('http.path') == '/traced/nestedError/John' &&
+                        it.tags.get('http.status_code') == 500 &&
+                        it.tags.get('error')  &&
+                        it.tags.get('http.client')
+            } != null
+        }
 
         cleanup:
         context.close()
@@ -164,7 +226,7 @@ class HttpTracingSpec extends Specification {
         ApplicationContext context = ApplicationContext.build()
         context.environment.addPropertySource(PropertySource.of(
                 'tracing.jaeger.enabled':true,
-                'tracing.jaeger.sampler.param':1))
+                'tracing.jaeger.sampler.probability':1))
         def reporter = new InMemoryReporter()
         context.registerSingleton(reporter)
         context.start()

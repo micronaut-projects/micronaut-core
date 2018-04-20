@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
@@ -29,6 +30,7 @@ import javax.lang.model.util.Types;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Implementation of {@link ConfigurationMetadataBuilder} for Java
@@ -53,48 +55,84 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     @Override
-    protected String buildPropertyPath(TypeElement declaringType, String propertyName) {
-        String value = buildTypePath(declaringType);
+    protected String buildPropertyPath(TypeElement owningType, TypeElement declaringType, String propertyName) {
+        String value = buildTypePath(owningType, declaringType);
         return value + '.' + propertyName;
     }
 
     @Override
-    protected String buildTypePath(TypeElement declaringType) {
-        return typePaths.computeIfAbsent(declaringType.getQualifiedName().toString(), s -> {
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(declaringType);
-            StringBuilder path = new StringBuilder(annotationMetadata.getValue(ConfigurationReader.class, String.class).orElseThrow(() ->
-                new IllegalStateException("@ConfigurationProperties found with no value for type: " + declaringType.getQualifiedName().toString())
-            ));
+    protected String buildTypePath(TypeElement owningType, TypeElement declaringType) {
+        String initialPath = calculateInitialPath(owningType, declaringType);
+        StringBuilder path = new StringBuilder(initialPath);
 
-            prependSuperclasses(declaringType, path);
-            if (declaringType.getNestingKind() == NestingKind.MEMBER) {
-                // we have an inner class, so prepend inner class
-                Element enclosingElement = declaringType.getEnclosingElement();
-                if (enclosingElement instanceof TypeElement) {
-                    TypeElement enclosingType = (TypeElement) enclosingElement;
-                    while (true) {
-                        Optional<String> parentConfig = annotationUtils.getAnnotationMetadata(enclosingType).getValue(ConfigurationReader.class, String.class);
-                        if (parentConfig.isPresent()) {
-                            path.insert(0, parentConfig.get() + '.');
-                            prependSuperclasses(enclosingType, path);
-                            if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
-                                Element el = enclosingType.getEnclosingElement();
-                                if (el instanceof TypeElement) {
-                                    enclosingType = (TypeElement) el;
-                                } else {
-                                    break;
-                                }
+        prependSuperclasses(declaringType, path);
+        if (owningType.getNestingKind() == NestingKind.MEMBER) {
+            // we have an inner class, so prepend inner class
+            Element enclosingElement = owningType.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement enclosingType = (TypeElement) enclosingElement;
+                while (true) {
+                    AnnotationMetadata enclosingTypeMetadata = annotationUtils.getAnnotationMetadata(enclosingType);
+                    Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
+                    if (parentConfig.isPresent()) {
+                        String parentPath = parentConfig.get();
+                        if(enclosingTypeMetadata.hasDeclaredAnnotation(EachProperty.class)) {
+                            path.insert(0, parentPath + ".*.");
+                        }
+                        else {
+                            path.insert(0, parentPath + '.');
+                        }
+                        prependSuperclasses(enclosingType, path);
+                        if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
+                            Element el = enclosingType.getEnclosingElement();
+                            if (el instanceof TypeElement) {
+                                enclosingType = (TypeElement) el;
                             } else {
                                 break;
                             }
                         } else {
                             break;
                         }
+                    } else {
+                        break;
                     }
                 }
             }
-            return path.toString();
-        });
+        }
+        return path.toString();
+    }
+
+    private String calculateInitialPath(TypeElement owningType, TypeElement declaringType) {
+        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(declaringType);
+        Function<String, String> evaluatePathFunction = pathEvaluationFunctionForMetadata(annotationMetadata);
+        return annotationMetadata.getValue(ConfigurationReader.class, String.class)
+                        .map(evaluatePathFunction)
+                        .orElseGet(() -> {
+                                    AnnotationMetadata ownerMetadata = annotationUtils.getAnnotationMetadata(owningType);
+                                    return ownerMetadata
+                                                .getValue(ConfigurationReader.class, String.class)
+                                                .map(pathEvaluationFunctionForMetadata(ownerMetadata))
+                                            .orElseThrow(() ->
+                                            new IllegalStateException("Non @ConfigurationProperties type visited")
+                                    );
+                                }
+
+                        );
+    }
+
+    private Function<String, String> pathEvaluationFunctionForMetadata(AnnotationMetadata annotationMetadata) {
+        return path -> {
+                if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
+                    return path + ".*";
+                }
+                String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class)
+                        .orElse(null);
+                if (prefix != null) {
+                    return prefix + "." + path;
+                } else {
+                    return path;
+                }
+            };
     }
 
     @Override

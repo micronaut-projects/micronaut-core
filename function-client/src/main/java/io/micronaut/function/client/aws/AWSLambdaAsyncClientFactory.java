@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.AWSLambdaAsync;
@@ -30,10 +31,18 @@ public class AWSLambdaAsyncClientFactory {
 
     private final AWSLambdaConfiguration configuration;
 
+    /**
+     * Constructor.
+     * @param configuration configuration from properties
+     */
     public AWSLambdaAsyncClientFactory(AWSLambdaConfiguration configuration) {
         this.configuration = configuration;
     }
 
+    /**
+     * The client returned from a builder.
+     * @return client object
+     */
     @Bean
     @Refreshable
     AWSLambdaAsync awsLambdaAsyncClient() {

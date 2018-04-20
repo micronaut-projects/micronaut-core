@@ -17,12 +17,14 @@ package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingServerFilter;
+import io.micronaut.tracing.instrument.util.TracingPublisher;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
@@ -33,6 +35,7 @@ import io.reactivex.Flowable;
 import io.reactivex.functions.Action;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.Nonnull;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -54,10 +57,12 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
         super(tracer);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+        Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if( request.getAttribute(APPLIED, Boolean.class).isPresent() ) {
-            return chain.proceed(request);
+            return responsePublisher;
         }
         else {
             request.setAttribute(APPLIED, true);
@@ -70,41 +75,32 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
                     spanContext
             );
 
-            Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(chain.proceed(request));
-
-            responsePublisher = responsePublisher.doOnRequest(amount -> {
-                if(amount > 0) {
-                    Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
-                    spanBuilder.withTag(TAG_HTTP_SERVER, true);
-                    Scope scope = spanBuilder.startActive(true);
-                    Span span = scope.span();
+            Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
+            return new TracingPublisher(responsePublisher, tracer, spanBuilder) {
+                @Override
+                protected void doOnSubscribe(@Nonnull Span span) {
+                    span.setTag(TAG_HTTP_SERVER, true);
                     request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-                    request.setAttribute(TraceRequestAttributes.CURRENT_SCOPE, scope);
 
                 }
-            });
 
-            responsePublisher = responsePublisher.map(response -> {
-                Optional<Span> currentSpan = request.getAttribute(TraceRequestAttributes.CURRENT_SPAN, Span.class);
+                @Override
+                protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
+                    if(object instanceof HttpResponse) {
+                        HttpResponse<?> response = (HttpResponse<?>) object;
+                        tracer.inject(
+                                span.context(),
+                                Format.Builtin.HTTP_HEADERS,
+                                new HttpHeadersTextMap(response.getHeaders())
+                        );
 
-                currentSpan.ifPresent(span -> {
-                    tracer.inject(
-                            span.context(),
-                            Format.Builtin.HTTP_HEADERS,
-                            new HttpHeadersTextMap(response.getHeaders())
-                    );
+                        String spanName = resolveSpanName(request);
+                        span.setOperationName(spanName);
+                        setResponseTags(request, response, span);
+                    }
+                }
+            };
 
-                    String spanName = resolveSpanName(request);
-                    span.setOperationName(spanName);
-                    setResponseTags(request, response, span);
-                });
-
-                return response;
-            });
-            return responsePublisher.doAfterTerminate(() -> {
-                Optional<Scope> registeredScope = request.getAttribute(TraceRequestAttributes.CURRENT_SCOPE, Scope.class);
-                registeredScope.ifPresent(Scope::close);
-            });
         }
     }
 

@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.aop;
 
 import io.micronaut.inject.ExecutableMethod;
 
 /**
- * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances
+ * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
+ *
+ *  @param <T> The declaring type
+ *  @param <R> The result of the method call
  *
  * @author Graeme Rocher
  * @since 1.0
