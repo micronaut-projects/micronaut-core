@@ -20,23 +20,21 @@ import java.util.*;
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
-public class InterceptUrlMapRule extends AbstractSecurityRule {
+abstract class InterceptUrlMapRule extends AbstractSecurityRule {
 
     /**
      * The order of the rule
      */
     public static final Integer ORDER = 0;
 
-    private final List<InterceptUrlMapPattern> patternList;
     private final AntPathMatcher pathMatcher;
 
-    InterceptUrlMapRule(SecurityConfiguration securityConfiguration,
-                        TokenConfiguration tokenConfiguration) {
+    InterceptUrlMapRule(TokenConfiguration tokenConfiguration) {
         super(tokenConfiguration);
-        this.patternList = securityConfiguration.getInterceptUrlMap();
         this.pathMatcher = PathMatcher.ANT;
     }
+
+    protected abstract List<InterceptUrlMapPattern> getPatternList();
 
     /**
      * If no configured pattern matches the request, return {@link SecurityRuleResult#UNKNOWN}.
@@ -53,7 +51,7 @@ public class InterceptUrlMapRule extends AbstractSecurityRule {
         final String uriString = uri.toString();
         final HttpMethod httpMethod = request.getMethod();
 
-        Optional<InterceptUrlMapPattern> matchedPattern = patternList
+        Optional<InterceptUrlMapPattern> matchedPattern = getPatternList()
                 .stream()
                 .filter(p -> p.getHttpMethod().map(method -> method.equals(httpMethod)).orElse(true))
                 .filter(p -> pathMatcher.matches(p.getPattern(), uriString))
