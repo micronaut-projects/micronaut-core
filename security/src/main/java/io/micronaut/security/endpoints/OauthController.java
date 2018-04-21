@@ -21,6 +21,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.security.Secured;
+import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.micronaut.security.token.render.AccessRefreshToken;
@@ -36,6 +38,7 @@ import java.util.Optional;
  */
 @Controller(OauthController.CONTROLLER_PATH)
 @Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".refresh")
+@Secured(SecurityRule.IS_ANONYMOUS)
 public class OauthController implements OauthControllerApi {
 
     public static final String CONTROLLER_PATH = "/oauth";

@@ -16,7 +16,7 @@ import spock.lang.Unroll
 class DelegatingAuthenticationProviderSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': getClass().simpleName,
+            'spec.authentication': true,
             "micronaut.security.enabled": true,
             "micronaut.security.endpoints.login": true,
             "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'

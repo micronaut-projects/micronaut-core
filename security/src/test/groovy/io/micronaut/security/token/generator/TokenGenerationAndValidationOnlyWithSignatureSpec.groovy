@@ -4,7 +4,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import io.micronaut.security.authentication.UserDetails
-import io.micronaut.security.token.configuration.EncryptionConfiguration
+import io.micronaut.security.token.configuration.EncryptionType
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator
 import io.micronaut.security.token.configuration.SignatureConfiguration
 import io.micronaut.security.token.configuration.SignatureConfigurationGenerator
@@ -36,7 +36,7 @@ class TokenGenerationAndValidationOnlyWithSignatureSpec extends Specification {
             isEnabled() >> false
             getEncryptionMethod() >> EncryptionMethod.A128GCM
             getJweAlgorithm() >> JWEAlgorithm.RSA_OAEP_256
-            getType() >> EncryptionConfiguration.RSA
+            getType() >> EncryptionType.RSA
         }
 
 

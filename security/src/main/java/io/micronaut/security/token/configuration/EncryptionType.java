@@ -21,6 +21,6 @@ package io.micronaut.security.token.configuration;
  * @author Sergio del Amo
  * @since 1.0
  */
-public enum EncryptionConfiguration {
+public enum EncryptionType {
     SECRET, RSA, EC
 }

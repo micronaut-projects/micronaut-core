@@ -53,7 +53,7 @@ public class JwtTokenGenerator implements TokenGenerator {
         Optional<SignatureConfiguration> signatureConfiguration = signatureConfigurationGenerator.getSignatureConfiguration();
         Optional<EncryptionConfiguration> encryptionConfiguration = encryptionConfigurationGenerator.getEncryptionConfiguration();
 
-        if ( signatureConfiguration.isPresent() && encryptionConfiguration.isPresent() ) {
+        if (signatureConfiguration.isPresent() && encryptionConfiguration.isPresent()) {
             this.jwtGenerator = new JwtGenerator<>(signatureConfiguration.get(), encryptionConfiguration.get());
         } else {
             this.jwtGenerator = signatureConfiguration.map(JwtGenerator::new).orElseGet(JwtGenerator::new);

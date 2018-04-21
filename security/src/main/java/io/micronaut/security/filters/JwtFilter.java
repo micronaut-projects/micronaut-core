@@ -23,9 +23,8 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.exceptions.HttpServerException;
-import io.micronaut.security.config.InterceptUrlMapPattern;
 import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.rules.SecurityRuleProvider;
+import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.reader.BearerTokenReader;
@@ -54,22 +53,22 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
     protected final TokenConfiguration tokenConfiguration;
     protected final TokenReader tokenReader;
     protected final TokenValidator tokenValidator;
-    private final Collection<SecurityRuleProvider> ruleProviders;
+    private final Collection<SecurityRule> securityRules;
 
     /**
      * @param tokenConfiguration The {@link TokenConfiguration} instance
      * @param tokenValidator The {@link TokenValidator} instance
      * @param tokenReader The {@link TokenReader} instance
-     * @param ruleProviders The list of providers that will allow or reject the request
+     * @param securityRules The list of rules that will allow or reject the request
      */
     public JwtFilter(TokenConfiguration tokenConfiguration,
                      TokenValidator tokenValidator,
                      TokenReader tokenReader,
-                     Collection<SecurityRuleProvider> ruleProviders) {
+                     Collection<SecurityRule> securityRules) {
         this.tokenConfiguration = tokenConfiguration;
         this.tokenValidator = tokenValidator;
         this.tokenReader = tokenReader;
-        this.ruleProviders = ruleProviders;
+        this.securityRules = securityRules;
     }
 
     private Publisher<MutableHttpResponse<?>> unauthorized() {
@@ -81,54 +80,43 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         String method = request.getMethod().toString();
         String path = request.getPath();
         Optional<String> token = tokenReader.findToken(request);
+        Optional<Map<String, Object>> optionalClaims = token.flatMap(tokenValidator::validateTokenAndGetClaims);
+        RouteMatch routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH).map(RouteMatch.class::cast).orElseThrow(() -> new HttpServerException("Request attribute for route match must be set to process security rules"));
 
-        if (token.isPresent()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Token {} found in request {} {}", token, method, path);
-            }
-            Optional<Map<String, Object>> optionalClaims = tokenValidator.validateTokenAndGetClaims(token.get());
-            if (optionalClaims.isPresent()) {
-                Map<String, Object> claims = optionalClaims.get();
-
-                if (LOG.isDebugEnabled()) {
-                    String claimsString = claims.entrySet()
-                            .stream()
-                            .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                            .collect(Collectors.joining(", "));
-                    LOG.debug("Claims: {}", claimsString);
+        if (LOG.isDebugEnabled()) {
+            if (token.isPresent()) {
+                LOG.debug("Token {} found in request {} {}", token.get(), method, path);
+                if (optionalClaims.isPresent()) {
+                        String claimsString = optionalClaims.get().entrySet()
+                                .stream()
+                                .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                                .collect(Collectors.joining(", "));
+                        LOG.debug("Claims: {}", claimsString);
+                } else {
+                    LOG.debug("Unauthenticated request {} {}. Failure to fetch claims because token validation failed.", method, path);
                 }
-
-                RouteMatch routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH).map(RouteMatch.class::cast).orElseThrow(() -> new HttpServerException("Request attribute for route match must be set to process security rules"));
-
-                for (SecurityRuleProvider provider: ruleProviders) {
-                    SecurityRuleResult result = provider.check(request, routeMatch, claims);
-                    if (result == SecurityRuleResult.REJECTED) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, provider.getClass().getName());
-                        }
-                        return unauthorized();
-                    }
-                    if (result == SecurityRuleResult.ALLOWED) {
-                        return chain.proceed(request);
-                    }
-                }
-
-                //We haven't returned at this point so that means no rule provider allowed or rejected the request
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Unauthorized request {} {}. No rule provider matched the request.", method, path);
-                }
-                return unauthorized();
             } else {
+                LOG.debug("Unauthenticated request {}, {}, no token found.", method, path);
+            }
+        }
+
+        for (SecurityRule rule: securityRules) {
+            SecurityRuleResult result = rule.check(request, routeMatch, optionalClaims.orElse(null));
+            if (result == SecurityRuleResult.REJECTED) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Unauthorized request {} {}. Fetched claims null. Token validation failed.", method, path);
+                    LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
                 return unauthorized();
             }
-        } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Unauthorized request {}, {}, no token found in request.", method, path);
+            if (result == SecurityRuleResult.ALLOWED) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
+                }
+                return chain.proceed(request);
             }
-            return unauthorized();
         }
+
+        //no rule found for the given request, not authorized
+        return unauthorized();
     }
 }

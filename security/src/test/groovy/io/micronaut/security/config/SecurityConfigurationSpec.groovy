@@ -32,7 +32,7 @@ class SecurityConfigurationSpec extends Specification {
         def ctx = ApplicationContext.run([
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
-                        [httpMethod: 'FOO', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
+                        [httpMethod: 'FOO', pattern: '/health', access: ['isAnonymous()']]
                 ]], "test")
 
         when:
@@ -51,7 +51,7 @@ class SecurityConfigurationSpec extends Specification {
         def ctx = ApplicationContext.run([
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
-                        [httpMethod: 'POST', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
+                        [httpMethod: 'POST', access: ['isAnonymous()']]
                 ]], "test")
 
         when:
@@ -71,9 +71,9 @@ class SecurityConfigurationSpec extends Specification {
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
                         [pattern: '/health', access: 'foo'],
-                        [pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']],
-                        [httpMethod: 'POST', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']],
-                        [httpMethod: 'post', pattern: '/health', access: ['IS_AUTHENTICATED_ANONYMOUSLY']]
+                        [pattern: '/health', access: 'isAnonymous()'],
+                        [httpMethod: 'POST', pattern: '/health', access: ['isAnonymous()']],
+                        [httpMethod: 'post', pattern: '/health', access: ['isAnonymous()']]
                 ]], "test")
 
         when:
@@ -83,16 +83,16 @@ class SecurityConfigurationSpec extends Specification {
         config.interceptUrlMap.size() == 4
         config.interceptUrlMap[0].pattern == '/health'
         config.interceptUrlMap[0].access == ['foo']
-        config.interceptUrlMap[0].httpMethod == HttpMethod.GET
+        !config.interceptUrlMap[0].httpMethod.isPresent()
         config.interceptUrlMap[1].pattern == '/health'
-        config.interceptUrlMap[1].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
-        config.interceptUrlMap[1].httpMethod == HttpMethod.GET
+        config.interceptUrlMap[1].access == ['isAnonymous()']
+        !config.interceptUrlMap[1].httpMethod.isPresent()
         config.interceptUrlMap[2].pattern == '/health'
-        config.interceptUrlMap[2].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
-        config.interceptUrlMap[2].httpMethod == HttpMethod.POST
+        config.interceptUrlMap[2].access == ['isAnonymous()']
+        config.interceptUrlMap[2].httpMethod.get() == HttpMethod.POST
         config.interceptUrlMap[3].pattern == '/health'
-        config.interceptUrlMap[3].access == ['IS_AUTHENTICATED_ANONYMOUSLY']
-        config.interceptUrlMap[3].httpMethod == HttpMethod.POST
+        config.interceptUrlMap[3].access == ['isAnonymous()']
+        config.interceptUrlMap[3].httpMethod.get() == HttpMethod.POST
 
         cleanup:
         ctx.stop()

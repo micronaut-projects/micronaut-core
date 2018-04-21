@@ -23,8 +23,9 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
+ * Converts a string to an {@link EncryptionMethod}.
  *
- * @author Sergio del Amo
+ * @author James Kleeh
  * @since 1.0
  */
 @Singleton

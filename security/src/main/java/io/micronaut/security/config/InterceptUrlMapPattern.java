@@ -32,9 +32,6 @@ import java.util.Optional;
 @Immutable
 public class InterceptUrlMapPattern {
 
-    public static final String TOKEN_IS_AUTHENTICATED_ANONYMOUSLY = "IS_AUTHENTICATED_ANONYMOUSLY";
-    public static final String TOKEN_IS_AUTHENTICATED = "IS_AUTHENTICATED";
-
     private final String pattern;
     private final List<String> access;
     private final Optional<HttpMethod> httpMethod;

@@ -36,7 +36,7 @@ public class TokenEncryptionConfigurationProperties implements TokenEncryptionCo
     protected boolean enabled = false;
     protected EncryptionMethod encryptionMethod = EncryptionMethod.A128GCM;
     protected JWEAlgorithm jweAlgorithm = JWEAlgorithm.RSA_OAEP_256;
-    protected EncryptionConfiguration type = EncryptionConfiguration.RSA;
+    protected EncryptionType type = EncryptionType.RSA;
 
     @Nullable
     protected String secret;
@@ -48,7 +48,7 @@ public class TokenEncryptionConfigurationProperties implements TokenEncryptionCo
     protected File privateKeyPath;
 
     @Override
-    public EncryptionConfiguration getType() {
+    public EncryptionType getType() {
         return this.type;
     }
 

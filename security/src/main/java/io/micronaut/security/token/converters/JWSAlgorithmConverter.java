@@ -24,6 +24,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
+ * Converts a string to a {@link JWSAlgorithm}.
  *
  * @author Sergio del Amo
  * @since 1.0

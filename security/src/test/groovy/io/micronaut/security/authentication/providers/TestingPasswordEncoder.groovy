@@ -5,7 +5,7 @@ import io.micronaut.context.annotation.Requires
 import javax.inject.Singleton
 
 @Singleton
-@Requires(property = 'spec.name', value = 'DelegatingAuthenticationProviderSpec')
+@Requires(property = 'spec.authentication')
 class TestingPasswordEncoder implements PasswordEncoder {
 
     @Override

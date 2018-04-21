@@ -20,7 +20,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.*;
+import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 
@@ -33,6 +35,7 @@ import java.util.Optional;
  */
 @Controller("/")
 @Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".login")
+@Secured(SecurityRule.IS_ANONYMOUS)
 public class LoginController implements LoginControllerApi {
 
     public static final String LOGIN_PATH = "/login";

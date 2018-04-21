@@ -37,9 +37,9 @@ public interface TokenEncryptionConfiguration extends Toggleable {
 
    /**
     *
-    * @return a value of {@link EncryptionConfiguration}
+    * @return a value of {@link EncryptionType}
     */
-    EncryptionConfiguration getType();
+    EncryptionType getType();
 
     /**
      * @return The path to the public key

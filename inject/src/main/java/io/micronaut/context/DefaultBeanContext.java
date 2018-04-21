@@ -1752,18 +1752,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-            return method.getAnnotation(annotationClass);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getDeclaredAnnotations();
+        public AnnotationMetadata getAnnotationMetadata() {
+            return method.getAnnotationMetadata();
         }
     }
 
@@ -1818,6 +1808,7 @@ public class DefaultBeanContext implements BeanContext {
         public R invoke(Object... arguments) {
             return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
         }
+
     }
 
     static final class BeanKey<T> implements BeanIdentifier {
