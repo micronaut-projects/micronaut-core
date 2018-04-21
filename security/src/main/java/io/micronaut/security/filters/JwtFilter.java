@@ -71,8 +71,8 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         this.securityRules = securityRules;
     }
 
-    private Publisher<MutableHttpResponse<?>> unauthorized() {
-        return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
+    private Publisher<MutableHttpResponse<?>> rejected(boolean forbidden) {
+        return Publishers.just(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
     }
 
     @Override
@@ -106,7 +106,7 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
-                return unauthorized();
+                rejected(optionalClaims.isPresent());
             }
             if (result == SecurityRuleResult.ALLOWED) {
                 if (LOG.isDebugEnabled()) {
@@ -116,7 +116,7 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
             }
         }
 
-        //no rule found for the given request, not authorized
-        return unauthorized();
+        //no rule found for the given request, reject
+        return rejected(optionalClaims.isPresent());
     }
 }

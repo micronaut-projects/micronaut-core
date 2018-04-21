@@ -67,7 +67,7 @@ class AuthorizationSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        e.status == HttpStatus.FORBIDDEN
     }
 
     void "test accessing the url map admin action with the required role"() {
@@ -117,7 +117,7 @@ class AuthorizationSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        e.status == HttpStatus.FORBIDDEN
     }
 
     void "test accessing the secured admin action with the required role"() {
@@ -144,6 +144,6 @@ class AuthorizationSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        e.status == HttpStatus.FORBIDDEN
     }
 }
