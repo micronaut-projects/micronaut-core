@@ -12,12 +12,12 @@ micronaut:
         pattern: /images/*
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY # <1>
+          - isAnonymoys() # <1>
       -
         pattern: /books
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED # <2>
+          - isAuthenticated() # <2>
       -
         pattern: /books/grails
         httpMethod: GET

@@ -23,7 +23,7 @@ micronaut:
         pattern: /images/*
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /books/grails
         httpMethod: GET

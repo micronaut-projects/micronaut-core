@@ -49,7 +49,7 @@ public class SecurityControllersRule extends InterceptUrlMapRule {
 
     protected List<InterceptUrlMapPattern> createPatternList(SecurityEndpointsConfiguration securityEndpointsConfiguration) {
         final List<InterceptUrlMapPattern> results = new ArrayList<>();
-        final List<String> access = Collections.singletonList(SecurityAccessExpression.IS_AUTHENTICATED_ANONYMOUSLY.getExpression());
+        final List<String> access = Collections.singletonList(SecurityRule.IS_ANONYMOUS);
         if (securityEndpointsConfiguration != null) {
             if (securityEndpointsConfiguration.isLogin()) {
                 results.add(new InterceptUrlMapPattern(LoginController.LOGIN_PATH, access, HttpMethod.POST));

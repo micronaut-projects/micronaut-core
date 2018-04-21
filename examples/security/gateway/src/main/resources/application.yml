@@ -27,32 +27,32 @@ micronaut:
         pattern: /
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /index.html
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /login
         httpMethod: POST
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /auth
         httpMethod: POST
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /oauth/access_token
         httpMethod: POST
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /images/*
         httpMethod: GET
         access:
-          - IS_AUTHENTICATED_ANONYMOUSLY
+          - isAnonymoys()
       -
         pattern: /books/grails
         httpMethod: GET

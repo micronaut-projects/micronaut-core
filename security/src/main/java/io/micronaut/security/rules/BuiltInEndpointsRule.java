@@ -30,8 +30,8 @@ public class BuiltInEndpointsRule extends InterceptUrlMapRule {
             return new ArrayList<>();
         }
         List<InterceptUrlMapPattern> patterns = new ArrayList<>();
-        List<String> anonymousAccess = Collections.singletonList(SecurityAccessExpression.IS_AUTHENTICATED_ANONYMOUSLY.getExpression());
-        List<String> authenticatedAccess = Collections.singletonList(SecurityAccessExpression.IS_AUTHENTICATED.getExpression());
+        List<String> anonymousAccess = Collections.singletonList(SecurityRule.IS_ANONYMOUS);
+        List<String> authenticatedAccess = Collections.singletonList(SecurityRule.IS_AUTHENTICATED);
         for (HttpMethod method : Arrays.asList(HttpMethod.GET, HttpMethod.POST)) {
             patterns.addAll(endpointConfigurations.stream()
                     .filter(ec -> ec.isEnabled().isPresent() ? ec.isEnabled().get() : false)
