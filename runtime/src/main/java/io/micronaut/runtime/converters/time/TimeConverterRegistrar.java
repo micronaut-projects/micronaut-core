@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.converters.time;
 
 import io.micronaut.context.annotation.Requires;
@@ -35,7 +36,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Registers data time converters
+ * Registers data time converters.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,6 +47,7 @@ import java.util.regex.Pattern;
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(\\d+)([s|m|h|d])(s?)$");
+    private static final int MILLIS = 3;
 
     @Override
     public void register(ConversionService<?> conversionService) {
@@ -72,7 +74,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                 case 's':
                                     return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
                                 case 'm':
-                                    String ms = matcher.group(3);
+                                    String ms = matcher.group(MILLIS);
                                     if (StringUtils.hasText(ms)) {
                                         return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
                                     } else {

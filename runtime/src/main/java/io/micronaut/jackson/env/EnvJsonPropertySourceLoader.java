@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.env;
 
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.ResourceLoader;
 
@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * <p>Reads properties from JSON stored in the environment variables <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt></p>
+ * <p>Reads properties from JSON stored in the environment variables <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +34,7 @@ import java.util.Optional;
 public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
 
     /**
-     * Position for the system property source loader in the chain
+     * Position for the system property source loader in the chain.
      */
     public static final int POSITION = SystemPropertiesPropertySource.POSITION + 50;
 
@@ -59,6 +59,10 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
         return Optional.empty();
     }
 
+    /**
+     * @return The JSON stored in the environment variables
+     * <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.
+     */
     protected String getEnvValue() {
         String v = System.getenv(SPRING_APPLICATION_JSON);
         if(v == null) {

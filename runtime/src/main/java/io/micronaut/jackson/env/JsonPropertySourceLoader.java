@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.env;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -20,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.MapType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
-import io.micronaut.context.env.PropertySourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * <p>A {@link PropertySourceLoader} that reads <tt>application.json</tt> files if they exist</p>
+ * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads <tt>application.json</tt> files if they exist.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,7 +38,7 @@ import java.util.Set;
 public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
 
     /**
-     * File extension for property source loader
+     * File extension for property source loader.
      */
     public static final String FILE_EXTENSION = "json";
 

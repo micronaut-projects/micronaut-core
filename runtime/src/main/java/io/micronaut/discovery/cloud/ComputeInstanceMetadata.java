@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud;
 
 import io.micronaut.context.env.ComputePlatform;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An interface modelling common Cloud platform compute instance metadata
+ * An interface modelling common Cloud platform compute instance metadata.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -30,13 +31,15 @@ import java.util.Map;
 public interface ComputeInstanceMetadata {
 
     /**
-     * The metadata as a map
+     * The metadata as a map.
      *
      * @return A map of metadata
      */
     Map<String, String> getMetadata();
 
     /**
+     * The network interfaces attached to the compute instance.
+     *
      * @return The {@link NetworkInterface} instances
      */
     List<NetworkInterface> getInterfaces();
@@ -47,7 +50,7 @@ public interface ComputeInstanceMetadata {
     ComputePlatform getComputePlatform();
 
     /**
-     * The tags attached to the instance
+     * The tags attached to the instance.
      *
      * @return A map of tags
      */
@@ -81,12 +84,12 @@ public interface ComputeInstanceMetadata {
     String getRegion();
 
     /**
-     * @return The local host name of hte instance
+     * @return The local host name of the instance
      */
     String getLocalHostname();
 
     /**
-     * @return the private host name of the instance
+     * @return The private host name of the instance
      */
     String getPrivateHostname();
 
