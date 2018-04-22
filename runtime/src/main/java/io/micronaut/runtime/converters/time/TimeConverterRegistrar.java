@@ -84,13 +84,17 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                     return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
                                 case 'd':
                                     return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                                default:
+                                    context.reject(
+                                            value,
+                                            new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                    return Optional.empty();
                             }
                         } catch (NumberFormatException e) {
                             context.reject(value, e);
                         }
                     }
                 }
-                context.reject(value, new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
                 return Optional.empty();
             }
         );
