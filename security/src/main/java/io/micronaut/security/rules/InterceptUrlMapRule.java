@@ -21,29 +21,41 @@ import io.micronaut.core.util.PathMatcher;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.InterceptUrlMapPattern;
-import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
-
 import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.*;
 
 /**
- * A security rule implementation backed by the {@link SecurityConfiguration#getInterceptUrlMap()}.
+ * An abstract class with common functionality for Security Rule implementations which
+ * opt to express their configuration as a List of {@link InterceptUrlMapPattern}.
  *
  * @author James Kleeh
  * @since 1.0
  */
 abstract class InterceptUrlMapRule extends AbstractSecurityRule {
 
+    /**
+     * The order of the rule.
+     */
+    public static final Integer ORDER = 0;
+
     private final AntPathMatcher pathMatcher;
 
+    /**
+     *
+     * @param tokenConfiguration The TokenConfiguration used by the parent class.
+     */
     InterceptUrlMapRule(TokenConfiguration tokenConfiguration) {
         super(tokenConfiguration);
         this.pathMatcher = PathMatcher.ANT;
     }
 
+    /**
+     * Provides a list of {@link InterceptUrlMapPattern} which will be used to provide {@link SecurityRule}.
+     * @return List of {@link InterceptUrlMapPattern}
+     */
     protected abstract List<InterceptUrlMapPattern> getPatternList();
 
     /**
@@ -71,5 +83,4 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
                 .map(pattern -> compareRoles(pattern.getAccess(), getRoles(claims)))
                 .orElse(SecurityRuleResult.UNKNOWN);
     }
-
 }

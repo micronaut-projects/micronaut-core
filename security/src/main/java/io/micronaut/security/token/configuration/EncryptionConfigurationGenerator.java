@@ -65,7 +65,7 @@ public class EncryptionConfigurationGenerator {
      */
     private static Optional<EncryptionConfiguration> createEncryptionConfiguration(TokenEncryptionConfiguration tokenEncryptionConfiguration,
                                                                                   EncryptionKeyProvider encryptionKeyProvider) {
-        if ( !tokenEncryptionConfiguration.isEnabled() ) {
+        if (!tokenEncryptionConfiguration.isEnabled()) {
             return Optional.empty();
         }
         try {

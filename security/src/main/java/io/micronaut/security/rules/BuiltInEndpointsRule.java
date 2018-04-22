@@ -29,18 +29,33 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * A {@link SecurityRule} provider which defines security rules for built-in {@link io.micronaut.management.endpoint.Endpoint}.
+ *
+ * @author Sergio
+ * @since 1.0
+ */
 @Singleton
 public class BuiltInEndpointsRule extends InterceptUrlMapRule {
 
     public static final Integer ORDER = 0;
     private final List<InterceptUrlMapPattern> patternList;
 
-
+    /**
+     *
+     * @param tokenConfiguration  The general TokenConfiguration
+     * @param beanContext the Bean Context
+     */
     public BuiltInEndpointsRule(TokenConfiguration tokenConfiguration, BeanContext beanContext) {
         super(tokenConfiguration);
         this.patternList = createPatternList(beanContext.getBeansOfType(EndpointConfiguration.class));
     }
 
+    /**
+     *
+     * @param endpointConfigurations a Collection of {@link EndpointConfiguration}
+     * @return List of {@link InterceptUrlMapPattern}
+     */
     protected List<InterceptUrlMapPattern> createPatternList(Collection<EndpointConfiguration> endpointConfigurations) {
         if (endpointConfigurations == null || endpointConfigurations.isEmpty()) {
             return new ArrayList<>();

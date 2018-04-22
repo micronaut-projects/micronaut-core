@@ -21,7 +21,6 @@ import io.micronaut.security.Secured;
 import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
-
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.*;
@@ -36,11 +35,15 @@ import java.util.*;
 public class SecuredAnnotationRule extends AbstractSecurityRule {
 
     /**
-     * The order of the rule
+     * The order of the rule.
      */
     public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER - 100;
 
-    protected SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
+    /**
+     *
+     * @param tokenConfiguration Token Configuration used by parent class.
+     */
+    SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
         super(tokenConfiguration);
     }
 

@@ -63,7 +63,7 @@ public class JwtTokenValidator implements TokenValidator {
             }
             return Optional.empty();
 
-        } catch ( TechnicalException e ) {
+        } catch (TechnicalException e) {
             return Optional.empty();
         }
     }

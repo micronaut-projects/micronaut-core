@@ -34,7 +34,11 @@ public abstract class AbstractSecurityRule implements SecurityRule {
 
     private final TokenConfiguration tokenConfiguration;
 
-    protected AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
+    /**
+     *
+     * @param tokenConfiguration General Token Configuration
+     */
+    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
         this.tokenConfiguration = tokenConfiguration;
     }
 

@@ -23,7 +23,7 @@ import javax.inject.Singleton;
 import java.util.List;
 
 /**
- * Rule provider for rules provided in the configuration as a List of {@link InterceptUrlMapPattern}
+ * A security rule implementation backed by the {@link SecurityConfiguration#getInterceptUrlMap()}.
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -37,8 +37,13 @@ public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
 
     private final List<InterceptUrlMapPattern> patternList;
 
-    protected ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
-                                               SecurityConfiguration securityConfiguration) {
+    /**
+     *
+     * @param tokenConfiguration The token configuration
+     * @param securityConfiguration The security Configuration
+     */
+    public ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
+                                            SecurityConfiguration securityConfiguration) {
         super(tokenConfiguration);
         this.patternList = securityConfiguration.getInterceptUrlMap();
     }

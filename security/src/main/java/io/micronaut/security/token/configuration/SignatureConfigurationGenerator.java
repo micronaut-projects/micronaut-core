@@ -59,7 +59,7 @@ public class SignatureConfigurationGenerator {
      * @return SignatureConfiguration if enabled
      */
     private Optional<SignatureConfiguration> createSignatureConfiguration(TokenSignatureConfiguration tokenSignatureConfiguration) {
-        if ( !tokenSignatureConfiguration.isEnabled()) {
+        if (!tokenSignatureConfiguration.isEnabled()) {
             return Optional.empty();
         }
         try {

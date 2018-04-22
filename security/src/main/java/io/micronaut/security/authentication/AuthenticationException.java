@@ -34,7 +34,7 @@ public class AuthenticationException extends RuntimeException {
     }
 
     /**
-     * No message
+     * No message.
      */
     public AuthenticationException() {
         super();

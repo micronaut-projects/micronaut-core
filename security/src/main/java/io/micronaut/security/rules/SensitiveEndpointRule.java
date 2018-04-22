@@ -34,7 +34,7 @@ import java.util.Map;
 public class SensitiveEndpointRule implements SecurityRule {
 
     /**
-     * The order of the rule
+     * The order of the rule.
      */
     public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER + 100;
 

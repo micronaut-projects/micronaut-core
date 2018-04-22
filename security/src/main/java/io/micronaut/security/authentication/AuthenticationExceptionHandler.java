@@ -28,7 +28,7 @@ import javax.inject.Singleton;
 
 
 /**
- * Handles the server response when an {@link AuthenticationException} is thrown
+ * Handles the server response when an {@link AuthenticationException} is thrown.
  *
  * @author James Kleeh
  * @since 1.0

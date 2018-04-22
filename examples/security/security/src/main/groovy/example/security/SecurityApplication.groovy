@@ -18,8 +18,6 @@ package example.security
 import example.security.services.RegisterService
 import groovy.transform.CompileStatic
 import io.micronaut.runtime.Micronaut
-import io.micronaut.security.authentication.providers.PersistenceAuthenticationProvider
-
 import javax.inject.Singleton
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.event.ServerStartupEvent

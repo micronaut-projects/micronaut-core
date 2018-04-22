@@ -30,7 +30,7 @@ public class AuthenticationFailed implements AuthenticationResponse {
     private String message;
 
     /**
-     * Empty Constructor.
+     * Necessary for JSON Serialization.
      */
     public AuthenticationFailed() {
         this(AuthenticationFailureReason.UNKNOWN);
@@ -44,21 +44,30 @@ public class AuthenticationFailed implements AuthenticationResponse {
         this.message = createMessage(authenticationFailure);
     }
 
-    private String createMessage(AuthenticationFailureReason authenticationFailure) {
+    /**
+     * Generates a Title Case string for give authentication Failure.
+     * @param authenticationFailure the authentication failure
+     * @return the Title Case String
+     */
+    protected String createMessage(AuthenticationFailureReason authenticationFailure) {
         StringBuilder sb = new StringBuilder(authenticationFailure.name().toLowerCase());
         for (int i = 0; i < sb.length(); i++) {
-            int end = i+1;
+            int end = i + 1;
             if (i == 0) {
                 sb.replace(i, end, String.valueOf(Character.toUpperCase(sb.charAt(i))));
             }
             if (sb.charAt(i) == '_') {
                 sb.replace(i, end, " ");
-                sb.replace(end, end+1, String.valueOf(Character.toUpperCase(sb.charAt(i+1))));
+                sb.replace(end, end + 1, String.valueOf(Character.toUpperCase(sb.charAt(i + 1))));
             }
         }
         return sb.toString();
     }
 
+    /**
+     * message getter.
+     * @return Failure message
+     */
     @Override
     public Optional<String> getMessage() {
         return Optional.of(message);
