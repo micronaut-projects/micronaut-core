@@ -23,6 +23,7 @@ class AuthorizationSpec extends Specification {
             "micronaut.security.interceptUrlMap": [
                     [pattern: "/urlMap/admin", access: "ROLE_ADMIN"],
                     [pattern: "/urlMap/**",    access: "isAuthenticated()"],
+                    [pattern: "/anonymous/**", access: "isAnonymous()"],
             ]
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
@@ -40,6 +41,15 @@ class AuthorizationSpec extends Specification {
         }
         client.toBlocking().exchange(req, String)
     }
+
+    void "test accessing an anonymous without authentication"() {
+        when:
+        HttpResponse<String> response = get("/anonymous/hello")
+
+        then:
+        response.body() == 'You are anonymous'
+    }
+
     void "test accessing the url map controller without authentication"() {
         when:
         get("/urlMap/authenticated")
