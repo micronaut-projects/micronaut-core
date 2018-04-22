@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -27,7 +28,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>A custom {@link javax.inject.Scope} that allows target beans to be refreshed</p>
+ * <p>A custom {@link javax.inject.Scope} that allows target beans to be refreshed.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

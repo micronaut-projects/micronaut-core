@@ -86,11 +86,11 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Create Cache Interceptor with given arguments.
      *
-     * @param cacheManager The cache manager
-     * @param errorHandler Cache error handler
-     * @param asyncCacheErrorHandler  Async cache error handlers
-     * @param ioExecutor The executor to create tasks
-     * @param beanContext The bean context to allow DI
+     * @param cacheManager           The cache manager
+     * @param errorHandler           Cache error handler
+     * @param asyncCacheErrorHandler Async cache error handlers
+     * @param ioExecutor             The executor to create tasks
+     * @param beanContext            The bean context to allow DI
      */
     public CacheInterceptor(CacheManager cacheManager,
                             CacheErrorHandler errorHandler,
@@ -129,9 +129,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Intercept the annotated method invocation with sync.
      *
-     * @param context Contains information about method invocation
-     * @param returnTypeObject The
-     * @param returnType The return type of the method in Micronaut
+     * @param context          Contains information about method invocation
+     * @param returnTypeObject The return type of the method in Micronaut
+     * @param returnType       The return type class
      * @return The value from the cache
      */
     protected Object interceptSync(MethodInvocationContext context, ReturnType returnTypeObject, Class returnType) {
@@ -207,7 +207,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cachePut.async();
                 if (async) {
                     ioExecutor.submit(() ->
-                        processCachePut(context, wrapper, cachePut, cacheOperation)
+                            processCachePut(context, wrapper, cachePut, cacheOperation)
                     );
                 } else {
                     processCachePut(context, wrapper, cachePut, cacheOperation);
@@ -221,12 +221,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cacheInvalidate.async();
                 if (async) {
                     ioExecutor.submit(() -> {
-                            try {
-                                processCacheEvict(context, cacheInvalidate, cacheOperation, async);
-                            } catch (Exception e) {
-                                throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
+                                try {
+                                    processCacheEvict(context, cacheInvalidate, cacheOperation, async);
+                                } catch (Exception e) {
+                                    throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
+                                }
                             }
-                        }
                     );
                 } else {
                     processCacheEvict(context, cacheInvalidate, cacheOperation, async);
@@ -238,11 +238,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
+     * Intercept the aync method invocation.
      *
-     * @param context
-     * @param returnTypeObject
-     * @param returnType
-     * @return
+     * @param context          Contains information about method invocation
+     * @param returnTypeObject The return type of the method in Micronaut
+     * @param returnType       The return type class
+     * @return The value from the cache
      */
     protected Object interceptCompletableFuture(MethodInvocationContext<Object, Object> context, ReturnType<?> returnTypeObject, Class returnType) {
         CacheOperation cacheOperation = new CacheOperation(context, returnType);
@@ -306,6 +307,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         return returnFuture;
     }
 
+    /**
+     * Saving inside the cache.
+     *
+     * @param context Contains information about method invocation
+     * @return The operations to cause the return value to be cached within the given cache name.
+     */
     CachePut[] putOperations(MethodInvocationContext context) {
         if (context.hasStereotype(CachePut.class)) {
             return new CachePut[]{context.getAnnotation(CachePut.class)};
@@ -317,9 +324,10 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
+     * Evict from the cache.
      *
      * @param context Extended version of {@link io.micronaut.aop.InvocationContext} for {@link MethodInterceptor} instances
-     * @return
+     * @return The operations to cause the eviction of the given caches
      */
     CacheInvalidate[] invalidateOperations(MethodInvocationContext context) {
         if (context.hasStereotype(CacheInvalidate.class)) {
@@ -508,7 +516,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * Resolve the cache key generator from the give type.
      *
      * @param type The key generator
-     * @return
+     * @return The cache key generator
      */
     protected CacheKeyGenerator resolveKeyGenerator(Class<? extends CacheKeyGenerator> type) {
         return keyGenerators.computeIfAbsent(type, aClass -> {
@@ -612,10 +620,10 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private void processCacheEvict(
-        MethodInvocationContext context,
-        CacheInvalidate cacheConfig,
-        CacheOperation cacheOperation,
-        boolean async) {
+            MethodInvocationContext context,
+            CacheInvalidate cacheConfig,
+            CacheOperation cacheOperation,
+            boolean async) {
 
         String[] cacheNames = cacheOperation.getCacheNames(cacheConfig);
         CacheKeyGenerator keyGenerator = cacheOperation.getKeyGenerator(cacheConfig);
