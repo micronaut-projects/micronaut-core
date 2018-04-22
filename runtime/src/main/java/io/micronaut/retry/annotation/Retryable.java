@@ -42,6 +42,8 @@ import java.lang.annotation.Target;
 @Type(DefaultRetryInterceptor.class)
 public @interface Retryable {
 
+    int MAX_INTEGRAL_DIGITS = 4;
+
     /**
      * @return The exception types to include (defaults to all)
      */
@@ -61,7 +63,7 @@ public @interface Retryable {
     /**
      * @return The maximum number of retry attempts
      */
-    @Digits(integer = 4, fraction = 0)
+    @Digits(integer = MAX_INTEGRAL_DIGITS, fraction = 0)
     String attempts() default "3";
 
     /**
