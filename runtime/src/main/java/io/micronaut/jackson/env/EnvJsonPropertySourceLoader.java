@@ -48,9 +48,9 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
 
     @Override
     protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
-        if(fileName.equals("application.json")) {
+        if (fileName.equals("application.json")) {
             String v = getEnvValue();
-            if(v != null) {
+            if (v != null) {
                 String encoding = System.getProperty("file.encoding");
                 Charset charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
                 return Optional.of(new ByteArrayInputStream(v.getBytes(charset)));
@@ -65,7 +65,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
      */
     protected String getEnvValue() {
         String v = System.getenv(SPRING_APPLICATION_JSON);
-        if(v == null) {
+        if (v == null) {
             v = System.getenv(MICRONAUT_APPLICATION_JSON);
         }
         return v;
