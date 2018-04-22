@@ -15,10 +15,13 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 
 /**
@@ -27,10 +30,17 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-class MethodConstructorInjectionPoint extends ReflectionMethodInjectionPoint implements ConstructorInjectionPoint {
+@Internal
+class ReflectionMethodConstructorInjectionPoint extends ReflectionMethodInjectionPoint implements ConstructorInjectionPoint {
 
-    public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Argument... arguments) {
-        super(declaringComponent, method, requiresReflection, arguments);
+    public ReflectionMethodConstructorInjectionPoint(
+            BeanDefinition declaringBean,
+            Class<?> declaringType,
+            String methodName,
+            @Nullable Argument[] arguments,
+            @Nullable AnnotationMetadata annotationMetadata
+    ) {
+        super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }
 
     @Override
