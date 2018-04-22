@@ -80,16 +80,15 @@ public enum EC2MetadataKeys {
         return name;
     }
 
-
     /**
-     * TODO: prepend & append not used, need to be removed.
+     * The URL for metadata information.
+     * Override to apply prepend and append.
      *
-     * @param prepend To prepend to URL
-     * @param append  To append into URL
+     * @param prepend Building the URL endpoints
+     * @param append  Region
      * @return The URL for the Metadata information of specific {@link #name}.
      * @throws MalformedURLException If the URL is invalid
      */
-    // override to apply prepend and append
     public URL getURL(String prepend, String append) throws MalformedURLException {
         return new URL(AWS_METADATA_URL + path + name);
     }
