@@ -57,9 +57,9 @@ public class SecuredAnnotationRule extends AbstractSecurityRule {
      * @return The result
      */
     @Override
-    public SecurityRuleResult check(HttpRequest request, RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
-        if (routeMatch instanceof MethodBasedRouteMatch) {
-            MethodBasedRouteMatch methodRoute = ((MethodBasedRouteMatch) routeMatch);
+    public SecurityRuleResult check(HttpRequest request, Optional<RouteMatch> routeMatch, @Nullable Map<String, Object> claims) {
+        if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
+            MethodBasedRouteMatch methodRoute = ((MethodBasedRouteMatch) routeMatch.get());
             if (methodRoute.hasAnnotation(Secured.class)) {
                 Optional<String[]> optionalValue = methodRoute.getValue(Secured.class, String[].class);
                 if (optionalValue.isPresent()) {

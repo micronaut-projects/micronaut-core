@@ -22,6 +22,7 @@ import io.micronaut.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Informs the JWT filter what to do with the given request.
@@ -46,9 +47,9 @@ public interface SecurityRule extends Ordered {
      * @see SecurityRuleResult
      *
      * @param request The current request
-     * @param routeMatch The matched route
+     * @param routeMatch The matched route or empty if no route was matched. e.g. static resource.
      * @param claims The claims from the token. Null if not authenticated
      * @return The result
      */
-    SecurityRuleResult check(HttpRequest request, RouteMatch routeMatch, @Nullable  Map<String, Object> claims);
+    SecurityRuleResult check(HttpRequest request, Optional<RouteMatch> routeMatch, @Nullable  Map<String, Object> claims);
 }

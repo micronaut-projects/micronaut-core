@@ -22,6 +22,7 @@ import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Finds any sensitive endpoints and processes requests that match their
@@ -39,7 +40,7 @@ public class SensitiveEndpointRule implements SecurityRule {
     public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER + 100;
 
     @Override
-    public SecurityRuleResult check(HttpRequest request, RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
+    public SecurityRuleResult check(HttpRequest request, Optional<RouteMatch> routeMatch, @Nullable Map<String, Object> claims) {
         return SecurityRuleResult.UNKNOWN;
     }
 

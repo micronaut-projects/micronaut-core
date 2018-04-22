@@ -75,13 +75,25 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         return Publishers.just(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
     }
 
+    private Optional<RouteMatch> routeMatchOfRequest(HttpRequest<?> request) {
+        Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
+        if (routeMatchAttribute.isPresent()) {
+            return Optional.of((RouteMatch) routeMatchAttribute.get());
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("route match attribute for Request ({}) not found", request.getPath());
+            }
+        }
+        return Optional.empty();
+    }
+
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         String method = request.getMethod().toString();
         String path = request.getPath();
         Optional<String> token = tokenReader.findToken(request);
         Optional<Map<String, Object>> optionalClaims = token.flatMap(tokenValidator::validateTokenAndGetClaims);
-        RouteMatch routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH).map(RouteMatch.class::cast).orElseThrow(() -> new HttpServerException("Request attribute for route match must be set to process security rules"));
+        Optional<RouteMatch> routeMatch = routeMatchOfRequest(request);
 
         if (LOG.isDebugEnabled()) {
             if (token.isPresent()) {
