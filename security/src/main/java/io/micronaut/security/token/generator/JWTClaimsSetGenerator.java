@@ -41,9 +41,14 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
 
     private final TokenConfiguration tokenConfiguration;
 
+    /**
+     *
+     * @param tokenConfiguration Token Configuration
+     */
     JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration) {
         this.tokenConfiguration = tokenConfiguration;
     }
+
     /**
      *
      * @param userDetails Authenticated user's representation.

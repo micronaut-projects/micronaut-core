@@ -31,7 +31,7 @@ import java.util.List;
 public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
 
     /**
-     * The order of the rule
+     * The order of the rule.
      */
     public static final Integer ORDER = 0;
 

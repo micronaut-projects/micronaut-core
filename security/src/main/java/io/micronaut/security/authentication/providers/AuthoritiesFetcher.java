@@ -27,10 +27,10 @@ import java.util.List;
 public interface AuthoritiesFetcher {
 
     /**
-     * Returns granted roles for the given username
+     * Returns granted roles for the given username.
      *
      * @param username e.g. admin
-     * @return A list of authorities, or null of none could be found
+     * @return A list of authorities, or null if none could be found
      */
     List<String> findAuthoritiesByUsername(String username);
 }

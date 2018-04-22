@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfiguration;
 
 /**
- * Retrieves configuration for creating the JWT token
+ * Retrieves configuration for creating the JWT token.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -37,7 +37,6 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     protected Integer accessTokenExpiration = DEFAULT_EXPIRATION;
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
 
-
     @Override
     public Integer getRefreshTokenExpiration() {
         return refreshTokenExpiration;
@@ -51,7 +50,6 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     public Integer getAccessTokenExpiration() {
         return accessTokenExpiration;
     }
-
 
     /**
      * @see TokenConfiguration#getRolesClaimName() ().
