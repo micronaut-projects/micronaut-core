@@ -18,9 +18,14 @@ package io.micronaut.security.token.generator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.token.configuration.TokenConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Map;
 
@@ -31,9 +36,14 @@ import java.util.Map;
  */
 @Singleton
 public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
-    private static final int MILLISECONDS_IN_A_SECOND = 1000;
+
     private static final Logger LOG = LoggerFactory.getLogger(JWTClaimsSetGenerator.class);
 
+    private final TokenConfiguration tokenConfiguration;
+
+    JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration) {
+        this.tokenConfiguration = tokenConfiguration;
+    }
     /**
      *
      * @param userDetails Authenticated user's representation.
@@ -41,24 +51,22 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
      * @return
      */
     @Override
-    public Map<String, Object> generateClaims(UserDetails userDetails, Integer expiration) {
+    public Map<String, Object> generateClaims(UserDetails userDetails, @Nullable Integer expiration) {
         return generateClaimsSet(userDetails, expiration).getClaims();
     }
 
-    private JWTClaimsSet generateClaimsSet(UserDetails userDetails, Integer expiration) {
+    private JWTClaimsSet generateClaimsSet(UserDetails userDetails, @Nullable Integer expiration) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
         builder.subject(userDetails.getUsername());
 
-        Date now = new Date();
-        builder.issueTime(now);
+        builder.issueTime(new Date());
 
         if (expiration != null) {
             LOG.debug("Setting expiration to {}", expiration.toString());
-            Date expirationTime = new Date(now.getTime() + (expiration * MILLISECONDS_IN_A_SECOND));
-            builder.expirationTime(expirationTime);
+            builder.expirationTime(Date.from(Instant.now().plus(expiration, ChronoUnit.MILLIS)));
         }
 
-        builder.claim("roles", userDetails.getRoles());
+        builder.claim(tokenConfiguration.getRolesClaimName(), userDetails.getRoles());
 
         LOG.debug("Generated claim set: {}", builder.build().toJSONObject().toString());
 

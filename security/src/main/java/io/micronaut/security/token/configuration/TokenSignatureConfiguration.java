@@ -24,10 +24,9 @@ import io.micronaut.core.util.Toggleable;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface
-TokenSignatureConfiguration extends Toggleable {
+public interface TokenSignatureConfiguration extends Toggleable {
+
     /**
-     *
      * @return The JWS Algorithm
      */
     JWSAlgorithm getJwsAlgorithm();
@@ -40,7 +39,7 @@ TokenSignatureConfiguration extends Toggleable {
 
     /**
      *
-     * @return a value of {@link SignatureConfiguration}
+     * @return The algorithm to be used to sign the token
      */
-    SignatureConfiguration getType();
+    CryptoAlgorithm getType();
 }

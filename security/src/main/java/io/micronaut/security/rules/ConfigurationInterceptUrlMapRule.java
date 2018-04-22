@@ -29,22 +29,27 @@ import java.util.List;
  */
 @Singleton
 public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
-    public static final int ORDER = 0;
+
+    /**
+     * The order of the rule
+     */
+    public static final Integer ORDER = 0;
 
     private final List<InterceptUrlMapPattern> patternList;
-    public ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
-                                            SecurityConfiguration securityConfiguration) {
+
+    protected ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
+                                               SecurityConfiguration securityConfiguration) {
         super(tokenConfiguration);
         this.patternList = securityConfiguration.getInterceptUrlMap();
     }
 
     @Override
-    public int getOrder() {
-        return ORDER;
+    protected List<InterceptUrlMapPattern> getPatternList() {
+        return this.patternList;
     }
 
     @Override
-    protected List<InterceptUrlMapPattern> getPatternList() {
-        return this.patternList;
+    public int getOrder() {
+        return ORDER;
     }
 }

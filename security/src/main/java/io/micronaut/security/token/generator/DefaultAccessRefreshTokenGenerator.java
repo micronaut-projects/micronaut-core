@@ -27,6 +27,9 @@ import org.pac4j.core.profile.jwt.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.Date;
 import java.util.Map;
 
@@ -84,9 +87,9 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
     @Override
     public HttpResponse<AccessRefreshToken> generate(UserDetails userDetails) {
         try {
-            String accessToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getDefaultExpiration());
+            String accessToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getAccessTokenExpiration());
             String refreshToken = tokenGenerator.generateToken(userDetails, tokenConfiguration.getRefreshTokenExpiration());
-            AccessRefreshToken accessRefreshToken = tokenRenderer.render(userDetails, tokenConfiguration.getDefaultExpiration(), accessToken, refreshToken);
+            AccessRefreshToken accessRefreshToken = tokenRenderer.render(userDetails, tokenConfiguration.getAccessTokenExpiration(), accessToken, refreshToken);
             return httpResponseWithAccessRefreshToken(accessRefreshToken);
         } catch (Exception e) {
             return HttpResponse.serverError();
@@ -104,7 +107,7 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
         claims.put(JwtClaims.EXPIRATION_TIME, expirationDate());
         try {
             String accessToken = tokenGenerator.generateToken(claims);
-            AccessRefreshToken accessRefreshToken = tokenRenderer.render(tokenConfiguration.getDefaultExpiration(), accessToken, refreshToken);
+            AccessRefreshToken accessRefreshToken = tokenRenderer.render(tokenConfiguration.getAccessTokenExpiration(), accessToken, refreshToken);
             return httpResponseWithAccessRefreshToken(accessRefreshToken);
         } catch (Exception e) {
             return HttpResponse.serverError();
@@ -116,9 +119,8 @@ public class DefaultAccessRefreshTokenGenerator implements AccessRefreshTokenGen
      * @return java.util.Date
      */
     protected Date expirationDate() {
-        Integer expiration = tokenConfiguration.getDefaultExpiration();
-        Date now = new Date();
+        Integer expiration = tokenConfiguration.getAccessTokenExpiration();
         LOG.debug("Setting expiration to {}", expiration.toString());
-        return new Date(now.getTime() + (expiration * MILLISECONDS_IN_A_SECOND));
+        return Date.from(Instant.now().plus(expiration, ChronoUnit.MILLIS));
     }
 }

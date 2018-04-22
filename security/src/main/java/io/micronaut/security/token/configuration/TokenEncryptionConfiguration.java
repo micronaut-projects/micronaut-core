@@ -36,10 +36,9 @@ public interface TokenEncryptionConfiguration extends Toggleable {
     boolean isEnabled();
 
    /**
-    *
-    * @return a value of {@link EncryptionType}
+    * @return The algorithm to encrypt the token
     */
-    EncryptionType getType();
+    CryptoAlgorithm getType();
 
     /**
      * @return The path to the public key

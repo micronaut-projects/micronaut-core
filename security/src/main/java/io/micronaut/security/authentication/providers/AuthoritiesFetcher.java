@@ -19,6 +19,7 @@ package io.micronaut.security.authentication.providers;
 import java.util.List;
 
 /**
+ * Responsible for finding granted authorities for a given user.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -26,9 +27,10 @@ import java.util.List;
 public interface AuthoritiesFetcher {
 
     /**
-     * Fetches User authorities.
+     * Returns granted roles for the given username
+     *
      * @param username e.g. admin
-     * @return a list of string containing user authorities e.g. ['ROLE_ADMIN', 'ROLE_USER']
+     * @return A list of authorities, or null of none could be found
      */
     List<String> findAuthoritiesByUsername(String username);
 }

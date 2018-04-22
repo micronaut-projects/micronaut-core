@@ -33,7 +33,7 @@ public class TokenSignatureConfigurationProperties implements TokenSignatureConf
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".signature";
 
     protected JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
-    protected SignatureConfiguration type = SignatureConfiguration.SECRET;
+    protected CryptoAlgorithm type = CryptoAlgorithm.SECRET;
     protected boolean enabled = true;
 
     @NotNull
@@ -41,7 +41,7 @@ public class TokenSignatureConfigurationProperties implements TokenSignatureConf
     protected String secret;
 
     @Override
-    public SignatureConfiguration getType() {
+    public CryptoAlgorithm getType() {
         return type;
     }
 

@@ -23,6 +23,8 @@ import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.jwt.config.encryption.EncryptionConfiguration;
 import org.pac4j.jwt.config.signature.SignatureConfiguration;
 import org.pac4j.jwt.profile.JwtGenerator;
+
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
@@ -67,7 +69,7 @@ public class JwtTokenGenerator implements TokenGenerator {
      * @return JWT token
      */
     @Override
-    public String generateToken(UserDetails userDetails, Integer expiration) {
+    public String generateToken(UserDetails userDetails, @Nullable Integer expiration) {
         Map<String, Object> claims = claimsGenerator.generateClaims(userDetails, expiration);
         return generateToken(claims);
     }

@@ -19,6 +19,8 @@ package io.micronaut.security.authentication.providers;
 import java.util.Optional;
 
 /**
+ * Responsible for returning user information based
+ * on their username.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -26,9 +28,10 @@ import java.util.Optional;
 public interface UserFetcher {
 
     /**
-     * Fetches a user from a persistence mechanism based on the username.
+     * Fetches a user based on the username.
+     *
      * @param username e.g. admin
-     * @return An implementation of {@link UserState}
+     * @return The users information
      */
     Optional<UserState> findByUsername(String username);
 }

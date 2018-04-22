@@ -17,6 +17,8 @@
 package io.micronaut.security.authentication.providers;
 
 /**
+ * Responsible for determining if a given password matches
+ * its encoded state and encoding raw passwords.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -24,17 +26,16 @@ package io.micronaut.security.authentication.providers;
 public interface PasswordEncoder {
 
     /**
-     *
-     * @param rawPassword Raw password.
-     * @return an encoded string
+     * @param rawPassword The plain text password
+     * @return The result of encoding the password
      */
     String encode(String rawPassword);
 
     /**
      *
-     * @param rawPassword typically user input
-     * @param encodedPassword typically retrieved from the database
-     * @return whether after encoding the raw password it matches the encoded password
+     * @param rawPassword The plain text password
+     * @param encodedPassword The encoded password to match against
+     * @return true if the passwords match
      */
     boolean matches(String rawPassword, String encodedPassword);
 }

@@ -25,20 +25,23 @@ package io.micronaut.security.token.configuration;
 public interface TokenConfiguration {
 
     /**
+     * The name in the claims object that stores the granted roles.
      *
-     * @return JWT Claims key for user roles.
+     * @return The roles claim name, e.g. roles.
      */
     String getRolesClaimName();
 
     /**
+     * How long until the access token expires in milliseconds.
      *
-     * @return expiration time in milliseconds for access token
+     * @return The time, or null if not set to expire
      */
-    Integer getDefaultExpiration();
+    Integer getAccessTokenExpiration();
 
     /**
+     * How long until the refresh token expires in milliseconds.
      *
-     * @return expiration time in milliseconds for refresh Token
+     * @return The time, or null if not set to expire
      */
     Integer getRefreshTokenExpiration();
 }

@@ -17,6 +17,7 @@
 package io.micronaut.security.authentication.providers;
 
 /**
+ * Represents the state of a user after authentication.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -25,37 +26,37 @@ public interface UserState {
 
     /**
      *
-     * @return a string representing the user e.g. admin
+     * @return The username
      */
     String getUsername();
 
     /**
      *
-     * @return typically encrypted string save in a persistence mechanism
+     * @return The encrypted password
      */
     String getPassword();
 
     /**
      *
-     * @return true or false indicating whether the user is enabled or not. For example, enabled if they have confirmed their email address.
+     * @return true if the user account is enabled
      */
     boolean isEnabled();
 
     /**
      *
-     * @return true or false indicating whether the user's account is expired
+     * @return true if the user account is expired
      */
     boolean isAccountExpired();
 
     /**
      *
-     * @return true or false indicating whether the user's account is locked
+     * @return true if the user account is locked
      */
     boolean isAccountLocked();
 
     /**
      *
-     * @return true or false indicating whether the user's password has expired
+     * @return true if the user has an expired password
      */
     boolean isPasswordExpired();
 }

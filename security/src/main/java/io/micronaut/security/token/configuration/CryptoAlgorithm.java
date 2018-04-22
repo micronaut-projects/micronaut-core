@@ -13,14 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.configuration;
 
 /**
+ * Represents the different algorithms available to be used
+ * to sign or encrypt a token.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public enum SignatureConfiguration {
-    SECRET, RSA, EC
+public enum CryptoAlgorithm {
+    SECRET,
+    RSA,
+    EC
 }
