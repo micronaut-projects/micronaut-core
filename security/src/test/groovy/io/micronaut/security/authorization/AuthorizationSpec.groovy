@@ -33,10 +33,16 @@ class AuthorizationSpec extends Specification {
         resp.body().accessToken
     }
 
+    HttpResponse get(String path, String token = null) {
+        HttpRequest req = HttpRequest.GET(path)
+        if (token != null) {
+            req = req.header("Authorization", "Bearer ${token}".toString())
+        }
+        client.toBlocking().exchange(req, String)
+    }
     void "test accessing the url map controller without authentication"() {
         when:
-        client.toBlocking()
-                .exchange(HttpRequest.GET("/urlMap/authenticated"), String)
+        get("/urlMap/authenticated")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -48,9 +54,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("valid")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/urlMap/authenticated")
-                    .header("Authorization", "Bearer ${token}".toString()), String)
+        HttpResponse<String> response = get("/urlMap/authenticated", token)
 
         then:
         response.body() == "You are authenticated"
@@ -61,9 +65,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("valid")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/urlMap/admin")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        get("/urlMap/admin", token)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -75,9 +77,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("admin")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/urlMap/admin")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        HttpResponse<String> response = get("/urlMap/admin", token)
 
         then:
         response.body() == "You have admin"
@@ -85,8 +85,7 @@ class AuthorizationSpec extends Specification {
 
     void "test accessing the secured controller without authentication"() {
         when:
-        client.toBlocking()
-                .exchange(HttpRequest.GET("/secured/authenticated"), String)
+        get("/secured/authenticated")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -98,9 +97,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("valid")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/secured/authenticated")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        HttpResponse<String> response = get("/secured/authenticated", token)
 
         then:
         response.body() == "You are authenticated"
@@ -111,9 +108,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("valid")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/secured/admin")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        get("/secured/admin", token)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -125,9 +120,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("admin")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/secured/admin")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        HttpResponse<String> response = get("/secured/admin", token)
 
         then:
         response.body() == "You have admin"
@@ -138,9 +131,7 @@ class AuthorizationSpec extends Specification {
         String token = loginWith("valid")
 
         when:
-        HttpResponse<String> response = client.toBlocking()
-                .exchange(HttpRequest.GET("/noRule/index")
-                .header("Authorization", "Bearer ${token}".toString()), String)
+        get("/noRule/index", token)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
