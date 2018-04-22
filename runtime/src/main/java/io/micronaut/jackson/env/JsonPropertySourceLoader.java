@@ -53,7 +53,7 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
         TypeFactory factory = TypeFactory.defaultInstance();
         MapType mapType = factory.constructMapType(LinkedHashMap.class, String.class, Object.class);
 
-        Map<String,Object> map = objectMapper.readValue(input, mapType);
+        Map<String, Object> map = objectMapper.readValue(input, mapType);
         processMap(finalMap, map, "");
     }
 }
