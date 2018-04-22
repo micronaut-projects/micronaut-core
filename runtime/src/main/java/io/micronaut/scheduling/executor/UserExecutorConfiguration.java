@@ -113,6 +113,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
             case WORK_STEALING:
                 configuration.parallelism = OptionalInt.of(num);
                 break;
+            default:
         }
         return configuration;
     }
