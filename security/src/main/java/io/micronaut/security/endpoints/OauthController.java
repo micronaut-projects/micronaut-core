@@ -87,7 +87,8 @@ public class OauthController implements OauthControllerApi {
      * @return true if the object is valid
      */
     protected boolean validateTokenRefreshRequest(TokenRefreshRequest tokenRefreshRequest) {
-        return tokenRefreshRequest.getGrantType().equals("refresh_token") &&
+        return tokenRefreshRequest.getGrantType() != null &&
+                tokenRefreshRequest.getGrantType().equals("refresh_token") &&
                 tokenRefreshRequest.getRefreshToken() != null;
     }
 }

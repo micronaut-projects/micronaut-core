@@ -4,6 +4,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Value
 import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationProvider
+import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
 import org.ldaptive.ConnectionConfig
@@ -40,7 +41,7 @@ class LdapService implements AuthenticationProvider {
     Integer ldapPort
 
     @Override
-    AuthenticationResponse authenticate(UsernamePasswordCredentials usernamePassword) {
+    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
         try {
             FormatDnResolver dnResolver = new FormatDnResolver()
             dnResolver.setFormat(baseDn)
@@ -79,12 +80,15 @@ class LdapService implements AuthenticationProvider {
             ldaptiveAuthenticator.setDnResolver(dnResolver)
             ldaptiveAuthenticator.setAuthenticationHandler(handler)
             LdapProfileService ldapProfileService = new LdapProfileService(connectionFactory, ldaptiveAuthenticator, '', baseDn)
-            org.pac4j.core.credentials.UsernamePasswordCredentials credentials = new org.pac4j.core.credentials.UsernamePasswordCredentials(usernamePassword.getUsername(), usernamePassword.getPassword(), null)
+            final String username = authenticationRequest.getIdentity() as String
+            final String password = authenticationRequest.getSecret() as String
+            org.pac4j.core.credentials.UsernamePasswordCredentials credentials =
+                    new org.pac4j.core.credentials.UsernamePasswordCredentials(username, password, null)
             ldapProfileService.validate(credentials, null)
             CommonProfile profile = credentials.getUserProfile()
 
             if (profile instanceof LdapProfile) {
-                String username = usernamePassword.getUsername()
+
                 return new UserDetails(username, rolesByUsername(username))
             }
         } catch (Exception e ) {
