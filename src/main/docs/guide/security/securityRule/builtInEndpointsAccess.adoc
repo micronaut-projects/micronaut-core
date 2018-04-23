@@ -2,13 +2,7 @@ When you turn on security, Built-in endpoints are secured depending on their sen
 
 [source, yaml]
 ----
-endpoints:
-  beans:
-    enabled: true
-    sensitive: true # <1>
-  health:
-    enabled: true
-    sensitive: false  # <2>
+include::{testssecurity}/security/securityRule/BuiltInEndpointsSpec.groovy[tag=yamlconfig,indent=0]
 ----
 
 <1> `/beans` endpoint is secured

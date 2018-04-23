@@ -1,29 +1,9 @@
 As illustrated below, you can use link:{api}/io/micronaut/security/Secured.html[Secured] annotation to configure
 access at link:{api}/io/micronaut/http/annotation/Controller.html[Controller] or Controller's Action level.
 
+[source, groovy]
 ----
-import io.micronaut.security.rules.SecurityRule
-
-@Controller("/secured")
-@Secured(SecurityRule.IS_AUTHENTICATED) // <1>
-class SecuredController {
-
-    @Get("/admin")
-    @Secured(["ROLE_ADMIN", "ROLE_X"]) // <2>
-    String withroles() {
-        "You have ROLE_ADMIN or ROLE_X roles"
-    }
-
-    @Secured(SecurityRule.IS_ANONYMOUS)  // <3>
-    String anonymous() {
-        "You are anonymous"
-    }
-
-    @Get("/authenticated") // <1>
-    String authenticated(Authentication authentication) {
-        "${authentication.id} is authenticated"
-    }
-}
+include::{testssecurity}/security/securityRule/ExampleController.groovy[tag=exampleControllerPlusImports,indent=0]
 ----
 
 <1> Authenticated users are able to access `authenticated` Controller's action.

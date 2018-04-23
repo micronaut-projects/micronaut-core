@@ -1,26 +1,8 @@
-You can configure endpoint authentication and authorization access with an Intercept URL Map:
+Moreover, you can configure endpoint authentication and authorization access with an Intercept URL Map:
 
 [source, yaml]
 ----
-micronaut:
-  security:
-    enabled: true
-    interceptUrlMap:
-      -
-        pattern: /images/*
-        httpMethod: GET
-        access:
-          - isAnonymous() # <1>
-      -
-        pattern: /books
-        access:
-          - isAuthenticated() # <2>
-      -
-        pattern: /books/grails
-        httpMethod: GET
-        access:
-          - ROLE_GRAILS # <3>
-          - ROLE_GROOVY
+include::{testssecurity}/security/securityRule/InterceptUrlMapSpec.groovy[tag=yamlconfig,indent=0]
 ----
 
 <1> Enable anonymous access

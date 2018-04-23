@@ -3,9 +3,5 @@ access to a list of IP Patterns as illustrated below:
 
 [source, yaml]
 ----
-micronaut:
-  security:
-    ipPatterns:
-      - 127.0.0.1
-      - 192.168.1.*
+include::{testssecurity}/security/securityRule/IpPatternSpec.groovy[tag=yamlconfig,indent=0]
 ----
