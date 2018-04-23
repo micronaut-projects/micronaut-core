@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon.discovery;
 
 import com.netflix.client.config.CommonClientConfigKey;
@@ -34,7 +35,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import javax.inject.Singleton;
 
 /**
- * Replaces the default {@link DiscoveryClientLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances
+ * Replaces the default {@link DiscoveryClientLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances.
  *
  * @author graemerocher
  * @since 1.0
@@ -45,6 +46,12 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
     private final BeanContext beanContext;
     private final IClientConfig defaultClientConfig;
 
+    /**
+     * Constructor.
+     * @param discoveryClient discoveryClient
+     * @param beanContext beanContext
+     * @param defaultClientConfig defaultClientConfig
+     */
     public RibbonDiscoveryClientLoadBalancerFactory(DiscoveryClient discoveryClient,
                                                     BeanContext beanContext,
                                                     IClientConfig defaultClientConfig) {
@@ -70,6 +77,15 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
         }
     }
 
+    /**
+     * Create the load balancer based on the parameters.
+     * @param niwsClientConfig niwsClientConfig
+     * @param rule rule
+     * @param ping ping
+     * @param serverListFilter serverListFilter
+     * @param serverList serverList
+     * @return balancer
+     */
     protected RibbonLoadBalancer createRibbonLoadBalancer(IClientConfig niwsClientConfig, IRule rule, IPing ping, ServerListFilter serverListFilter, ServerList<Server> serverList) {
         return new RibbonLoadBalancer(
             niwsClientConfig,

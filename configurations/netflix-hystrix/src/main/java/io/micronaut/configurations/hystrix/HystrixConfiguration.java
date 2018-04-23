@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix;
 
 import com.netflix.hystrix.Hystrix;
@@ -30,7 +31,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * This class allows hooking into {@link HystrixPlugins} simply by defining beans
+ * This class allows hooking into {@link HystrixPlugins} simply by defining beans.
  *
  * @author graemerocher
  * @since 1.0
@@ -39,16 +40,19 @@ import java.io.IOException;
 public class HystrixConfiguration implements Closeable {
 
     /**
-     * Whether the /hystrix.stream is enabled
+     * Whether the /hystrix.stream is enabled.
      */
     public static final String HYSTRIX_STREAM_ENABLED = "hystrix.stream.enabled";
 
+    /**
+     * Constructor.
+     */
     public HystrixConfiguration() {
         HystrixPlugins.reset();
     }
 
     /**
-     * Allows defining the {@link HystrixCommandExecutionHook} as a bean
+     * Allows defining the {@link HystrixCommandExecutionHook} as a bean.
      *
      * @param commandExecutionHook The command execution hook
      */
@@ -61,7 +65,7 @@ public class HystrixConfiguration implements Closeable {
     }
 
     /**
-     * Allows defining the {@link HystrixEventNotifier} as a bean
+     * Allows defining the {@link HystrixEventNotifier} as a bean.
      *
      * @param eventNotifier The command execution hook
      */
@@ -74,7 +78,7 @@ public class HystrixConfiguration implements Closeable {
     }
 
     /**
-     * Allows defining the {@link com.netflix.hystrix.strategy.concurrency.HystrixConcurrencyStrategy} as a bean
+     * Allows defining the {@link com.netflix.hystrix.strategy.concurrency.HystrixConcurrencyStrategy} as a bean.
      *
      * @param concurrencyStrategy The command execution hook
      */
@@ -87,7 +91,7 @@ public class HystrixConfiguration implements Closeable {
     }
 
     /**
-     * Allows defining the {@link HystrixMetricsPublisher} as a bean
+     * Allows defining the {@link HystrixMetricsPublisher} as a bean.
      *
      * @param metricsPublisher The command execution hook
      */
