@@ -1,0 +1,11 @@
+When you turn on security, traffic coming from any ip address is allowed by default. You can however restrict
+access to a list of IP Patterns as illustrated below:
+
+[source, yaml]
+----
+micronaut:
+  security:
+    ipPatterns:
+      - 127.0.0.1
+      - 192.168.1.*
+----

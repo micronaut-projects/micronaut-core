@@ -6,7 +6,7 @@
 
 | `micronaut.security.token.defaultExpiration` |  `3600` | Access token expiration time in milliseconds
 
-| `micronaut.security.token.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds
+| `micronaut.security.token.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds. By default, they don't expire.
 
 |===
 

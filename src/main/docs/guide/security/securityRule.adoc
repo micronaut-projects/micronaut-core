@@ -1,0 +1,2 @@
+You can enable endpoint's access with several built-in security rules.
+If they don't fulfil your needs, you can implement your own link:{api}/io/micronaut/security/rules/SecurityRule.html[SecurityRule].

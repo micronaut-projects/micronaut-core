@@ -86,20 +86,24 @@ management:
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
-  interceptUrlMap: Intercept URL Map
-  builtInEndpointsAccess: Built-In Endpoints Security
+  securityRule:
+    title: Security Rules
+    ipPattern: IP Pattern Rule
+    secured: Secured Annotation
+    interceptUrlMap: Intercept URL Map
+    builtInEndpointsAccess: Built-In Endpoints Security
   jwt: JSON Web Token
+  generation:
+    title: Token Generation
+    token: JWT configuration
+    signature: JWT Signature
+    encryption: Encrypted JWTs
   filter:
     title: Token Read
     bearerToken: Bearer Token Reader
     cookieToken: Cookie Token Reader
   render:
     title: Token Render
-  generation:
-    title: Token Generation
-    token: JWT configuration
-    signature: JWT Signature
-    encryption: Encrypted JWTs
   endpoints:
     title: Built-In Security Controllers
     login:

@@ -1,4 +1,4 @@
-By default a bearer token is returned to the client as part of an OAuth 2.0 [RFC6749] access token response.
+By default a bearer token is returned to the client as part of an OAuth 2.0 https://tools.ietf.org/html/RFC6749[RFC6749] access token response.
 An example of such a response is:
 
 [source, json]

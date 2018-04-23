@@ -1,3 +1,4 @@
+Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
 JSON Web Token (JWT) is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
 
 === How does a JWT looks like?
