@@ -62,7 +62,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
      */
     public Neo4jBoltConfiguration() {
         config.withLogging(name -> new Logger() {
-            org.slf4j.Logger logger = LoggerFactory.getLogger(name);
+            private org.slf4j.Logger logger = LoggerFactory.getLogger(name);
 
             @Override
             public void error(String message, Throwable cause) {
