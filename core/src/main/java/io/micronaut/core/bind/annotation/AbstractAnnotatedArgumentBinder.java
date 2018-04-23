@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -26,8 +27,11 @@ import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
- * An abstract {@link AnnotatedArgumentBinder} implementation
+ * An abstract {@link AnnotatedArgumentBinder} implementation.
  *
+ * @param <A> The annotation type
+ * @param <T> The argument type
+ * @param <S> The binding source type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,10 +39,21 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
 
     private final ConversionService<?> conversionService;
 
+    /**
+     * Constructor.
+     * @param conversionService conversionService
+     */
     protected AbstractAnnotatedArgumentBinder(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
     }
 
+    /**
+     * Do binding.
+     * @param context context
+     * @param values values
+     * @param annotationValue annotationValue
+     * @return result
+     */
     @SuppressWarnings("unchecked")
     protected BindingResult<T> doBind(
         ArgumentConversionContext<T> context,

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationSource;
@@ -40,14 +41,14 @@ import java.util.Map;
 public interface ConversionContext extends AnnotationSource, TypeVariableResolver, ErrorsContext {
 
     /**
-     * The default conversion context
+     * The default conversion context.
      */
     ConversionContext DEFAULT = new ConversionContext() {};
 
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
      * the concrete types of those arguments. For example for the {@link Map} type two keys will be present
-     * called 'K' and 'V' with the actual types of the key and value
+     * called 'K' and 'V' with the actual types of the key and value.
      *
      * @return A map of type variables
      */
@@ -76,8 +77,9 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Augment this context with data for the given argument
+     * Augment this context with data for the given argument.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -119,7 +121,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
+     * Create a simple {@link ConversionContext} for the given generic type variables.
      *
      * @param typeVariables The type variables
      * @return The conversion context
@@ -135,8 +137,9 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
+     * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -145,8 +148,9 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
+     * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -155,8 +159,9 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
+     * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @param locale   The locale
      * @return The conversion context
@@ -166,8 +171,9 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables
+     * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * @param <T> type Generic
      * @param argument The argument
      * @param locale   The locale
      * @param charset  The charset

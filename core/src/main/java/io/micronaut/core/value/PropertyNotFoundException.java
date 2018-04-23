@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 /**
- * Thrown when a property cannot be resolved
+ * Thrown when a property cannot be resolved.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class PropertyNotFoundException extends ValueException {
 
+    /**
+     * Constructor.
+     * @param name name
+     * @param type type
+     */
     public PropertyNotFoundException(String name, Class type) {
         super("No property found for name [" + name + "] and type [" + type.getName() + "]");
     }

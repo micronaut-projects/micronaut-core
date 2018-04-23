@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ConversionService;
@@ -20,7 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import java.util.Map;
 
 /**
- * Mutable version of {@link ConvertibleMultiValuesMap}
+ * Mutable version of {@link ConvertibleMultiValuesMap}.
  *
  * @author Graeme Rocher
  * @since 1.0

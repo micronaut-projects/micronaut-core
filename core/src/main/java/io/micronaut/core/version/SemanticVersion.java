@@ -13,38 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.version;
 
 /**
- * Utility class for comparing semantic versions
+ * Utility class for comparing semantic versions.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class SemanticVersion implements Comparable<SemanticVersion> {
 
+    private static final int PARTS_MIN = 3;
     /**
-     * The major version
+     * The major version.
      */
     private final Integer major;
     /**
-     * The minor version
+     * The minor version.
      */
     private final Integer minor;
     /**
-     * The patch version
+     * The patch version.
      */
     private final Integer patch;
 
     /**
-     * The full version
+     * The full version.
      */
     private final String version;
 
+    /**
+     * Constructor.
+     * @param version version
+     */
     public SemanticVersion(String version) {
         this.version = version;
         String[] parts = version.replace('_', '.').split("\\.");
-        if (parts.length >= 3) {
+        if (parts.length >= PARTS_MIN) {
             try {
                 this.major = Integer.valueOf(parts[0]);
                 this.minor = Integer.valueOf(parts[1]);
@@ -84,7 +90,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
     }
 
     /**
-     * Check whether the current version is at least the given major and minor version
+     * Check whether the current version is at least the given major and minor version.
      *
      * @param version      The version to check
      * @param majorVersion The major version
@@ -97,7 +103,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
     }
 
     /**
-     * Check whether the version is at least the given version
+     * Check whether the version is at least the given version.
      *
      * @param version         The version
      * @param requiredVersion The required version

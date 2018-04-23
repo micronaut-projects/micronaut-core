@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 /**
- * An interface for a type that provides {@link AnnotationMetadata}
+ * An interface for a type that provides {@link AnnotationMetadata}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,7 +25,7 @@ package io.micronaut.core.annotation;
 public interface AnnotationMetadataProvider {
 
     /**
-     * Supplies the metadata. Defaults to {@link AnnotationMetadata#EMPTY_METADATA}
+     * Supplies the metadata. Defaults to {@link AnnotationMetadata#EMPTY_METADATA}.
      *
      * @return The {@link AnnotationMetadata}
      */

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.naming.conventions;
 
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI</p>
+ * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,47 +28,47 @@ import java.util.Optional;
 public enum MethodConvention {
 
     /**
-     * The index method of controllers
+     * The index method of controllers.
      */
     INDEX("", "GET"),
 
     /**
-     * The show method of controllers
+     * The show method of controllers.
      */
     SHOW(MethodConvention.ID_PATH, "GET"),
 
     /**
-     * The show method of controllers
+     * The show method of controllers.
      */
     SAVE("", "POST"),
 
     /**
-     * The default update method of controllers
+     * The default update method of controllers.
      */
     UPDATE(MethodConvention.ID_PATH, "PUT"),
 
     /**
-     * The default delete method of controllers
+     * The default delete method of controllers.
      */
     DELETE(MethodConvention.ID_PATH),
 
     /**
-     * The default options method of controllers
+     * The default options method of controllers.
      */
     OPTIONS(""),
 
     /**
-     * The default head method of controllers
+     * The default head method of controllers.
      */
     HEAD(""),
 
     /**
-     * The default trace method of controllers
+     * The default trace method of controllers.
      */
     TRACE("");
 
     /**
-     * Path for the id
+     * Path for the id.
      */
     public static final String ID_PATH = "{/id}";
 
@@ -95,7 +96,7 @@ public enum MethodConvention {
     }
 
     /**
-     * The HTTP method name for this convention
+     * The HTTP method name for this convention.
      */
     public String httpMethod() {
         return httpMethod;
@@ -109,7 +110,7 @@ public enum MethodConvention {
     }
 
     /**
-     * Obtain the method convention for the given method
+     * Obtain the method convention for the given method.
      *
      * @param name The method name
      * @return An optional of the method convention

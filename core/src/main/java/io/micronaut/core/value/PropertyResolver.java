@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * A property resolver is capable of resolving properties from an underlying property source
+ * A property resolver is capable of resolving properties from an underlying property source.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -45,7 +46,7 @@ public interface PropertyResolver extends ValueResolver<String> {
     boolean containsProperty(String name);
 
     /**
-     * Whether the given property or any nested properties exist for the key given key within this resolver
+     * Whether the given property or any nested properties exist for the key given key within this resolver.
      *
      * @param name The name of the property
      * @return True if it is
@@ -99,7 +100,7 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name
      * @param requiredType The required type
@@ -111,7 +112,7 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name
      * @param requiredType The required type
@@ -124,12 +125,13 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
-     * Resolve the given property for the given name
+     * Resolve the given property for the given name.
      *
      * @param name         The name of the property
      * @param requiredType The required type
      * @param <T>          The concrete type
      * @return The value of the property
+     * @throws PropertyNotFoundException exception when property does not exist
      */
     default <T> T getRequiredProperty(String name, Class<T> requiredType) throws PropertyNotFoundException {
         return getProperty(name, requiredType).orElseThrow(() ->
@@ -138,7 +140,7 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
-     * Builds a property name for the given property path
+     * Builds a property name for the given property path.
      *
      * @param path The path
      * @return The property name

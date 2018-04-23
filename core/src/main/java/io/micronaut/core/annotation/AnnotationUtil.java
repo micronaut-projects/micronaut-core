@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ConversionService;
@@ -43,7 +44,7 @@ import java.util.Optional;
 public class AnnotationUtil {
 
     /**
-     * Constant for Kotlin metadata
+     * Constant for Kotlin metadata.
      */
     public static final String KOTLIN_METADATA = "kotlin.Metadata";
 
@@ -62,16 +63,16 @@ public class AnnotationUtil {
     );
 
     /**
-     * Constant indicating an zero annotation
+     * Constant indicating an zero annotation.
      */
     public static final Annotation[] ZERO_ANNOTATIONS = new Annotation[0];
 
     /**
-     * Constant indicating an zero annotation
+     * Constant indicating an zero annotation.
      */
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
     /**
-     * An empty re-usable element
+     * An empty re-usable element.
      */
     public static final AnnotatedElement EMPTY_ANNOTATED_ELEMENT = new AnnotatedElement() {
         @Override
@@ -91,7 +92,7 @@ public class AnnotationUtil {
     };
 
     /**
-     * Find the value of the annotation dynamically
+     * Find the value of the annotation dynamically.
      *
      * @param annotation   The annotation
      * @param requiredType The required requiredType
@@ -106,7 +107,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Find the value of the annotation dynamically
+     * Find the value of the annotation dynamically.
      *
      * @param annotation   The annotation
      * @param requiredType The required requiredType
@@ -118,7 +119,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given stereotype
+     * Finds an annotation on the given class for the given stereotype.
      *
      * @param element    The element
      * @param stereotype The stereotype
@@ -130,7 +131,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given stereotype
+     * Finds an annotation on the given class for the given stereotype.
      *
      * @param element        The element
      * @param stereotypeName The stereotype
@@ -240,7 +241,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given type
+     * Finds an annotation on the given class for the given type.
      *
      * @param annotations The annotations
      * @param type        The annotation type
@@ -257,7 +258,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given stereotype
+     * Finds an annotation on the given class for the given stereotype.
      *
      * @param stereotype  The stereotype
      * @param annotations The annotations to search
@@ -270,7 +271,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given stereotype
+     * Finds an annotation on the given class for the given stereotype.
      *
      * @param stereotypeName The stereotype
      * @param annotations    The annotations to search
@@ -291,7 +292,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation from the given array of annotations that matches the given stereotype
+     * Finds an annotation from the given array of annotations that matches the given stereotype.
      *
      * @param stereotype  The stereotype
      * @param annotations The annotations to search
@@ -313,7 +314,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation from the given array of annotations that matches the given stereotype
+     * Finds an annotation from the given array of annotations that matches the given stereotype.
      *
      * @param stereotypeName The stereotype
      * @param annotations    The annotations to search
@@ -334,7 +335,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Find all the annotations on the given {@link AnnotatedElement} candidates for the given stereotype
+     * Find all the annotations on the given {@link AnnotatedElement} candidates for the given stereotype.
      *
      * @param candidates The annotated element
      * @param stereotype The stereotype
@@ -354,7 +355,7 @@ public class AnnotationUtil {
     }
 
     /**
-     * Find all the annotations on the given {@link AnnotatedElement} for the given stereotype
+     * Find all the annotations on the given {@link AnnotatedElement} for the given stereotype.
      *
      * @param annotatedElement The annotated element
      * @param stereotype       The stereotype

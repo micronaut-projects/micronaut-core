@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import java.util.Objects;
 
 /**
- * Utility methods for checking method argument values
+ * Utility methods for checking method argument values.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +27,7 @@ import java.util.Objects;
 public class ArgumentUtils {
 
     /**
-     * Perform a check on an argument
+     * Perform a check on an argument.
      *
      * @param check The check
      * @return The {@link ArgumentCheck}
@@ -36,7 +37,7 @@ public class ArgumentUtils {
     }
 
     /**
-     * Perform a check on an argument
+     * Perform a check on an argument.
      *
      * @param name  The name of the argument
      * @param value The value of the argument
@@ -48,7 +49,7 @@ public class ArgumentUtils {
     }
 
     /**
-     * Allows producing error messages
+     * Allows producing error messages.
      */
     public static class ArgumentCheck<T> {
         private final Check check;
@@ -68,7 +69,7 @@ public class ArgumentUtils {
         }
 
         /**
-         * Fail the argument with the given message
+         * Fail the argument with the given message.
          *
          * @param message The message
          * @throws IllegalArgumentException Thrown with the given message if the check fails
@@ -80,7 +81,7 @@ public class ArgumentUtils {
         }
 
         /**
-         * Fail the argument with the given message
+         * Fail the argument with the given message.
          *
          * @throws IllegalArgumentException Thrown with the given message if the check fails
          */
