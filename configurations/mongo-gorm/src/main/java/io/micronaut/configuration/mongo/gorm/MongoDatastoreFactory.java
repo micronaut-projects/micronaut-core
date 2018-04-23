@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.gorm;
 
 import com.mongodb.MongoClient;
@@ -34,7 +35,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Sets up GORM for MongoDB
+ * Sets up GORM for MongoDB.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,6 +43,12 @@ import javax.inject.Singleton;
 @Factory
 public class MongoDatastoreFactory {
 
+    /**
+     * Factory method that will return the datastore.
+     * @param applicationContext applicationContext
+     * @param mongoClient mongoClient
+     * @return mongoDatastore
+     */
     @Context
     @Bean
     @Primary
@@ -65,6 +72,11 @@ public class MongoDatastoreFactory {
         return datastore;
     }
 
+    /**
+     * Return the transaction manager for the database.
+     * @param datastore datastore
+     * @return transactionManager
+     */
     @Singleton
     @Bean
     @Named("mongo")
