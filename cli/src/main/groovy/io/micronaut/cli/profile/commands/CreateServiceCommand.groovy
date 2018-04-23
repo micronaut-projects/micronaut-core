@@ -490,7 +490,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
-            List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames)
+            List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -504,15 +504,27 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 MicronautConsole.getInstance().warn(warning.toString())
             }
 
-            def validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }
-            def requiredFeatures = profile.requiredFeatures
-            def dependentFeatures = validFeatureNames.collect { String featureName -> profile.getDependentFeaturesFor(featureName) }.flatten() as Iterable<Feature>
+            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }// as List<Feature>
+            Iterable<Feature> requiredFeatures = profile.requiredFeatures// as List<Feature>
 
-            return (validFeatures + requiredFeatures + dependentFeatures).unique()
+            Iterable<Feature> validFeaturesDependent = this.getDependentFeatures(profile, validFeatures)
+            Iterable<Feature> requiredFeaturesDependent = this.getDependentFeatures(profile, requiredFeatures)
+
+            return (validFeatures + requiredFeatures + validFeaturesDependent + requiredFeaturesDependent).unique()
         }
         else {
-            return (profile.defaultFeatures + profile.requiredFeatures).unique()
+            Iterable<Feature> defaultFeatures = profile.defaultFeatures
+            Iterable<Feature> requiredFeatures = profile.requiredFeatures
+
+            Iterable<Feature> defaultFeaturesDependent = this.getDependentFeatures(profile, defaultFeatures)
+            Iterable<Feature> requiredFeaturesDependent = this.getDependentFeatures(profile, requiredFeatures)
+
+            return (defaultFeatures + requiredFeatures + defaultFeaturesDependent + requiredFeaturesDependent).unique()
         }
+    }
+
+    private Iterable<Feature> getDependentFeatures(Profile profile, Iterable<Feature> features) {
+        features.collect { Feature f -> profile.getDependentFeaturesFor(f) }.flatten() as Iterable<Feature>
     }
 
     protected String getDefaultProfile() {
