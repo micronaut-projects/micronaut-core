@@ -36,28 +36,28 @@ import java.util.Optional;
 @ConfigurationProperties(RedisSetting.PREFIX)
 public class RedisHttpSessionConfiguration extends HttpSessionConfiguration implements Toggleable {
 
-    private WriteMode writeMode = WriteMode.BATCH;
-    private boolean enableKeyspaceEvents = true;
-    private String namespace = "micronaut:session:";
-    private String activeSessionsKey = namespace + "active-sessions";
-    private String sessionCreatedTopic = namespace + "event:session-created";
-    private Class<ObjectSerializer> valueSerializer;
-    private Charset charset = StandardCharsets.UTF_8;
-    private Duration expiredSessionCheck = Duration.ofMinutes(1);
-    private String serverName;
+    protected String namespace = "micronaut:session:";
+    protected String serverName;
+    protected String sessionCreatedTopic = namespace + "event:session-created";
+    protected String activeSessionsKey = namespace + "active-sessions";
+    protected Class<ObjectSerializer> valueSerializer;
+    protected Charset charset = StandardCharsets.UTF_8;
+    protected boolean enableKeyspaceEvents = true;
+    protected WriteMode writeMode = WriteMode.BATCH;
+    protected Duration expiredSessionCheck = Duration.ofMinutes(1);
+
+    /**
+     * @return The key prefix to use for reading and writing sessions
+     */
+    public String getNamespace() {
+        return namespace;
+    }
 
     /**
      * @return The name of the a configured Redis server to use.
      */
     public Optional<String> getServerName() {
         return Optional.ofNullable(serverName);
-    }
-
-    /**
-     * @param serverName The server name.
-     */
-    public void setServerName(String serverName) {
-        this.serverName = serverName;
     }
 
     /**
@@ -68,13 +68,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @param sessionCreatedTopic The topic to publish the creation of new sessions.
-     */
-    public void setSessionCreatedTopic(String sessionCreatedTopic) {
-        this.sessionCreatedTopic = sessionCreatedTopic;
-    }
-
-    /**
      * @return The key of the sorted set used to maintain a set of active sessions.
      */
     public String getActiveSessionsKey() {
@@ -82,38 +75,10 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @param activeSessionsKey The key used to maintain a set of active sessions
-     */
-    public void setActiveSessionsKey(String activeSessionsKey) {
-        this.activeSessionsKey = activeSessionsKey;
-    }
-
-    /**
-     * @return The key prefix to use for reading and writing sessions
-     */
-    public String getNamespace() {
-        return namespace;
-    }
-
-    /**
-     * @param namespace The key prefix to use for reading and writing sessions
-     */
-    public void setNamespace(String namespace) {
-        this.namespace = namespace;
-    }
-
-    /**
      * @return The {@link ObjectSerializer} type to use for serializing values. Defaults to {@link io.micronaut.core.serialize.JdkSerializer}
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
-    }
-
-    /**
-     * @param valueSerializer The {@link ObjectSerializer} type to use for serializing values
-     */
-    public void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
-        this.valueSerializer = valueSerializer;
     }
 
     /**
@@ -131,13 +96,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @param enableKeyspaceEvents Whether keyspace events should be enabled programmatically
-     */
-    public void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
-        this.enableKeyspaceEvents = enableKeyspaceEvents;
-    }
-
-    /**
      * @return The {@link RedisHttpSessionConfiguration.WriteMode} to use. Defaults to {@link RedisHttpSessionConfiguration.WriteMode#BATCH}
      */
     public WriteMode getWriteMode() {
@@ -145,24 +103,10 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     }
 
     /**
-     * @param writeMode The {@link RedisHttpSessionConfiguration.WriteMode}
-     */
-    public void setWriteMode(WriteMode writeMode) {
-        this.writeMode = writeMode;
-    }
-
-    /**
      * @return The duration with which to check for expired sessions
      */
     public Duration getExpiredSessionCheck() {
         return expiredSessionCheck;
-    }
-
-    /**
-     * @param expiredSessionCheck The duration with which to check for expired sessions
-     */
-    public void setExpiredSessionCheck(Duration expiredSessionCheck) {
-        this.expiredSessionCheck = expiredSessionCheck;
     }
 
     /**
@@ -180,6 +124,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
          *
          * <p>This strategy has the advantage of providing greater consistency at the expense of more network traffic</p>
          */
-        BACKGROUND;
+        BACKGROUND
     }
 }
