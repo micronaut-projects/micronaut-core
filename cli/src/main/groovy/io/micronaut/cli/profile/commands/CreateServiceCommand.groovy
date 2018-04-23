@@ -492,9 +492,10 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
+        Set<Feature> features = []
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
-            List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames)
+            List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -507,12 +508,23 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
                 MicronautConsole.getInstance().warn(warning.toString())
             }
-            return (profile.features.findAll() { Feature f -> validFeatureNames.contains(f.name) } + profile.requiredFeatures).unique()
+
+            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }// as List<Feature>
+            features.addAll(validFeatures)
+        } else {
+            features.addAll(profile.defaultFeatures)
         }
-        else {
-            return (profile.defaultFeatures + profile.requiredFeatures).unique()
+
+        features.addAll(profile.requiredFeatures)
+
+        for (int i = 0; i < features.size(); i++) {
+            features.addAll(features[i].getDependentFeatures(profile))
         }
+
+        features
     }
+
+
 
     protected String getDefaultProfile() {
         ProfileRepository.DEFAULT_PROFILE_NAME
