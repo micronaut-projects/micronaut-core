@@ -25,27 +25,27 @@ endpoints:
     sensitive: false  # <2>
 '''//end::yamlconfig[]
 
-
     @Shared
     Map<String, Object> endpointsMap = [
-            'endpoints': [
-                    'health': [
-                            'enabled'                : true,
-                            'sensitive'              : true,
+            endpoints: [
+                    beans: [
+                            enabled                : true,
+                            sensitive              : true,
                     ],
-                    'beans': [
-                            'enabled'                : true,
-                            'sensitive'              : true,
-                    ]
+                    health: [
+                            enabled                : true,
+                            sensitive              : false,
+                    ],
             ]
     ]
 
     @Shared
     Map<String, Object> config = [
+            'micronaut.security.endpoints.login': true,
             'spec.authentication': true,
             "micronaut.security.enabled": true,
             "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
-    ] << endpointsMap
+    ] << flatten(endpointsMap)
 
     @Shared
     @AutoCleanup
@@ -60,10 +60,7 @@ endpoints:
         get("/health")
 
         then:
-        HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
-//        then:
-//        noExceptionThrown()
+        noExceptionThrown()
 
         when:
         Map m = new Yaml().load(cleanYamlAsciidocTag(yamlConfig))

@@ -17,6 +17,8 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.authentication': true,
+            'endpoints.health.enabled': true,
+            'endpoints.health.sensitive': true,
             "micronaut.security.enabled": true,
             "micronaut.security.endpoints.login": true,
             "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
@@ -27,6 +29,15 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
             ]
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+    void "test /health is secured"() {
+        when:
+        get("/health")
+
+        then:
+        HttpClientResponseException e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     void "test accessing an anonymous without authentication"() {
         when:

@@ -37,7 +37,7 @@ micronaut:
             'endpoints.health.enabled'                 : true,
             'endpoints.health.sensitive'               : false,
             "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
-    ] << ipPatternsMap
+    ] << flatten(ipPatternsMap)
 
     @Shared
     @AutoCleanup
