@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.processor;
 
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import org.reactivestreams.Processor;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -25,15 +25,25 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * <p>A {@link Processor} that only allows a single {@link Subscriber}</p>
+ * <p>A {@link Processor} that only allows a single {@link Subscriber}</p>.
  *
  * @param <T> the type of element signaled to the {@link Subscriber}
- * @param <R> the type of element signaled by the {@link Publisher}
+ * @param <R> the type of element signaled by the {@link org.reactivestreams.Publisher}
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSubscriber<T> implements Processor<T, R> {
 
+    protected static final Subscription EMPTY_SUBSCRIPTION = new Subscription() {
+        @Override
+        public void request(long n) {
+        }
+
+        @Override
+        public void cancel() {
+
+        }
+    };
     protected Subscription parentSubscription;
     private final AtomicReference<Subscriber<? super R>> subscriber = new AtomicReference<>();
 
@@ -47,27 +57,16 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
         }
     }
 
-    protected static final Subscription EMPTY_SUBSCRIPTION = new Subscription() {
-        @Override
-        public void request(long n) {
-        }
-
-        @Override
-        public void cancel() {
-
-        }
-    };
-
     /**
-     * Override to implement {@link Publisher#subscribe(Subscriber)}
+     * Override to implement {@link org.reactivestreams.Publisher#subscribe(Subscriber)}.
      *
      * @param subscriber The subscriber
-     * @see Publisher#subscribe(Subscriber)
+     * @see org.reactivestreams.Publisher#subscribe(Subscriber)
      */
     protected abstract void doSubscribe(Subscriber<? super R> subscriber);
 
     /**
-     * Get the current {@link Subscriber}
+     * Get the current {@link Subscriber}.
      *
      * @return The {@link Subscriber}
      * @throws IllegalStateException if the subscriber is not present
@@ -79,7 +78,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Get the current {@link Subscriber}
+     * Get the current {@link Subscriber}.
      *
      * @return An {@link Optional} subscriber
      */
@@ -89,7 +88,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Called after {@link #doOnError(Throwable)} completes
+     * Called after {@link #doOnError(Throwable)} completes.
      *
      * @param throwable The error
      */
@@ -98,21 +97,22 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
     }
 
     /**
-     * Called after {@link #doOnComplete()} completes
+     * Called after {@link #doOnComplete()} completes.
      */
     protected void doAfterComplete() {
         // no-op
     }
 
     /**
-     * Called after {@link #doOnSubscribe(Subscription)} completes
+     * Called after {@link #doOnSubscribe(Subscription)} completes.
+     * @param subscription subscription
      */
     protected void doAfterOnSubscribe(Subscription subscription) {
         // no-op
     }
 
     /**
-     * Perform the actual subscription to the subscriber
+     * Perform the actual subscription to the subscriber.
      *
      * @param subscription The subscription
      * @param subscriber   The subscriber (never null)
@@ -155,7 +155,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
         }
     }
 
-    private final boolean verifyState(Subscriber<? super R> subscriber) {
+    private boolean verifyState(Subscriber<? super R> subscriber) {
         if (subscriber == null) {
             throw new IllegalStateException("No subscriber present!");
         }

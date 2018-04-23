@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import java.lang.annotation.Annotation;
@@ -45,11 +46,11 @@ import java.util.Optional;
  */
 public interface AnnotationSource extends AnnotatedElement {
     /**
-     * An empty annotation source
+     * An empty annotation source.
      */
     AnnotationSource EMPTY = () -> AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     /**
-     * <p>The annotated elements that this {@link AnnotationSource} is able to resolve annotations from</p>
+     * <p>The annotated elements that this {@link AnnotationSource} is able to resolve annotations from</p>.
      * <p>
      * <p>These elements are used when resolving annotations via the {@link #findAnnotationsWithStereoType(Class)} method</p>
      *
@@ -58,7 +59,7 @@ public interface AnnotationSource extends AnnotatedElement {
     AnnotatedElement[] getAnnotatedElements();
 
     /**
-     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class
+     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class.
      *
      * @param type The type
      * @param <A>  The generic type
@@ -76,7 +77,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class
+     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class.
      *
      * @param type The type
      * @param <A>  The generic type
@@ -91,7 +92,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation for the given stereotype on the method
+     * Find the first annotation for the given stereotype on the method.
      *
      * @param stereotype The method
      * @return The stereotype
@@ -108,7 +109,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Find all the annotations for the given stereotype on the method
+     * Find all the annotations for the given stereotype on the method.
      *
      * @param stereotype The method
      * @return The stereotype
@@ -119,7 +120,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Get a concrete annotation for the given annotation type searching all of the {@link #getAnnotatedElements()}
+     * Get a concrete annotation for the given annotation type searching all of the {@link #getAnnotatedElements()}.
      *
      * @param annotationClass The annotation class
      * @param <T>             The annotation generic type
@@ -164,7 +165,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Return whether an annotation is present for any of the given stereotypes
+     * Return whether an annotation is present for any of the given stereotypes.
      *
      * @param stereotypes The stereotypes
      * @return True if it is
@@ -181,7 +182,7 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
-     * Return whether any annotation is present for any of the given annotation names
+     * Return whether any annotation is present for any of the given annotation names.
      *
      * @param annotationNames The annotation names
      * @return True if it is

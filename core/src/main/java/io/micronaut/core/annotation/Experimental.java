@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Annotates a class or method as being experimental and subject to change or removal
+ * Annotates a class or method as being experimental and subject to change or removal.
  *
  * @author Graeme Rocher
  * @since 1.0

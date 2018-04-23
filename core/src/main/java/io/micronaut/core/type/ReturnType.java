@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationSource;
@@ -24,7 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Models a return type of an {@link Executable} method in Micronaut
+ * Models a return type of an {@link Executable} method in Micronaut.
  *
  * @param <T> The concrete type
  * @author Graeme Rocher
@@ -46,7 +47,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
     }
 
     /**
-     * Create a new return type from the given type and arguments
+     * Create a new return type from the given type and arguments.
      *
      * @param type          The type
      * @param typeArguments The type arguments

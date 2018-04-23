@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.exceptions;
 
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
 
 /**
- * An exception thrown in the case of a {@link io.micronaut.core.convert.ConversionError}
+ * An exception thrown in the case of a {@link io.micronaut.core.convert.ConversionError}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,7 +37,7 @@ public class ConversionErrorException extends RuntimeException {
     }
 
     /**
-     * @return The argument that failed conversion
+     * @return The argument that failed conversion.
      */
     public Argument getArgument() {
         return argument;

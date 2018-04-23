@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async;
 
 import java.util.function.Supplier;
 
 /**
- * Helper methods for dealing with {@link Supplier}
+ * Helper methods for dealing with {@link Supplier}.
  *
  * @author James Kleeh
  * @since 1.0
@@ -36,9 +37,11 @@ public class SupplierUtil {
         return new Supplier<T>() {
             Supplier<T> delegate = this::initialize;
             boolean initialized;
+
             public T get() {
                 return delegate.get();
             }
+
             private synchronized T initialize() {
                 if (!initialized) {
                     T value = actual.get();

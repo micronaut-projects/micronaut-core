@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.scan;
 
 import io.micronaut.core.io.ResourceLoader;
 
 /**
- * Abstraction to load resources from the the classpath
+ * Abstraction to load resources from the the classpath.
  */
 public interface ClassPathResourceLoader extends ResourceLoader {
 

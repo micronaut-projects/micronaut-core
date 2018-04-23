@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A simple map based implementation of the {@link ValueResolver} interface
+ * A simple map based implementation of the {@link ValueResolver} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,7 +39,9 @@ class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
     @Override
     public <T> Optional<T> get(K name, ArgumentConversionContext<T> conversionContext) {
         Object v = map.get(name);
-        if (v == null) return Optional.empty();
+        if (v == null) {
+            return Optional.empty();
+        }
 
         Argument<T> argument = conversionContext.getArgument();
         if (argument.getType().isInstance(v)) {
@@ -49,8 +52,12 @@ class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         MapValueResolver that = (MapValueResolver) o;
 

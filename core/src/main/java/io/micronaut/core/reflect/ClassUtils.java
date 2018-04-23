@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Utility methods for loading classes
+ * Utility methods for loading classes.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -65,7 +66,7 @@ public class ClassUtils {
     }
 
     /**
-     * <p>Converts a URI to a class file reference to the class name</p>
+     * <p>Converts a URI to a class file reference to the class name</p>.
      * <p>
      * <p>ie. ClassUtils.pathToClassName("foo/bar/MyClass.class") == "foo.bar.MyClass"</p>
      *
@@ -81,7 +82,7 @@ public class ClassUtils {
     }
 
     /**
-     * Check whether the given class is present in the given classloader
+     * Check whether the given class is present in the given classloader.
      *
      * @param name        The name of the class
      * @param classLoader The classloader
@@ -92,7 +93,7 @@ public class ClassUtils {
     }
 
     /**
-     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type
+     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
      *
      * @param type The type
      * @return True if it is
@@ -102,7 +103,7 @@ public class ClassUtils {
     }
 
     /**
-     * The primitive type for the given type name. For example the value "byte" returns {@link Byte#TYPE}
+     * The primitive type for the given type name. For example the value "byte" returns {@link Byte#TYPE}.
      *
      * @param primitiveType The type name
      * @return An optional type
@@ -131,8 +132,9 @@ public class ClassUtils {
                 return Optional.empty();
         }
     }
+
     /**
-     * Attempt to load a class for the given name from the given class loader
+     * Attempt to load a class for the given name from the given class loader.
      *
      * @param name        The name of the class
      * @param classLoader The classloader

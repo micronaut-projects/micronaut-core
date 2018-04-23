@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 /**
- * An {@link Argument} with a value
+ * An {@link Argument} with a value.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,7 +29,7 @@ public interface ArgumentValue<V> extends Argument<V> {
     V getValue();
 
     /**
-     * Create a new {@link ArgumentValue} for the given {@link Argument} and value
+     * Create a new {@link ArgumentValue} for the given {@link Argument} and value.
      *
      * @param argument The argument
      * @param value    The value
