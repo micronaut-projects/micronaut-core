@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.naming.NameUtils;
@@ -42,7 +43,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * Responsible for writing files out to the response in Netty
+ * Responsible for writing files out to the response in Netty.
  *
  * @author James Kleeh
  * @since 1.0
@@ -50,13 +51,17 @@ import java.util.Optional;
 @Singleton
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
+    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class};
     private final FileTypeHandlerConfiguration configuration;
-    private static final Class<?>[] supportedTypes = new Class[]{File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class};
 
+    /**
+     * @param configuration The file type handler configuration
+     */
     public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     public void handle(Object obj, HttpRequest<?> request, NettyHttpResponse<?> response, ChannelHandlerContext context) {
         NettyFileCustomizableResponseType type;
@@ -103,10 +108,14 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @Override
     public boolean supports(Class<?> type) {
-        return Arrays.stream(supportedTypes)
+        return Arrays.stream(SUPPORTED_TYPES)
             .anyMatch((aClass -> aClass.isAssignableFrom(type)));
     }
 
+    /**
+     * @param filename The filename
+     * @return The {@link MediaType}
+     */
     protected MediaType getMediaType(String filename) {
         String extension = NameUtils.extension(filename);
         Optional<MediaType> mediaType = MediaType.forExtension(extension);
@@ -114,6 +123,10 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     }
 
+    /**
+     * @param response     The Http response
+     * @param lastModified The last modified
+     */
     protected void setDateAndCacheHeaders(MutableHttpResponse response, long lastModified) {
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
@@ -128,6 +141,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         headers.lastModified(lastModified);
     }
 
+    /**
+     * @param response The Http response
+     */
     protected void setDateHeader(MutableHttpResponse response) {
         MutableHttpHeaders headers = response.getHeaders();
         LocalDateTime now = LocalDateTime.now();

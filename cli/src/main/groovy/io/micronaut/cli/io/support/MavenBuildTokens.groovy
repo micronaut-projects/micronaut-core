@@ -1,7 +1,6 @@
 package io.micronaut.cli.io.support
 
 import groovy.xml.MarkupBuilder
-import groovy.xml.XmlUtil
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
@@ -11,6 +10,8 @@ class MavenBuildTokens {
     public static Map<String, String> scopeConversions = [:]
 
     static {
+        scopeConversions.put("compile", "compile")
+        scopeConversions.put("runtime", "runtime")
         scopeConversions.put("compileOnly", "provided")
         scopeConversions.put("testRuntime", "test")
         scopeConversions.put("testCompile", "test")
@@ -48,15 +49,21 @@ class MavenBuildTokens {
             dep.scope != 'build'
         }
 
-        for(Feature f in features) {
-            dependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope != 'build'}
+        for (Feature f in features) {
+            dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
         }
 
-        dependencies = dependencies.unique().sort({ Dependency dep -> dep.scope })
+        dependencies = dependencies.unique()
+                .findAll { scopeConversions.containsKey(it.scope) }
+                .collect { convertScope(it) }
+                .sort { it.scope }
+                .groupBy { it.artifact }
+                .collect { k, deps -> deps.size() == 1 ? deps.first() : resolveScopeDuplicate(deps) }
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
         dependencies.each { Dependency dep ->
+
             def artifact = dep.artifact
             def v = artifact.version.replace('BOM', '')
             dependenciesXml.dependency {
@@ -65,7 +72,7 @@ class MavenBuildTokens {
                 if (v) {
                     version(artifact.version)
                 }
-                scope(scopeConversions.getOrDefault(dep.scope, dep.scope))
+                scope(dep.scope)
             }
         }
 
@@ -84,6 +91,18 @@ class MavenBuildTokens {
         }
 
         ["services": prettyPrint(modulesWriter.toString(), 8)]
+    }
+  
+    Dependency convertScope(Dependency dependency) {
+        dependency.setScope(scopeConversions.getOrDefault(dependency.scope, dependency.scope))
+    }
+
+    Dependency resolveScopeDuplicate(List<Dependency> dependencies) {
+        dependencies.find { it.scope == 'compile' } ?:
+                dependencies.find { it.scope == 'provided' } ?:
+                        dependencies.find { it.scope = 'runtime' } ?:
+                                dependencies.find { it.scope = 'test' }
+
     }
 
     String prettyPrint(String xml, int spaces) {

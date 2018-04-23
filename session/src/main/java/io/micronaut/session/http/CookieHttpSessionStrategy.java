@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.Requires;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Resolves {@link io.micronaut.session.Session} identifiers from cookies
+ * Resolves {@link io.micronaut.session.Session} identifiers from cookies.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -43,6 +44,11 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
     private final String prefix;
     private final HttpSessionConfiguration configuration;
 
+    /**
+     * Constructor.
+     *
+     * @param configuration The HTTP session configuration
+     */
     public CookieHttpSessionStrategy(HttpSessionConfiguration configuration) {
         this.configuration = configuration;
         this.base64Decode = configuration.isBase64Encode();

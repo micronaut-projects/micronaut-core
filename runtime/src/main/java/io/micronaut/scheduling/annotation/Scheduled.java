@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -27,7 +28,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * An annotation for scheduling a re-occurring task
+ * An annotation for scheduling a re-occurring task.
  *
  * @author graemerocher
  * @since 1.0

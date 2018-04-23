@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.scheduling.executor;
 
-import java.util.concurrent.Executors;
+package io.micronaut.scheduling.executor;
 
 /**
  * An enum modelling different {@link java.util.concurrent.Executor} types that mirror the methods defined in the
- * {@link java.util.concurrent.Executors} class
+ * {@link java.util.concurrent.Executors} class.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,17 +31,17 @@ public enum ExecutorType {
     SCHEDULED,
 
     /**
-     * @see Executors#newCachedThreadPool()
+     * @see java.util.concurrent.Executors#newCachedThreadPool()
      */
     CACHED,
 
     /**
-     * @see Executors#newFixedThreadPool(int)
+     * @see java.util.concurrent.Executors#newFixedThreadPool(int)
      */
     FIXED,
 
     /**
-     * @see Executors#newWorkStealingPool()
+     * @see java.util.concurrent.Executors#newWorkStealingPool()
      */
     WORK_STEALING
 }

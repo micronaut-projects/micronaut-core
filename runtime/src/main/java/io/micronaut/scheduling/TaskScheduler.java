@@ -13,22 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling;
 
 import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.concurrent.Callable;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * Interface for Scheduling tasks
+ * Interface for Scheduling tasks.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface TaskScheduler {
-    
+
     /**
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
@@ -38,9 +38,9 @@ public interface TaskScheduler {
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
-     * @throws RejectedExecutionException if the task cannot be
-     *                                    scheduled for execution
-     * @throws NullPointerException       if command or delay is null
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
+     *                                                         scheduled for execution
+     * @throws NullPointerException                            if command or delay is null
      */
     ScheduledFuture<?> schedule(String cron, Runnable command);
 
@@ -49,7 +49,8 @@ public interface TaskScheduler {
      * after the given delay.
      *
      * @param cron    The cron expression
-     * @param command the task to execute
+     * @param command The task to execute
+     * @param <V>     The type of the callable's result
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
@@ -78,9 +79,9 @@ public interface TaskScheduler {
      * Creates and executes a ScheduledFuture that becomes enabled after the
      * given delay.
      *
-     * @param delay    the time from now to delay execution
-     * @param callable the function to execute
-     * @param <V>      the type of the callable's result
+     * @param delay    The time from now to delay execution
+     * @param callable The function to execute
+     * @param <V>      The type of the callable's result
      * @return a ScheduledFuture that can be used to extract result or cancel
      * @throws RejectedExecutionException if the task cannot be
      *                                    scheduled for execution

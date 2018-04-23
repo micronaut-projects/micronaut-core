@@ -291,7 +291,7 @@ public final class NameUtils {
     /**
      * Returns the class name without the package prefix.
      *
-     * @param className The class name to get a short name for
+     * @param className The class name from which to get a short name
      * @return The short name of the class
      */
     public static String getShortName(String className) {
@@ -303,9 +303,9 @@ public final class NameUtils {
     }
 
     /**
-     * Returns the class name without the package prefix.
+     * Returns the package name without the class.
      *
-     * @param className The class name to get a short name for
+     * @param className The class name from which to get a package name
      * @return The short name of the class
      */
     public static String getPackageName(String className) {
@@ -314,7 +314,7 @@ public final class NameUtils {
         if (i > -1) {
             packageName = className.substring(0, i);
         }
-        return packageName;
+        return packageName.toLowerCase();
     }
 
     /**

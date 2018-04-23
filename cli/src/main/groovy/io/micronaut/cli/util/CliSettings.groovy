@@ -50,7 +50,7 @@ class CliSettings {
     /**
      * The name of the profile being used
      */
-    public static final String PROFILE = "micronaut.profile"
+    public static final String PROFILE = "profile"
     /**
      * Specifies the profile repositories to use
      */

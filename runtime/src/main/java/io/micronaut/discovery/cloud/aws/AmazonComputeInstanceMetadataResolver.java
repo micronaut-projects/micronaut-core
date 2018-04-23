@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.aws;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,7 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Resolves {@link ComputeInstanceMetadata} for Amazon EC2
+ * Resolves {@link ComputeInstanceMetadata} for Amazon EC2.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -50,17 +51,28 @@ import java.util.Optional;
 public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMetadataResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(AmazonComputeInstanceMetadataResolver.class);
+    private static final int READ_TIMEOUT_IN_MILLS = 5000;
+    private static final int CONNECTION_TIMEOUT_IN_MILLS = 5000;
 
     private final ObjectMapper objectMapper;
     private final AmazonMetadataConfiguration configuration;
     private AmazonEC2InstanceMetadata cachedMetadata;
 
+    /**
+     * Create a new instance to resolve {@link ComputeInstanceMetadata} for Amazon EC2.
+     *
+     * @param objectMapper To convert AWS EC2 metadata information into Map
+     * @param configuration AWS Metadata configuration
+     */
     @Inject
     public AmazonComputeInstanceMetadataResolver(ObjectMapper objectMapper, AmazonMetadataConfiguration configuration) {
         this.objectMapper = objectMapper;
         this.configuration = configuration;
     }
 
+    /**
+     * Create a new instance to resolve {@link ComputeInstanceMetadata} for Amazon EC2 with default configurations.
+     */
     public AmazonComputeInstanceMetadataResolver() {
         this.objectMapper = new ObjectMapper();
         this.configuration = new AmazonMetadataConfiguration();
@@ -79,7 +91,7 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
         try {
             String ec2InstanceIdentityDocURL = configuration.getInstanceDocumentUrl();
             String ec2InstanceMetadataURL = configuration.getMetadataUrl();
-            JsonNode metadataJson = readEc2MetadataJson(new URL(ec2InstanceIdentityDocURL), 5000, 5000);
+            JsonNode metadataJson = readEc2MetadataJson(new URL(ec2InstanceIdentityDocURL), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
             if (metadataJson != null) {
                 ec2InstanceMetadata.account = metadataJson.findValue(EC2MetadataKeys.accountId.name()).textValue();
                 ec2InstanceMetadata.availabilityZone = metadataJson.findValue(EC2MetadataKeys.availabilityZone.name()).textValue();
@@ -90,28 +102,28 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 ec2InstanceMetadata.imageId = metadataJson.findValue("imageId").textValue();
             }
             try {
-                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.getName()), 1000, 5000);
+                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
             } catch (IOException e) {
                 LOG.error("Error getting local hostname from url:" + ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.name(), e);
             }
             try {
-                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName()), 1000, 5000);
+                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
             } catch (IOException e) {
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.name(), e);
             }
             // build up network info
             try {
-                String macAddress = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.mac), 1000, 5000);
+                String macAddress = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.mac), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
                 AmazonNetworkInterface networkInterface = new AmazonNetworkInterface();
                 networkInterface.setMac(macAddress);
-                String vpcId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/vpc-id/"), 1000, 5000);
-                String subnetId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/subnet-id/"), 1000, 5000);
+                String vpcId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/vpc-id/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
+                String subnetId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/subnet-id/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
                 networkInterface.setNetwork(subnetId);
 
-                ec2InstanceMetadata.publicIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/public-ipv4s/"), 1000, 5000);
-                ec2InstanceMetadata.privateIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/local-ipv4s/"), 1000, 5000);
+                ec2InstanceMetadata.publicIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/public-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
+                ec2InstanceMetadata.privateIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/local-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
                 networkInterface.setIpv4(ec2InstanceMetadata.privateIpV4);
-                networkInterface.setId(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/interface-id/"), 1000, 5000));
+                networkInterface.setId(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/interface-id/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
                 networkInterface.setGateway(vpcId);
                 ec2InstanceMetadata.interfaces = new ArrayList<>();
                 ec2InstanceMetadata.interfaces.add(networkInterface);
@@ -128,6 +140,15 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
         return Optional.of(ec2InstanceMetadata);
     }
 
+    /**
+     * Read EC2 metadata from the given URL.
+     *
+     * @param url URL to fetch AWS EC2 metadata information
+     * @param connectionTimeoutMs connection timeout in millis
+     * @param readTimeoutMs read timeout in millis
+     * @return AWS EC2 metadata information
+     * @throws IOException Signals that an I/O exception of some sort has occurred
+     */
     protected JsonNode readEc2MetadataJson(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
         URLConnection urlConnection = url.openConnection();
 
@@ -150,6 +171,15 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
         }
     }
 
+    /**
+     * Read EC2 metadata from the given URL.
+     *
+     * @param url URL to fetch AWS EC2 metadata information
+     * @param connectionTimeoutMs connection timeout in millis
+     * @param readTimeoutMs read timeout in millis
+     * @return AWS EC2 metadata information
+     * @throws IOException Signals that an I/O exception of some sort has occurred
+     */
     protected String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
         URLConnection urlConnection = url.openConnection();
 

@@ -48,6 +48,11 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     }
 
     @Override
+    public Argument[] getTypeParameters() {
+        return argument.getTypeParameters();
+    }
+
+    @Override
     public Map<String, Argument<?>> getTypeVariables() {
         return argument.getTypeVariables();
     }

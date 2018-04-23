@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.context.scope.CustomScope;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * A {@link CustomScope} that stores objects in thread local storage
+ * A {@link io.micronaut.context.scope.CustomScope} that stores objects in thread local storage.
  *
  * @author Graeme Rocher
  * @since 1.0

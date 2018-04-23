@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.AWSLambdaAsync;
@@ -40,8 +41,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * A {@link FunctionInvoker} for invoking functions on AWS
+ * A {@link FunctionInvoker} for invoking functions on AWS.
  *
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
@@ -49,11 +52,19 @@ import java.util.concurrent.Future;
 @Singleton
 public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, FunctionInvokerChooser {
 
+    private static final int STATUS_CODE_ERROR = 300;
     private final AWSLambdaAsync asyncClient;
     private final ByteBufferFactory byteBufferFactory;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final ExecutorService ioExecutor;
 
+    /**
+     * Constructor.
+     * @param asyncClient asyncClient
+     * @param byteBufferFactory byteBufferFactory
+     * @param jsonMediaTypeCodec jsonMediaTypeCodec
+     * @param ioExecutor ioExecutor
+     */
     protected AWSLambdaFunctionExecutor(
         AWSLambdaAsync asyncClient,
         ByteBufferFactory byteBufferFactory,
@@ -102,7 +113,7 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
 
     private Object decodeResult(FunctionDefinition definition, Argument<O> outputType, InvokeResult invokeResult) {
         Integer statusCode = invokeResult.getStatusCode();
-        if (statusCode >= 300) {
+        if (statusCode >= STATUS_CODE_ERROR) {
             throw new FunctionExecutionException("Error executing AWS Lambda [" + definition.getName() + "]: " + invokeResult.getFunctionError());
         }
         io.micronaut.core.io.buffer.ByteBuffer byteBuffer = byteBufferFactory.copiedBuffer(invokeResult.getPayload());
