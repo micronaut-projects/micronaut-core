@@ -503,7 +503,12 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
                 MicronautConsole.getInstance().warn(warning.toString())
             }
-            return (profile.features.findAll() { Feature f -> validFeatureNames.contains(f.name) } + profile.requiredFeatures).unique()
+
+            def validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }
+            def requiredFeatures = profile.requiredFeatures
+            def dependentFeatures = validFeatureNames.collect { String featureName -> profile.getDependentFeaturesFor(featureName) }.flatten() as Iterable<Feature>
+
+            return (validFeatures + requiredFeatures + dependentFeatures).unique()
         }
         else {
             return (profile.defaultFeatures + profile.requiredFeatures).unique()
