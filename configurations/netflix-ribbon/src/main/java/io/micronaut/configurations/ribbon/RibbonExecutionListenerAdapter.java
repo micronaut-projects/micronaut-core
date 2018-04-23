@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.loadbalancer.reactive.ExecutionContext;
@@ -22,7 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
 /**
- * An adapter for the {@link ExecutionListener} interface
+ * An adapter for the {@link ExecutionListener} interface.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.ClientException;
@@ -35,7 +36,7 @@ import org.reactivestreams.Publisher;
 import java.util.List;
 
 /**
- * A {@link LoadBalancer} that is also a Ribbon {@link ILoadBalancer}
+ * A {@link LoadBalancer} that is also a Ribbon {@link ILoadBalancer}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,6 +47,14 @@ public class RibbonLoadBalancer implements LoadBalancer, ILoadBalancer {
     private final LoadBalancerContext loadBalancerContext;
     private final IClientConfig clientConfig;
 
+    /**
+     * Constructor.
+     * @param niwsClientConfig niwsClientConfig
+     * @param serverList serverList
+     * @param serverListFilter serverListFilter
+     * @param rule rule
+     * @param ping ping
+     */
     @SuppressWarnings("unchecked")
     public RibbonLoadBalancer(
         IClientConfig niwsClientConfig,
