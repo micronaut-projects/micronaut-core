@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.metadata;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -21,7 +22,7 @@ import java.util.Map;
 
 /**
  * Strategy interface for classes to contribute to {@link io.micronaut.discovery.ServiceInstance} metadata
- * when registering an instance with a discovery service
+ * when registering an instance with a discovery service.
  *
  * @author graemerocher
  * @since 1.0
@@ -29,7 +30,7 @@ import java.util.Map;
 public interface ServiceInstanceMetadataContributor {
 
     /**
-     * Contribute metadata to the given {@link ServiceInstance} prior to registration
+     * Contribute metadata to the given {@link ServiceInstance} prior to registration.
      *
      * @param instance The instance
      * @param metadata The metadata

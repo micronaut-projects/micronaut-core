@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.intercept;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -32,7 +33,7 @@ import java.util.OptionalDouble;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A context object for storing the state of the Circuit
+ * A context object for storing the state of the Circuit.
  *
  * @author graemerocher
  * @since 1.0
@@ -50,6 +51,12 @@ class CircuitBreakerRetry implements MutableRetryState {
     private volatile long time = System.currentTimeMillis();
     private volatile MutableRetryState childState;
 
+    /**
+     * @param openTimeout       The circuit open timeout in millis
+     * @param childStateBuilder The retry state builder
+     * @param method            A compile time produced invocation of a method call
+     * @param eventPublisher    To publish circuit events
+     */
     CircuitBreakerRetry(
         long openTimeout,
         RetryStateBuilder childStateBuilder,
@@ -159,7 +166,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
-     * Opens the circuit
+     * Opens the circuit.
      *
      * @return The current state
      */
@@ -189,7 +196,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
-     * Resets the circuit state to {@link CircuitState#CLOSED}
+     * Resets the circuit state to {@link CircuitState#CLOSED}.
      *
      * @return The current state
      */
@@ -217,7 +224,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
-     * Resets the circuit state to {@link CircuitState#CLOSED}
+     * Resets the circuit state to {@link CircuitState#CLOSED}.
      *
      * @return The current state
      */

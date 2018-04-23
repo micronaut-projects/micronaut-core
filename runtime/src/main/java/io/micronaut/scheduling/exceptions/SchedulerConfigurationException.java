@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.exceptions;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -24,6 +25,10 @@ import io.micronaut.inject.ExecutableMethod;
  */
 public class SchedulerConfigurationException extends ConfigurationException {
 
+    /**
+     * @param method  A compile time produced invocation of a method call
+     * @param message The detailed message
+     */
     public SchedulerConfigurationException(ExecutableMethod<?, ?> method, String message) {
         super("Invalid @Scheduled definition for method: " + method + " - Reason: " + message);
     }

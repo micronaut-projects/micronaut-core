@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -26,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * <p>Represents a remote service discovered by the underlying discovery implementation</p>
+ * <p>Represents a remote service discovered by the underlying discovery implementation.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,17 +35,17 @@ import java.util.Optional;
 public interface ServiceInstance {
 
     /**
-     * Constant to represent the group of the service contained with {@link #getMetadata()}
+     * Constant to represent the group of the service contained with {@link #getMetadata()}.
      */
     String GROUP = "group";
 
     /**
-     * Constant to represent the zone of the service contained with {@link #getMetadata()}
+     * Constant to represent the zone of the service contained with {@link #getMetadata()}.
      */
     String ZONE = "zone";
 
     /**
-     * Constant to represent the region of the service contained with {@link #getMetadata()}
+     * Constant to represent the region of the service contained with {@link #getMetadata()}.
      */
     String REGION = "region";
 
@@ -73,7 +74,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Returns the availability zone to use. A zone is, for example, the AWS availability zone
+     * Returns the availability zone to use. A zone is, for example, the AWS availability zone.
      *
      * @return The zone to use
      */
@@ -91,7 +92,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Returns the application group. For example, the AWS auto-scaling group
+     * Returns the application group. For example, the AWS auto-scaling group.
      *
      * @return The group to use
      */
@@ -129,7 +130,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Resolve a URI relative to this service instance
+     * Resolve a URI relative to this service instance.
      *
      * @param relativeURI The relative URI
      * @return The relative URI
@@ -153,7 +154,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Construct a new {@link ServiceInstance} for the given ID and URL
+     * Construct a new {@link ServiceInstance} for the given ID and URL.
      *
      * @param id  The ID
      * @param url The URL
@@ -169,7 +170,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Construct a new {@link ServiceInstance} for the given ID and URL
+     * Construct a new {@link ServiceInstance} for the given ID and URL.
      *
      * @param id  The ID
      * @param uri The URI
@@ -190,7 +191,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * Construct a new {@link ServiceInstance} for the given ID, host and port using the HTTP scheme
+     * Construct a new {@link ServiceInstance} for the given ID, host and port using the HTTP scheme.
      *
      * @param id   The ID
      * @param host The host
@@ -212,7 +213,7 @@ public interface ServiceInstance {
     }
 
     /**
-     * A builder to builder a {@link ServiceInstance}
+     * A builder to builder a {@link ServiceInstance}.
      *
      * @param id  The id
      * @param uri The URI
@@ -223,11 +224,11 @@ public interface ServiceInstance {
     }
 
     /**
-     * A builder for building {@link ServiceInstance} references
+     * A builder for building {@link ServiceInstance} references.
      */
     interface Builder {
         /**
-         * Sets the instance id
+         * Sets the instance id.
          *
          * @param id The instance id
          * @return This builder
@@ -235,7 +236,7 @@ public interface ServiceInstance {
         Builder instanceId(String id);
 
         /**
-         * Sets the zone
+         * Sets the zone.
          *
          * @param zone The zone
          * @return This builder
@@ -243,7 +244,7 @@ public interface ServiceInstance {
         Builder zone(String zone);
 
         /**
-         * Sets the region
+         * Sets the region.
          *
          * @param region The region
          * @return This builder
@@ -251,7 +252,7 @@ public interface ServiceInstance {
         Builder region(String region);
 
         /**
-         * Sets the application group
+         * Sets the application group.
          *
          * @param group The group
          * @return This builder
@@ -259,7 +260,7 @@ public interface ServiceInstance {
         Builder group(String group);
 
         /**
-         * Sets the application status
+         * Sets the application status.
          *
          * @param status The status
          * @return This builder
@@ -267,7 +268,7 @@ public interface ServiceInstance {
         Builder status(HealthStatus status);
 
         /**
-         * Sets the application metadata
+         * Sets the application metadata.
          *
          * @param metadata The metadata
          * @return This builder

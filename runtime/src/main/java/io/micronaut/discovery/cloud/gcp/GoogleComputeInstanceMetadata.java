@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.context.env.ComputePlatform;
@@ -24,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform
+ * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -32,14 +33,11 @@ import java.util.Map;
  */
 public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
 
-    // anything non-standard goes in here
-    Map<String, String> metadata;
-
-    // quick way to lookup tags
-    private Map<String, String> tags = Collections.emptyMap();
-
     //network interfaces to get ip addresses
     List<NetworkInterface> interfaces = Collections.emptyList();
+
+    // anything non-standard goes in here
+    Map<String, String> metadata;
 
     String name;
     String availabilityZone;
@@ -60,6 +58,9 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String privateIpV6;
 
     boolean cached = false;
+
+    // quick way to lookup tags
+    private Map<String, String> tags = Collections.emptyMap();
 
     @Override
     public String getImageId() {

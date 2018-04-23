@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
 /**
- * <p>Strategy interface for retrieving and updating the current {@link HealthStatus} of the application</p>
+ * <p>Strategy interface for retrieving and updating the current {@link HealthStatus} of the application.</p>
  * <p>
  * <p>Implementations of this class should be thread safe</p>
  *
@@ -31,7 +32,7 @@ public interface CurrentHealthStatus {
     HealthStatus current();
 
     /**
-     * Updates the {@link HealthStatus} of the application
+     * Updates the {@link HealthStatus} of the application.
      *
      * @param newStatus The new status
      * @return The previous {@link HealthStatus}

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.serialize;
 
 import io.micronaut.core.convert.ConversionService;
@@ -39,6 +40,13 @@ public class DefaultStringKeySerializer implements ObjectSerializer {
     private final String cacheName;
     private final Charset charset;
 
+    /**
+     * Construct a default serializer for given parameters.
+     *
+     * @param cacheName         The cache key or name
+     * @param charset           The charset used for serialization and de-serializing instance from the to/from cache
+     * @param conversionService To convert value/object from the cache to String
+     */
     public DefaultStringKeySerializer(String cacheName, Charset charset, ConversionService<?> conversionService) {
         this.cacheName = cacheName;
         this.charset = charset;
@@ -47,7 +55,9 @@ public class DefaultStringKeySerializer implements ObjectSerializer {
 
     @Override
     public Optional<byte[]> serialize(Object object) throws SerializationException {
-        if (object == null) return Optional.empty();
+        if (object == null) {
+            return Optional.empty();
+        }
         return Optional.of(toByteArray(object));
     }
 
