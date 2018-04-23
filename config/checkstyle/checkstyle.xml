@@ -80,7 +80,10 @@
 
         <!-- Needed for SuppressWarningsFilter -->
         <module name="SuppressWarningsHolder"/>
-             
+
+        <!-- Needed for SuppressWarningsFilter -->
+        <module name="SuppressWarningsHolder"/>
+
         <!-- Checks for Javadoc comments.                     -->
         <!-- See http://checkstyle.sf.net/config_javadoc.html -->
         <module name="JavadocMethod">
@@ -173,7 +176,7 @@
         <module name="InnerTypeLast"/>
         <module name="ModifierOrder"/>
         <module name="DeclarationOrder"/>
-        
+
         <!-- Miscellaneous other checks.                   -->
         <!-- See http://checkstyle.sf.net/config_misc.html -->
         <module name="ArrayTypeStyle"/>

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jdbc;
 
 import io.micronaut.core.reflect.ClassUtils;
@@ -55,14 +56,15 @@ public class JdbcDatabaseManager {
     }
 
     /**
-     * Searches defined database where the URL prefix matches one of the prefixes
-     * defined in a {@link JdbcDatabase}. The prefix is determined by:
+     * Searches defined database where the URL prefix matches one of the prefixes defined in a {@link JdbcDatabase}.
+     * The prefix is determined by:
      * <p>
      * jdbc:<prefix>:...
      *
      * @param jdbcUrl The connection URL
      * @return An optional {@link JdbcDatabase}
      */
+    @SuppressWarnings("MagicNumber")
     public static Optional<JdbcDatabase> findDatabase(String jdbcUrl) {
         if (StringUtils.isNotEmpty(jdbcUrl)) {
             if (!jdbcUrl.startsWith("jdbc")) {
@@ -92,7 +94,7 @@ public class JdbcDatabaseManager {
     }
 
     /**
-     * Searches embedded databases where the driver matches the argument
+     * Searches embedded databases where the driver matches the argument.
      *
      * @param driverClassName The driver class name to search on
      * @return True if the driver matches an embedded database type
@@ -105,7 +107,8 @@ public class JdbcDatabaseManager {
     }
 
     /**
-     * Provides the required information in order to connect toa JDBC database, including the necessary driver and validation query
+     * Provides the required information in order to connect toa JDBC database, including the necessary driver and
+     * validation query.
      */
     public static class JdbcDatabase {
 
@@ -113,16 +116,29 @@ public class JdbcDatabaseManager {
         private String validationQuery;
         private Collection<String> urlPrefixes;
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param validationQuery The validation query
+         * @param urlPrefixes     The url prefixes
+         */
         JdbcDatabase(String driverClassName, String validationQuery, String[] urlPrefixes) {
             this.driverClassName = driverClassName;
             this.urlPrefixes = Arrays.asList(urlPrefixes);
             this.validationQuery = validationQuery;
         }
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param urlPrefixes     The url prefixes
+         */
         JdbcDatabase(String driverClassName, String[] urlPrefixes) {
             this(driverClassName, "SELECT 1", urlPrefixes);
         }
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param urlPrefix       The url prefix
+         */
         JdbcDatabase(String driverClassName, String urlPrefix) {
             this(driverClassName, "SELECT 1", new String[]{urlPrefix});
         }
@@ -130,7 +146,7 @@ public class JdbcDatabaseManager {
         /**
          * @return Whether the database is embedded
          */
-        boolean isEmbedded() {
+        protected boolean isEmbedded() {
             return Boolean.FALSE;
         }
 
@@ -149,36 +165,56 @@ public class JdbcDatabaseManager {
             return validationQuery;
         }
 
+        /**
+         * @param prefix The prefix to check
+         * @return Whether the url prefixes contain the prefix
+         */
         public boolean containsPrefix(String prefix) {
             return urlPrefixes.contains(prefix);
         }
     }
 
     /**
-     * Extends {@link JdbcDatabase} with additional defaults for the use of embedded databases such as H2
+     * Extends {@link JdbcDatabase} with additional defaults for the use of embedded databases such as H2.
      */
     public static class EmbeddedJdbcDatabase extends JdbcDatabase {
 
         private String defaultUrl;
         private String defaultName = "devDb";
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param validationQuery The validation query
+         * @param urlPrefixes     The url prefixes
+         * @param defaultUrl      The default url
+         */
         EmbeddedJdbcDatabase(String driverClassName, String validationQuery, String[] urlPrefixes, String defaultUrl) {
             super(driverClassName, validationQuery, urlPrefixes);
             this.defaultUrl = defaultUrl;
         }
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param urlPrefixes     The url prefixes
+         * @param defaultUrl      The default url
+         */
         EmbeddedJdbcDatabase(String driverClassName, String[] urlPrefixes, String defaultUrl) {
             super(driverClassName, urlPrefixes);
             this.defaultUrl = defaultUrl;
         }
 
+        /**
+         * @param driverClassName The jdbc driver class name
+         * @param urlPrefix       The url prefix
+         * @param defaultUrl      The default url
+         */
         EmbeddedJdbcDatabase(String driverClassName, String urlPrefix, String defaultUrl) {
             super(driverClassName, urlPrefix);
             this.defaultUrl = defaultUrl;
         }
 
         /**
-         * Obtain an embedded database URL for the given database name
+         * Obtain an embedded database URL for the given database name.
          *
          * @param databaseName The database name
          * @return The URL
@@ -191,7 +227,7 @@ public class JdbcDatabaseManager {
         }
 
         @Override
-        boolean isEmbedded() {
+        protected boolean isEmbedded() {
             return Boolean.TRUE;
         }
     }
