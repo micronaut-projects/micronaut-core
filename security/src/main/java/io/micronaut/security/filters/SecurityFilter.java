@@ -48,9 +48,12 @@ import java.util.stream.Collectors;
 @Filter("/**")
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    /**
+     * The attribute used to store the authentication object in the request.
+     */
     public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
 
+    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
 
     protected final TokenConfiguration tokenConfiguration;
     protected final TokenReader tokenReader;

@@ -22,7 +22,6 @@ import io.micronaut.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Informs the JWT filter what to do with the given request.

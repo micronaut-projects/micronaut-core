@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Finds any sensitive endpoints and processes requests that match their
@@ -51,6 +50,14 @@ public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProc
     private final EndpointDefaultConfiguration defaultConfiguration;
     private Map<Method, Boolean> endpointMethods = new HashMap<>();
 
+    /**
+     * Constructs the rule with the existing and default endpoint
+     * configurations used to determine if a given endpoint is
+     * sensitive.
+     *
+     * @param endpointConfigurations The endpoint configurations
+     * @param defaultConfiguration The default endpoint configuration
+     */
     SensitiveEndpointRule(EndpointConfiguration[] endpointConfigurations,
                           EndpointDefaultConfiguration defaultConfiguration) {
         this.endpointConfigurations = endpointConfigurations;
