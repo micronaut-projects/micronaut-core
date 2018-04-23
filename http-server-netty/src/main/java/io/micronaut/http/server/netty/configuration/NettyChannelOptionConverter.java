@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -25,7 +26,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * A {@link TypeConverter} that converts {@link CharSequence} instances to Netty {@link ChannelOption} instances
+ * A {@link TypeConverter} that converts {@link CharSequence} instances to Netty {@link ChannelOption} instances.
  *
  * @author Graeme Rocher
  * @since 1.0

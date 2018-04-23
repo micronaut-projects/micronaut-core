@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.convert.ConversionService;
@@ -24,7 +25,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
 /**
- * Implementation of {@link HttpResponseFactory} for Netty
+ * Implementation of {@link HttpResponseFactory} for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
