@@ -333,7 +333,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     }
                 }
 
-                copySkeleton(profileInstance, p, cmd.build)
+                copySkeleton(profileInstance, p, cmd)
 
                 ymlCache.each { File applicationYmlFile, String previousApplicationYml ->
                     if(applicationYmlFile.exists()) {
@@ -365,11 +365,11 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
             }
 
+
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
-            cmd.console.addStatus(
-                "Service created at ${projectTargetDirectory.absolutePath}"
-            )
+            messageOnComplete(cmd.console, cmd, projectTargetDirectory)
+
             if (profileInstance.instructions) {
                 cmd.console.addStatus(profileInstance.instructions)
             }
@@ -421,6 +421,10 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         return this.handle(cmd)
     }
 
+    protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
+        console.addStatus("Service created at ${targetDir.absolutePath}")
+    }
+
     protected boolean validateProfile(Profile profileInstance, String profileName) {
         if (profileInstance == null) {
             MicronautConsole.instance.error("Profile not found for name [$profileName]")
@@ -456,7 +460,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
+    protected void replaceBuildTokens(String build, Profile profile, List features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
 
         Map tokens
@@ -607,12 +611,14 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileStatic(TypeCheckingMode.SKIP)
-    private void copySkeleton(Profile profile, Profile participatingProfile, String build) {
+    protected void copySkeleton(Profile profile, Profile participatingProfile, CreateServiceCommandObject cmd) {
         def buildMergeProfileNames = profile.buildMergeProfileNames
         def excludes = profile.skeletonExcludes
         if (profile == participatingProfile) {
             excludes = []
         }
+        excludes.addAll(cmd.skeletonExclude)
+        String build = cmd.build
 
         AntBuilder ant = new ConsoleAntBuilder()
 
@@ -690,12 +696,6 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         }
     }
 
-    protected String resolveArtifactString(Dependency dep) {
-        def artifact = dep.artifact
-        def v = artifact.version.replace('BOM', '')
-
-        return v ? "${artifact.groupId}:${artifact.artifactId}:${v}" : "${artifact.groupId}:${artifact.artifactId}"
-    }
 
     static class CreateServiceCommandObject {
         String appName
@@ -706,5 +706,6 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         boolean inplace = false
         String build = "gradle"
         MicronautConsole console
+        List<String> skeletonExclude = []
     }
 }

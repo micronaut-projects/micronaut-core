@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile;
 
 /**
- * A listener for listening for cancellation of {@link io.micronaut.cli.profile.Command} executions
+ * A listener for listening for cancellation of {@link io.micronaut.cli.profile.Command} executions.
  *
  * @author Lari Hotari
  * @author Graeme Rocher
+ * @since 1.0
  */
 public interface CommandCancellationListener {
+
     /**
-     * Fired when a {@link io.micronaut.cli.profile.Command} is cancelled
+     * Fired when a {@link io.micronaut.cli.profile.Command} is cancelled.
      */
-    public void commandCancelled();
+    void commandCancelled();
 }
