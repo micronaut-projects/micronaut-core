@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.stop;
 
 import io.micronaut.context.ApplicationContext;
@@ -22,18 +23,34 @@ import io.micronaut.management.endpoint.Write;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * <p>Exposes an {@link Endpoint} to stor the server.</p>
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Endpoint(id = "stop", defaultEnabled = false)
 public class ServerStopEndpoint {
+
+    private static final long WAIT_BEFORE_STOP = 500L;
 
     private final ApplicationContext context;
     private final Map<String, String> message;
 
+    /**
+     * @param context The application context
+     */
     ServerStopEndpoint(ApplicationContext context) {
         this.context = context;
         this.message = new LinkedHashMap<>(1);
         this.message.put("message", "Server shutdown started");
     }
 
+    /**
+     * Stops the server.
+     *
+     * @return The message
+     */
     @Write(consumes = {})
     public Object stop() {
         try {
@@ -47,7 +64,7 @@ public class ServerStopEndpoint {
 
     private void stopServer() {
         try {
-            Thread.sleep(500L);
+            Thread.sleep(WAIT_BEFORE_STOP);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }

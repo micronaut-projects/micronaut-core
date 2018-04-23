@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.inject.BeanDefinition;
@@ -21,8 +22,9 @@ import org.reactivestreams.Publisher;
 import java.util.Collection;
 
 /**
- * <p>Used to respond with bean information used for the {@link BeansEndpoint}</p>
+ * <p>Used to respond with bean information used for the {@link BeansEndpoint}.</p>
  *
+ * @param <T> The type
  * @author James Kleeh
  * @since 1.0
  */
