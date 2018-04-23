@@ -40,7 +40,7 @@ import java.security.spec.X509EncodedKeySpec;
  */
 @Singleton
 public class FileRSAKeyProvider implements EncryptionKeyProvider {
-    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FileRSAKeyProvider.class);
 
     protected final TokenEncryptionConfiguration tokenEncryptionConfiguration;
 

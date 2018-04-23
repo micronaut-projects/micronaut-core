@@ -53,7 +53,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
      */
     public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
 
-    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
 
     protected final TokenConfiguration tokenConfiguration;
     protected final TokenReader tokenReader;
