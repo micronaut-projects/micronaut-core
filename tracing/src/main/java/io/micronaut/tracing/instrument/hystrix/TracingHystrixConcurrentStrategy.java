@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.hystrix;
 
 import com.netflix.hystrix.HystrixThreadPoolKey;
@@ -36,7 +37,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Replaces the default {@link HystrixConcurrencyStrategy} with one that is enhanced for Tracing
+ * Replaces the default {@link HystrixConcurrencyStrategy} with one that is enhanced for Tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -50,6 +51,12 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     private final HystrixConcurrencyStrategy delegate;
     private final Tracer tracer;
 
+    /**
+     * Creates enhanced {@link HystrixConcurrencyStrategy} for tracing.
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     * @param hystrixConcurrencyStrategy Different behavior or implementations for concurrency related aspects of the system with default implementations
+     */
     @Inject
     public TracingHystrixConcurrentStrategy(Tracer tracer, @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
         this.delegate = hystrixConcurrencyStrategy != null ? hystrixConcurrencyStrategy : HystrixConcurrencyStrategyDefault.getInstance();
@@ -82,10 +89,9 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     @Override
     public <T> Callable<T> wrapCallable(Callable<T> callable) {
         Callable<T> wrapped = super.wrapCallable(callable);
-        if(callable instanceof TracingCallable) {
+        if (callable instanceof TracingCallable) {
             return callable;
-        }
-        else {
+        } else {
             return new TracingCallable<>(wrapped, tracer);
         }
     }

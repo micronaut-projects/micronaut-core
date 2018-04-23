@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.http;
 
 /**
- * Combines {@link HttpSessionIdResolver} and {@link HttpSessionIdEncoder}
+ * Combines {@link HttpSessionIdResolver} and {@link HttpSessionIdEncoder}.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
@@ -32,8 +33,9 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Default implementation of the {@link RouteMatch} interface for matches to URIs
+ * Default implementation of the {@link RouteMatch} interface for matches to URIs.
  *
+ * @param <T>
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,6 +47,12 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
     private final Charset defaultCharset;
 
+    /**
+     * @param matchInfo The URI match info
+     * @param uriRoute The URI route
+     * @param defaultCharset The default charset
+     * @param conversionService The conversion service
+     */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          DefaultRouteBuilder.DefaultUriRoute uriRoute,
                          Charset defaultCharset, ConversionService<?> conversionService

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
@@ -32,19 +33,29 @@ import org.reactivestreams.Subscription;
 import java.util.Optional;
 
 /**
- * A Publisher that handles HTTP client request tracing
+ * A Publisher that handles HTTP client request tracing.
  *
  * @author graemerocher
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
 class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
+    private static final int HTTP_SUCCESS_CODE_UPPER_LIMIT = 299;
+
     private final Publisher<HttpResponse<?>> publisher;
     private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
     private final TraceContext.Injector<MutableHttpHeaders> injector;
     private final MutableHttpRequest<?> request;
     private final Tracer tracer;
 
+    /**
+     * Construct a publisher to handle HTTP client request tracing.
+     *
+     * @param publisher The response publisher
+     * @param request An extended version of request that allows mutating
+     * @param clientHandler The standardize way to instrument client
+     * @param httpTracing HttpTracing
+     */
     HttpClientTracingPublisher(
             Publisher<HttpResponse<?>> publisher,
             MutableHttpRequest<?> request,
@@ -62,23 +73,22 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     public void subscribe(Subscriber<? super HttpResponse<?>> actual) {
         brave.Span span = clientHandler.handleSend(injector, request.getHeaders(), request);
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-        try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+        try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
             publisher.subscribe(new Subscriber<HttpResponse<?>>() {
                 @Override
                 public void onSubscribe(Subscription s) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         actual.onSubscribe(s);
                     }
                 }
 
                 @Override
                 public void onNext(HttpResponse<?> response) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         configureAttributes(response);
                         configureSpan(span);
                         HttpStatus status = response.getStatus();
-                        if(status.getCode() > 299) {
-
+                        if (status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
                             span.tag(AbstractOpenTracingFilter.TAG_HTTP_STATUS_CODE, String.valueOf(status.getCode()));
                         }
                         clientHandler.handleReceive(response, null, span);
@@ -88,16 +98,15 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
 
                 @Override
                 public void onError(Throwable error) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         configureSpan(span);
-                        if(error instanceof HttpClientResponseException) {
+                        if (error instanceof HttpClientResponseException) {
                             HttpClientResponseException e = (HttpClientResponseException) error;
                             HttpResponse<?> response = e.getResponse();
                             configureAttributes(response);
 
                             clientHandler.handleReceive(response, e, span);
-                        }
-                        else {
+                        } else {
                             span.error(error);
                             span.finish();
                         }

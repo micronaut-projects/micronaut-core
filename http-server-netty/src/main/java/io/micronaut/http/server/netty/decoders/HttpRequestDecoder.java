@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.decoders;
 
 import io.micronaut.core.convert.ConversionService;
@@ -31,7 +32,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * A {@link MessageToMessageDecoder} that decodes a Netty {@link HttpRequest} into a Micronaut {@link io.micronaut.http.HttpRequest}
+ * A {@link MessageToMessageDecoder} that decodes a Netty {@link HttpRequest} into a Micronaut
+ * {@link io.micronaut.http.HttpRequest}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,7 +42,7 @@ import java.util.List;
 public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> implements Ordered {
 
     /**
-     * Constant for Micronaut http decoder
+     * Constant for Micronaut http decoder.
      */
     public static final String ID = "micronaut-http-decoder";
 
@@ -50,6 +52,11 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final ConversionService<?> conversionService;
     private final HttpServerConfiguration configuration;
 
+    /**
+     * @param embeddedServer    The embedded service
+     * @param conversionService The conversion service
+     * @param configuration     The Http server configuration
+     */
     public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService<?> conversionService, HttpServerConfiguration configuration) {
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;

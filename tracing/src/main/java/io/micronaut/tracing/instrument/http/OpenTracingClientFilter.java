@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
@@ -35,7 +36,7 @@ import org.reactivestreams.Publisher;
 import javax.annotation.Nonnull;
 
 /**
- * An HTTP client instrumentation filter that uses Open Tracing
+ * An HTTP client instrumentation filter that uses Open Tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,6 +47,11 @@ import javax.annotation.Nonnull;
 @Requires(missingBeans = BraveTracingClientFilter.class)
 public class OpenTracingClientFilter extends AbstractOpenTracingFilter implements HttpClientFilter {
 
+    /**
+     * Initialize the open tracing client filter with tracer.
+     *
+     * @param tracer The tracer for span creation and configuring across arbitrary transports
+     */
     public OpenTracingClientFilter(Tracer tracer) {
         super(tracer);
     }
@@ -82,7 +88,7 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
 
             @Override
             protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
-                if(object instanceof HttpResponse) {
+                if (object instanceof HttpResponse) {
                     setResponseTags(request, (HttpResponse<?>) object, span);
                 }
             }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -29,7 +30,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * A method designed to annotate an {@link Endpoint} write operation
+ * A method designed to annotate an {@link Endpoint} write operation.
  *
  * @author Graeme Rocher
  * @since 1.0

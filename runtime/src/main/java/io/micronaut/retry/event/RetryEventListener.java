@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.event;
 
 import io.micronaut.context.event.ApplicationEventListener;
 
 /**
- * Generalization of {@link ApplicationEventListener} for {@link RetryEvent}
+ * Generalization of {@link ApplicationEventListener} for {@link RetryEvent}.
  *
  * @author graemerocher
  * @since 1.0

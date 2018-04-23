@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
@@ -35,7 +36,8 @@ import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
- * <p>The default {@link Router} implementation. This implementation does not perform any additional caching of route discovery</p>
+ * <p>The default {@link Router} implementation. This implementation does not perform any additional caching of
+ * route discovery.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,7 +51,7 @@ public class DefaultRouter implements Router {
     private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
 
     /**
-     * Construct a new router for the given route builders
+     * Construct a new router for the given route builders.
      *
      * @param builders The builders
      */
@@ -95,6 +97,8 @@ public class DefaultRouter implements Router {
                     case TRACE:
                         traceRoutes.add(route);
                         break;
+                    default:
+                        // no-op
                 }
             }
 
@@ -136,6 +140,8 @@ public class DefaultRouter implements Router {
                 case TRACE:
                     routesByMethod[method.ordinal()] = finalizeRoutes(traceRoutes);
                     break;
+                default:
+                    // no-op
             }
         }
     }

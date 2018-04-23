@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.EachProperty;
@@ -25,7 +26,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Allows configuration {@link java.util.concurrent.ExecutorService} instances that are made available as beans
+ * Allows configuration {@link java.util.concurrent.ExecutorService} instances that are made available as beans.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ import java.util.concurrent.ThreadFactory;
 public class UserExecutorConfiguration implements ExecutorConfiguration {
 
     /**
-     * Number of available processors
+     * Number of available processors.
      */
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
@@ -44,6 +45,9 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     protected OptionalInt corePoolSize = OptionalInt.of(AVAILABLE_PROCESSORS * 2);
     protected Optional<Class<? extends ThreadFactory>> threadFactoryClass = Optional.empty();
 
+    /**
+     * Default Constructor.
+     */
     protected UserExecutorConfiguration() {
     }
 
@@ -76,7 +80,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     }
 
     /**
-     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
+     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}.
      *
      * @param type The type
      * @return The configuration
@@ -89,7 +93,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     }
 
     /**
-     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
+     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}.
      *
      * @param type The type
      * @param num  The number of threads for {@link ExecutorType#FIXED} or the parallelism for
@@ -109,12 +113,13 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
             case WORK_STEALING:
                 configuration.parallelism = OptionalInt.of(num);
                 break;
+            default:
         }
         return configuration;
     }
 
     /**
-     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}
+     * Construct a {@link UserExecutorConfiguration} for the given {@link ExecutorType}.
      *
      * @param type               The type
      * @param num                The number of threads for {@link ExecutorType#FIXED} or the parallelism for
