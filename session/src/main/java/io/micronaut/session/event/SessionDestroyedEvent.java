@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.event;
 
 import io.micronaut.session.Session;
 
 /**
- * Fired when a session is destroyed
+ * Fired when a session is destroyed.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class SessionDestroyedEvent extends AbstractSessionEvent {
 
+    /**
+     * Constructs a Session destroyed event.
+     *
+     * @param source The object on which the Event initially occurred.
+     */
     public SessionDestroyedEvent(Session source) {
         super(source);
     }

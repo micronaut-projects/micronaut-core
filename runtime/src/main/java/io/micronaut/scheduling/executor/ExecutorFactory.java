@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.Bean;
@@ -20,12 +21,10 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 
 /**
- * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances
+ * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,10 +34,20 @@ public class ExecutorFactory {
 
     private final ThreadFactory threadFactory;
 
+    /**
+     *
+     * @param threadFactory The factory to create new threads
+     */
     public ExecutorFactory(ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
     }
 
+    /**
+     * Create the ExecutorService with the given configuration.
+     *
+     * @param executorConfiguration The configuration to create a thread pool that creates new threads as needed
+     * @return A thread pool that creates new threads as needed
+     */
     @EachBean(ExecutorConfiguration.class)
     @Bean(preDestroy = "shutdown")
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration) {
@@ -67,7 +76,9 @@ public class ExecutorFactory {
 
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
+
+            default:
+                throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
         }
-        throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
     }
 }

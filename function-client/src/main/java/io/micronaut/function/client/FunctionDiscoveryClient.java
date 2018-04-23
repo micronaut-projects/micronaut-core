@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
-import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import org.reactivestreams.Publisher;
 
-import java.net.URI;
-
 /**
- * An interface for discovery functions, either remote or local
+ * An interface for discovery functions, either remote or local.
  *
  * @author graemerocher
  * @since 1.0
@@ -29,10 +27,10 @@ import java.net.URI;
 public interface FunctionDiscoveryClient {
 
     /**
-     * Finds a function for the given function name
+     * Finds a function for the given function name.
      *
      * @param functionName The function name
-     * @return A {@link Publisher} that emits the {@link URI} of the function or a {@link FunctionNotFoundException} if no function is found
+     * @return A {@link Publisher} that emits the {@link java.net.URI} of the function or a {@link io.micronaut.function.client.exceptions.FunctionNotFoundException} if no function is found
      */
     Publisher<FunctionDefinition> getFunction(String functionName);
 }

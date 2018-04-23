@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -26,7 +27,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * {@link Around} advice that ensures an objects methods are validated
+ * {@link Around} advice that ensures an objects methods are validated.
  *
  * @author Graeme Rocher
  * @since 1.0

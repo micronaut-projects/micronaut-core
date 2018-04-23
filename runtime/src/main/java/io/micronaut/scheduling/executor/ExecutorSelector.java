@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.inject.MethodReference;
@@ -21,7 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Interface that allows customizing the selection of the {@link ExecutorService} to run an operation on
+ * Interface that allows customizing the selection of the {@link ExecutorService} to run an operation on.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 public interface ExecutorSelector {
 
     /**
-     * Select an {@link ExecutorService} for the given {@link MethodReference}
+     * Select an {@link ExecutorService} for the given {@link MethodReference}.
      *
      * @param method The {@link MethodReference}
      * @return An optional {@link ExecutorService}. If an {@link ExecutorService} cannot be established

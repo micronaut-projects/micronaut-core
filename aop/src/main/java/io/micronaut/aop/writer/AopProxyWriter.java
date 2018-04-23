@@ -26,17 +26,20 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.*;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -127,10 +130,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int interceptorArgumentIndex;
     private int beanContextArgumentIndex = -1;
     private Map<String, Object> constructorArgumentTypes;
-    private Map<String, Object> constructorQualfierTypes;
+    private Map<String, AnnotationMetadata> constructArgumentMetadata;
     private Map<String, Map<String, Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
     private List<Runnable> deferredInjectionPoints = new ArrayList<>();
+    private AnnotationMetadata constructorAnnotationMedata;
+    private boolean constructorRequriesReflection;
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
@@ -233,8 +238,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitBeanDefinitionConstructor() {
-        visitBeanDefinitionConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    public void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
+                                               boolean requiresReflection) {
+        visitBeanDefinitionConstructor(
+                annotationMetadata,
+                requiresReflection,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyMap()
+        );
     }
 
     @Override
@@ -278,26 +290,30 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor()} should be called at least once
+     * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean)}  should be called at least once
      *
      * @param argumentTypes  The argument names and types. Should be an ordered map should as {@link LinkedHashMap}
-     * @param qualifierTypes The argument names and qualifier types. Should be an ordered map should as {@link LinkedHashMap}
+     * @param argumentAnnotationMetadata The argument names and metadata
      * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
-    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
+    @Override
+    public void visitBeanDefinitionConstructor(
+            AnnotationMetadata annotationMetadata,
+            boolean requiresReflection,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes) {
+        this.constructorAnnotationMedata = annotationMetadata;
+        this.constructorRequriesReflection = requiresReflection;
         this.constructorArgumentTypes = argumentTypes;
-        this.constructorQualfierTypes = qualifierTypes;
+        this.constructArgumentMetadata = argumentAnnotationMetadata;
         this.constructorGenericTypes = genericTypes;
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
         this.beanContextArgumentIndex = argumentTypes.size();
         constructorNewArgumentTypes.put("beanContext", BeanContext.class);
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
-    }
 
-    @Override
-    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, qualifierTypes, genericTypes);
     }
 
     /**
@@ -309,7 +325,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param returnTypeGenericTypes Map containing the return generic types
      * @param methodName     The method name
      * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes The qualifier types of each argument. Can be null.
+     * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes   The generic types of each argument. Can be null.
      * @param annotationMetadata metadata
      */
@@ -319,12 +335,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
-                                  Map<String, Object> qualifierTypes,
+                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata) {
 
         // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
-        visitExecutableMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
+        visitExecutableMethod(
+                declaringType,
+                returnType,
+                genericReturnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -382,7 +407,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
+            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes);
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
@@ -487,6 +512,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         if (constructorArgumentTypes == null) {
             throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         }
+        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
+        this.constructArgumentMetadata = new LinkedHashMap<>( this.constructArgumentMetadata );
+        this.constructArgumentMetadata.put("interceptors", new DefaultAnnotationMetadata() {{
+            addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
+                    "value", Arrays.stream(interceptorTypes).map(Type::getClassName).toArray()
+            ));
+        }});
         String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
         ClassWriter proxyClassWriter = this.classWriter;
         this.constructorWriter = proxyClassWriter.visitMethod(
@@ -497,7 +529,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             null);
 
         // Add the interceptor @Type(..) annotation
-        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
         AnnotationVisitor interceptorTypeAnn = constructorWriter.visitParameterAnnotation(
             interceptorArgumentIndex, Type.getDescriptor(io.micronaut.context.annotation.Type.class), true
         ).visitArray("value");
@@ -521,16 +552,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
-        if (!isInterface) {
-            proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(
-                targetClassFullName,
-                constructorArgumentTypes,
-                constructorQualfierTypes,
-                constructorGenericTypes
-
-            );
-        }
-        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
+        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(
+                constructorAnnotationMedata,
+                constructorRequriesReflection,
+                constructorNewArgumentTypes,
+                constructArgumentMetadata,
+                constructorGenericTypes);
 
         GeneratorAdapter targetDefinitionGenerator = null;
         if (parentWriter != null) {
@@ -789,20 +816,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSetterInjectionPoint(
-        Object declaringType,
-        Object qualifierType,
-        boolean requiresReflection,
-        Object fieldType,
-        String fieldName,
-        String setterName,
-        Map<String, Object> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterInjectionPoint(
-            declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
-        ));
-    }
-
-    @Override
     public void visitSuperBeanDefinition(String name) {
         proxyBeanDefinitionWriter.visitSuperBeanDefinition(name);
     }
@@ -815,7 +828,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitSetterValue(
         Object declaringType,
-        Object qualifierType,
+        AnnotationMetadata annotationMetadata,
         boolean requiresReflection,
         Object fieldType,
         String fieldName,
@@ -823,51 +836,95 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Map<String, Object> genericTypes,
         boolean isOptional) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(
-            declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
+            declaringType, annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
         ));
     }
 
     @Override
-    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object valueType, String setterName, Map<String, Object> genericTypes, boolean isOptional) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(declaringType, qualifierType, requiresReflection, valueType, setterName, genericTypes, isOptional));
+    public void visitSetterValue(
+            Object declaringType,
+            AnnotationMetadata setterMetadata,
+            boolean requiresReflection,
+            Object valueType,
+            String setterName,
+            Map<String, Object> genericTypes,
+            AnnotationMetadata setterArgumentMetadata,
+            boolean isOptional) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitSetterValue(
+                        declaringType,
+                        setterMetadata,
+                        requiresReflection,
+                        valueType,
+                        setterName,
+                        genericTypes,
+                        setterArgumentMetadata,
+                        isOptional)
+        );
     }
 
     @Override
     public void visitPostConstructMethod(
-        Object declaringType,
-        boolean requiresReflection,
-        Object returnType,
-        String methodName,
-        Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
-        Map<String, Map<String, Object>> genericTypes) {
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPostConstructMethod(
-            declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes
-        ));
+                declaringType,
+                requiresReflection,
+                returnType,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata));
     }
 
     @Override
     public void visitPreDestroyMethod(
-        Object declaringType,
-        boolean requiresReflection,
-        Object returnType,
-        String methodName,
-        Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
-        Map<String, Map<String, Object>> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes));
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitPreDestroyMethod(
+                        declaringType,
+                        requiresReflection,
+                        returnType,
+                        methodName,
+                        argumentTypes,
+                        argumentAnnotationMetadata,
+                        genericTypes,
+                        annotationMetadata)
+        );
     }
 
     @Override
     public void visitMethodInjectionPoint(
-        Object declaringType,
-        boolean requiresReflection,
-        Object returnType,
-        String methodName,
-        Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
-        Map<String, Map<String, Object>> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes));
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitMethodInjectionPoint(
+                        declaringType,
+                        requiresReflection,
+                        returnType,
+                        methodName,
+                        argumentTypes,
+                        argumentAnnotationMetadata,
+                        genericTypes,
+                        annotationMetadata)
+        );
     }
 
     @Override
@@ -878,7 +935,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Map<String, Object> returnTypeGenericTypes,
         String methodName,
         Map<String, Object> argumentTypes,
-        Map<String, Object> qualifierTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
         Map<String, Map<String, Object>> genericTypes,
         AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() ->
@@ -889,7 +946,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
-                qualifierTypes,
+                argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata
             )
@@ -898,15 +955,47 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitFieldInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldInjectionPoint(declaringType, qualifierType, requiresReflection, fieldType, fieldName));
+    public void visitFieldInjectionPoint(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitFieldInjectionPoint(
+                        declaringType,
+                        fieldType,
+                        fieldName,
+                        requiresReflection,
+                        annotationMetadata,
+                        typeArguments
+                )
+        );
     }
 
     @Override
-    public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional));
-
+    public void visitFieldValue(
+            Object declaringType,
+            Object fieldType,
+            String fieldName,
+            boolean requiresReflection,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Map<String, Object> typeArguments,
+            boolean isOptional) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitFieldValue(
+                        declaringType,
+                        fieldType,
+                        fieldName,
+                        requiresReflection,
+                        annotationMetadata,
+                        typeArguments,
+                        isOptional
+                )
+        );
     }
+
 
     @Override
     public String getPackageName() {

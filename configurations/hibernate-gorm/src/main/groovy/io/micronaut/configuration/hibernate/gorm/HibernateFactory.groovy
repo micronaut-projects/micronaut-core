@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.hibernate.gorm
 
 import grails.gorm.annotation.Entity
@@ -33,7 +34,7 @@ import javax.sql.DataSource
 import java.util.stream.Stream
 
 /**
- * <p>A factory for configuring GORM for Hibernate 5 within Micronaut</p>
+ * <p>A factory for configuring GORM for Hibernate 5 within Micronaut</p>.
  *
  * @author Graeme Rocher
  * @since 1.0

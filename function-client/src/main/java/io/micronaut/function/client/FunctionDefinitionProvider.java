@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import java.util.Collection;
 
 /**
- * Interface for a type that provides function definitions
+ * Interface for a type that provides function definitions.
  *
  * @author graemerocher
  * @since 1.0

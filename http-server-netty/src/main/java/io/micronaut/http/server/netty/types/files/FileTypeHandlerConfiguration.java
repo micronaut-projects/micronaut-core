@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Allows configuration of properties for the {@link FileTypeHandler}
+ * Allows configuration of properties for the {@link FileTypeHandler}.
  *
  * @author James Kleeh
  * @since 1.0
