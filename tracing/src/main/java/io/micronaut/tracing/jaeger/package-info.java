@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * This package contains configuration for Jaeger based tracing
+ * This package contains configuration for Jaeger based tracing.
  *
  * @author graemerocher
  * @since 1.0

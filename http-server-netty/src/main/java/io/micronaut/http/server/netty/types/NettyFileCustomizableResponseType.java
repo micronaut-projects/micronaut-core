@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 
 /**
- * A special type for files specific to Netty
+ * A special type for files specific to Netty.
  *
  * @author James Kleeh
  * @since 1.0

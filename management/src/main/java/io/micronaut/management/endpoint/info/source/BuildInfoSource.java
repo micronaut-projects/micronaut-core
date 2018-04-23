@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.annotation.Requires;
@@ -21,15 +22,16 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+
 import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * <p>An {@link InfoSource} that retrieves info from build properties. </p>
+ * <p>An {@link io.micronaut.management.endpoint.info.InfoSource} that retrieves info from build properties.</p>
+ *
  * @author Zachary Klein
  * @since 1.0
  */
@@ -47,6 +49,9 @@ public class BuildInfoSource implements PropertiesInfoSource {
     private ResourceResolver resourceResolver;
     private final Supplier<Optional<PropertySource>> supplier;
 
+    /**
+     * @param resourceResolver A {@link ResourceResolver}
+     */
     public BuildInfoSource(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
         this.supplier = SupplierUtil.memoized(this::retrieveBuildInfo);
@@ -61,5 +66,4 @@ public class BuildInfoSource implements PropertiesInfoSource {
     private Optional<PropertySource> retrieveBuildInfo() {
         return retrievePropertiesPropertySource(buildPropertiesPath, PREFIX, EXTENSION, resourceResolver);
     }
-
 }

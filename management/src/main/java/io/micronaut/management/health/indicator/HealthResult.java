@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator;
 
 import io.micronaut.health.HealthStatus;
@@ -46,7 +47,7 @@ public interface HealthResult {
     Object getDetails();
 
     /**
-     * Creates a builder to build a {@link HealthResult}
+     * Creates a builder to build a {@link HealthResult}.
      *
      * @param name   The name of the result
      * @param status The status
@@ -57,7 +58,7 @@ public interface HealthResult {
     }
 
     /**
-     * Creates a builder to build a {@link HealthResult}
+     * Creates a builder to build a {@link HealthResult}.
      *
      * @param name The name of the result
      * @return The builder
@@ -66,18 +67,28 @@ public interface HealthResult {
         return new Builder(name);
     }
 
+    /**
+     * Helper class to build instances.
+     */
     class Builder {
 
         private final String name;
         private Optional<HealthStatus> status;
         private Optional<Object> details;
 
+        /**
+         * @param name   The name of the health result
+         * @param status The status
+         */
         Builder(String name, HealthStatus status) {
             this.name = name;
             this.status = Optional.ofNullable(status);
             this.details = Optional.empty();
         }
 
+        /**
+         * @param name   The name of the health result
+         */
         Builder(String name) {
             this.name = name;
             this.status = Optional.empty();
@@ -85,7 +96,7 @@ public interface HealthResult {
         }
 
         /**
-         * Assigns the status to the builder
+         * Assigns the status to the builder.
          *
          * @param status The status, null allowed
          * @return The builder
@@ -96,7 +107,7 @@ public interface HealthResult {
         }
 
         /**
-         * Builds the details based off an exception
+         * Builds the details based off an exception.
          *
          * @param ex The exception that occurred
          * @return The builder
@@ -108,7 +119,7 @@ public interface HealthResult {
         }
 
         /**
-         * Sets the details of the result
+         * Sets the details of the result.
          *
          * @param details The details, null allowed
          * @return The builder
@@ -119,7 +130,7 @@ public interface HealthResult {
         }
 
         /**
-         * Builds the result
+         * Builds the result.
          *
          * @return The {@link HealthResult}
          */

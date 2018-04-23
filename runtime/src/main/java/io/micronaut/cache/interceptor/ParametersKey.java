@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.interceptor;
 
 import io.micronaut.core.reflect.ClassUtils;
@@ -22,7 +23,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 /**
- * A key that uses the parameters of a method
+ * A key that uses the parameters of a method.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +35,9 @@ public class ParametersKey implements Serializable {
     private final Object[] params;
     private final int hashCode;
 
+    /**
+     * @param params Parameters of the method
+     */
     public ParametersKey(Object... params) {
         if (ArrayUtils.isEmpty(params)) {
             this.params = ArrayUtils.EMPTY_OBJECT_ARRAY;
@@ -47,7 +51,9 @@ public class ParametersKey implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
+        if (this == o) {
+            return true;
+        }
         return o instanceof ParametersKey && Arrays.deepEquals(params, ((ParametersKey) o).params);
     }
 

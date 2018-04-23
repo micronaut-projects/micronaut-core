@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jdbc;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -38,11 +39,18 @@ public class CalculatedSettings {
     private Optional<JdbcDatabaseManager.EmbeddedJdbcDatabase> embeddedDatabaseConnection;
     private BasicJdbcConfiguration basicJdbcConfiguration;
 
+    /**
+     * @param basicJdbcConfiguration The basic jdbc configuration
+     */
     public CalculatedSettings(BasicJdbcConfiguration basicJdbcConfiguration) {
         this.basicJdbcConfiguration = basicJdbcConfiguration;
         embeddedDatabaseConnection = JdbcDatabaseManager.get(this.getClass().getClassLoader());
     }
 
+    /**
+     * @param basicJdbcConfiguration The basic jdbc configuration
+     * @param classLoader            The classloader to get the embedded database connection from
+     */
     public CalculatedSettings(BasicJdbcConfiguration basicJdbcConfiguration, ClassLoader classLoader) {
         this.basicJdbcConfiguration = basicJdbcConfiguration;
         embeddedDatabaseConnection = JdbcDatabaseManager.get(classLoader);

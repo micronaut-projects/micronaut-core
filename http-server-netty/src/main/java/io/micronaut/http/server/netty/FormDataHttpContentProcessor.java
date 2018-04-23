@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.http.MediaType;
@@ -30,7 +31,7 @@ import org.reactivestreams.Subscriber;
 import java.nio.charset.Charset;
 
 /**
- * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner</p>
+ * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
  * <p>
  * <p>Designed to be used by a single thread</p>
  *
@@ -42,6 +43,10 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
 
+    /**
+     * @param nettyHttpRequest The {@link NettyHttpRequest}
+     * @param configuration    The {@link NettyHttpServerConfiguration}
+     */
     public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
@@ -56,7 +61,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     public boolean isEnabled() {
         return enabled;
     }
-
 
     @Override
     protected void onData(ByteBufHolder message) {
@@ -81,6 +85,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                                     subscriber.onNext(fileUpload);
                                 }
                                 break;
+                            default:
+                                // no-op
                         }
                     } finally {
                         data.release();

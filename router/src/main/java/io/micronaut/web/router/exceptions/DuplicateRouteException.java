@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.exceptions;
 
 import io.micronaut.web.router.UriRouteMatch;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * An exception thrown when multiple routes match a given URI
+ * An exception thrown when multiple routes match a given URI.
  *
  * @author James Kleeh
  * @since 1.0
@@ -30,11 +31,18 @@ public class DuplicateRouteException extends RoutingException {
 
     private final String uri;
 
+    /**
+     * @param uri The URI
+     * @param uriRoutes The routes
+     */
     public DuplicateRouteException(String uri, List<UriRouteMatch<Object>> uriRoutes) {
         super(buildMessage(uri, uriRoutes));
         this.uri = uri;
     }
 
+    /**
+     * @return The uri
+     */
     public String getUri() {
         return uri;
     }

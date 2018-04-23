@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
@@ -22,14 +23,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Write;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**
- * A processor that processes references to {@link Write} operations {@link Endpoint} instances
+ * A processor that processes references to {@link Write} operations {@link io.micronaut.management.endpoint.Endpoint}
+ * instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +38,11 @@ import java.lang.annotation.Annotation;
 @Singleton
 public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
+    /**
+     * @param beanContext       The application context
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public WriteEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }

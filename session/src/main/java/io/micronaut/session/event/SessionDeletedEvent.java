@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.event;
 
 import io.micronaut.session.Session;
 
 /**
- * Fired when an {@link Session} is deleted
+ * Fired when an {@link Session} is deleted.
  *
  * @author Graeme Rocher
  * @since 1.0

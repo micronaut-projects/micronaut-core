@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.annotation;
 
 import io.micronaut.cache.interceptor.CacheInterceptor;
@@ -48,12 +49,16 @@ public @interface CachePut {
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return The cache names
      */
     @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return The cache names
      */
     @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
     String[] cacheNames() default {};
@@ -61,6 +66,8 @@ public @interface CachePut {
 
     /**
      * Alias for {@link CacheConfig#keyGenerator}.
+     *
+     * @return The key generator class
      */
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
@@ -79,15 +86,15 @@ public @interface CachePut {
      * <p>The value if <tt>async</tt> impacts behaviour in the following ways:</p>
      * <p>
      * <ul>
-     *     <li>For blocking return types when the value is <tt>false</tt> the method will not return until the value
-     *     has been written and any cache write errors will be propagated back to the client.</li>
-     *     <li>For blocking return types when the value is <tt>true</tt> the method will return prior to cache writes
-     *     occurring and errors will be logged via the {@link io.micronaut.cache.AsyncCacheErrorHandler}.</li>
-     *     <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>false</tt>
-     *     the future will not complete until the {@link CachePut} operation is complete.</li>
-     *     <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>true</tt>
-     *     the future will complete prior to any {@link CachePut} operations completing and the operations will be
-     *     executing asynchronously with errors logged by {@link io.micronaut.cache.AsyncCacheErrorHandler}.</li>
+     * <li>For blocking return types when the value is <tt>false</tt> the method will not return until the value
+     * has been written and any cache write errors will be propagated back to the client.</li>
+     * <li>For blocking return types when the value is <tt>true</tt> the method will return prior to cache writes
+     * occurring and errors will be logged via the {@link io.micronaut.cache.AsyncCacheErrorHandler}.</li>
+     * <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>false</tt>
+     * the future will not complete until the {@link CachePut} operation is complete.</li>
+     * <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>true</tt>
+     * the future will complete prior to any {@link CachePut} operations completing and the operations will be
+     * executing asynchronously with errors logged by {@link io.micronaut.cache.AsyncCacheErrorHandler}.</li>
      * </ul>
      *
      * @return True if cache writes should be done asynchronously

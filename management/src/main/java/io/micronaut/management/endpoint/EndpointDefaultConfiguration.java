@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -20,7 +21,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import java.util.Optional;
 
 /**
- * The default {@link Endpoint} configuration
+ * The default {@link Endpoint} configuration.
  *
  * @author James Kleeh
  * @since 1.0
@@ -29,13 +30,12 @@ import java.util.Optional;
 public class EndpointDefaultConfiguration {
 
     /**
-     * The prefix for endpoints settings
+     * The prefix for endpoints settings.
      */
     public static final String PREFIX = "endpoints.all";
 
     protected Optional<Boolean> enabled = Optional.empty();
     protected Optional<Boolean> sensitive = Optional.empty();
-
 
     /**
      * @return Whether the endpoint is enabled

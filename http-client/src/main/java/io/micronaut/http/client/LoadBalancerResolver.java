@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import java.util.Optional;
 
 /**
- * A resolver of {@link LoadBalancer} instances that are capable of resolving references to services into a concrete loadbalance
+ * A resolver of {@link LoadBalancer} instances that are capable of resolving references to services into a concrete loadbalance.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +27,7 @@ import java.util.Optional;
 public interface LoadBalancerResolver {
 
     /**
-     * Resolve a {@link LoadBalancer} for the given references
+     * Resolve a {@link LoadBalancer} for the given references.
      *
      * @param serviceReferences The references. These could be service IDs or fully HTTP URLs
      * @return A {@link LoadBalancer} or empty of non can be resolved

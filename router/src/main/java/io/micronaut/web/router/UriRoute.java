@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
@@ -26,7 +27,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Represents a {@link Route} that matches a {@link URI}
+ * Represents a {@link Route} that matches a {@link URI}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ import java.util.function.Predicate;
 public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
 
     /**
-     * Defines routes nested within this route
+     * Defines routes nested within this route.
      *
      * @param nested The nested routes
      * @return This route
@@ -52,7 +53,7 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     UriMatchTemplate getUriMatchTemplate();
 
     /**
-     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
      *
      * @param uri The URI The URI
      * @return An {@link Optional} of {@link RouteMatch}
@@ -63,7 +64,7 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     }
 
     /**
-     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
      *
      * @param uri The URI The URI
      * @return An {@link Optional} of {@link RouteMatch}
