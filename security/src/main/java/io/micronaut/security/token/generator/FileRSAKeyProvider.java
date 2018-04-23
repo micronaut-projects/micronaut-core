@@ -17,7 +17,6 @@
 package io.micronaut.security.token.generator;
 
 import io.micronaut.security.token.configuration.TokenEncryptionConfiguration;
-import io.micronaut.security.token.reader.BearerTokenReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.annotation.PostConstruct;
