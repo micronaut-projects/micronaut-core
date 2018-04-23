@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -29,7 +30,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Defines a management endpoint for a given ID
+ * Defines a management endpoint for a given ID.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -44,12 +45,12 @@ import java.lang.annotation.Target;
 public @interface Endpoint {
 
     /**
-     * Whether endpoints are enabled by default
+     * Whether endpoints are enabled by default.
      */
     boolean ENABLED = true;
 
     /**
-     * Whether endpoints are sensitive by default
+     * Whether endpoints are sensitive by default.
      */
     boolean SENSITIVE = false;
 

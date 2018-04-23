@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.aggregator;
 
 import io.micronaut.context.annotation.Requires;
@@ -33,13 +34,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * <p>Default implementation of {@link HealthAggregator} that creates
- * a {status: , description: (optional) , details: } response. The top level object
- * represents the most severe status found in the provided health results,
- * or {@link HealthStatus#UNKNOWN} if none found. All registered indicators
- * have their own {status: , description: (optional , details: } object, keyed by the
- * name of the {@link HealthResult} defined inside of the details of the top
- * level object.
+ * <p>Default implementation of {@link HealthAggregator} that creates a {status: , description: (optional) , details: }
+ * response. The top level object represents the most severe status found in the provided health results, or
+ * {@link HealthStatus#UNKNOWN} if none found. All registered indicators have their own
+ * {status: , description: (optional , details: } object, keyed by the name of the {@link HealthResult} defined inside
+ * of the details of the top level object.
  * <p>
  * Example:
  * [status: "UP, details: [diskSpace: [status: UP, details: [:]], cpuUsage: ...]]</p>
@@ -72,6 +71,10 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
         return result.toFlowable();
     }
 
+    /**
+     * @param results A list of {@link HealthResult}
+     * @return The calculated overall health status
+     */
     protected HealthStatus calculateOverallStatus(List<HealthResult> results) {
         return results.stream()
             .map(HealthResult::getStatus)
@@ -81,6 +84,10 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
             .orElse(HealthStatus.UNKNOWN);
     }
 
+    /**
+     * @param indicators An array of {@link HealthIndicator}
+     * @return The aggregated results from all health indicators
+     */
     protected Flowable<HealthResult> aggregateResults(HealthIndicator[] indicators) {
         return Flowable.merge(
             Arrays.stream(indicators)
@@ -89,12 +96,22 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
         );
     }
 
+    /**
+     * @param results A list of health results
+     * @return The aggregated details for the results
+     */
     protected Object aggregateDetails(List<HealthResult> results) {
         Map<String, Object> details = new HashMap<>(results.size());
         results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails())));
         return details;
     }
 
+    /**
+     * @param status  A {@link HealthStatus}
+     * @param details The health status details
+     * @return A {@link Map} with the results from the health status
+     */
+    @SuppressWarnings("MagicNumber")
     protected Map<String, Object> buildResult(HealthStatus status, Object details) {
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
         healthStatus.put("status", status.getName());

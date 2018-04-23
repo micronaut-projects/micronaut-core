@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.routes.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -35,6 +36,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * A RxJava route data collector.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
 @Requires(beans = RoutesEndpoint.class)
 public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
@@ -42,6 +49,10 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
     private final RouteData routeData;
     private final ExecutorService executorService;
 
+    /**
+     * @param routeData       The RouteData
+     * @param executorService The executor service
+     */
     public RxJavaRouteDataCollector(RouteData routeData,
                                     @Named(TaskExecutors.IO) ExecutorService executorService) {
         this.routeData = routeData;
@@ -61,6 +72,10 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
             ).toFlowable();
     }
 
+    /**
+     * @param route The URI route
+     * @return The route key
+     */
     protected String getRouteKey(UriRoute route) {
         String produces = route
             .getProduces()

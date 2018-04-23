@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator;
 
 import io.micronaut.core.order.Ordered;
-import io.micronaut.management.health.aggregator.HealthAggregator;
 import org.reactivestreams.Publisher;
 
 /**
- * <p>Describes an indicator of health of the application. Used by the {@link HealthAggregator} to create
- * a response combining all indicators. </p>
+ * <p>Describes an indicator of health of the application. Used by the
+ * {@link io.micronaut.management.health.aggregator.HealthAggregator} to create a response combining all indicators.</p>
  *
  * @author James Kleeh
  * @since 1.0

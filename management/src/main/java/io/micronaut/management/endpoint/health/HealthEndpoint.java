@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.management.endpoint.Endpoint;
@@ -21,7 +22,6 @@ import io.micronaut.management.endpoint.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.reactivex.Single;
-import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -33,23 +33,30 @@ import org.reactivestreams.Publisher;
 public class HealthEndpoint {
 
     /**
-     * Constant for health
+     * Constant for health.
      */
     public static final String NAME = "health";
 
     /**
-     * Prefix for health endpoint
+     * Prefix for health endpoint.
      */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     private HealthAggregator healthAggregator;
     private HealthIndicator[] healthIndicators;
 
+    /**
+     * @param healthAggregator The {@link HealthAggregator}
+     * @param healthIndicators The {@link HealthIndicator}
+     */
     public HealthEndpoint(HealthAggregator healthAggregator, HealthIndicator[] healthIndicators) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
     }
 
+    /**
+     * @return The health information as a {@link Single}
+     */
     @Read
     Single getHealth() {
         return Single.fromPublisher(healthAggregator.aggregate(healthIndicators));

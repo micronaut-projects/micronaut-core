@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info;
 
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.order.Ordered;
 import org.reactivestreams.Publisher;
 
-
 /**
- * <p>Describes an source of info that will be retrieved by the {@link InfoEndpoint}. </p>
+ * <p>Describes an source of info that will be retrieved by the {@link InfoEndpoint}.</p>
  *
  * @author Zachary Klein
  * @since 1.0
@@ -29,8 +29,7 @@ import org.reactivestreams.Publisher;
 public interface InfoSource extends Ordered {
 
     /**
-     * @return A publisher that returns a {@link PropertySource} containing
-     * data to be added to the endpoint response
+     * @return A publisher that returns a {@link PropertySource} containing data to be added to the endpoint response.
      */
     Publisher<PropertySource> getSource();
 
