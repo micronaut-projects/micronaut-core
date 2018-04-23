@@ -147,4 +147,32 @@ class AuthorizationSpec extends Specification {
         HttpClientResponseException e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
     }
+
+    void "test accessing a non sensitive endpoint without authentication"() {
+        when:
+        HttpResponse<String> response = get("/nonSensitive")
+
+        then:
+        response.body() == "World"
+    }
+
+    void "test accessing a sensitive endpoint without authentication"() {
+        when:
+        get("/sensitive")
+
+        then:
+        HttpClientResponseException e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    void "test accessing a sensitive endpoint with authentication"() {
+        given:
+        String token = loginWith("valid")
+
+        when:
+        HttpResponse<String> response = get("/sensitive", token)
+
+        then:
+        response.body() == "World"
+    }
 }
