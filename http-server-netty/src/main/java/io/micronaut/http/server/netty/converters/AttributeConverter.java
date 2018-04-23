@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -25,7 +26,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * A converter capable of converting {@link Attribute} instances
+ * A converter capable of converting {@link Attribute} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,6 +36,9 @@ public class AttributeConverter implements TypeConverter<Attribute, Object> {
 
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     public AttributeConverter(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
     }

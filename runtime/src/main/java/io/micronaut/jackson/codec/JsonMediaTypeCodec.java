@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -37,7 +38,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A {@link MediaTypeCodec} for JSON and Jackson
+ * A {@link MediaTypeCodec} for JSON and Jackson.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,6 +49,10 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     private final ObjectMapper objectMapper;
     private final ApplicationConfiguration applicationConfiguration;
 
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     */
     public JsonMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
@@ -85,6 +90,15 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         }
     }
 
+    /**
+     * Decodes the given JSON node.
+     *
+     * @param type The type
+     * @param node The Json Node
+     * @param <T> The generic type
+     * @return The decoded object
+     * @throws CodecException When object cannot be decoded
+     */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
             return objectMapper.treeToValue(node, type.getType());

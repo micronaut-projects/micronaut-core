@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.netty.handler.codec.DecoderResult;
@@ -20,10 +21,19 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpVersion;
 
+/**
+ * Delegate for HTTP Message.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class DelegateHttpMessage implements HttpMessage {
 
     protected final HttpMessage message;
 
+    /**
+     * @param message The message
+     */
     public DelegateHttpMessage(HttpMessage message) {
         this.message = message;
     }

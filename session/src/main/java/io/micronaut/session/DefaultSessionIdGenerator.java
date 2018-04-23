@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import io.micronaut.context.annotation.Primary;
@@ -21,7 +22,7 @@ import javax.inject.Singleton;
 import java.util.UUID;
 
 /**
- * Default session ID generator that uses {@link UUID}
+ * Default session ID generator that uses {@link UUID}.
  *
  * @author Graeme Rocher
  * @since 1.0

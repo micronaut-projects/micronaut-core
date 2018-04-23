@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -26,7 +26,6 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
@@ -44,7 +43,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * A {@link Body} argument binder for a reactive streams {@link Publisher}
+ * A {@link io.micronaut.http.annotation.Body} argument binder for a reactive streams {@link Publisher}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -55,6 +54,11 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
 
+    /**
+     * @param conversionService       The conversion service
+     * @param beanLocator             The bean locator
+     * @param httpServerConfiguration The Http server configuration
+     */
     public PublisherBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
         super(conversionService);
         this.beanLocator = beanLocator;
@@ -80,7 +84,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                     .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument)context.getArgument()) {
+                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {

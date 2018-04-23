@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -34,7 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Default implementation that stores sessions in-memory
+ * Default implementation that stores sessions in-memory.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,6 +49,13 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
     private final Cache<String, InMemorySession> sessions;
     private final SessionIdGenerator sessionIdGenerator;
 
+    /**
+     * Constructor.
+     *
+     * @param sessionIdGenerator The session id generator
+     * @param sessionConfiguration The sessions configuration
+     * @param eventPublisher The application event publisher
+     */
     public InMemorySessionStore(
         SessionIdGenerator sessionIdGenerator,
         SessionConfiguration sessionConfiguration,
@@ -80,7 +88,9 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
 
     @Override
     public CompletableFuture<InMemorySession> save(InMemorySession session) {
-        if (session == null) throw new IllegalArgumentException("Session cannot be null");
+        if (session == null) {
+            throw new IllegalArgumentException("Session cannot be null");
+        }
         String id = session.getId();
         session.setNew(false);
         InMemorySession existing = sessions.getIfPresent(id);
@@ -95,11 +105,20 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
         return CompletableFuture.completedFuture(session);
     }
 
+    /**
+     * Performs any pending maintenance operations needed by the cache.
+     */
     @Internal
     void cleanUp() {
         sessions.cleanUp();
     }
 
+    /**
+     * Creates a new session cache.
+     *
+     * @param configuration The session configuration
+     * @return The new cache
+     */
     protected Cache<String, InMemorySession> newSessionCache(SessionConfiguration configuration) {
         Caffeine<String, InMemorySession> builder = Caffeine
             .newBuilder()
@@ -148,7 +167,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
                 case EXPLICIT:
                     eventPublisher.publishEvent(new SessionDeletedEvent(value));
                     break;
-                case COLLECTED:
+                default:
                     throw new IllegalStateException("Session should never be garbage collectable");
             }
         };

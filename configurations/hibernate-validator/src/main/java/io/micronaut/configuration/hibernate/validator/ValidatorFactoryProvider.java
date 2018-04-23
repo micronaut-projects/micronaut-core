@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.hibernate.validator;
 
 import io.micronaut.context.annotation.Bean;
@@ -34,7 +35,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 /**
- * Provides a {@link ValidatorFactory} instance
+ * Provides a {@link ValidatorFactory} instance.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -57,6 +58,11 @@ public class ValidatorFactoryProvider {
     @Value("${hibernate.validator.ignoreXmlConfiguration:true}")
     protected boolean ignoreXmlConfiguration = true;
 
+    /**
+     * Produces a Validator factory class.
+     * @param environment optional param for environment
+     * @return validator factory
+     */
     @Singleton
     @Bean
     ValidatorFactory validatorFactory(Optional<Environment> environment) {

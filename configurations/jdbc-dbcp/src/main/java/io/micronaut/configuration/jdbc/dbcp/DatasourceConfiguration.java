@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.dbcp;
 
 import io.micronaut.context.annotation.EachProperty;
@@ -43,6 +44,10 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     private final CalculatedSettings calculatedSettings;
     private final String name;
 
+    /**
+     * Constructor.
+     * @param name name configured from properties
+     */
     public DatasourceConfiguration(@Parameter String name) {
         super();
         this.name = name;
@@ -73,11 +78,19 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
         }
     }
 
+    /**
+     * Before this bean is destroyed close the connection.
+     * @throws SQLException exception
+     */
     @PreDestroy
     void preDestroy() throws SQLException {
         this.close();
     }
 
+    /**
+     * Get the name of the bean.
+     * @return name
+     */
     public String getName() {
         return this.name;
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.annotation;
 
 import io.micronaut.cache.interceptor.CacheInterceptor;
@@ -27,12 +28,11 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.function.Supplier;
 
 /**
  * <p>An annotation that can be applied at the type or method level to indicate that the return value of the method
  * should be cached for
- * the configured {@link #cacheNames()}</p>
+ * the configured {@link #cacheNames()}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -47,12 +47,16 @@ public @interface Cacheable {
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return The cache names
      */
     @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return The cache names
      */
     @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
     String[] cacheNames() default {};
@@ -67,6 +71,8 @@ public @interface Cacheable {
 
     /**
      * Alias for {@link CacheConfig#keyGenerator}.
+     *
+     * @return The cache key generator class
      */
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;

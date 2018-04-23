@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,7 +26,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts {@link ArrayNode} instances to arrays
+ * Converts {@link ArrayNode} instances to arrays.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,10 +36,14 @@ public class ArrayNodeToArrayConverter implements TypeConverter<ArrayNode, Objec
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * Create a converter to convert form ArrayNode to Array.
+     *
+     * @param objectMapper To convert from Json to Array
+     */
     public ArrayNodeToArrayConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
-
 
     @Override
     public Optional<Object[]> convert(ArrayNode node, Class<Object[]> targetType, ConversionContext context) {

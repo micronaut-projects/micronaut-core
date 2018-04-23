@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import java.net.URI;
 import java.util.Optional;
 
 /**
- * Represents a discovered function definition
+ * Represents a discovered function definition.
  *
  * @author graemerocher
  * @since 1.0

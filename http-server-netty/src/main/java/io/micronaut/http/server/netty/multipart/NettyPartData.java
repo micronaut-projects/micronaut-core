@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
@@ -28,7 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * A Netty implementation of {@link PartData}
+ * A Netty implementation of {@link PartData}.
  *
  * @author James Kleeh
  * @since 1.0
@@ -38,6 +39,10 @@ public class NettyPartData implements PartData {
     private final FileUpload fileUpload;
     private final Long chunk;
 
+    /**
+     * @param fileUpload The file upload
+     * @param chunk      The chunk
+     */
     public NettyPartData(FileUpload fileUpload, Long chunk) {
         this.fileUpload = fileUpload;
         this.chunk = chunk;
