@@ -41,6 +41,7 @@ class DefaultFeature implements Feature {
     final NavigableMap configuration = new NavigableMap()
     final List<Dependency> dependencies = []
     final List<String> buildPlugins
+    final List<String> dependentFeatures = []
 
     DefaultFeature(Profile profile, String name, Resource location) {
         this.profile = profile
@@ -50,6 +51,7 @@ class DefaultFeature implements Feature {
         def featureConfig = (Map<String, Object>) new Yaml().loadAs(featureYml.getInputStream(), Map)
         configuration.merge(featureConfig)
         def dependencyMap = configuration.get("dependencies")
+        dependentFeatures.addAll((List) featureConfig.get("dependentFeatures", Collections.emptyList()))
 
         if(dependencyMap instanceof Map) {
             for(entry in ((Map)dependencyMap)) {

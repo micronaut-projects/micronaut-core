@@ -252,6 +252,13 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
+    Iterable<Feature> getDependentFeaturesFor(String featureName) {
+        Feature f = features.find { it.name == featureName }
+
+        return features.findAll { it.name in f.dependentFeatures }
+    }
+
+    @Override
     Iterable<Feature> getFeatures() {
         Set<Feature> calculatedFeatures = []
         calculatedFeatures.addAll(features)
