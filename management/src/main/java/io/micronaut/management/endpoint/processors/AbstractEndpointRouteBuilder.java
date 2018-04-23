@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
@@ -35,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Abstract {@link io.micronaut.web.router.RouteBuilder} implementation for {@link Endpoint} method processors
+ * Abstract {@link io.micronaut.web.router.RouteBuilder} implementation for {@link Endpoint} method processors.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -45,18 +46,44 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
 
     private Map<Class, Optional<String>> endpointIds = new ConcurrentHashMap<>();
+
     private final ApplicationContext beanContext;
 
+    /**
+     * @param applicationContext The application context
+     * @param uriNamingStrategy  The URI naming strategy
+     * @param conversionService  The conversion service
+     */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(applicationContext, uriNamingStrategy, conversionService);
         this.beanContext = applicationContext;
     }
 
+    /**
+     * @return The class
+     */
+    protected abstract Class<? extends Annotation> getSupportedAnnotation();
+
+    /**
+     * Register a route.
+     *
+     * @param method The {@link ExecutableMethod}
+     * @param id     The route id
+     */
+    protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id);
+
+    /**
+     * Clears endpoint ids information.
+     */
     @Override
     public final void onComplete() {
         endpointIds.clear();
     }
 
+    /**
+     * @param beanDefinition The bean definition to process
+     * @param method         The executable method
+     */
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         Class<?> declaringType = method.getDeclaringType();
@@ -66,10 +93,10 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         }
     }
 
-    abstract protected Class<? extends Annotation> getSupportedAnnotation();
-
-    abstract protected void registerRoute(ExecutableMethod<?, ?> method, String id);
-
+    /**
+     * @param declaringType The type
+     * @return An optional string with the endpoint id
+     */
     protected Optional<String> resolveActiveEndPointId(Class<?> declaringType) {
         return endpointIds.computeIfAbsent(declaringType, aClass -> {
             Optional<? extends BeanDefinition<?>> opt = beanContext.findBeanDefinition(declaringType);
@@ -89,6 +116,11 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         });
     }
 
+    /**
+     * @param method The {@link ExecutableMethod}
+     * @param id     The route id
+     * @return An {@link UriTemplate}
+     */
     protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
         UriTemplate template = new UriTemplate(uriNamingStrategy.resolveUri(id));
         for (Argument argument : method.getArguments()) {
@@ -99,6 +131,10 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         return template;
     }
 
+    /**
+     * @param argument An {@link Argument}
+     * @return Whether the argument is a path parameter
+     */
     protected boolean isPathParameter(Argument argument) {
         return argument.getAnnotations().length == 0 || argument.getAnnotation(QueryValue.class) != null;
     }

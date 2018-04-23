@@ -82,6 +82,17 @@ class MavenBuildTokens {
         tokens
     }
 
+    Map getTokens(List<String> services) {
+        final StringWriter modulesWriter = new StringWriter()
+        MarkupBuilder modulesXml = new MarkupBuilder(modulesWriter)
+
+        services.each { String name ->
+            modulesXml.module(name)
+        }
+
+        ["services": prettyPrint(modulesWriter.toString(), 8)]
+    }
+  
     Dependency convertScope(Dependency dependency) {
         dependency.setScope(scopeConversions.getOrDefault(dependency.scope, dependency.scope))
     }
@@ -91,6 +102,7 @@ class MavenBuildTokens {
                 dependencies.find { it.scope == 'provided' } ?:
                         dependencies.find { it.scope = 'runtime' } ?:
                                 dependencies.find { it.scope = 'test' }
+
     }
 
     String prettyPrint(String xml, int spaces) {

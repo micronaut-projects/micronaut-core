@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.reflect.ClassUtils;
 
+import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -28,6 +29,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class StringArrayToClassArrayConverter implements TypeConverter<Object[], Class[]> {
 
     private final ClassLoader classLoader;

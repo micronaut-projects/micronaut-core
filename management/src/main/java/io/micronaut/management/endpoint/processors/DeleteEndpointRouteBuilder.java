@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
@@ -20,20 +21,25 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.Delete;
-import io.micronaut.management.endpoint.Endpoint;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**
- * A processor that processes references to {@link Delete} operations {@link Endpoint} instances
+ * A processor that processes references to {@link Delete} operations {@link io.micronaut.management.endpoint.Endpoint}
+ * instances.
  *
  * @author Graeme Rocher
- * @since 1.00
+ * @since 1.0
  */
 @Singleton
 public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
+    /**
+     * @param beanContext       The application contect
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public DeleteEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }

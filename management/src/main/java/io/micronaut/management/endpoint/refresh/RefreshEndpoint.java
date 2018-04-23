@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.refresh;
 
 import io.micronaut.context.env.Environment;
@@ -26,13 +27,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * <p>Exposes an {@link Endpoint} to refresh application state via a {@link RefreshEvent}</p>
- *
- * @see io.micronaut.runtime.context.scope.refresh.RefreshScope
- * @see RefreshEvent
- * @see io.micronaut.runtime.context.scope.Refreshable
+ * <p>Exposes an {@link Endpoint} to refresh application state via a {@link RefreshEvent}.</p>
  *
  * @author Graeme Rocher
+ * @see io.micronaut.runtime.context.scope.refresh.RefreshScope
+ * @see io.micronaut.runtime.context.scope.refresh.RefreshEvent
+ * @see io.micronaut.runtime.context.scope.Refreshable
  * @since 1.0
  */
 @Endpoint("refresh")
@@ -41,13 +41,17 @@ public class RefreshEndpoint {
     private final Environment environment;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * @param environment    The Environment
+     * @param eventPublisher The Application event publiser
+     */
     public RefreshEndpoint(Environment environment, ApplicationEventPublisher eventPublisher) {
         this.environment = environment;
         this.eventPublisher = eventPublisher;
     }
 
     /**
-     * Refresh application state only if environment has changed (unless <code>force</code> is set to true)
+     * Refresh application state only if environment has changed (unless <code>force</code> is set to true).
      *
      * @param force {@link Nullable} body property to indicate whether to force all {@link io.micronaut.runtime.context.scope.Refreshable} beans to be refreshed
      * @return array of change keys if applicable

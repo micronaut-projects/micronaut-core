@@ -22,7 +22,7 @@ dependencies {
 File outDir = new File(project.buildDir, 'bin')
 
 task createStartScripts(type: MicronautCreateStartScripts) {
-    description = "Creates OS specific scripts to run grails-shell as a JVM application."
+    description = "Creates OS specific scripts to run the Micronaut CLI."
     mainClassName = 'io.micronaut.cli.MicronautCli'
     applicationName = 'mn'
     defaultJvmOpts = ["-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=3"]

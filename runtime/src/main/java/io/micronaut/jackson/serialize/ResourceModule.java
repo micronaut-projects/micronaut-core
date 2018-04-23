@@ -13,19 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.databind.module.SimpleModule;
-
 import javax.inject.Singleton;
 
 /**
+ * Modifies deserialization for {@link io.micronaut.http.hateos.Resource}.
+ *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
 public class ResourceModule extends SimpleModule {
 
+    /**
+     * Construct a new resource module with default deserializer for {@link io.micronaut.http.hateos.Resource}.
+     */
     public ResourceModule() {
         setDeserializerModifier(new ResourceDeserializerModifier());
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Configuration for RabbitMQ
+ * Configuration for RabbitMQ.
  */
 @Configuration
 @Requires(classes = {Channel.class, Connection.class, ConnectionFactory.class})

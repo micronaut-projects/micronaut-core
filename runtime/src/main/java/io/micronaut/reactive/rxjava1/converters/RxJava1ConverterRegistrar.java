@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.reactive.rxjava1.converters;
 
 import hu.akarnokd.rxjava.interop.RxJavaInterop;
@@ -27,7 +28,7 @@ import rx.Single;
 import javax.inject.Singleton;
 
 /**
- * Allows conversion between RxJava 1.x types and 2.x
+ * Allows conversion between RxJava 1.x types and 2.x.
  *
  * @author graemerocher
  * @since 1.0

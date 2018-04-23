@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -20,14 +21,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.Around;
 
 import javax.inject.Scope;
-import java.lang.ThreadLocal;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * A meta annotation for a scoped proxy
+ * A meta annotation for a scoped proxy.
  *
  * @author Graeme Rocher
  * @see ThreadLocal

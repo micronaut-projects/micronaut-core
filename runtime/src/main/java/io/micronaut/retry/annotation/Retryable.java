@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.retry.annotation;
 
+package io.micronaut.retry.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -30,7 +30,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * AOP Advice that can be applied to any method
+ * AOP Advice that can be applied to any method.
  *
  * @author graemerocher
  * @since 1.0
@@ -41,6 +41,8 @@ import java.lang.annotation.Target;
 @Around
 @Type(DefaultRetryInterceptor.class)
 public @interface Retryable {
+
+    int MAX_INTEGRAL_DIGITS = 4;
 
     /**
      * @return The exception types to include (defaults to all)
@@ -61,7 +63,7 @@ public @interface Retryable {
     /**
      * @return The maximum number of retry attempts
      */
-    @Digits(integer = 4, fraction = 0)
+    @Digits(integer = MAX_INTEGRAL_DIGITS, fraction = 0)
     String attempts() default "3";
 
     /**

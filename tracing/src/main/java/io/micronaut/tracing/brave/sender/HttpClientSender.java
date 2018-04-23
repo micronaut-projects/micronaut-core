@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.sender;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -20,6 +21,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.*;
 import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
@@ -35,7 +37,6 @@ import zipkin2.codec.Encoding;
 import zipkin2.reporter.Sender;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
@@ -44,12 +45,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * An {@link Sender} implementation that uses Micronaut's {@link io.micronaut.http.client.HttpClient}
+ * An {@link Sender} implementation that uses Micronaut's {@link io.micronaut.http.client.HttpClient}.
  *
  * @author graemerocher
  * @since 1.0
  */
-public class HttpClientSender extends Sender {
+public final class HttpClientSender extends Sender {
 
     private final HttpClient httpClient ;
     private final Encoding encoding;
@@ -86,26 +87,24 @@ public class HttpClientSender extends Sender {
 
     @Override
     public Call<Void> sendSpans(List<byte[]> encodedSpans) {
-        if(httpClient != null && httpClient.isRunning()) {
-            return new HttpCall(httpClient, endpoint, compressionEnabled,encodedSpans);
-        }
-        else {
+        if (httpClient != null && httpClient.isRunning()) {
+            return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
+        } else {
             throw new IllegalStateException("HTTP Client Closed");
         }
     }
 
     @Override
     public CheckResult check() {
-        if(httpClient == null) {
+        if (httpClient == null) {
             return CheckResult.failed(new NoAvailableServiceException(ZipkinServiceInstanceList.SERVICE_ID));
         }
 
         try {
             HttpResponse<Object> response = httpClient.toBlocking().exchange(HttpRequest.POST(endpoint, Collections.emptyList()));
-            if(response.getStatus().getCode() < 300) {
+            if (response.getStatus().getCode() < HttpStatus.MULTIPLE_CHOICES.getCode()) {
                 return CheckResult.OK;
-            }
-            else {
+            } else {
                 throw new IllegalStateException("check response failed: " + response);
             }
         } catch (Exception e) {
@@ -115,11 +114,14 @@ public class HttpClientSender extends Sender {
 
     @Override
     public void close() throws IOException {
-        if(httpClient != null) {
+        if (httpClient != null) {
             httpClient.close();
         }
     }
 
+    /**
+     * The HTTP call.
+     */
     private static class HttpCall extends Call<Void> {
         private final HttpClient httpClient;
         private final URI endpoint;
@@ -129,7 +131,7 @@ public class HttpClientSender extends Sender {
         private AtomicReference<Subscription> subscription = new AtomicReference<>();
         private AtomicBoolean cancelled = new AtomicBoolean(false);
 
-        public HttpCall(HttpClient httpClient, URI endpoint, boolean compressionEnabled, List<byte[]> encodedSpans) {
+        HttpCall(HttpClient httpClient, URI endpoint, boolean compressionEnabled, List<byte[]> encodedSpans) {
             this.httpClient = httpClient;
             this.endpoint = endpoint;
             this.compressionEnabled = compressionEnabled;
@@ -140,13 +142,11 @@ public class HttpClientSender extends Sender {
         public Void execute() throws IOException {
             BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
             HttpResponse<Object> response = blockingHttpClient.exchange(prepareRequest());
-            if(response.getStatus().getCode() >= 400) {
+            if (response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                 throw new IllegalStateException("Response return invalid status code: " + response.getStatus());
             }
             return null;
         }
-
-
 
         @Override
         public void enqueue(Callback<Void> callback) {
@@ -160,10 +160,9 @@ public class HttpClientSender extends Sender {
 
                 @Override
                 public void onNext(HttpResponse<ByteBuffer> response) {
-                    if(response.getStatus().getCode() >= 400) {
+                    if (response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                         callback.onError(new IllegalStateException("Response return invalid status code: " + response.getStatus()));
-                    }
-                    else {
+                    } else {
                         callback.onSuccess(null);
                     }
                 }
@@ -183,7 +182,7 @@ public class HttpClientSender extends Sender {
         @Override
         public void cancel() {
             Subscription s = this.subscription.get();
-            if(s != null) {
+            if (s != null) {
                 cancelled.set(true);
                 s.cancel();
             }
@@ -192,7 +191,7 @@ public class HttpClientSender extends Sender {
         @Override
         public boolean isCanceled() {
             Subscription s = this.subscription.get();
-            if(s != null) {
+            if (s != null) {
                 return cancelled.get();
             }
             return false;
@@ -201,7 +200,7 @@ public class HttpClientSender extends Sender {
         @Override
         public Call<Void> clone() {
             // stateless. no need to clone
-            return new HttpCall(httpClient, endpoint,compressionEnabled, encodedSpans);
+            return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
         }
 
         protected MutableHttpRequest<Flowable<Object>> prepareRequest() {
@@ -219,11 +218,12 @@ public class HttpClientSender extends Sender {
     }
 
     /**
-     * Constructs the {@link HttpClientSender}
+     * Constructs the {@link HttpClientSender}.
      */
     public static class Builder {
         public static final String DEFAULT_PATH = "/api/v2/spans";
         public static final String DEFAULT_SERVER_URL = "http://localhost:9411";
+
         private Encoding encoding = Encoding.JSON;
         private int messageMaxBytes = 5 * 1024;
         private String path = DEFAULT_PATH;
@@ -231,6 +231,11 @@ public class HttpClientSender extends Sender {
         private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
         private final HttpClientConfiguration clientConfiguration;
 
+        /**
+         * Initialize the builder with HTTP client configurations.
+         *
+         * @param clientConfiguration The HTTP client configuration
+         */
         public Builder(HttpClientConfiguration clientConfiguration) {
             this.clientConfiguration = clientConfiguration;
         }
@@ -249,14 +254,15 @@ public class HttpClientSender extends Sender {
          * @return This builder
          */
         public Builder encoding(Encoding encoding) {
-            if(encoding != null) {
+            if (encoding != null) {
                 this.encoding = encoding;
             }
             return this;
         }
 
         /**
-         * The message max bytes
+         * The message max bytes.
+         *
          * @param messageMaxBytes The max bytes
          * @return This builder
          */
@@ -266,7 +272,8 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * Whether compression is enabled (defaults to true)
+         * Whether compression is enabled (defaults to true).
+         *
          * @param compressionEnabled True if compression is enabled
          * @return This builder
          */
@@ -276,20 +283,20 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param endpoint The fully qualified URI of the Zipkin endpoint
          * @return This builder
          */
         public Builder server(URI endpoint) {
-            if(endpoint != null) {
+            if (endpoint != null) {
                 this.servers = Collections.singletonList(endpoint);
             }
             return this;
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param endpoint The fully qualified URI of the Zipkin endpoint
          * @return This builder
@@ -299,20 +306,22 @@ public class HttpClientSender extends Sender {
         }
 
         /**
-         * The endpoint to use
+         * The endpoint to use.
          *
          * @param urls The zipkin server URLs
          * @return This builder
          */
         public Builder urls(List<URI> urls) {
-            if(CollectionUtils.isNotEmpty(urls)) {
+            if (CollectionUtils.isNotEmpty(urls)) {
                 this.servers = Collections.unmodifiableList(urls);
             }
             return this;
         }
 
         /**
-         * Consructs a {@link HttpClientSender}
+         * Constructs a {@link HttpClientSender}.
+         *
+         * @param loadBalancerResolver Resolver instance capable of resolving references to services into a concrete load-balance
          * @return The sender
          */
         public HttpClientSender build(LoadBalancerResolver loadBalancerResolver) {

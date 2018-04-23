@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.http.*;
@@ -24,7 +25,7 @@ import io.opentracing.Tracer;
 import java.util.Optional;
 
 /**
- * Abstract filter used for Open Tracing based HTTP tracing
+ * Abstract filter used for Open Tracing based HTTP tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -39,14 +40,22 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     public static final String TAG_HTTP_CLIENT = "http.client";
     public static final String TAG_HTTP_SERVER = "http.server";
 
+    private static final int HTTP_SUCCESS_CODE_UPPER_LIMIT = 299;
+
     protected final Tracer tracer;
 
+    /**
+     * Configure tracer in the filter for span creation and propagation across arbitrary transports.
+     *
+     * @param tracer The tracer
+     */
     public AbstractOpenTracingFilter(Tracer tracer) {
         this.tracer = tracer;
     }
 
     /**
-     * Sets the response tags
+     * Sets the response tags.
+     *
      * @param request The request
      * @param response The response
      * @param span The span
@@ -54,7 +63,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     protected void setResponseTags(HttpRequest<?> request, HttpResponse<?> response, Span span) {
         HttpStatus status = response.getStatus();
         int code = status.getCode();
-        if(code > 299) {
+        if (code > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
             span.setTag(TAG_HTTP_STATUS_CODE, code);
             span.setTag(TAG_ERROR, status.getReason());
         }
@@ -64,20 +73,24 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     }
 
     /**
-     * Sets the error tags to use on the span
+     * Sets the error tags to use on the span.
+     *
      * @param span The span
      * @param error The error
      */
     protected void setErrorTags(Span span, Throwable error) {
-        if(error != null) {
+        if (error != null) {
             String message = error.getMessage();
-            if(message == null) message = error.getClass().getSimpleName();
+            if (message == null) {
+                message = error.getClass().getSimpleName();
+            }
             span.setTag(TAG_ERROR, message);
         }
     }
 
     /**
-     * Resolve the span name to use for the request
+     * Resolve the span name to use for the request.
+     *
      * @param request The request
      * @return The span name
      */
@@ -87,7 +100,8 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     }
 
     /**
-     * Creates a new span for the given request and span context
+     * Creates a new span for the given request and span context.
+     *
      * @param request The request
      * @param spanContext The span context
      * @return The span builder

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -24,7 +25,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback
+ * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback.
  *
  * @author graemerocher
  * @since 1.0

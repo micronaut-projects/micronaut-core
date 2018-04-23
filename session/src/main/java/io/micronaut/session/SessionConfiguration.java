@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -21,7 +22,7 @@ import java.time.Duration;
 import java.util.OptionalInt;
 
 /**
- * <p>Base configuration properties for session handling</p>
+ * <p>Base configuration properties for session handling.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,6 +30,7 @@ import java.util.OptionalInt;
 @ConfigurationProperties(SessionSettings.PREFIX)
 public class SessionConfiguration {
 
+    private static final long DEFAULT_MAX_INACTIVE_INTERVAL = 30;
     private Duration maxInactiveInterval = Duration.ofMinutes(30);
     private Integer maxActiveSessions;
 
@@ -40,11 +42,11 @@ public class SessionConfiguration {
     }
 
     /**
-     * Sets the maximum number of active sessions
+     * Sets the maximum number of active sessions.
      *
      * @param maxActiveSessions The max active sessions
      */
-    void setMaxActiveSessions(Integer maxActiveSessions) {
+    protected void setMaxActiveSessions(Integer maxActiveSessions) {
         this.maxActiveSessions = maxActiveSessions;
     }
 
@@ -56,11 +58,11 @@ public class SessionConfiguration {
     }
 
     /**
-     * Set the max active sessions
+     * Set the max active sessions.
      *
-     * @param maxInactiveInterval
+     * @param maxInactiveInterval The max inactive interval
      */
-    void setMaxInactiveInterval(Duration maxInactiveInterval) {
+    protected void setMaxInactiveInterval(Duration maxInactiveInterval) {
         if (maxInactiveInterval != null) {
             this.maxInactiveInterval = maxInactiveInterval;
         }

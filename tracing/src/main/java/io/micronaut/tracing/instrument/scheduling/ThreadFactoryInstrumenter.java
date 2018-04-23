@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.scheduling;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import javax.inject.Singleton;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Instruments thread creation for {@link Tracer}
+ * Instruments thread creation for {@link Tracer}.
  *
  * @author graemerocher
  * @since 1.0
@@ -36,6 +37,10 @@ public class ThreadFactoryInstrumenter implements BeanCreatedEventListener<Threa
 
     private final Tracer tracer;
 
+    /**
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public ThreadFactoryInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }

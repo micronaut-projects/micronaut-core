@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
 
+package io.micronaut.web.router;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
@@ -50,7 +50,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * A DefaultRouteBuilder implementation for building roots
+ * A DefaultRouteBuilder implementation for building roots.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -58,15 +58,13 @@ import java.util.stream.Collectors;
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used
+     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used.
      */
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
 
-    protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
-
     /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used
+     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
      */
     public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
         @Override
@@ -76,13 +74,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public String resolveUri(String property) {
-            if (StringUtils.isEmpty(property)) return "/";
+            if (StringUtils.isEmpty(property)) {
+                return "/";
+            }
             if (property.charAt(0) != '/') {
                 return '/' + NameUtils.hyphenate(property, true);
             }
             return property;
         }
     };
+
+    protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
     static final Object NO_VALUE = new Object();
     protected final ExecutionHandleLocator executionHandleLocator;
@@ -96,14 +98,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
     private List<FilterRoute> filterRoutes = new ArrayList<>();
 
+    /**
+     * @param executionHandleLocator The execution handler locator
+     */
     public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator) {
         this(executionHandleLocator, CAMEL_CASE_NAMING_STRATEGY);
     }
 
+    /**
+     * @param executionHandleLocator The execution handler locator
+     * @param uriNamingStrategy The URI naming strategy
+     */
     public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy) {
         this(executionHandleLocator, uriNamingStrategy, ConversionService.SHARED);
     }
 
+    /**
+     * @param executionHandleLocator The execution handler locator
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
@@ -149,12 +163,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return uriNamingStrategy;
     }
 
-
     @Override
     public ResourceRoute resources(Class cls) {
         return new DefaultResourceRoute(cls);
     }
-
 
     @Override
     public ResourceRoute single(Class cls) {
@@ -283,6 +295,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildRoute(HttpMethod.TRACE, uri, type, method, parameterTypes);
     }
 
+    /**
+     * Build a route.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri The URI
+     * @param type The type
+     * @param method The method
+     * @param parameterTypes Parameters
+     *
+     * @return an {@link UriRoute}
+     */
     protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class... parameterTypes) {
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
@@ -301,6 +324,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return route;
     }
 
+    /**
+     * Abstract class for base {@link MethodBasedRoute}.
+     */
     abstract class AbstractRoute implements MethodBasedRoute {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle targetMethod;
@@ -309,6 +335,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgument;
 
+        /**
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         * @param mediaTypes The media types
+         */
         AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
@@ -377,16 +408,30 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     }
 
+    /**
+     * Default Error Route.
+     */
     class DefaultErrorRoute extends AbstractRoute implements ErrorRoute, Comparable<ErrorRoute> {
 
         private final Class<? extends Throwable> error;
         private final Class originatingClass;
 
+        /**
+         * @param error The throwable
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
         public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             this(null, error, targetMethod, conversionService);
         }
 
-        public DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        /**
+         * @param originatingClass The originating class
+         * @param error The throwable
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public  DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
@@ -442,12 +487,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             DefaultErrorRoute that = (DefaultErrorRoute) o;
 
-            if (error != null ? !error.equals(that.error) : that.error != null) return false;
+            if (error != null ? !error.equals(that.error) : that.error != null) {
+                return false;
+            }
             return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
         }
 
@@ -490,12 +541,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
-     * Represents a route for an {@link HttpStatus} code
+     * Represents a route for an {@link HttpStatus} code.
      */
     class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
 
+        /**
+         * @param status The HTTP Status
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
         public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.status = status;
@@ -535,14 +591,21 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return (StatusRoute) super.where(condition);
         }
 
+        /**
+         * @return The {@link HttpStatus}
+         */
         public HttpStatus getStatus() {
             return status;
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             DefaultStatusRoute that = (DefaultStatusRoute) o;
 
@@ -556,7 +619,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
-     * The default route impl
+     * The default route impl.
      */
     class DefaultUriRoute extends AbstractRoute implements UriRoute {
 
@@ -564,18 +627,40 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
 
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param targetMethod The target method execution handle
+         */
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
         }
 
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param mediaType The Media type
+         * @param targetMethod The target method execution handle
+         */
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
             this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod);
         }
 
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param targetMethod The target method execution handle
+         */
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
             this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod);
         }
 
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param mediaTypes The media types
+         * @param targetMethod The target method execution handle
+         */
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
             super(targetMethod, ConversionService.SHARED, mediaTypes);
             this.httpMethod = httpMethod;
@@ -611,7 +696,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public UriRoute consumes(MediaType... mediaTypes) {
             return (UriRoute) super.consumes(mediaTypes);
         }
-
 
         @Override
         public UriRoute produces(MediaType... mediaType) {
@@ -658,12 +742,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     }
 
+    /**
+     * Define a single route.
+     */
     class DefaultSingleRoute extends DefaultResourceRoute {
 
+        /**
+         * @param resourceRoutes The resource routes
+         * @param getRoute The default Uri route
+         */
         DefaultSingleRoute(Map<HttpMethod, Route> resourceRoutes, DefaultUriRoute getRoute) {
             super(resourceRoutes, getRoute);
         }
 
+        /**
+         * @param type The class
+         */
         DefaultSingleRoute(Class type) {
             super(type);
         }
@@ -703,16 +797,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     }
 
+    /**
+     * Default resource route.
+     */
     class DefaultResourceRoute implements ResourceRoute {
 
         private final Map<HttpMethod, Route> resourceRoutes;
         private final DefaultUriRoute getRoute;
 
+        /**
+         * @param resourceRoutes The resource routes
+         * @param getRoute The default Uri route
+         */
         DefaultResourceRoute(Map<HttpMethod, Route> resourceRoutes, DefaultUriRoute getRoute) {
             this.resourceRoutes = resourceRoutes;
             this.getRoute = getRoute;
         }
 
+        /**
+         * @param type The class
+         */
         DefaultResourceRoute(Class type) {
             this.resourceRoutes = new LinkedHashMap<>();
             // GET /foo/1
@@ -782,10 +886,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return handleExclude(Arrays.asList(methods));
         }
 
+        /**
+         * @param newMap New map info
+         * @param getRoute The default route
+         *
+         * @return The {@link ResourceRoute}
+         */
         protected ResourceRoute newResourceRoute(Map<HttpMethod, Route> newMap, DefaultUriRoute getRoute) {
             return new DefaultResourceRoute(newMap, getRoute);
         }
 
+        /**
+         * @param type The class
+         * @param routeMap The route info
+         *
+         * @return The {@link DefaultUriRoute}
+         */
         protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type, ID);
             routeMap.put(
@@ -794,6 +910,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return getRoute;
         }
 
+        /**
+         * Build the remaining routes.
+         *
+         * @param type The class
+         * @param routeMap The route info
+         */
         protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
             // GET /foo
             routeMap.put(

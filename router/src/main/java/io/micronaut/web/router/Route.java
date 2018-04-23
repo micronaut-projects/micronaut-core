@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpRequest;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Represents a Route definition constructed by a {@link RouteBuilder}
+ * Represents a Route definition constructed by a {@link RouteBuilder}.
  *
  * @author Graeme Rocher
  * @see RouteBuilder
@@ -33,12 +34,12 @@ import java.util.function.Predicate;
 public interface Route {
 
     /**
-     * The default media type produced by routes
+     * The default media type produced by routes.
      */
     List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
 
     /**
-     * Applies the given accepted media type the route
+     * Applies the given accepted media type the route.
      *
      * @param mediaType The media type
      * @return A new route with the media type applied
@@ -46,7 +47,7 @@ public interface Route {
     Route consumes(MediaType... mediaType);
 
     /**
-     * Applies the given accepted media type the route
+     * Applies the given accepted media type the route.
      *
      * @param mediaType The media type
      * @return A new route with the media type applied
@@ -54,14 +55,14 @@ public interface Route {
     Route produces(MediaType... mediaType);
 
     /**
-     * Accept all {@link MediaType} references
+     * Accept all {@link MediaType} references.
      *
      * @return A new route with the media type applied
      */
     Route acceptAll();
 
     /**
-     * Defines routes nested within this route
+     * Defines routes nested within this route.
      *
      * @param nested The nested routes
      * @return This route
@@ -69,7 +70,7 @@ public interface Route {
     Route nest(Runnable nested);
 
     /**
-     * Match this {@link Route} only if the given predicate is true
+     * Match this {@link Route} only if the given predicate is true.
      *
      * @param condition The condition which accepts a {@link HttpRequest}
      * @return This route
@@ -77,7 +78,7 @@ public interface Route {
     Route where(Predicate<HttpRequest<?>> condition);
 
     /**
-     * The name of the argument to the route that is the request body
+     * The name of the argument to the route that is the request body.
      *
      * @param argument The argument
      * @return This route
@@ -85,7 +86,7 @@ public interface Route {
     Route body(String argument);
 
     /**
-     * The media types able to produced by this route
+     * The media types able to produced by this route.
      *
      * @return A list of {@link MediaType} that this route can produce
      */
@@ -95,7 +96,7 @@ public interface Route {
 
 
     /**
-     * The media types able to produced by this route
+     * The media types able to produced by this route.
      *
      * @return A list of {@link MediaType} that this route can produce
      */

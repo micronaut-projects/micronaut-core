@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.groovy;
 
 import io.micronaut.context.ApplicationContext;
@@ -26,7 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Base class for Function scripts
+ * Base class for Function scripts.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,9 +36,16 @@ public abstract class FunctionScript extends FunctionInitializer implements Prop
 
     private Map<String, Object> props;
 
+    /**
+     * Constuctor.
+     */
     public FunctionScript() {
     }
 
+    /**
+     * Constructor.
+     * @param applicationContext applicationContext
+     */
     protected FunctionScript(ApplicationContext applicationContext) {
         super(applicationContext, false);
     }
@@ -59,6 +67,12 @@ public abstract class FunctionScript extends FunctionInitializer implements Prop
         return resolveProps().keySet().iterator();
     }
 
+    /**
+     * Add a property to the script.
+     *
+     * @param name name of the property
+     * @param value value
+     */
     protected void addProperty(String name, Object value) {
         resolveProps().put(name, value);
     }

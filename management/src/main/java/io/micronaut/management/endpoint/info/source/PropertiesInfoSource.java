@@ -13,19 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.env.PropertiesPropertySourceLoader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
-import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 
 import java.util.Optional;
 
 /**
- * <p>Extends {@link InfoEndpoint} to add a helper method for retrieving a {@link PropertySource} from a properties file. </p>
+ * <p>Extends {@link io.micronaut.management.endpoint.info.InfoEndpoint} to add a helper method for retrieving a
+ * {@link PropertySource} from a properties file.</p>
  *
  * @author Zachary Klein
  * @since 1.0
@@ -33,13 +34,13 @@ import java.util.Optional;
 public interface PropertiesInfoSource extends InfoSource {
 
     /**
-     * <p>Extends {@link InfoEndpoint} to add a helper method for retrieving a {@link PropertySource} from a properties file. </p>
+     * <p>Extends {@link io.micronaut.management.endpoint.info.InfoEndpoint} to add a helper method for retrieving a
+     * {@link PropertySource} from a properties file. </p>
      *
-     * @param path The path to the properties file
-     * @param prefix prefix for resolving the file (used if not included in {@code path})
-     * @param extension file extension (used if not included in {@code path})
+     * @param path             The path to the properties file
+     * @param prefix           prefix for resolving the file (used if not included in {@code path})
+     * @param extension        file extension (used if not included in {@code path})
      * @param resourceResolver Instance of {@link ResourceResolver} to resolve the file location
-     *
      * @return An {@link Optional} of {@link PropertySource} containing the values from the properties file
      */
     default Optional<PropertySource> retrievePropertiesPropertySource(String path, String prefix, String extension, ResourceResolver resourceResolver) {

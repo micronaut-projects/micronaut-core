@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -48,6 +49,10 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
     private BeanDefinitionData beanDefinitionData;
     private ExecutorService executorService;
 
+    /**
+     * @param beanDefinitionData The {@link BeanDefinitionData}
+     * @param executorService    The Executor service
+     */
     RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData,
                                       @Named(TaskExecutors.IO) ExecutorService executorService) {
         this.beanDefinitionData = beanDefinitionData;
@@ -63,10 +68,15 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
         }).toFlowable();
     }
 
+    /**
+     * @param definitions The bean definitions
+     * @return A {@link Single} that wraps a Map
+     */
     protected Single<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
         Map<String, Object> beans = new ConcurrentHashMap<>(definitions.size());
 
-        return Flowable.fromIterable(definitions)
+        return Flowable
+            .fromIterable(definitions)
             .subscribeOn(Schedulers.from(executorService))
             .collectInto(beans, (map, definition) ->
                 map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))

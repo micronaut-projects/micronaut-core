@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import io.micronaut.context.annotation.Primary;
@@ -20,7 +21,7 @@ import io.micronaut.context.annotation.Primary;
 import javax.inject.Singleton;
 
 /**
- * Default implementation of {@link CacheErrorHandler}
+ * Default implementation of {@link CacheErrorHandler}.
  *
  * @author Graeme Rocher
  * @since 1.0

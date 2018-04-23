@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -41,6 +42,12 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     private final com.github.benmanes.caffeine.cache.Cache cache;
     private final ConversionService<?> conversionService;
 
+    /**
+     * Construct a sync cache implementation with given configurations.
+     *
+     * @param cacheConfiguration The cache configurations
+     * @param conversionService To convert the value from the cache into given required type
+     */
     public DefaultSyncCache(CacheConfiguration cacheConfiguration, ConversionService<?> conversionService) {
         this.cacheConfiguration = cacheConfiguration;
         this.conversionService = conversionService;
@@ -110,6 +117,12 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
         return existing;
     }
 
+    /**
+     * Build a cache from the given configurations.
+     *
+     * @param cacheConfiguration The cache configurations
+     * @return cache
+     */
     protected com.github.benmanes.caffeine.cache.Cache buildCache(CacheConfiguration cacheConfiguration) {
         Caffeine<Object, Object> builder = Caffeine.newBuilder();
         cacheConfiguration.getExpireAfterAccess().ifPresent(duration -> builder.expireAfterAccess(duration.toMillis(), TimeUnit.MILLISECONDS));

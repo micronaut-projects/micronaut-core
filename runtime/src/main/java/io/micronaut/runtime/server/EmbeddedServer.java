@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.server;
 
 import io.micronaut.context.ApplicationContext;
@@ -25,7 +26,7 @@ import java.net.URL;
 
 /**
  * <p>An EmbeddedServer is a general abstraction to manage the lifecycle of any server implementation within
- * a running Micronaut application</p>
+ * a running Micronaut application.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
