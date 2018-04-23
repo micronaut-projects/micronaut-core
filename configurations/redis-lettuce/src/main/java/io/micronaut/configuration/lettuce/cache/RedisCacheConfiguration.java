@@ -35,9 +35,7 @@ import java.util.Optional;
 public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected String server;
-
     protected Class<ObjectSerializer> keySerializer;
-
     protected Class<ObjectSerializer> valueSerializer;
 
     /**
@@ -50,6 +48,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
     }
 
     /**
+     * @see io.micronaut.configuration.lettuce.NamedRedisServersConfiguration
      * @return The name of the server to use.
      */
     public Optional<String> getServer() {
@@ -61,29 +60,10 @@ public class RedisCacheConfiguration extends CacheConfiguration {
     }
 
     /**
-     * Sets the name of a configured server to use.
-     *
-     * @param server The name of the server
-     * @see io.micronaut.configuration.lettuce.NamedRedisServersConfiguration
-     */
-    public void setServer(String server) {
-        this.server = server;
-    }
-
-    /**
      * @return The {@link ObjectSerializer} type to use for serializing values.
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
-    }
-
-    /**
-     * The serializer to use for values.
-     *
-     * @param valueSerializer The value serializer.
-     */
-    public void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
-        this.valueSerializer = valueSerializer;
     }
 
     /**
@@ -95,12 +75,4 @@ public class RedisCacheConfiguration extends CacheConfiguration {
         return Optional.ofNullable(keySerializer);
     }
 
-    /**
-     * The serializer to use for keys.
-     *
-     * @param keySerializer The key serializer
-     */
-    public void setKeySerializer(Class<ObjectSerializer> keySerializer) {
-        this.keySerializer = keySerializer;
-    }
 }
