@@ -49,11 +49,8 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
-        server.start()
 
         then:
-        server != null
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
@@ -61,6 +58,14 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !config.host.isPresent()
         config.parent.threads == 8
         config.worker.threads == 8
+
+        then:
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        server != null
+
 
         cleanup:
         beanContext.close()

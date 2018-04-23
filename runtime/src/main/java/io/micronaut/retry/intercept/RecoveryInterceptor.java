@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.intercept;
 
 import io.micronaut.aop.InterceptPhase;
@@ -26,7 +27,6 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.annotation.Fallback;
-import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.exception.FallbackException;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -40,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * A {@link MethodInterceptor} that will attempt to execute a {@link Fallback}
- * when the target method is in an error state
+ * when the target method is in an error state.
  *
  * @author graemerocher
  * @since 1.0
@@ -49,13 +49,16 @@ import java.util.concurrent.CompletableFuture;
 public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
     /**
-     * Positioned before the {@link Retryable} interceptor
+     * Positioned before the {@link io.micronaut.retry.annotation.Retryable} interceptor.
      */
     public static final int POSITION = InterceptPhase.RETRY.getPosition() - 10;
 
     private static final Logger LOG = LoggerFactory.getLogger(RecoveryInterceptor.class);
     private final BeanContext beanContext;
 
+    /**
+     * @param beanContext The bean context to allow for DI of class annotated with {@link javax.inject.Inject}.
+     */
     public RecoveryInterceptor(BeanContext beanContext) {
         this.beanContext = beanContext;
     }
@@ -118,7 +121,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
-     * Finds a fallback method for the given context
+     * Finds a fallback method for the given context.
      *
      * @param context The context
      * @return The fallback method if it is present
@@ -185,7 +188,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
-     * Resolves a fallback for the given execution context and exception
+     * Resolves a fallback for the given execution context and exception.
      *
      * @param context   The context
      * @param exception The exception

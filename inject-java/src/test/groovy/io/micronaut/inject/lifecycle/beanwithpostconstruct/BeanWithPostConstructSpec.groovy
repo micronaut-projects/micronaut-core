@@ -19,9 +19,55 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanFactory
 import spock.lang.Specification
 
-class BeanWithPostConstructSpec extends Specification{
+class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
+
+    void "test @PreDestroy and @PostConstruct injection compile"() {
+        given:"A bean that has life cycle annotations"
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+import javax.annotation.*;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import io.micronaut.context.annotation.*;
+
+@Executable
+class MyBean {
+    
+    Foo foo;
+    
+    public Foo getFoo() { return this.foo; }
+    
+    @PostConstruct
+    public void init(Foo foo) {
+        this.foo = foo;
+    }
+    
+    @PreDestroy
+    public void setFoo(Foo foo) {
+        this.foo = null;
+    }
+    @PreDestroy
+    public void close() {}
+}
+
+
+@javax.inject.Singleton
+class Foo {}
+
+''')
+        then:"the state is correct"
+        beanDefinition.injectedMethods.size() == 3
+        beanDefinition.preDestroyMethods.size() == 2
+        beanDefinition.postConstructMethods.size() == 1
+
+    }
 
     void "test that a bean with a protected post construct hook that the hook is invoked"() {
         given:

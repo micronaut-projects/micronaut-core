@@ -133,7 +133,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorInjectionPoint constructor = declaringType.getConstructor();
-            if (constructor instanceof MethodConstructorInjectionPoint) {
+            if (constructor instanceof ReflectionMethodConstructorInjectionPoint) {
                 MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");

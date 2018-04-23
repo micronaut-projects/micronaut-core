@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -37,7 +38,7 @@ import java.util.Optional;
 import java.util.TimeZone;
 
 /**
- * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}
+ * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,7 +47,7 @@ import java.util.TimeZone;
 public class ObjectMapperFactory {
 
     /**
-     * Name for Micronaut module
+     * Name for Micronaut module.
      */
     public static final String MICRONAUT_MODULE = "micronaut";
 
@@ -67,7 +68,7 @@ public class ObjectMapperFactory {
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
 
     /**
-     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}
+     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
      * @param jsonFactory          The JSON factory

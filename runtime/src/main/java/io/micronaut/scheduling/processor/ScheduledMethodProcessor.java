@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.BeanContext;
@@ -37,7 +38,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation
+ * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
  *
  * @author graemerocher
  * @since 1.0
@@ -49,6 +50,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private final ConversionService<?> conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
 
+    /**
+     * @param beanContext       The bean context for DI of beans annotated with {@link javax.inject.Inject}
+     * @param conversionService To convert one type to another
+     */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService) {
         this.beanContext = beanContext;

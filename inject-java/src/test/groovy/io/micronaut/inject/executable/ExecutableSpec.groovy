@@ -18,18 +18,48 @@ package io.micronaut.inject.executable
 import io.micronaut.context.AbstractExecutableMethod
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
-import io.micronaut.inject.MethodExecutionHandle
-import io.micronaut.context.AbstractExecutableMethod
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.inject.ExecutionHandle
-import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.MethodExecutionHandle
 import spock.lang.Specification
 
-class ExecutableSpec extends Specification {
+import javax.inject.Named
+import javax.inject.Singleton
+
+class ExecutableSpec extends AbstractTypeElementSpec {
+
+    void "test executable compile spec"() {
+        given:"A bean that defines no explicit scope"
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Executable
+class MyBean {
+    public String methodOne(@javax.inject.Named("foo") String one) {
+        return "good";
+    }
+    
+    public String methodTwo(String one, String two) {
+        return "good";
+    }
+    
+    public String methodZero() {
+        return "good";
+    }
+}
+
+
+''')
+        then:"the default scope is singleton"
+        beanDefinition.executableMethods.size() == 3
+        beanDefinition.executableMethods[0].methodName == 'methodOne'
+        beanDefinition.executableMethods[0].getArguments()[0].getAnnotation(Named).value() == 'foo'
+    }
 
     void "test executable metadata"() {
         given:

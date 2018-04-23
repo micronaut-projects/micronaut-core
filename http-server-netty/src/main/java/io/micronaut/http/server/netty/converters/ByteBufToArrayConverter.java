@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -24,7 +25,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a {@link ByteBuf} to a byte array
+ * Converts a {@link ByteBuf} to a byte array.
  *
  * @author Graeme Rocher
  * @since 1.0

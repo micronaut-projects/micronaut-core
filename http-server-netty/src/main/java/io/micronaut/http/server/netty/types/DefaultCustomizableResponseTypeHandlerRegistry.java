@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
 import javax.inject.Singleton;
@@ -21,7 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry of {@link NettyCustomizableResponseTypeHandler} instances
+ * Registry of {@link NettyCustomizableResponseTypeHandler} instances.
  *
  * @author James Kleeh
  * @since 1.0
@@ -32,6 +33,9 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
     private NettyCustomizableResponseTypeHandler[] handlers;
     private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
 
+    /**
+     * @param typeHandlers The Netty customizable response type handlers
+     */
     public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler... typeHandlers) {
         this.handlers = typeHandlers;
     }

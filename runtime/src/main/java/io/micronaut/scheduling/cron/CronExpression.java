@@ -16,6 +16,7 @@
  * Note: rewritten to standard Java 8 DateTime by zemiak (c) 2016
  * Forked from: https://github.com/frode-carlsen/cron
  */
+
 package io.micronaut.scheduling.cron;
 
 import java.time.DayOfWeek;
@@ -31,7 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * This provides cron support for java8 using java-time.
+ * This provides cron support for Java 8 using java-time.
  * <p>
  * <p>
  * Parser for unix-like cron expressions: Cron expressions allow specifying combinations of criteria for time
@@ -50,44 +51,44 @@ import java.util.regex.Pattern;
  * </tr>
  * <tr>
  * <td align="left"><code>Seconds (may be omitted)</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>0-59</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * /</code></td>
  * </tr>
  * <tr>
  * <td align="left"><code>Minutes</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>0-59</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * /</code></td>
  * </tr>
  * <tr>
  * <td align="left"><code>Hours</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>0-23</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * /</code></td>
  * </tr>
  * <tr>
  * <td align="left"><code>Day of month</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>1-31</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * ? / L W</code></td>
  * </tr>
  * <tr>
  * <td align="left"><code>Month</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>1-12 or JAN-DEC (note: english abbreviations)</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * /</code></td>
  * </tr>
  * <tr>
  * <td align="left"><code>Day of week</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>1-7 or MON-SUN (note: english abbreviations)</code></td>
- * <td align="left">&nbsp;</th>
+ * <td align="left">&nbsp;</td>
  * <td align="left"><code>, - * ? / L #</code></td>
  * </tr>
  * </table>
@@ -131,20 +132,39 @@ import java.util.regex.Pattern;
  */
 public class CronExpression {
 
+    /**
+     * Represents a field in the cron expression.
+     */
     enum CronFieldType {
-        SECOND(0, 59, null), MINUTE(0, 59, null), HOUR(0, 23, null), DAY_OF_MONTH(1, 31, null), MONTH(1, 12,
-            Arrays.asList("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")), DAY_OF_WEEK(1, 7,
-            Arrays.asList("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"));
+        SECOND(0, 59, null),
+        MINUTE(0, 59, null),
+        HOUR(0, 23, null),
+        DAY_OF_MONTH(1, 31, null),
+        MONTH(1, 12,
+                Arrays.asList("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")),
+        DAY_OF_WEEK(1, 7,
+                Arrays.asList("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"));
 
         final int from, to;
         final List<String> names;
 
+        /**
+         * Create a new cron field with given value.
+         *
+         * @param from  The minimum value
+         * @param to    The maximum value
+         * @param names The name assigned to each unit
+         */
         CronFieldType(int from, int to, List<String> names) {
             this.from = from;
             this.to = to;
             this.names = names;
         }
     }
+
+    private static final int CRON_EXPRESSION_LENGTH_WITH_SEC = 6;
+    private static final int CRON_EXPRESSION_LENGTH_WITHOUT_SEC = 5;
+    private static final int FOUR = 4;
 
     private final String expr;
     private final SimpleField secondField;
@@ -154,6 +174,11 @@ public class CronExpression {
     private final SimpleField monthField;
     private final DayOfMonthField dayOfMonthField;
 
+    /**
+     * Construct an object form a valid cron expression string.
+     *
+     * @param expr The cron expression.
+     */
     CronExpression(final String expr) {
         this(expr, true);
     }
@@ -165,7 +190,7 @@ public class CronExpression {
 
         this.expr = expr;
 
-        final int expectedParts = withSeconds ? 6 : 5;
+        final int expectedParts = withSeconds ? CRON_EXPRESSION_LENGTH_WITH_SEC : CRON_EXPRESSION_LENGTH_WITHOUT_SEC;
         final String[] parts = expr.split("\\s+"); //$NON-NLS-1$
         if (parts.length != expectedParts) {
             throw new IllegalArgumentException(String.format("Invalid cron expression [%s], expected %s field, got %s", expr, expectedParts, parts.length));
@@ -180,24 +205,50 @@ public class CronExpression {
         this.dayOfWeekField = new DayOfWeekField(parts[ix++]);
     }
 
+    /**
+     * Create object from the String expression.
+     *
+     * @param expr The cron expression
+     * @return The {@link CronExpression} instance
+     */
     public static CronExpression create(final String expr) {
         return new CronExpression(expr, true);
     }
 
+    /**
+     * This will search for the next time within the next 4 years. If there is no
+     * time matching, an InvalidArgumentException will be thrown (it is very
+     * likely that the cron expression is invalid, like the February 30th).
+     *
+     * @param afterTime A date-time with a time-zone in the ISO-8601 calendar system
+     * @return The next time within next 4 years
+     */
     public ZonedDateTime nextTimeAfter(ZonedDateTime afterTime) {
-        // will search for the next time within the next 4 years. If there is no
-        // time matching, an InvalidArgumentException will be thrown (it is very
-        // likely that the cron expression is invalid, like the February 30th).
-        return nextTimeAfter(afterTime, afterTime.plusYears(4));
+        return nextTimeAfter(afterTime, afterTime.plusYears(FOUR));
     }
 
+
+    /**
+     * This will search for the next time within the next durationInMillis
+     * millisecond. Be aware that the duration is specified in millis,
+     * but in fact the limit is checked on a day-to-day basis.
+     *
+     * @param afterTime        A date-time with a time-zone in the ISO-8601 calendar system
+     * @param durationInMillis The maximum duration in millis after a given time
+     * @return The next time within given duration
+     */
     public ZonedDateTime nextTimeAfter(ZonedDateTime afterTime, long durationInMillis) {
-        // will search for the next time within the next durationInMillis
-        // millisecond. Be aware that the duration is specified in millis,
-        // but in fact the limit is checked on a day-to-day basis.
         return nextTimeAfter(afterTime, afterTime.plus(Duration.ofMillis(durationInMillis)));
     }
 
+
+    /**
+     * This will search for the next time within the given dateTimeBarrier.
+     *
+     * @param afterTime       A date-time with a time-zone in the ISO-8601 calendar system
+     * @param dateTimeBarrier The upper limit or maximum date-time to check for next time
+     * @return The next time within given barrier
+     */
     public ZonedDateTime nextTimeAfter(ZonedDateTime afterTime, ZonedDateTime dateTimeBarrier) {
         ZonedDateTime nextTime = ZonedDateTime.from(afterTime).withNano(0).plusSeconds(1).withNano(0);
 
@@ -255,25 +306,41 @@ public class CronExpression {
         return getClass().getSimpleName() + "<" + expr + ">";
     }
 
+    /**
+     * A class that represent a cron field part.
+     */
     static class FieldPart {
-        private Integer from, to, increment;
-        private String modifier, incrementModifier;
+
+        private Integer from;
+        private Integer to;
+        private Integer increment;
+        private String modifier;
+        private String incrementModifier;
     }
 
+    /**
+     * A class that represent a basic field part of the cron field.
+     */
     abstract static class BasicField {
         private static final Pattern CRON_FIELD_REGEXP = Pattern
-            .compile("(?:                                             # start of group 1\n"
-                    + "   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)\n"
-                    + " | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol\n"
-                    + "      (?:                                        # start of group 2\n"
-                    + "         (?<mod>L|W)                             # modifier (L,W)\n"
-                    + "       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)\n"
-                    + "      )?                                         # end of group 2\n"
-                    + ")                                              # end of group 1\n"
-                    + "(?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)\n",
-                Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
+                .compile("(?:                                             # start of group 1\n"
+                                + "   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)\n"
+                                + " | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol\n"
+                                + "      (?:                                        # start of group 2\n"
+                                + "         (?<mod>L|W)                             # modifier (L,W)\n"
+                                + "       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)\n"
+                                + "      )?                                         # end of group 2\n"
+                                + ")                                              # end of group 1\n"
+                                + "(?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)\n",
+                        Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
+
+        private static final int PART_INCREMENT = 999;
 
         final CronFieldType fieldType;
+
+        /**
+         * Represent parts for the cron field.
+         */
         final List<FieldPart> parts = new ArrayList<>();
 
         private BasicField(CronFieldType fieldType, String fieldExpr) {
@@ -281,6 +348,11 @@ public class CronExpression {
             parse(fieldExpr);
         }
 
+        /**
+         * Create a {@link BasicField} from the given String expression.
+         *
+         * @param fieldExpr String expression for a field
+         */
         private void parse(String fieldExpr) { // NOSONAR
             String[] rangeParts = fieldExpr.split(",");
             for (String rangePart : rangeParts) {
@@ -295,7 +367,7 @@ public class CronExpression {
                 String increment = m.group("inc");
 
                 FieldPart part = new FieldPart();
-                part.increment = 999;
+                part.increment = PART_INCREMENT;
                 if (startNummer != null) {
                     part.from = mapValue(startNummer);
                     part.modifier = modifier;
@@ -331,6 +403,11 @@ public class CronExpression {
             }
         }
 
+        /**
+         * Validate the cron field part.
+         *
+         * @param part The part of cron-field
+         */
         protected void validatePart(FieldPart part) {
             if (part.modifier != null) {
                 throw new IllegalArgumentException(String.format("Invalid modifier [%s]", part.modifier));
@@ -339,26 +416,45 @@ public class CronExpression {
             }
         }
 
+        /**
+         * Validate range of the cron-field part.
+         *
+         * @param part The part of cron-field
+         */
         private void validateRange(FieldPart part) {
             if ((part.from != null && part.from < fieldType.from) || (part.to != null && part.to > fieldType.to)) {
                 throw new IllegalArgumentException(String.format("Invalid interval [%s-%s], must be %s<=_<=%s", part.from, part.to, fieldType.from,
-                    fieldType.to));
+                        fieldType.to));
             } else if (part.from != null && part.to != null && part.from > part.to) {
                 throw new IllegalArgumentException(
-                    String.format(
-                        "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s",
-                        part.from, part.to, fieldType.from, fieldType.to));
+                        String.format(
+                                "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s",
+                                part.from, part.to, fieldType.from, fieldType.to));
             }
         }
 
+        /**
+         * Map value to the {@link CronFieldType} name.
+         *
+         * @param value The value to map to names of {@link CronFieldType}
+         * @return The integer value of name from the names for cron-field type
+         */
         protected Integer mapValue(String value) {
             Integer idx;
-            if (fieldType.names != null && (idx = fieldType.names.indexOf(value.toUpperCase(Locale.getDefault()))) >= 0) {
-                return idx + 1;
+            if (fieldType.names != null) {
+                idx = fieldType.names.indexOf(value.toUpperCase(Locale.getDefault()));
+                if (idx >= 0) {
+                    return idx + 1;
+                }
             }
             return Integer.valueOf(value);
         }
 
+        /**
+         * @param val  The value
+         * @param part Cron field part to match to
+         * @return True/False if the value matches the field part
+         */
         protected boolean matches(int val, FieldPart part) {
             if (val >= part.from && val <= part.to && (val - part.from) % part.increment == 0) {
                 return true;
@@ -367,11 +463,27 @@ public class CronExpression {
         }
     }
 
+    /**
+     * A class that represent a simple cron field.
+     */
     static class SimpleField extends BasicField {
+
+        /**
+         * Create a simple field type for the given field type and expression.
+         *
+         * @param fieldType The type of field, eg: month, day, second etc.
+         * @param fieldExpr The field expression
+         */
         SimpleField(CronFieldType fieldType, String fieldExpr) {
             super(fieldType, fieldExpr);
         }
 
+        /**
+         * Check if the given value matches the SimpleField.
+         *
+         * @param val The cron-field value
+         * @return Whether the value matches
+         */
         public boolean matches(int val) {
             if (val >= fieldType.from && val <= fieldType.to) {
                 for (FieldPart part : parts) {
@@ -384,24 +496,40 @@ public class CronExpression {
         }
     }
 
+    /**
+     * A class that represents day of the week field in the cron expression.
+     */
     static class DayOfWeekField extends BasicField {
 
+        static final int DAYS_IN_WEEK = 7;
+
+        /**
+         * Construct the field from the given expression.
+         *
+         * @param fieldExpr The field expression
+         */
         DayOfWeekField(String fieldExpr) {
             super(CronFieldType.DAY_OF_WEEK, fieldExpr);
         }
 
-        boolean matches(LocalDate dato) {
+        /**
+         * Check if the date matches the day of the week.
+         *
+         * @param date The date
+         * @return Whether the date matches the day of the field
+         */
+        boolean matches(LocalDate date) {
             for (FieldPart part : parts) {
                 if ("L".equals(part.modifier)) {
-                    YearMonth ym = YearMonth.of(dato.getYear(), dato.getMonth().getValue());
-                    return dato.getDayOfWeek() == DayOfWeek.of(part.from) && dato.getDayOfMonth() > (ym.lengthOfMonth() - 7);
+                    YearMonth ym = YearMonth.of(date.getYear(), date.getMonth().getValue());
+                    return date.getDayOfWeek() == DayOfWeek.of(part.from) && date.getDayOfMonth() > (ym.lengthOfMonth() - DAYS_IN_WEEK);
                 } else if ("#".equals(part.incrementModifier)) {
-                    if (dato.getDayOfWeek() == DayOfWeek.of(part.from)) {
-                        int num = dato.getDayOfMonth() / 7;
-                        return part.increment == (dato.getDayOfMonth() % 7 == 0 ? num : num + 1);
+                    if (date.getDayOfWeek() == DayOfWeek.of(part.from)) {
+                        int num = date.getDayOfMonth() / DAYS_IN_WEEK;
+                        return part.increment == (date.getDayOfMonth() % DAYS_IN_WEEK == 0 ? num : num + 1);
                     }
                     return false;
-                } else if (matches(dato.getDayOfWeek().getValue(), part)) {
+                } else if (matches(date.getDayOfWeek().getValue(), part)) {
                     return true;
                 }
             }
@@ -411,7 +539,7 @@ public class CronExpression {
         @Override
         protected Integer mapValue(String value) {
             // Use 1-7 for weedays, but 0 will also represent sunday (linux practice)
-            return "0".equals(value) ? Integer.valueOf(7) : super.mapValue(value);
+            return "0".equals(value) ? Integer.valueOf(DAYS_IN_WEEK) : super.mapValue(value);
         }
 
         @Override
@@ -429,27 +557,46 @@ public class CronExpression {
         }
     }
 
+    /**
+     * A class that represent the Day of Month field in the cron expression.
+     */
     static class DayOfMonthField extends BasicField {
+
+        static final int WEEK_DAYS = 5;
+        static final int FIRST_DAY = 1;
+        static final int ONE_DAY = 1;
+
+        /**
+         * Construct the Day of Month field from the given expression.
+         *
+         * @param fieldExpr The field expression
+         */
         DayOfMonthField(String fieldExpr) {
             super(CronFieldType.DAY_OF_MONTH, fieldExpr);
         }
 
-        boolean matches(LocalDate dato) {
+        /**
+         * Check if the given date matches the day in the month.
+         *
+         * @param date The date
+         * @return Whether the date matches the day in the month
+         */
+        boolean matches(LocalDate date) {
             for (FieldPart part : parts) {
                 if ("L".equals(part.modifier)) {
-                    YearMonth ym = YearMonth.of(dato.getYear(), dato.getMonth().getValue());
-                    return dato.getDayOfMonth() == (ym.lengthOfMonth() - (part.from == null ? 0 : part.from));
+                    YearMonth ym = YearMonth.of(date.getYear(), date.getMonth().getValue());
+                    return date.getDayOfMonth() == (ym.lengthOfMonth() - (part.from == null ? 0 : part.from));
                 } else if ("W".equals(part.modifier)) {
-                    if (dato.getDayOfWeek().getValue() <= 5) {
-                        if (dato.getDayOfMonth() == part.from) {
+                    if (date.getDayOfWeek().getValue() <= WEEK_DAYS) {
+                        if (date.getDayOfMonth() == part.from) {
                             return true;
-                        } else if (dato.getDayOfWeek().getValue() == 5) {
-                            return dato.plusDays(1).getDayOfMonth() == part.from;
-                        } else if (dato.getDayOfWeek().getValue() == 1) {
-                            return dato.minusDays(1).getDayOfMonth() == part.from;
+                        } else if (date.getDayOfWeek().getValue() == WEEK_DAYS) {
+                            return date.plusDays(ONE_DAY).getDayOfMonth() == part.from;
+                        } else if (date.getDayOfWeek().getValue() == FIRST_DAY) {
+                            return date.minusDays(ONE_DAY).getDayOfMonth() == part.from;
                         }
                     }
-                } else if (matches(dato.getDayOfMonth(), part)) {
+                } else if (matches(date.getDayOfMonth(), part)) {
                     return true;
                 }
             }

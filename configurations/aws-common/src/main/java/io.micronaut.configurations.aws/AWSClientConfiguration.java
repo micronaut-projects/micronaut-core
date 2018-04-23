@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.aws;
 
 import com.amazonaws.ClientConfiguration;
@@ -20,15 +21,21 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS client
+ * Configuration options for AWS client.
  *
  * @author graemerocher
  * @since 1.0
  */
-
 @ConfigurationProperties("client")
 public class AWSClientConfiguration extends AWSConfiguration {
 
     @ConfigurationBuilder
-    public ClientConfiguration clientConfiguration = new ClientConfiguration();
+    protected ClientConfiguration clientConfiguration = new ClientConfiguration();
+
+    /**
+     * @return The AWS client configuration
+     */
+    public ClientConfiguration getClientConfiguration() {
+        return clientConfiguration;
+    }
 }

@@ -22,4 +22,3 @@ package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.context.annotation.Requires;
 import io.reactivex.Flowable;
-import io.micronaut.context.annotation.Requires;
