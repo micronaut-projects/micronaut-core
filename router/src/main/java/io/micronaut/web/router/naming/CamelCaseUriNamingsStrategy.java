@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Primary;
@@ -21,7 +22,7 @@ import io.micronaut.web.router.RouteBuilder;
 import javax.inject.Singleton;
 
 /**
- * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application
+ * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.
  *
  * @author Graeme Rocher
  * @since 1.0
