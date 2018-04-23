@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Parameter;
@@ -32,7 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Implements the {@link EmbeddedServerInstance} interface for Netty
+ * Implements the {@link EmbeddedServerInstance} interface for Netty.
  *
  * @author graemerocher
  * @since 1.0
@@ -48,6 +49,13 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
 
     private ConvertibleValues<String> instanceMetadata;
 
+    /**
+     * @param id                              The id
+     * @param nettyHttpServer                 The {@link NettyHttpServer}
+     * @param environment                     The Environment
+     * @param computeInstanceMetadataResolver The {@link ComputeInstanceMetadataResolver}
+     * @param metadataContributors            The {@link ServiceInstanceMetadataContributor}
+     */
     NettyEmbeddedServerInstance(
         @Parameter String id,
         @Parameter NettyHttpServer nettyHttpServer,

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.annotation.Primary;
@@ -27,7 +28,7 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import javax.inject.Singleton;
 
 /**
- * Handles exceptions of type {@link DuplicateRouteException}
+ * Handles exceptions of type {@link DuplicateRouteException}.
  *
  * @author James Kleeh
  * @since 1.0

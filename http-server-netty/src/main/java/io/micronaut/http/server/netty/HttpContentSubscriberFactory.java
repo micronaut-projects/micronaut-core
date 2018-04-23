@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
-import io.netty.handler.codec.http.HttpContent;
-import org.reactivestreams.Subscriber;
-
 /**
- * Interface that allows plugging into the constructor of the {@link HttpContent} subscriber
+ * Interface that allows plugging into the constructor of the {@link io.netty.handler.codec.http.HttpContent}
+ * subscriber.
  *
  * @author Graeme Rocher
  * @see DefaultHttpContentProcessor
@@ -28,7 +27,7 @@ import org.reactivestreams.Subscriber;
 public interface HttpContentSubscriberFactory {
 
     /**
-     * Build a {@link Subscriber} for the given request
+     * Build a {@link org.reactivestreams.Subscriber} for the given request.
      *
      * @param request The request
      * @return The subscriber
