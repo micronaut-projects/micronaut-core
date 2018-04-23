@@ -85,20 +85,20 @@ public class JaegerTracerFactory implements Closeable {
     Tracer jaegerTracer() {
         Configuration configuration = this.configuration.getConfiguration();
         io.jaegertracing.Tracer.Builder tracerBuilder = resolveBuilder(configuration);
-        if(this.configuration.isExpandExceptionLogs()) {
+        if (this.configuration.isExpandExceptionLogs()) {
             tracerBuilder.withExpandExceptionLogs();
         }
-        if(this.configuration.isZipkinSharedRpcSpan()) {
+        if (this.configuration.isZipkinSharedRpcSpan()) {
             tracerBuilder.withZipkinSharedRpcSpan();
         }
-        if(reporter != null) {
+        if (reporter != null) {
             tracerBuilder.withReporter(reporter);
         }
-        if(sampler != null) {
+        if (sampler != null) {
             tracerBuilder.withSampler(sampler);
         }
         Tracer tracer = tracerBuilder.build();
-        if(!GlobalTracer.isRegistered()) {
+        if (!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);
         }
         return tracer;

@@ -92,7 +92,7 @@ public class ReactorTracingInstrumentation {
                     }
             );
         } catch (Exception e) {
-            if(LOG.isErrorEnabled()) {
+            if (LOG.isErrorEnabled()) {
                 LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
             }
         }

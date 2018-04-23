@@ -49,7 +49,7 @@ public class AsyncReporterConfiguration {
      * @param sender For sending list of spans to a transport such as http or Kafka
      */
     public AsyncReporterConfiguration(BraveTracerConfiguration configuration, Sender sender) {
-        if(configuration == null) {
+        if (configuration == null) {
             throw new IllegalArgumentException("Argument [configuration] cannot be null");
         }
         this.builder = AsyncReporter.builder(sender);
@@ -69,7 +69,7 @@ public class AsyncReporterConfiguration {
      */
     @Inject
     public void setReporterMetrics(@Nullable ReporterMetrics metrics) {
-        if(metrics != null) {
+        if (metrics != null) {
             builder.metrics(metrics);
         }
     }

@@ -87,8 +87,8 @@ public final class HttpClientSender extends Sender {
 
     @Override
     public Call<Void> sendSpans(List<byte[]> encodedSpans) {
-        if(httpClient != null && httpClient.isRunning()) {
-            return new HttpCall(httpClient, endpoint, compressionEnabled,encodedSpans);
+        if (httpClient != null && httpClient.isRunning()) {
+            return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
         } else {
             throw new IllegalStateException("HTTP Client Closed");
         }
@@ -96,13 +96,13 @@ public final class HttpClientSender extends Sender {
 
     @Override
     public CheckResult check() {
-        if(httpClient == null) {
+        if (httpClient == null) {
             return CheckResult.failed(new NoAvailableServiceException(ZipkinServiceInstanceList.SERVICE_ID));
         }
 
         try {
             HttpResponse<Object> response = httpClient.toBlocking().exchange(HttpRequest.POST(endpoint, Collections.emptyList()));
-            if(response.getStatus().getCode() < HttpStatus.MULTIPLE_CHOICES.getCode()) {
+            if (response.getStatus().getCode() < HttpStatus.MULTIPLE_CHOICES.getCode()) {
                 return CheckResult.OK;
             } else {
                 throw new IllegalStateException("check response failed: " + response);
@@ -114,7 +114,7 @@ public final class HttpClientSender extends Sender {
 
     @Override
     public void close() throws IOException {
-        if(httpClient != null) {
+        if (httpClient != null) {
             httpClient.close();
         }
     }
@@ -142,7 +142,7 @@ public final class HttpClientSender extends Sender {
         public Void execute() throws IOException {
             BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
             HttpResponse<Object> response = blockingHttpClient.exchange(prepareRequest());
-            if(response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
+            if (response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                 throw new IllegalStateException("Response return invalid status code: " + response.getStatus());
             }
             return null;
@@ -160,7 +160,7 @@ public final class HttpClientSender extends Sender {
 
                 @Override
                 public void onNext(HttpResponse<ByteBuffer> response) {
-                    if(response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
+                    if (response.getStatus().getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
                         callback.onError(new IllegalStateException("Response return invalid status code: " + response.getStatus()));
                     } else {
                         callback.onSuccess(null);
@@ -182,7 +182,7 @@ public final class HttpClientSender extends Sender {
         @Override
         public void cancel() {
             Subscription s = this.subscription.get();
-            if(s != null) {
+            if (s != null) {
                 cancelled.set(true);
                 s.cancel();
             }
@@ -191,7 +191,7 @@ public final class HttpClientSender extends Sender {
         @Override
         public boolean isCanceled() {
             Subscription s = this.subscription.get();
-            if(s != null) {
+            if (s != null) {
                 return cancelled.get();
             }
             return false;
@@ -200,7 +200,7 @@ public final class HttpClientSender extends Sender {
         @Override
         public Call<Void> clone() {
             // stateless. no need to clone
-            return new HttpCall(httpClient, endpoint,compressionEnabled, encodedSpans);
+            return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
         }
 
         protected MutableHttpRequest<Flowable<Object>> prepareRequest() {
@@ -254,7 +254,7 @@ public final class HttpClientSender extends Sender {
          * @return This builder
          */
         public Builder encoding(Encoding encoding) {
-            if(encoding != null) {
+            if (encoding != null) {
                 this.encoding = encoding;
             }
             return this;
@@ -289,7 +289,7 @@ public final class HttpClientSender extends Sender {
          * @return This builder
          */
         public Builder server(URI endpoint) {
-            if(endpoint != null) {
+            if (endpoint != null) {
                 this.servers = Collections.singletonList(endpoint);
             }
             return this;
@@ -312,7 +312,7 @@ public final class HttpClientSender extends Sender {
          * @return This builder
          */
         public Builder urls(List<URI> urls) {
-            if(CollectionUtils.isNotEmpty(urls)) {
+            if (CollectionUtils.isNotEmpty(urls)) {
                 this.servers = Collections.unmodifiableList(urls);
             }
             return this;

@@ -43,9 +43,9 @@ public class RxJava2TracingInstrumentation {
      */
     @PostConstruct
     void init(TracingRunnableInstrumenter instrumenter) {
-        if(instrumenter != null) {
+        if (instrumenter != null) {
             Function<? super Runnable, ? extends Runnable> existing = RxJavaPlugins.getScheduleHandler();
-            if(existing != null && !(existing instanceof TracingRunnableInstrumenter)) {
+            if (existing != null && !(existing instanceof TracingRunnableInstrumenter)) {
                 RxJavaPlugins.setScheduleHandler(runnable -> instrumenter.apply(existing.apply(runnable)));
             } else {
                 RxJavaPlugins.setScheduleHandler(instrumenter::apply);

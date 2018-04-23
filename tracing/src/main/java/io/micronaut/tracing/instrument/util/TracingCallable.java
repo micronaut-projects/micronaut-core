@@ -65,7 +65,7 @@ public class TracingCallable<V> implements Callable<V> {
 
     private Span getSpan(Tracer tracer) {
         Scope active = tracer.scopeManager().active();
-        if(active != null) {
+        if (active != null) {
             return active.span();
         } else {
             return tracer.activeSpan();

@@ -55,7 +55,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     public JaegerConfiguration(
             ApplicationConfiguration applicationConfiguration) {
-        if(StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
+        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();
@@ -121,7 +121,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     @Inject
     public void setSamplerConfiguration(@Nullable Configuration.SamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             configuration.withSampler(samplerConfiguration);
         }
     }
@@ -133,7 +133,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     @Inject
     public void setReporterConfiguration(@Nullable Configuration.ReporterConfiguration reporterConfiguration) {
-        if(reporterConfiguration != null) {
+        if (reporterConfiguration != null) {
             configuration.withReporter(reporterConfiguration);
         }
     }
@@ -145,7 +145,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     @Inject
     public void setSamplerConfiguration(@Nullable JaegerSamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             configuration.withSampler(samplerConfiguration.configuration);
         }
     }
@@ -157,7 +157,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     @Inject
     public void setReporterConfiguration(@Nullable JaegerReporterConfiguration reporterConfiguration) {
-        if(reporterConfiguration != null) {
+        if (reporterConfiguration != null) {
             configuration.withReporter(reporterConfiguration.configuration);
         }
     }
@@ -169,7 +169,7 @@ public class JaegerConfiguration implements Toggleable  {
      */
     @Inject
     public void setCodecConfiguration(@Nullable Configuration.CodecConfiguration codecConfiguration) {
-        if(codecConfiguration != null) {
+        if (codecConfiguration != null) {
             configuration.withCodec(codecConfiguration);
         }
     }
@@ -180,7 +180,7 @@ public class JaegerConfiguration implements Toggleable  {
      * @param metricsFactory The metrics factory
      */
     @Inject void setMetricsFactory(@Nullable MetricsFactory metricsFactory) {
-        if(metricsFactory != null) {
+        if (metricsFactory != null) {
             configuration.withMetricsFactory(metricsFactory);
         }
     }
@@ -235,7 +235,7 @@ public class JaegerConfiguration implements Toggleable  {
          */
         @Inject
         public void setSenderConfiguration(@Nullable Configuration.SenderConfiguration senderConfiguration) {
-            if(senderConfiguration != null) {
+            if (senderConfiguration != null) {
                 configuration.withSender(senderConfiguration);
             }
         }

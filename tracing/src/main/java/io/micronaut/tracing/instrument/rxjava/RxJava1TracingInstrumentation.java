@@ -46,9 +46,9 @@ public class RxJava1TracingInstrumentation {
      */
     @PostConstruct
     void init(TracingRunnableInstrumenter instrumenter) {
-        if(instrumenter != null) {
+        if (instrumenter != null) {
             Func1<Action0, Action0> existing = RxJavaHooks.getOnScheduleAction();
-            if(existing != null && !(existing instanceof InstrumentScheduleAction)) {
+            if (existing != null && !(existing instanceof InstrumentScheduleAction)) {
                 RxJavaHooks.setOnScheduleAction(action0 ->
                         new InstrumentScheduleAction(instrumenter).call(existing.call(action0))
                 );

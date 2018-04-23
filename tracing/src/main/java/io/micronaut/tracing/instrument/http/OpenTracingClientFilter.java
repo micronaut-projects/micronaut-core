@@ -88,7 +88,7 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
 
             @Override
             protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
-                if(object instanceof HttpResponse) {
+                if (object instanceof HttpResponse) {
                     setResponseTags(request, (HttpResponse<?>) object, span);
                 }
             }

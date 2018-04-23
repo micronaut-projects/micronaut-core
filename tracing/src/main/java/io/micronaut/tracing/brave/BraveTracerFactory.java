@@ -65,7 +65,7 @@ public class BraveTracerFactory {
     @Requires(classes = Tracing.class)
     Tracing braveTracing(@Nullable Reporter<Span> reporter) {
         Tracing.Builder builder = braveTracerConfiguration.getTracingBuilder();
-        if(reporter != null) {
+        if (reporter != null) {
             builder.spanReporter(reporter);
         } else {
             builder.spanReporter(Reporter.NOOP);
@@ -98,7 +98,7 @@ public class BraveTracerFactory {
     @Primary
     Tracer braveTracer(Tracing tracing) {
         BraveTracer braveTracer = BraveTracer.create(tracing);
-        if(!GlobalTracer.isRegistered()) {
+        if (!GlobalTracer.isRegistered()) {
             GlobalTracer.register(braveTracer);
         }
         return braveTracer;

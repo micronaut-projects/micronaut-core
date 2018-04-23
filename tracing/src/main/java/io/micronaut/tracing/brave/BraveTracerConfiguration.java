@@ -49,7 +49,7 @@ public class BraveTracerConfiguration implements Toggleable {
     public static final String PREFIX = "tracing.zipkin";
     public static final float DEFAULT_SAMPLER_PROBABILITY = 0.1f;
 
-    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser","clock","endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
+    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser", "clock", "endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
     protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
     private boolean enabled = false;
@@ -62,7 +62,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     public BraveTracerConfiguration(ApplicationConfiguration configuration) {
         tracingBuilder.sampler(CountingSampler.create(samplerProbability));
-        if(configuration != null) {
+        if (configuration != null) {
             tracingBuilder.localServiceName(configuration.getName().orElse(Environment.DEFAULT_NAME));
         } else {
             tracingBuilder.localServiceName(Environment.DEFAULT_NAME);
@@ -89,7 +89,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setSamplerConfiguration(@Nullable SamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             tracingBuilder.sampler(CountingSampler.create(samplerConfiguration.getProbability()));
         }
     }
@@ -106,7 +106,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setSampler(@Nullable Sampler sampler) {
-        if(sampler != null) {
+        if (sampler != null) {
             tracingBuilder.sampler(sampler);
         }
     }
@@ -116,7 +116,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setErrorParser(@Nullable ErrorParser errorParser) {
-        if(errorParser != null) {
+        if (errorParser != null) {
             tracingBuilder.errorParser(errorParser);
         }
     }
@@ -126,7 +126,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setPropagationFactory(@Nullable Propagation.Factory propagationFactory) {
-        if(propagationFactory != null) {
+        if (propagationFactory != null) {
             tracingBuilder.propagationFactory(propagationFactory);
         }
     }
@@ -136,7 +136,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setClock(@Nullable Clock clock) {
-        if(clock != null) {
+        if (clock != null) {
             tracingBuilder.clock(clock);
         }
     }
@@ -148,7 +148,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setCurrentTraceContext(CurrentTraceContext traceContext) {
-        if(traceContext != null) {
+        if (traceContext != null) {
             tracingBuilder.currentTraceContext(traceContext);
         }
     }
