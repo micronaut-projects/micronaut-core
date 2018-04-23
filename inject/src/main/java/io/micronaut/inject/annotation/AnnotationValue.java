@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -28,16 +29,22 @@ import java.util.Map;
 public class AnnotationValue {
 
     private final String annotationName;
-    private final Map<CharSequence, Object> values;
+    private final ConvertibleValues<Object> convertibleValues;
 
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
-        this.values = values;
+        this.convertibleValues = ConvertibleValues.of(values);
     }
 
+    @SuppressWarnings("unchecked")
     public AnnotationValue(String annotationName) {
         this.annotationName = annotationName;
-        this.values = null;
+        this.convertibleValues = ConvertibleValues.EMPTY;
+    }
+
+    public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
+        this.annotationName = annotationName;
+        this.convertibleValues = convertibleValues;
     }
 
     /**
@@ -50,14 +57,15 @@ public class AnnotationValue {
     /**
      * @return The attribute values
      */
+    @SuppressWarnings("unchecked")
     public Map<CharSequence, Object> getValues() {
-        return values;
+        return (Map)convertibleValues.asMap();
     }
 
     /**
      * @return The attribute values
      */
     public ConvertibleValues<Object> getConvertibleValues() {
-        return ConvertibleValues.of(values);
+        return convertibleValues;
     }
 }

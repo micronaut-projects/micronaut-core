@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
@@ -150,6 +151,32 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         instantiateInternal(generatorAdapter, annotationMetadata, true);
     }
 
+    /**
+     * Writes annotation attributes to the given generator
+     *
+     * @param generatorAdapter The generator adapter
+     * @param annotationData The annotation data
+     */
+    @Internal
+    public static void pushAnnotationAttributes(GeneratorAdapter generatorAdapter, Map<CharSequence, Object> annotationData) {
+        int totalSize = annotationData.size() * 2;
+        // start a new array
+        pushNewArray(generatorAdapter, Object.class, totalSize);
+        int i = 0;
+        for (Map.Entry<CharSequence, Object> entry : annotationData.entrySet()) {
+            // use the property name as the key
+            String memberName = entry.getKey().toString();
+            pushStoreStringInArray(generatorAdapter, i++, totalSize, memberName);
+            // use the property type as the value
+            Object value = entry.getValue();
+            pushStoreInArray(generatorAdapter, i++, totalSize, () ->
+                    pushValue(generatorAdapter, value)
+            );
+        }
+        // invoke the AbstractBeanDefinition.createMap method
+        generatorAdapter.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+    }
+
     private static void instantiateInternal(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, boolean isNew) {
         if(isNew) {
             generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA.getInternalName());
@@ -256,25 +283,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
-    }
-
-    private static void pushAnnotationAttributes(GeneratorAdapter methodVisitor, Map<CharSequence, Object> annotationData) {
-        int totalSize = annotationData.size() * 2;
-        // start a new array
-        pushNewArray(methodVisitor, Object.class, totalSize);
-        int i = 0;
-        for (Map.Entry<CharSequence, Object> entry : annotationData.entrySet()) {
-            // use the property name as the key
-            String memberName = entry.getKey().toString();
-            pushStoreStringInArray(methodVisitor, i++, totalSize, memberName);
-            // use the property type as the value
-            Object value = entry.getValue();
-            pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                pushValue(methodVisitor, value)
-            );
-        }
-        // invoke the AbstractBeanDefinition.createMap method
-        methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
     }
 
     private static void pushValue(GeneratorAdapter methodVisitor, Object value) {

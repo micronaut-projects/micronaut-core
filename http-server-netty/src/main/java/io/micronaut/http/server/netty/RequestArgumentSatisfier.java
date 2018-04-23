@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -37,7 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A class containing methods to aid in satisfying arguments of a {@link io.micronaut.web.router.Route}
+ * A class containing methods to aid in satisfying arguments of a {@link io.micronaut.web.router.Route}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -47,15 +48,19 @@ class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;
 
+    /**
+     * @param requestBinderRegistry The Request binder registry
+     */
     RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
         this.binderRegistry = requestBinderRegistry;
     }
 
     /**
-     * Attempt to satisfy the arguments of the given route with the data from the given request
+     * Attempt to satisfy the arguments of the given route with the data from the given request.
      *
-     * @param route   The route
-     * @param request The request
+     * @param route            The route
+     * @param request          The request
+     * @param satisfyOptionals Whether to satisfy optionals
      * @return The route
      */
     RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {

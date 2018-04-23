@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.bind;
 
 import io.micronaut.core.bind.BeanPropertyBinder;
@@ -25,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances
+ * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,6 +36,9 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     private final BeanPropertyBinder beanPropertyBinder;
 
+    /**
+     * @param beanPropertyBinder To bind map and Java bean properties
+     */
     public MapToObjectConverter(BeanPropertyBinder beanPropertyBinder) {
         this.beanPropertyBinder = beanPropertyBinder;
     }

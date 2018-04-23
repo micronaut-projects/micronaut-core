@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -27,21 +28,28 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * Builds a {@link RetryState} from {@link AnnotationMetadata}
+ * Builds a {@link RetryState} from {@link AnnotationMetadata}.
  *
  * @author graemerocher
  * @since 1.0
  */
 class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
-    private final AnnotationMetadata annotationMetadata;
     private static final String ATTEMPTS = "attempts";
     private static final String MULTIPLIER = "multiplier";
     private static final String DELAY = "delay";
     private static final String MAX_DELAY = "maxDelay";
     private static final String INCLUDES = "value";
     private static final String EXCLUDES = "excludes";
+    private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
+    private final AnnotationMetadata annotationMetadata;
+
+    /**
+     * Build the meta data for the given element with retry.
+     *
+     * @param annotationMetadata Allows the inspection of annotation metadata and stereotypes (meta-annotations)
+     */
     AnnotationRetryStateBuilder(AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata;
     }
@@ -49,7 +57,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     @Override
     public RetryState build() {
         ConvertibleValues<?> retry = annotationMetadata.getValues(Retryable.class);
-        int attempts = retry.get(ATTEMPTS, Integer.class).orElse(3);
+        int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
         Set<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
         Set<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);

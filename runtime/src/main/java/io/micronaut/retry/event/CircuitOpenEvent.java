@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.event;
 
 import io.micronaut.context.event.ApplicationEvent;
@@ -21,7 +22,7 @@ import io.micronaut.retry.RetryState;
 
 /**
  * An event fired when the Circuit is {@link io.micronaut.retry.CircuitState#OPEN} and
- * requests are no longer being accepted
+ * requests are no longer being accepted.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,6 +32,11 @@ public class CircuitOpenEvent extends ApplicationEvent {
     private final RetryState retryState;
     private final Throwable throwable;
 
+    /**
+     * @param source     A compile time produced invocation of a method call
+     * @param retryState Encapsulate the current state of {@link io.micronaut.retry.annotation.Retryable} operation.
+     * @param throwable  The cause
+     */
     public CircuitOpenEvent(
         ExecutableMethod<?, ?> source,
         RetryState retryState,

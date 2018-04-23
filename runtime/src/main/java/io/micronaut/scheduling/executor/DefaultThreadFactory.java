@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.Bean;
@@ -24,7 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * The default thread factory used for creating threads in Micronaut
+ * The default thread factory used for creating threads in Micronaut.
  *
  * @author graemerocher
  * @since 1.0

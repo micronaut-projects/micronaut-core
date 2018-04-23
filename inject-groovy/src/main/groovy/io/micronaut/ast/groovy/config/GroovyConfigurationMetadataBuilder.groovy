@@ -19,11 +19,15 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.context.annotation.ConfigurationReader
+import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
+
+import javax.lang.model.element.TypeElement
+import java.util.function.Function
 
 /**
  * Implementation of ConfigurationMetadataBuilder for Groovy
@@ -33,42 +37,69 @@ import org.codehaus.groovy.ast.InnerClassNode
  */
 @CompileStatic
 class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<ClassNode> {
-    private final Map<ClassNode, String> typePaths = new HashMap<>()
 
     @Override
-    protected String buildPropertyPath(ClassNode declaringType, String propertyName) {
-        String value = buildTypePath(declaringType)
+    protected String buildPropertyPath(ClassNode owningType, ClassNode declaringType, String propertyName) {
+        String value = buildTypePath(owningType, declaringType)
         return value + '.' + propertyName
     }
 
     @Override
-    protected String buildTypePath(ClassNode declaringType) {
-        return typePaths.computeIfAbsent(declaringType, { s ->
-            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(declaringType)
-            StringBuilder path = new StringBuilder(annotationMetadata.getValue(ConfigurationReader.class, String.class).orElseThrow({
-                ->
-                new IllegalStateException("@ConfigurationProperties found with no value for type: " + declaringType.name)
-            }))
+    protected String buildTypePath(ClassNode owningType, ClassNode declaringType) {
+        StringBuilder path = new StringBuilder(calculateInitialPath(owningType, declaringType))
 
-            prependSuperclasses(declaringType, path)
-            while (declaringType != null && declaringType instanceof InnerClassNode) {
-                // we have an inner class, so prepend inner class
-                declaringType = ((InnerClassNode) declaringType).getOuterClass()
-                if (declaringType != null) {
+        prependSuperclasses(declaringType, path)
+        while (declaringType != null && declaringType instanceof InnerClassNode) {
+            // we have an inner class, so prepend inner class
+            declaringType = ((InnerClassNode) declaringType).getOuterClass()
+            if (declaringType != null) {
 
-                    Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(declaringType).getValue(ConfigurationReader.class, String.class)
-                    if (parentConfig.isPresent()) {
-                        path.insert(0, parentConfig.get() + '.')
-                        prependSuperclasses(declaringType, path)
-                    } else {
-                        break
+                AnnotationMetadata parentMetadata = AstAnnotationUtils.getAnnotationMetadata(declaringType)
+                Optional<String> parentConfig = parentMetadata.getValue(ConfigurationReader.class, String.class)
+                if (parentConfig.isPresent()) {
+                    String parentPath = parentConfig.get()
+                    if(parentMetadata.hasDeclaredAnnotation(EachProperty)) {
+                        path.insert(0, parentPath + ".*.")
                     }
+                    else {
 
+                        path.insert(0, parentPath + '.')
+                    }
+                    prependSuperclasses(declaringType, path)
+                } else {
+                    break
                 }
 
             }
-            return path.toString()
+
+        }
+        return path.toString()
+    }
+
+    private String calculateInitialPath(ClassNode owningType, ClassNode declaringType) {
+        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(declaringType)
+        return annotationMetadata.getValue(ConfigurationReader.class, String.class)
+                .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
+            AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(owningType);
+            return ownerMetadata.getValue(ConfigurationReader.class, String.class)
+                                .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
+                new IllegalStateException("Non @ConfigurationProperties type visited")
+            })
         })
+    }
+
+    private Function<String, String> pathEvaluationFunction(AnnotationMetadata annotationMetadata) {
+        return { String path ->
+            if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
+                return path + ".*"
+            }
+            String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class).orElse(null)
+            if (prefix != null) {
+                return prefix + "." + path
+            } else {
+                return path
+            }
+        } as Function<String, String>
     }
 
     @Override
@@ -82,7 +113,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
             Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(superclass).getValue(ConfigurationReader.class, String.class)
             if (parentConfig.isPresent()) {
                 path.insert(0, parentConfig.get() + '.')
-                superclass = declaringType.getSuperClass()
+                superclass = superclass.getSuperClass()
             } else {
                 break
             }

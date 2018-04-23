@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import java.util.StringJoiner;
 
 /**
- * The default generate for Instance IDs
+ * The default implementation to generate Instance IDs.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +33,9 @@ import java.util.StringJoiner;
 @Singleton
 public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGenerator {
 
+    /**
+     * Default constructor.
+     */
     protected DefaultServiceInstanceIdGenerator() {
     }
 
