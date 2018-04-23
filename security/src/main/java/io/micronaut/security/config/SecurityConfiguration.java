@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -32,10 +33,12 @@ import java.util.List;
 public class SecurityConfiguration implements Toggleable {
 
     public static final String PREFIX = "micronaut.security";
+    public static final String ANYWHERE = "0.0.0.0";
 
     protected boolean enabled = false;
     protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
     protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
+    protected List<String> ipPatterns = Arrays.asList(ANYWHERE);
 
     /**
      * enabled getter.
@@ -60,5 +63,13 @@ public class SecurityConfiguration implements Toggleable {
      */
     public List<InterceptUrlMapPattern> getInterceptUrlMap() {
         return interceptUrlMap;
+    }
+
+    /**
+     * ipPatterns getter.
+     * @return a list of IP Regex patterns. e.g. [192.168.1.*]
+     */
+    public List<String> getIpPatterns() {
+        return ipPatterns;
     }
 }
