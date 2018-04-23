@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.annotation;
 
 import java.lang.annotation.Documented;
@@ -23,7 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Allows for repeated annotations of the type {@link CacheInvalidate}
+ * Allows for repeated annotations of the type {@link CacheInvalidate}.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpMessage;
@@ -25,8 +26,9 @@ import org.reactivestreams.Subscriber;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes
+ * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -38,6 +40,10 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
 
+    /**
+     * @param nettyHttpRequest The {@link NettyHttpRequest}
+     * @param configuration    The {@link HttpServerConfiguration}
+     */
     public AbstractHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.advertisedLength = nettyHttpRequest.getContentLength();
@@ -46,7 +52,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     }
 
     /**
-     * Called after verifying the data of the message
+     * Called after verifying the data of the message.
      *
      * @param message The message
      */

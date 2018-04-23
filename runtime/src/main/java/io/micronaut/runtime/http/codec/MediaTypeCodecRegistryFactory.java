@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.http.codec;
 
 import io.micronaut.context.annotation.Bean;
@@ -24,7 +25,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import javax.inject.Singleton;
 
 /**
- * A bean for the default {@link MediaTypeCodecRegistry} used by the server
+ * A bean for the default {@link MediaTypeCodecRegistry} used by the server.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +33,10 @@ import javax.inject.Singleton;
 @Factory
 public class MediaTypeCodecRegistryFactory {
 
+    /**
+     * @param codecs List of codecs for media types
+     * @return A bean for default codecs registry
+     */
     @Singleton
     @Primary
     @Bean

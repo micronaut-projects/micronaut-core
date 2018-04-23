@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import javax.inject.Singleton;
 
 /**
- * A codec for {@link MediaType#APPLICATION_JSON_STREAM}
+ * A codec for {@link MediaType#APPLICATION_JSON_STREAM}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,6 +31,10 @@ import javax.inject.Singleton;
 @Singleton
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     */
     public JsonStreamMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
         super(objectMapper, applicationConfiguration);
     }

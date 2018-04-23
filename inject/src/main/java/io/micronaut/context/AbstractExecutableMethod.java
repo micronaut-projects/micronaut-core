@@ -82,8 +82,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public String toString() {
-        Stream<String> stringStream = Arrays.stream(getArguments()).map(Argument::toString);
-        String text = stringStream.collect(Collectors.joining(","));
+        String text = Argument.toString(getArguments());
         return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
     }
 

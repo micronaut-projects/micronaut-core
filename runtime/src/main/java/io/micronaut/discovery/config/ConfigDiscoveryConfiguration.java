@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.config;
 
 import io.micronaut.core.util.Toggleable;
@@ -20,7 +21,7 @@ import io.micronaut.core.util.Toggleable;
 import java.util.Optional;
 
 /**
- * Abstract class for common configuration discovery settings
+ * Abstract class for common configuration discovery settings.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,12 +29,12 @@ import java.util.Optional;
 public abstract class ConfigDiscoveryConfiguration implements Toggleable {
 
     /**
-     * The prefix to use for all Consul client config settings
+     * The prefix to use for all Consul client config settings.
      */
     public static final String PREFIX = "config";
 
     /**
-     * The default path
+     * The default path.
      */
     public static final String DEFAULT_PATH = "/" + PREFIX + "/";
 
@@ -87,28 +88,33 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
     }
 
     /**
-     * The format the configuration is stored in
+     * The format the configuration is stored in.
      */
     public enum Format {
+
         /**
-         * Stored in YAML format
+         * Stored in YAML format.
          */
         YAML,
+
         /**
-         * Stored in JSON format
+         * Stored in JSON format.
          */
         JSON,
+
         /**
-         * Stored in Java properties file format
+         * Stored in Java properties file format.
          */
         PROPERTIES,
+
         /**
-         * Stored in the native format provided by the configuration server
+         * Stored in the native format provided by the configuration server.
          */
         NATIVE,
+
         /**
          * Each value in the configuration server represents the name of a file and the contents of the file.
-         * Useful when using solutions such as git2consul
+         * Useful when using solutions such as git2consul.
          */
         FILE
     }

@@ -13,14 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
-import io.micronaut.cache.annotation.CacheInvalidate;
-import io.micronaut.cache.annotation.CachePut;
-import io.micronaut.cache.annotation.Cacheable;
-
 /**
- * <p>An interface for handling cache errors</p>
+ * <p>An interface for handling cache errors.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,7 +25,7 @@ import io.micronaut.cache.annotation.Cacheable;
 public interface CacheErrorHandler {
 
     /**
-     * Handles a cache {@link CacheInvalidate} error. Defaults to simply rethrowing the error.
+     * Handles a cache {@link io.micronaut.cache.annotation.CacheInvalidate} error. Defaults to simply rethrowing the error.
      * By returning <tt>false</tt> cache invalidate errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
@@ -41,7 +38,7 @@ public interface CacheErrorHandler {
     }
 
     /**
-     * Handles a cache {@link CacheInvalidate} error. Defaults to simply rethrowing the error.
+     * Handles a cache {@link io.micronaut.cache.annotation.CacheInvalidate} error. Defaults to simply rethrowing the error.
      * By returning <tt>false</tt> cache invalidate errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
@@ -53,10 +50,12 @@ public interface CacheErrorHandler {
     }
 
     /**
-     * Handles a cache {@link CachePut} error. Defaults to simply rethrowing the error.
+     * Handles a cache {@link io.micronaut.cache.annotation.CachePut} error. Defaults to simply rethrowing the error.
      * By returning <tt>false</tt> cache write errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
+     * @param key The key name
+     * @param result The result
      * @param e     The error
      * @return Whether the exception should be swallowed or rethrown. A value of true will rethrow he exception.
      */
@@ -65,7 +64,7 @@ public interface CacheErrorHandler {
     }
 
     /**
-     * Handles an error loading a value from the cache via {@link Cacheable}. Note that
+     * Handles an error loading a value from the cache via {@link io.micronaut.cache.annotation.Cacheable}. Note that
      * by returning <tt>false</tt> the behaviour can be customized such that cache related exceptions are ignored and
      * the original method invoked.
      *
