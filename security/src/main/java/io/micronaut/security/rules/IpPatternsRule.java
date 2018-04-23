@@ -38,7 +38,7 @@ public class IpPatternsRule extends AbstractSecurityRule {
     /**
      * The order of the rule.
      */
-    public static final Integer ORDER = 0;
+    public static final Integer ORDER = SecuredAnnotationRule.ORDER - 100;
 
     private final List<Pattern> patternList;
 

@@ -44,7 +44,7 @@ public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProc
     /**
      * The order of the rule.
      */
-    public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER + 100;
+    public static final Integer ORDER = 0;
 
     private final EndpointConfiguration[] endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;

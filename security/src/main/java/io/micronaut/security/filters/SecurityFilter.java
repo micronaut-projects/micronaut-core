@@ -127,10 +127,6 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
                 }
                 return rejected(attributes.isPresent());
             }
-        }
-
-        for (SecurityRule rule: securityRules) {
-            SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes.orElse(null));
             if (result == SecurityRuleResult.ALLOWED) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
