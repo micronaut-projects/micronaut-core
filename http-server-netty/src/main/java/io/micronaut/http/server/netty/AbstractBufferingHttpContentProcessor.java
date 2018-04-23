@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpMessage;
@@ -26,8 +27,9 @@ import org.reactivestreams.Subscriber;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes
+ * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -40,6 +42,10 @@ public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThr
     protected final HttpServerConfiguration configuration;
     private final long partMaxSize;
 
+    /**
+     * @param nettyHttpRequest The {@link NettyHttpRequest}
+     * @param configuration    The {@link HttpServerConfiguration}
+     */
     public AbstractBufferingHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.advertisedLength = nettyHttpRequest.getContentLength();
@@ -65,6 +71,10 @@ public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThr
         }
     }
 
+    /**
+     * @param message The message
+     * @return Whether the message has verified part size
+     */
     protected boolean verifyPartDefinedSize(ByteBufHolder message) {
         long partLength = message instanceof HttpData ? ((HttpData) message).definedLength() : -1;
         boolean validPart = partLength > partMaxSize;
@@ -74,7 +84,11 @@ public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThr
         }
         return true;
     }
-    
+
+    /**
+     * @param receivedLength The received length
+     * @param expected       The expected length
+     */
     protected void fireExceedsLength(long receivedLength, long expected) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));

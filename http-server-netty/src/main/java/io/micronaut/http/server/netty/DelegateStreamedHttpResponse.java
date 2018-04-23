@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpResponse;
@@ -21,10 +22,20 @@ import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
+/**
+ * Delegate for Streamed HTTP Response.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements StreamedHttpResponse {
 
     private final Publisher<HttpContent> stream;
 
+    /**
+     * @param response The {@link HttpResponse}
+     * @param stream The {@link Publisher} for {@link HttpContent}
+     */
     public DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
         super(response);
         this.stream = stream;
@@ -35,4 +46,3 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
         stream.subscribe(subscriber);
     }
 }
-

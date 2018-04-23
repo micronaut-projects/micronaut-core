@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -53,8 +54,9 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance
+ * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -74,7 +76,13 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
 
-
+    /**
+     * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param ctx                 The {@link ChannelHandlerContext}
+     * @param environment         The Environment
+     * @param serverConfiguration The {@link HttpServerConfiguration}
+     */
+    @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
@@ -119,7 +127,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             synchronized (this) { // double check
                 cookies = this.nettyCookies;
                 if (cookies == null) {
-                    this.nettyCookies = cookies = new NettyCookies(getPath(), headers.getNettyHeaders(), conversionService);
+                    cookies = new NettyCookies(getPath(), headers.getNettyHeaders(), conversionService);
+                    this.nettyCookies = cookies;
                 }
             }
         }
@@ -165,11 +174,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     public Optional<T> getBody() {
         Object body = this.body;
         if (body == null && !receivedContent.isEmpty()) {
-            this.body = body = buildBody();
+            body = buildBody();
+            this.body = body;
         }
         return Optional.ofNullable((T) body);
     }
 
+    /**
+     * @return A {@link CompositeByteBuf}
+     */
     protected CompositeByteBuf buildBody() {
         int size = receivedContent.size();
         CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
@@ -197,7 +210,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Release and cleanup resources
+     * Release and cleanup resources.
      */
     @Internal
     public void release() {
@@ -214,6 +227,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
+    /**
+     * @param value An object with a value
+     */
     protected void releaseIfNecessary(Object value) {
         if (value instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) value;
@@ -227,7 +243,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Sets the body
+     * Sets the body.
      *
      * @param body The body to set
      */
@@ -245,7 +261,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return matchedRoute;
     }
 
-
+    /**
+     * @param httpContent The HttpContent as {@link ByteBufHolder}
+     */
     @Internal
     void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof MemoryAttribute) {
@@ -254,7 +272,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 synchronized (this) { // double check
                     body = this.body;
                     if (body == null) {
-                        this.body = body = new LinkedHashMap<String, Object>();
+                        body = new LinkedHashMap<String, Object>();
+                        this.body = body;
                     }
                 }
             }
@@ -271,16 +290,25 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
+    /**
+     * @param matchedRoute The matched route
+     */
     @Internal
     void setMatchedRoute(RouteMatch<?> matchedRoute) {
         this.matchedRoute = matchedRoute;
     }
 
+    /**
+     * @param bodyRequired Sets the body as required
+     */
     @Internal
     void setBodyRequired(boolean bodyRequired) {
         this.bodyRequired = bodyRequired;
     }
 
+    /**
+     * @return Whether the body is required
+     */
     @Internal
     boolean isBodyRequired() {
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
@@ -292,7 +320,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Lookup the current request from the context
+     * Lookup the current request from the context.
      *
      * @param ctx The context
      * @return The request or null if it is not present
@@ -304,14 +332,16 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Lookup the current request from the context
+     * Lookup the current request from the context.
      *
      * @param ctx The context
      * @return The request or null if it is not present
      */
     public static NettyHttpRequest current(ChannelHandlerContext ctx) {
         NettyHttpRequest current = get(ctx);
-        if (current == null) throw new IllegalStateException("Current request not present");
+        if (current == null) {
+            throw new IllegalStateException("Current request not present");
+        }
         return current;
     }
 }

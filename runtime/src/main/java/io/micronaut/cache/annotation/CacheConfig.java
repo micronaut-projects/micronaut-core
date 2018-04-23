@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.annotation;
 
 import io.micronaut.aop.Around;
@@ -30,7 +31,7 @@ import java.lang.annotation.Target;
 
 /**
  * <p>An annotation that can be used on either a type or an annotation stereotype to configure common caching
- * behaviour</p>
+ * behaviour.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

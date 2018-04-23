@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.tomcat;
 
 import io.micronaut.context.annotation.EachProperty;
@@ -40,12 +41,19 @@ public class DatasourceConfiguration extends PoolProperties implements BasicJdbc
 
     private CalculatedSettings calculatedSettings;
 
+    /**
+     * Constructor.
+     * @param name name that comes from properties
+     */
     public DatasourceConfiguration(@Parameter String name) {
         super();
         this.setName(name);
         this.calculatedSettings = new CalculatedSettings(this);
     }
 
+    /**
+     * After construction of the bean, call the getters.
+     */
     @PostConstruct
     void postConstruct() {
         getDriverClassName();
