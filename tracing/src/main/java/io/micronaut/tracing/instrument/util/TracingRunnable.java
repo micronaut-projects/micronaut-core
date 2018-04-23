@@ -61,7 +61,7 @@ public class TracingRunnable implements Runnable {
 
     private Span getSpan(Tracer tracer) {
         Scope active = tracer.scopeManager().active();
-        if(active != null) {
+        if (active != null) {
             return active.span();
         } else {
             return tracer.activeSpan();

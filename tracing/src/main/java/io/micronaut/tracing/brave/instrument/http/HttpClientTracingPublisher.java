@@ -73,23 +73,22 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     public void subscribe(Subscriber<? super HttpResponse<?>> actual) {
         brave.Span span = clientHandler.handleSend(injector, request.getHeaders(), request);
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-        try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+        try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
             publisher.subscribe(new Subscriber<HttpResponse<?>>() {
                 @Override
                 public void onSubscribe(Subscription s) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         actual.onSubscribe(s);
                     }
                 }
 
                 @Override
                 public void onNext(HttpResponse<?> response) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         configureAttributes(response);
                         configureSpan(span);
                         HttpStatus status = response.getStatus();
-                        if(status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
-
+                        if (status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
                             span.tag(AbstractOpenTracingFilter.TAG_HTTP_STATUS_CODE, String.valueOf(status.getCode()));
                         }
                         clientHandler.handleReceive(response, null, span);
@@ -99,9 +98,9 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
 
                 @Override
                 public void onError(Throwable error) {
-                    try(Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                    try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         configureSpan(span);
-                        if(error instanceof HttpClientResponseException) {
+                        if (error instanceof HttpClientResponseException) {
                             HttpClientResponseException e = (HttpClientResponseException) error;
                             HttpResponse<?> response = e.getResponse();
                             configureAttributes(response);

@@ -89,7 +89,7 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     @Override
     public <T> Callable<T> wrapCallable(Callable<T> callable) {
         Callable<T> wrapped = super.wrapCallable(callable);
-        if(callable instanceof TracingCallable) {
+        if (callable instanceof TracingCallable) {
             return callable;
         } else {
             return new TracingCallable<>(wrapped, tracer);

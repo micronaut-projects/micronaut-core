@@ -63,7 +63,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
     protected void setResponseTags(HttpRequest<?> request, HttpResponse<?> response, Span span) {
         HttpStatus status = response.getStatus();
         int code = status.getCode();
-        if(code > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
+        if (code > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
             span.setTag(TAG_HTTP_STATUS_CODE, code);
             span.setTag(TAG_ERROR, status.getReason());
         }
@@ -79,9 +79,9 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
      * @param error The error
      */
     protected void setErrorTags(Span span, Throwable error) {
-        if(error != null) {
+        if (error != null) {
             String message = error.getMessage();
-            if(message == null) {
+            if (message == null) {
                 message = error.getClass().getSimpleName();
             }
             span.setTag(TAG_ERROR, message);

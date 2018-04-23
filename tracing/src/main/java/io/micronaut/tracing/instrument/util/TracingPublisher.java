@@ -63,7 +63,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param tracer The tracer
      */
     public TracingPublisher(Publisher<T> publisher, Tracer tracer) {
-        this(publisher, tracer, (Tracer.SpanBuilder)null);
+        this(publisher, tracer, (Tracer.SpanBuilder) null);
     }
 
     /**
@@ -92,7 +92,7 @@ public class TracingPublisher<T> implements Publisher<T> {
         this.spanBuilder = spanBuilder;
         this.parentSpan = tracer.activeSpan();
         this.isSingle = isSingle;
-        if(parentSpan != null && spanBuilder != null) {
+        if (parentSpan != null && spanBuilder != null) {
             spanBuilder.asChildOf(parentSpan);
         }
     }
@@ -100,18 +100,18 @@ public class TracingPublisher<T> implements Publisher<T> {
     @Override
     public void subscribe(Subscriber<? super T> actual) {
         Span span;
-        if(spanBuilder != null) {
+        if (spanBuilder != null) {
             span = spanBuilder.start();
         } else {
             span = parentSpan;
         }
-        if(span != null) {
-            try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+        if (span != null) {
+            try (Scope ignored = tracer.scopeManager().activate(span, false)) {
                 publisher.subscribe(new Subscriber<T>() {
                     boolean finished = false;
                     @Override
                     public void onSubscribe(Subscription s) {
-                        try(Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
                             TracingPublisher.this.doOnSubscribe(span);
                             actual.onSubscribe(s);
                         }
@@ -119,10 +119,10 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onNext(T object) {
-                        try(Scope ignored = tracer.scopeManager().activate(span, isSingle)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span, isSingle)) {
                             TracingPublisher.this.doOnNext(object, span);
                             actual.onNext(object);
-                            if(isSingle) {
+                            if (isSingle) {
                                 finished = true;
                                 TracingPublisher.this.doOnFinish(span);
                             }
@@ -131,7 +131,7 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onError(Throwable t) {
-                        try(Scope ignored = tracer.scopeManager().activate(span, true)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
                             TracingPublisher.this.onError(t, span);
                             actual.onError(t);
                             finished = true;
@@ -140,8 +140,8 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onComplete() {
-                        if(!finished) {
-                            try(Scope ignored = tracer.scopeManager().activate(span, true)) {
+                        if (!finished) {
+                            try (Scope ignored = tracer.scopeManager().activate(span, true)) {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
                             }

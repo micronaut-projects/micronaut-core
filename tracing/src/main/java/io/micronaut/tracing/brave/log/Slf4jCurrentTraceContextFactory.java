@@ -42,7 +42,7 @@ public class Slf4jCurrentTraceContextFactory {
     @Requires(classes = {MDC.class, CurrentTraceContext.class})
     @Context
     Slf4jCurrentTraceContext currentTraceContext(@Nullable CurrentTraceContext existing) {
-        if(existing != null) {
+        if (existing != null) {
             return new Slf4jCurrentTraceContext(existing);
         } else {
             return new Slf4jCurrentTraceContext();

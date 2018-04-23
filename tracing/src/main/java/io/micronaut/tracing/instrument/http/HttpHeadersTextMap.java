@@ -66,7 +66,7 @@ class HttpHeadersTextMap implements TextMap {
                     @Override
                     public String getValue() {
                         List<String> value = entry.getValue();
-                        if(CollectionUtils.isNotEmpty(value)) {
+                        if (CollectionUtils.isNotEmpty(value)) {
                             return value.get(0);
                         }
                         return null;
@@ -85,8 +85,8 @@ class HttpHeadersTextMap implements TextMap {
 
     @Override
     public void put(String key, String value) {
-        if(headers instanceof MutableHttpHeaders) {
-            ((MutableHttpHeaders)headers).add(key, value);
+        if (headers instanceof MutableHttpHeaders) {
+            ((MutableHttpHeaders) headers).add(key, value);
         }
     }
 }

@@ -84,7 +84,7 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
             String sampled = String.valueOf(currentSpan.sampled());
             MDC.put(SPAN_EXPORTABLE, sampled);
 
-            if(LOG.isTraceEnabled()) {
+            if (LOG.isTraceEnabled()) {
                 LOG.trace("Starting scope for span: {}", currentSpan);
             }
 
@@ -107,7 +107,7 @@ class Slf4jCurrentTraceContext extends CurrentTraceContext {
          */
         class ThreadContextCurrentTraceContextScope implements Scope {
             @Override public void close() {
-                if(LOG.isTraceEnabled()) {
+                if (LOG.isTraceEnabled()) {
                     LOG.trace("Closing scope for span: {}", currentSpan);
                 }
                 scope.close();

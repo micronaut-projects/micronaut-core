@@ -60,11 +60,11 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Span span = serverHandler.handleReceive(extractor, request.getHeaders(), request);
         // place the span in scope such that down stream filters have access
-        try(Tracer.SpanInScope scope = httpTracing.tracing().tracer().withSpanInScope(span)) {
+        try (Tracer.SpanInScope scope = httpTracing.tracing().tracer().withSpanInScope(span)) {
             Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
             Flowable<MutableHttpResponse<?>> responseFlowable = Flowable.fromPublisher(responsePublisher);
-            responseFlowable = responseFlowable.doOnRequest( amount -> {
-                if(amount > 0) {
+            responseFlowable = responseFlowable.doOnRequest(amount -> {
+                if (amount > 0) {
                     withSpanInScope(request, span);
                 }
             });

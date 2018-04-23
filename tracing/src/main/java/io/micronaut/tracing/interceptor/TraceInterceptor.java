@@ -98,7 +98,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
                 Object returnObject = context.proceed();
-                if(returnObject == null || (returnObject instanceof TracingPublisher)) {
+                if (returnObject == null || (returnObject instanceof TracingPublisher)) {
                     return returnObject;
                 } else {
                     Publisher<?> resultFlowable = conversionService.convert(returnObject, Publisher.class)
@@ -139,7 +139,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
                 Object returnedObject = context.proceed();
-                if(returnedObject == null || (returnedObject instanceof TracingPublisher)) {
+                if (returnedObject == null || (returnedObject instanceof TracingPublisher)) {
                     return returnedObject;
                 } else {
                     Publisher<?> resultPublisher = conversionService.convert(returnedObject, Publisher.class)
@@ -158,16 +158,16 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                     ).orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
                 }
             } else {
-                if(CompletionStage.class.isAssignableFrom(javaReturnType)) {
+                if (CompletionStage.class.isAssignableFrom(javaReturnType)) {
                     try (Scope scope = builder.startActive(false)) {
                         Span span = scope.span();
                         populateTags(context, hystrixCommand, span);
                         try {
                             CompletionStage<?> completionStage = (CompletionStage) context.proceed();
-                            if(completionStage != null) {
+                            if (completionStage != null) {
 
-                                return  completionStage.whenComplete((o, throwable) -> {
-                                    if(throwable != null) {
+                                return completionStage.whenComplete((o, throwable) -> {
+                                    if (throwable != null) {
                                         logError(span, throwable);
                                     }
                                     span.finish();

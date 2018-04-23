@@ -94,13 +94,13 @@ public class HttpTracingFactory {
             @Override
             public String methodFromResponse(HttpResponse<?> httpResponse) {
                 return httpResponse.getAttribute(HttpAttributes.METHOD_NAME, String.class)
-                                   .orElseGet(()-> super.methodFromResponse(httpResponse) );
+                                   .orElseGet(() -> super.methodFromResponse(httpResponse));
             }
 
             @Override
             public String route(HttpResponse<?> response) {
                 Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(()->super.route(response));
+                return value.orElseGet(() -> super.route(response));
             }
         });
     }
@@ -138,7 +138,7 @@ public class HttpTracingFactory {
             @Override
             public String route(HttpResponse<?> response) {
                 Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(()->super.route(response));
+                return value.orElseGet(() -> super.route(response));
             }
 
             @Override

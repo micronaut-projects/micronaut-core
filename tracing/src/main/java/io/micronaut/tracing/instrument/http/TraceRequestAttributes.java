@@ -59,7 +59,7 @@ public enum TraceRequestAttributes implements CharSequence {
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return attr.subSequence(start,end);
+        return attr.subSequence(start, end);
     }
 
     @SuppressWarnings("NullableProblems")
