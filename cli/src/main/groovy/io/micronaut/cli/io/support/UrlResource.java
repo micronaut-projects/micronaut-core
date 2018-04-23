@@ -136,6 +136,9 @@ public class UrlResource extends AbstractFileResolvingResource {
     /**
      * This implementation returns the underlying URI directly,
      * if possible.
+     *
+     * @throws IOException if there was a problem getting the URI
+     * @return The URI
      */
     public URI getURI() throws IOException {
         if (uri != null) {
@@ -147,6 +150,9 @@ public class UrlResource extends AbstractFileResolvingResource {
     /**
      * This implementation returns a File reference for the underlying URL/URI,
      * provided that it refers to a file in the file system.
+     *
+     * @throws IOException if there was a problem getting the file
+     * @return The file
      */
     @Override
     public File getFile() throws IOException {
@@ -156,7 +162,10 @@ public class UrlResource extends AbstractFileResolvingResource {
     /**
      * This implementation creates a UrlResource, applying the given path
      * relative to the path of the underlying URL of this resource descriptor.
+     *
      * @see java.net.URL#URL(java.net.URL, String)
+     * @param relativePath The path
+     * @return The resource for the path
      */
     public Resource createRelative(String relativePath)  {
         if (relativePath.startsWith("/")) {
@@ -171,8 +180,10 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * This implementation returns the name of the file that this URL refers to.
+     *
      * @see java.net.URL#getFile()
      * @see java.io.File#getName()
+     * @return The filename
      */
     public String getFilename() {
         return new File(url.getFile()).getName();
@@ -180,6 +191,8 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * This implementation returns a description that includes the URL.
+     *
+     * @return The description
      */
     public String getDescription() {
         return "URL [" + url + "]";
