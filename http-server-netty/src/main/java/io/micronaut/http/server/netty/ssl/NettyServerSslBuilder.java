@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
@@ -32,8 +33,8 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * The Netty implementation of {@link SslBuilder} that generates
- * an {@link SslContext} to create a server handler with to support SSL.
+ * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handler
+ * with to support SSL.
  *
  * @author James Kleeh
  * @since 1.0
@@ -41,10 +42,17 @@ import java.util.Optional;
 @Singleton
 public class NettyServerSslBuilder extends SslBuilder<SslContext> {
 
+    /**
+     * @param ssl              The SSL configuration
+     * @param resourceResolver The resource resolver
+     */
     public NettyServerSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
+    /**
+     * @return The SSL configuration
+     */
     public SslConfiguration getSslConfiguration() {
         return ssl;
     }
@@ -66,6 +74,7 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forServer(getKeyManagerFactory())
             .trustManager(getTrustManagerFactory());
+
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }

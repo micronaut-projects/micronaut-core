@@ -117,7 +117,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         try {
-            this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+            this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
         } catch (SdkClientException ske) {
             LOG.warn("Warning: cannot find any AWS credentials. Please verify your configuration.", ske);
         }
@@ -231,7 +231,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
 
     public String createNamespace(AWSServiceDiscovery serviceDiscovery, String name) {
         if (serviceDiscovery == null) {
-            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
         }
         String requestId = Long.toString(System.nanoTime());
 
@@ -250,7 +250,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
 
     public String createService(AWSServiceDiscovery serviceDiscovery, String name, String description, String namespaceId, Long ttl) {
         if (serviceDiscovery == null) {
-            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.clientConfiguration).build();
+            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
         }
         DnsRecord dnsRecord = new DnsRecord().withType(RecordType.A).withTTL(ttl);
         DnsConfig dnsConfig = new DnsConfig().withDnsRecords(dnsRecord).withNamespaceId(namespaceId).withRoutingPolicy(RoutingPolicy.WEIGHTED);

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * <p>Support classes that simplify writing standalone functions as Groovy scripts</p>
+ * <p>Support classes that simplify writing standalone functions as Groovy scripts</p>.
  *
  * @author Graeme Rocher
  * @since 1.0

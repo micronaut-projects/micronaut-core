@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session.binder;
 
 import io.micronaut.context.annotation.Requires;
@@ -32,7 +33,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Binds an argument of type {@link Session} for controllers
+ * Binds an argument of type {@link Session} for controllers.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -43,6 +44,11 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
 
     private final SessionStore<Session> sessionStore;
 
+    /**
+     * Constructor.
+     *
+     * @param sessionStore The session store
+     */
     public SessionArgumentBinder(SessionStore<Session> sessionStore) {
         this.sessionStore = sessionStore;
     }

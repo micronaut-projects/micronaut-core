@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -31,7 +32,7 @@ import java.util.Optional;
 public interface Session extends MutableConvertibleValues<Object> {
 
     /**
-     * Returns the time when this session was created
+     * Returns the time when this session was created.
      *
      * @return An {@link Instant} instance
      * @throws IllegalStateException if this method is called on an invalidated session
@@ -40,7 +41,7 @@ public interface Session extends MutableConvertibleValues<Object> {
     Instant getCreationTime();
 
     /**
-     * A unique identifier for the session
+     * A unique identifier for the session.
      *
      * @return The id of the session
      */
@@ -48,7 +49,7 @@ public interface Session extends MutableConvertibleValues<Object> {
     String getId();
 
     /**
-     * Returns the last time the client sent a request associated with this session as an {@link Instant}
+     * Returns the last time the client sent a request associated with this session as an {@link Instant}.
      * <p>
      * <p>Actions that your application takes, such as getting or setting a value associated with the session, do not
      * affect the access time.
@@ -59,22 +60,21 @@ public interface Session extends MutableConvertibleValues<Object> {
     @Nonnull
     Instant getLastAccessedTime();
 
-
     /**
-     * Sets the last accessed time on the session
+     * Sets the last accessed time on the session.
      *
      * @param instant The instant that represents the last accessed time
+     * @return The session
      */
     Session setLastAccessedTime(Instant instant);
-
 
     /**
      * Specifies the duration between client requests before session should be invalidated.
      *
      * @param duration A duration specifying the max inactive interval
+     * @return The session
      */
     Session setMaxInactiveInterval(Duration duration);
-
 
     /**
      * Returns the maximum time interval as a {@link Duration} that sessions will  be kept open between client accesses.
@@ -92,7 +92,7 @@ public interface Session extends MutableConvertibleValues<Object> {
     boolean isNew();
 
     /**
-     * Retrieve an attribute for the given name
+     * Retrieve an attribute for the given name.
      *
      * @param attr The attribute name
      * @return An {@link Optional} of the attribute

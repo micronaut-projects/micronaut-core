@@ -144,7 +144,6 @@ public class TracingPublisher<T> implements Publisher<T> {
                             try(Scope ignored = tracer.scopeManager().activate(span, true)) {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
-                                span.finish();
                             }
                         } else {
                             actual.onComplete();

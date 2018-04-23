@@ -54,6 +54,11 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
+    public Argument[] getTypeParameters() {
+        return argument.getTypeParameters();
+    }
+
+    @Override
     public Map<String, Argument<?>> getTypeVariables() {
         return argument.getTypeVariables();
     }

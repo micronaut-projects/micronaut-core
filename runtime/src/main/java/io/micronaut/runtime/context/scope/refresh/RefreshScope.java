@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.context.BeanContext;
@@ -48,7 +49,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Implementation of {@link Refreshable}
+ * Implementation of {@link Refreshable}.
  *
  * @author Graeme Rocher
  * @see Refreshable
@@ -63,6 +64,10 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final BeanContext beanContext;
     private final Executor executorService;
 
+    /**
+     * @param beanContext     The bean context to allow DI of beans annotated with {@link javax.inject.Inject}
+     * @param executorService The executor service
+     */
     public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
         this.beanContext = beanContext;
         this.executorService = executorService;
@@ -123,6 +128,10 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     }
 
+    /**
+     * @param object The bean
+     * @return The lock on the object
+     */
     ReadWriteLock getLock(Object object) {
         ReadWriteLock readWriteLock = locks.get(object);
         if (readWriteLock == null) {

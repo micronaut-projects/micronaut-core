@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.aop.MethodInterceptor;
@@ -23,7 +24,7 @@ import java.util.concurrent.locks.Lock;
 
 /**
  * <p>A {@link MethodInterceptor} that will lock the bean preventing it from being destroyed by a
- * {@link RefreshEvent} until the method completes</p>
+ * {@link RefreshEvent} until the method completes.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,6 +34,9 @@ public class RefreshInterceptor implements MethodInterceptor {
 
     private final RefreshScope refreshScope;
 
+    /**
+     * @param refreshScope To allow target beans to be refreshed
+     */
     public RefreshInterceptor(RefreshScope refreshScope) {
         this.refreshScope = refreshScope;
     }

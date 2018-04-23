@@ -15,26 +15,33 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ConstructorInjectionPoint;
 
-import java.lang.reflect.Method;
+import javax.annotation.Nullable;
 
 /**
- * <p>Calls a method that constructs the object</p>
+ * Represents an injection point for a method that requires reflection
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
+@Internal
+class ReflectionMethodInjectionPoint extends DefaultMethodInjectionPoint {
 
-    public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Argument... arguments) {
-        super(declaringComponent, method, requiresReflection, arguments);
+    ReflectionMethodInjectionPoint(
+            BeanDefinition declaringBean,
+            Class<?> declaringType,
+            String methodName,
+            @Nullable Argument[] arguments,
+            @Nullable AnnotationMetadata annotationMetadata) {
+        super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }
 
     @Override
-    public Object invoke(Object... args) {
-        throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
+    public boolean requiresReflection() {
+        return true;
     }
 }

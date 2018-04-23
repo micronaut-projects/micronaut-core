@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The default health status stores the values in memory
+ * The default health status stores the values in memory.
  *
  * @author graemerocher
  * @since 1.0
