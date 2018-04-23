@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.event;
 
 import io.micronaut.discovery.ServiceInstance;
 
 /**
- * An event triggered when de-registering a {@link ServiceInstance}
+ * An event triggered when de-registering a {@link ServiceInstance}.
  *
  * @author graemerocher
  * @since 1.0

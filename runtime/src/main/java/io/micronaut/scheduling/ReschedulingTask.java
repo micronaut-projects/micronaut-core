@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling;
 
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
@@ -28,7 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
- * Wraps a {@link Runnable} and re-schedules the tasks
+ * Wraps a {@link Runnable} and re-schedules the tasks.
+ *
+ * @param <V> The result type returned by this Future
  *
  * @author graemerocher
  * @since 1.0
@@ -41,6 +44,11 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
     private ScheduledFuture<?> currentFuture;
     private AtomicBoolean cancelled = new AtomicBoolean(false);
 
+    /**
+     * @param task          The task
+     * @param taskScheduler To schedule the task for next time
+     * @param nextTime      The next time
+     */
     ReschedulingTask(Callable<V> task, TaskScheduler taskScheduler, Supplier<Duration> nextTime) {
         this.task = task;
         this.taskScheduler = taskScheduler;

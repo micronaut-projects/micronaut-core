@@ -27,7 +27,7 @@ import io.reactivex.Single;
  * @author Zachary Klein
  * @since 1.0
  */
-@Endpoint("info")
+@Endpoint(InfoEndpoint.NAME)
 public class InfoEndpoint {
 
     /**

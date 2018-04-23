@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
@@ -28,7 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * A Netty implementation of {@link CompletedFileUpload}
+ * A Netty implementation of {@link CompletedFileUpload}.
  *
  * @author Zachary Klein
  * @since 1.0
@@ -37,13 +38,16 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     private final FileUpload fileUpload;
 
+    /**
+     * @param fileUpload The file upload
+     */
     public NettyCompletedFileUpload(FileUpload fileUpload) {
         this.fileUpload = fileUpload;
         fileUpload.retain();
     }
 
     /**
-     * Gets the content of this part as a <tt>InputStream</tt>
+     * Gets the content of this part as a <tt>InputStream</tt>.
      *
      * <p>The contents of the file will be released when the stream is closed.
      * This method should only be called <strong>once</strong></p>
@@ -56,9 +60,8 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         return new ByteBufInputStream(fileUpload.getByteBuf(), true);
     }
 
-
     /**
-     * Gets the content of this part as a <tt>byte[]</tt>
+     * Gets the content of this part as a <tt>byte[]</tt>.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
@@ -77,7 +80,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     /**
-     * Gets the content of this part as a <tt>ByteBuffer</tt>
+     * Gets the content of this part as a <tt>ByteBuffer</tt>.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>

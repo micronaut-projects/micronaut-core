@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
@@ -57,10 +58,14 @@ public class Micronaut {
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
     private Collection<Map<String, Object>> propertyMaps = new ArrayList<>();
 
+    /**
+     * The default constructor.
+     */
     protected Micronaut() {
     }
 
     /**
+     * @param applicationClass The application class
      * @return Run this {@link Micronaut}
      */
     public ApplicationContext start(Class applicationClass) {
@@ -123,7 +128,7 @@ public class Micronaut {
     }
 
     /**
-     * Add classes to be included in the initialization of the application
+     * Add classes to be included in the initialization of the application.
      *
      * @param classes The application
      * @return The classes
@@ -136,7 +141,7 @@ public class Micronaut {
     }
 
     /**
-     * Add additional properties to the {@link PropertySource} list
+     * Add additional properties to the {@link PropertySource} list.
      *
      * @param properties The properties
      * @return The properties
@@ -149,7 +154,7 @@ public class Micronaut {
     }
 
     /**
-     * Set the command line arguments
+     * Set the command line arguments.
      *
      * @param args The arguments
      * @return This application
@@ -162,7 +167,7 @@ public class Micronaut {
     }
 
     /**
-     * Set the environment
+     * Set the environment.
      *
      * @param environments The environment
      * @return This application
@@ -175,7 +180,7 @@ public class Micronaut {
     }
 
     /**
-     * Add packages to scan
+     * Add packages to scan.
      *
      * @param packages The packages
      * @return This application
@@ -188,7 +193,7 @@ public class Micronaut {
     }
 
     /**
-     * Add packages to scan
+     * Add packages to scan.
      *
      * @param packages The packages
      * @return This application
@@ -206,7 +211,7 @@ public class Micronaut {
     }
 
     /**
-     * Allow customizing the configurations that will be loaded
+     * Allow customizing the configurations that will be loaded.
      *
      * @param configurations The configurations to include
      * @return This application
@@ -219,7 +224,7 @@ public class Micronaut {
     }
 
     /**
-     * Allow customizing the configurations that will be loaded
+     * Allow customizing the configurations that will be loaded.
      *
      * @param configurations The configurations to exclude
      * @return This application
@@ -232,7 +237,7 @@ public class Micronaut {
     }
 
     /**
-     * Maps an exception to the given error code
+     * Maps an exception to the given error code.
      *
      * @param exception The exception
      * @param mapper    The mapper

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.intercept;
 
 import io.micronaut.aop.InterceptPhase;
@@ -42,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link MethodInterceptor} that retries an operation according to the specified
- * {@link Retryable} annotation
+ * {@link Retryable} annotation.
  *
  * @author graemerocher
  * @since 1.0
@@ -51,10 +52,16 @@ import java.util.concurrent.TimeUnit;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
+    private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
     private final ApplicationEventPublisher eventPublisher;
     private final Map<Method, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
 
+    /**
+     * Construct a default retry method interceptor with the event publisher.
+     *
+     * @param eventPublisher The event publisher to publish retry events
+     */
     public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
     }
@@ -77,7 +84,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             if (isCircuitBreaker) {
                 long timeout = context
                     .getValue(CircuitBreaker.class, "reset", Duration.class)
-                    .map(Duration::toMillis).orElse(Duration.ofSeconds(20).toMillis());
+                    .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
                 retryState = circuitContexts.computeIfAbsent(
                     context.getTargetMethod(),
                     method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)

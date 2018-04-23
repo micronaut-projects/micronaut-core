@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
-import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.type.Argument;
-
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /**
- * <p>A synchronous API for accessing cache values that is useful for in-memory caching implementations</p>
+ * <p>A synchronous API for accessing cache values that is useful for in-memory caching implementations.</p>
  * <p>
  * <p>Caching implementations that require blocking IO should implement the {@link #async()} method to provide a
  * non-blocking implementation of this interface</p>
  * <p>
- * <p>Implementers of this interface should mark the implementation as {@link Blocking} if a blocking operation is
+ * <p>Implementers of this interface should mark the implementation as {@link io.micronaut.core.annotation.Blocking} if a blocking operation is
  * required to read or write cache values</p>
+ *
+ * @param <C> The native cache implementation
  *
  * @author Graeme Rocher
  * @see Cache
@@ -39,7 +40,7 @@ import java.util.function.Supplier;
 public interface SyncCache<C> extends Cache<C> {
 
     /**
-     * Resolve the given value for the given key
+     * Resolve the given value for the given key.
      *
      * @param key          The cache key
      * @param requiredType The required type
@@ -61,16 +62,17 @@ public interface SyncCache<C> extends Cache<C> {
     <T> T get(Object key, Argument<T> requiredType, Supplier<T> supplier);
 
     /**
-     * <p>Cache the specified value using the specified key if it is not already present</p>
+     * <p>Cache the specified value using the specified key if it is not already present.</p>
      *
      * @param key   the key with which the specified value is to be associated
      * @param value the value to be associated with the specified key
+     * @param <T>   The concrete type
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
     <T> Optional<T> putIfAbsent(Object key, T value);
 
     /**
-     * <p>Cache the specified value using the specified key</p>
+     * <p>Cache the specified value using the specified key.</p>
      *
      * @param key   the key with which the specified value is to be associated
      * @param value the value to be associated with the specified key
@@ -78,14 +80,14 @@ public interface SyncCache<C> extends Cache<C> {
     void put(Object key, Object value);
 
     /**
-     * Invalidate the value for the given key
+     * Invalidate the value for the given key.
      *
      * @param key The key to invalid
      */
     void invalidate(Object key);
 
     /**
-     * Invalidate all cached values within this cache
+     * Invalidate all cached values within this cache.
      */
     void invalidateAll();
 
@@ -104,7 +106,7 @@ public interface SyncCache<C> extends Cache<C> {
     }
 
     /**
-     * Resolve the given value for the given key
+     * Resolve the given value for the given key.
      *
      * @param key          The cache key
      * @param requiredType The required type
@@ -116,7 +118,7 @@ public interface SyncCache<C> extends Cache<C> {
     }
 
     /**
-     * <p>This method should return an async API version of this cache interface implementation</p>
+     * <p>This method should return an async API version of this cache interface implementation.</p>
      * <p>
      * <p>The default behaviour assumes the cache implementation is running in-memory and performs no blocking
      * operations and hence simply delegates to the {@link SyncCache} implementation.

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -41,7 +42,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Resolves {@link ComputeInstanceMetadata} for Google Cloud Platform
+ * Resolves {@link ComputeInstanceMetadata} for Google Cloud Platform.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -52,7 +53,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMetadataResolver {
 
     /**
-     * Constant for Metadata flavor
+     * Constant for Metadata flavor.
      */
     public static final String HEADER_METADATA_FLAVOR = "Metadata-Flavor";
 
@@ -62,12 +63,20 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
     private final GoogleComputeMetadataConfiguration configuration;
     private GoogleComputeInstanceMetadata cachedMetadata;
 
+    /**
+     *
+     * @param objectMapper To read and write JSON
+     * @param configuration The configuration for computing Google Metadata
+     */
     @Inject
     public GoogleComputeInstanceMetadataResolver(ObjectMapper objectMapper, GoogleComputeMetadataConfiguration configuration) {
         this.objectMapper = objectMapper;
         this.configuration = configuration;
     }
 
+    /**
+     * Construct with default settings.
+     */
     public GoogleComputeInstanceMetadataResolver() {
         this.objectMapper = new ObjectMapper();
         this.configuration = new GoogleComputeMetadataConfiguration();
@@ -151,6 +160,15 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
         return Optional.empty();
     }
 
+    /**
+     * Get instance Metadata JSON.
+     *
+     * @param url                 The metadata URL
+     * @param connectionTimeoutMs connection timeout in millis
+     * @param readTimeoutMs       read timeout in millis
+     * @return The Metadata JSON
+     * @throws IOException Failed or interrupted I/O operations while reading from input stream.
+     */
     protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
         URLConnection urlConnection = url.openConnection();
 
