@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.exceptions;
 
 /**
- * An exception thrown when no service is available
+ * An exception thrown when no service is available.
  *
  * @author graemerocher
  * @since 1.0
@@ -25,11 +26,17 @@ public class NoAvailableServiceException extends DiscoveryException {
 
     private final String serviceID;
 
+    /**
+     * @param serviceID The service ID
+     */
     public NoAvailableServiceException(String serviceID) {
         super("No available services for ID: " + serviceID);
         this.serviceID = serviceID;
     }
 
+    /**
+     * @return The service ID
+     */
     public String getServiceID() {
         return serviceID;
     }

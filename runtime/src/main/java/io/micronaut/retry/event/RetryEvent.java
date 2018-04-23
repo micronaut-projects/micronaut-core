@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.event;
 
 import io.micronaut.aop.MethodInvocationContext;
@@ -20,7 +21,7 @@ import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.retry.RetryState;
 
 /**
- * An event triggered on each retry
+ * An event triggered on each retry.
  *
  * @author graemerocher
  * @since 1.0
@@ -30,6 +31,11 @@ public class RetryEvent extends ApplicationEvent {
     private final RetryState retryState;
     private final Throwable throwable;
 
+    /**
+     * @param source     The source method invocation context for intercepting method call
+     * @param retryState To encapsulate current state into {@link io.micronaut.retry.annotation.Retryable}
+     * @param throwable  The error
+     */
     public RetryEvent(MethodInvocationContext<?, ?> source, RetryState retryState, Throwable throwable) {
         super(source);
         this.retryState = retryState;

@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.RetryState;
-import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A context object for {@link Retryable} operations
+ * A context object for {@link io.micronaut.retry.annotation.Retryable} operations.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,6 +46,14 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final Set<Class<? extends Throwable>> includes;
     private final Set<Class<? extends Throwable>> excludes;
 
+    /**
+     * @param maxAttempts The maximum number of attemps
+     * @param multiplier The multiplier to use between delays
+     * @param delay The overall delay so far
+     * @param maxDelay The maximum overall delay
+     * @param includes Classes to include for retry
+     * @param excludes Classes to exclude for retry
+     */
     SimpleRetry(
         int maxAttempts,
         double multiplier,
@@ -64,16 +72,27 @@ class SimpleRetry implements RetryState, MutableRetryState {
         this.hasExcludes = !this.excludes.isEmpty();
     }
 
-    public SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay) {
+    /**
+     * @param maxAttempts The maximum number of attemps
+     * @param multiplier The multiplier to use between delays
+     * @param delay The overall delay so far
+     * @param maxDelay The maximum overall delay
+     */
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay) {
         this(maxAttempts, multiplier, delay, maxDelay, Collections.emptySet(), Collections.emptySet());
     }
 
-    public SimpleRetry(int maxAttempts, double multiplier, Duration delay) {
+    /**
+     * @param maxAttempts The maximum number of attemps
+     * @param multiplier  The multiplier to use between delays
+     * @param delay       The overall delay so far
+     */
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay) {
         this(maxAttempts, multiplier, delay, null);
     }
 
     /**
-     * Should a retry attempt occur
+     * Should a retry attempt occur.
      *
      * @return True if it should
      */

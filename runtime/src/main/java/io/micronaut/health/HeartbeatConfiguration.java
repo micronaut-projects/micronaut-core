@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -21,7 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import java.time.Duration;
 
 /**
- * Configuration for heart beat
+ * Configuration for heart beat.
  *
  * @author Graeme Rocher
  * @since 1.0
