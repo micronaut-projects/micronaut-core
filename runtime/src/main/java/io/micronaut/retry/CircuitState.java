@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry;
 
 /**
- * State for Circuit breaker phases
+ * State for Circuit breaker phases.
  *
  * @author graemerocher
  * @since 1.0
@@ -24,17 +25,17 @@ package io.micronaut.retry;
 public enum CircuitState {
 
     /**
-     * The circuit is open and downstream logic should not be invoked
+     * The circuit is open and downstream logic should not be invoked.
      */
     OPEN,
 
     /**
-     * The circuit is closed and downstream logic should proceed as normal
+     * The circuit is closed and downstream logic should proceed as normal.
      */
     CLOSED,
 
     /**
-     * The circuit has just closed to allow a single downstream call to check if it is backup
+     * The circuit has just closed to allow a single downstream call to check if it is backup.
      */
     HALF_OPEN
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpMessage;
@@ -22,7 +23,6 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpData;
 import org.reactivestreams.Subscriber;
@@ -30,7 +30,7 @@ import org.reactivestreams.Subscriber;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * This class will handle subscribing to a stream of {@link HttpContent}
+ * This class will handle subscribing to a stream of {@link io.netty.handler.codec.http.HttpContent}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,6 +46,10 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     protected final AtomicLong receivedLength = new AtomicLong();
     private final long partMaxSize;
 
+    /**
+     * @param nettyHttpRequest The {@link NettyHttpRequest}
+     * @param configuration    The {@link HttpServerConfiguration}
+     */
     public DefaultHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();

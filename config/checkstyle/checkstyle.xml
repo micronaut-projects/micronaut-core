@@ -76,7 +76,10 @@
     <!-- See http://checkstyle.sf.net/config_filters.html#SuppressWarningsFilter -->
     <module name="SuppressWarningsFilter"/>
 
-    <module name="TreeWalker">
+     <module name="TreeWalker">
+
+        <!-- Needed for SuppressWarningsFilter -->
+        <module name="SuppressWarningsHolder"/>
 
         <!-- Needed for SuppressWarningsFilter -->
         <module name="SuppressWarningsHolder"/>
@@ -123,10 +126,10 @@
         <!-- <module name="NoWhitespaceAfter"/> -->
         <!-- <module name="NoWhitespaceBefore"/> -->
         <!-- <module name="OperatorWrap"/> -->
-        <!-- <module name="ParenPad"/> -->
+        <module name="ParenPad"/>
         <!-- <module name="TypecastParenPad"/> -->
-        <!-- <module name="WhitespaceAfter"/> -->
-        <!-- <module name="WhitespaceAround"/> -->
+        <module name="WhitespaceAfter"/>
+        <module name="WhitespaceAround"/>
         <module name="EmptyLineSeparator">
             <property name="allowNoEmptyLineBetweenFields" value="true"/>
             <property name="allowMultipleEmptyLines" value="false"/>

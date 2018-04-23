@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.annotation;
 
 import java.lang.annotation.Documented;
@@ -22,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Repeatable annotation wrapper for {@link Scheduled}
+ * Repeatable annotation wrapper for {@link Scheduled}.
  *
  * @author graemerocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -24,7 +25,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * A byte buf to object converter
+ * A byte buf to object converter.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +35,9 @@ public class ByteBufToObjectConverter implements TypeConverter<ByteBuf, Object> 
 
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     public ByteBufToObjectConverter(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
     }

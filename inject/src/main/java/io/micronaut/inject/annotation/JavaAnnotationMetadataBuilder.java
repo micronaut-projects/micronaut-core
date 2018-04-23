@@ -99,7 +99,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             hierarchy.add(element);
             return hierarchy;
         } else {
-            return Collections.singletonList(element);
+            ArrayList<Element> single = new ArrayList<>();
+            single.add(element);
+            return single;
         }
     }
 

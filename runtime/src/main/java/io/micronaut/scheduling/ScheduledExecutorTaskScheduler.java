@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling;
 
 import static io.micronaut.core.util.ArgumentUtils.check;
@@ -32,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Simple abstraction over {@link ScheduledExecutorService}
+ * Simple abstraction over {@link ScheduledExecutorService}.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,6 +43,9 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     private final ScheduledExecutorService executorService;
 
+    /**
+     * @param executorService To schedule executor tasks
+     */
     public ScheduledExecutorTaskScheduler(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         if (!(executorService instanceof ScheduledExecutorService)) {
             throw new IllegalStateException("Cannot schedule tasks on ExecutorService that is not a ScheduledExecutorService: " + executorService);

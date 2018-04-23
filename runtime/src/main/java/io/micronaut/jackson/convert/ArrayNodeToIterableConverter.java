@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,12 @@ public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, It
     private final ObjectMapper objectMapper;
     private final ConversionService conversionService;
 
+    /**
+     * Create a new converter to convert from json to given type iteratively.
+     *
+     * @param objectMapper  To convert from Json
+     * @param conversionService Convert the given json node to the given target type.
+     */
     public ArrayNodeToIterableConverter(ObjectMapper objectMapper, ConversionService conversionService) {
         this.objectMapper = objectMapper;
         this.conversionService = conversionService;

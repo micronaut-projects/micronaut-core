@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.annotation.Primary;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 
 /**
- * Handles exceptions of type {@link UnsatisfiedRouteException}
+ * Handles exceptions of type {@link UnsatisfiedRouteException}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,8 +43,8 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
-        if(LOG.isErrorEnabled()) {
-            LOG.error("{} (Bad Request): {}",request, exception.getMessage());
+        if (LOG.isErrorEnabled()) {
+            LOG.error("{} (Bad Request): {}", request, exception.getMessage());
         }
         VndError error = new VndError(exception.getMessage());
         error.path('/' + exception.getArgument().getName());
