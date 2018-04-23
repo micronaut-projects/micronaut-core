@@ -33,12 +33,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.HttpMethodMapping;
-import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.Client;
 import io.micronaut.http.client.DefaultHttpClient;
@@ -68,6 +63,7 @@ import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -153,7 +149,26 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Object body = null;
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
+
             Map<String, String> headers = new LinkedHashMap<>(3);
+
+            Headers headersAnnotation = context.getAnnotation(Headers.class);
+            if (headersAnnotation!=null) {
+                Header[] headerArray = headersAnnotation.value();
+                for (Header header : headerArray) {
+                    headers.put(header.name(), header.value());
+                }
+            }
+
+
+/*
+            headersAnnotation.getClass()
+
+            // this annotation adds a header for each request the client makes
+            if (headerAnnotation!=null && headerAnnotation.name()!= null && headerAnnotation.name().length()>0) {
+                headers.put(headerAnnotation.name(),headerAnnotation.value());
+            }
+*/
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {

@@ -21,6 +21,8 @@ import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Headers;
 import io.micronaut.http.client.Client;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
