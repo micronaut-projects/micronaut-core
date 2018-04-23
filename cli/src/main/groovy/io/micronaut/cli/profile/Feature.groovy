@@ -66,5 +66,5 @@ interface Feature {
     /**
      * @return The dependent feature names
      */
-    List<String> getDependentFeatures()
+    Iterable<Feature> getDependentFeatures(Profile profile)
 }

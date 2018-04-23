@@ -488,6 +488,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
+        Set<Feature> features = []
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
             List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
@@ -505,27 +506,21 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             }
 
             Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }// as List<Feature>
-            Iterable<Feature> requiredFeatures = profile.requiredFeatures// as List<Feature>
-
-            Iterable<Feature> validFeaturesDependent = this.getDependentFeatures(profile, validFeatures)
-            Iterable<Feature> requiredFeaturesDependent = this.getDependentFeatures(profile, requiredFeatures)
-
-            return (validFeatures + requiredFeatures + validFeaturesDependent + requiredFeaturesDependent).unique()
+            features.addAll(validFeatures)
+        } else {
+            features.addAll(profile.defaultFeatures)
         }
-        else {
-            Iterable<Feature> defaultFeatures = profile.defaultFeatures
-            Iterable<Feature> requiredFeatures = profile.requiredFeatures
 
-            Iterable<Feature> defaultFeaturesDependent = this.getDependentFeatures(profile, defaultFeatures)
-            Iterable<Feature> requiredFeaturesDependent = this.getDependentFeatures(profile, requiredFeatures)
+        features.addAll(profile.requiredFeatures)
 
-            return (defaultFeatures + requiredFeatures + defaultFeaturesDependent + requiredFeaturesDependent).unique()
+        for (int i = 0; i < features.size(); i++) {
+            features.addAll(features[i].getDependentFeatures(profile))
         }
+
+        features
     }
 
-    private Iterable<Feature> getDependentFeatures(Profile profile, Iterable<Feature> features) {
-        features.collect { Feature f -> profile.getDependentFeaturesFor(f) }.flatten() as Iterable<Feature>
-    }
+
 
     protected String getDefaultProfile() {
         ProfileRepository.DEFAULT_PROFILE_NAME

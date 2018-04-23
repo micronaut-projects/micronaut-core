@@ -252,20 +252,6 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
-    Iterable<Feature> getDependentFeaturesFor(Feature feature) {
-        List<String> dependentFeatures = feature.dependentFeatures
-
-        if (dependentFeatures) {
-            return dependentFeatures
-                .collect { this.getFeatureFromName(it) }
-                .collect { this.getDependentFeaturesFor(it) }
-                .flatten() as Iterable<Feature>
-        } else {
-            return [feature]
-        }
-    }
-
-    @Override
     Iterable<Feature> getFeatures() {
         Set<Feature> calculatedFeatures = []
         calculatedFeatures.addAll(features)
@@ -538,9 +524,5 @@ abstract class AbstractProfile implements Profile {
 
     List<String> getSkeletonExcludes() {
         this.skeletonExcludes
-    }
-
-    private Feature getFeatureFromName(String name) {
-        this.features.find { it.name == name}
     }
 }
