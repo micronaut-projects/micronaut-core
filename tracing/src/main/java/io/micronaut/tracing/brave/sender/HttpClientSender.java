@@ -223,11 +223,9 @@ public final class HttpClientSender extends Sender {
     public static class Builder {
         public static final String DEFAULT_PATH = "/api/v2/spans";
         public static final String DEFAULT_SERVER_URL = "http://localhost:9411";
-        private static final int BYTES_IN_KB = 1024;
-        private static final int FIVE = 5;
 
         private Encoding encoding = Encoding.JSON;
-        private int messageMaxBytes = FIVE * BYTES_IN_KB;
+        private int messageMaxBytes = 5 * 1024;
         private String path = DEFAULT_PATH;
         private boolean compressionEnabled = true;
         private List<URI> servers = Collections.singletonList(URI.create(DEFAULT_SERVER_URL));
