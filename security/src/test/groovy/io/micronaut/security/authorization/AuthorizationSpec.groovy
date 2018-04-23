@@ -13,7 +13,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class AuthorizationSpec extends Specification {
+class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.authentication': true,
@@ -27,20 +27,6 @@ class AuthorizationSpec extends Specification {
             ]
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
-    String loginWith(String username = "valid") {
-        def creds = new UsernamePasswordCredentials(username, "valid")
-        def resp = client.toBlocking().exchange(HttpRequest.POST('/login', creds), BearerAccessRefreshToken)
-        resp.body().accessToken
-    }
-
-    HttpResponse get(String path, String token = null) {
-        HttpRequest req = HttpRequest.GET(path)
-        if (token != null) {
-            req = req.header("Authorization", "Bearer ${token}".toString())
-        }
-        client.toBlocking().exchange(req, String)
-    }
 
     void "test accessing an anonymous without authentication"() {
         when:

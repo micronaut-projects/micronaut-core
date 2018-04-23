@@ -18,6 +18,8 @@ package io.micronaut.security.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,7 +35,7 @@ public class SecurityConfiguration implements Toggleable {
 
     protected boolean enabled = false;
     protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
-    protected List<InterceptUrlMapPattern> interceptUrlMap;
+    protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
 
     /**
      * enabled getter.
