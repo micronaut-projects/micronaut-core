@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisURI;
@@ -26,13 +27,16 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Abstract configuration for Lettuce
+ * Abstract configuration for Lettuce.
  */
 public abstract class AbstractRedisConfiguration extends RedisURI {
 
     private RedisURI uri;
     private List<RedisURI> uris = Collections.emptyList();
 
+    /**
+     * Constructor.
+     */
     protected AbstractRedisConfiguration() {
         setClientName(Environment.DEFAULT_NAME);
         setPort(RedisURI.DEFAULT_REDIS_PORT);
@@ -40,7 +44,7 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     }
 
     /**
-     * @return Get the Redis URI for configuration
+     * @return Get the Redis URI for configuration.
      */
     public Optional<RedisURI> getUri() {
         if (uri != null) {
@@ -50,7 +54,7 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     }
 
     /**
-     * Sets the Redis URI for configuration by string
+     * Sets the Redis URI for configuration by string.
      *
      * @param uri The URI
      */
@@ -59,14 +63,14 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     }
 
     /**
-     * @return Get the Redis URIs for cluster configuration
+     * @return Get the Redis URIs for cluster configuration.
      */
     public List<RedisURI> getUris() {
         return uris;
     }
 
     /**
-     * Sets the Redis URIs for cluster configuration
+     * Sets the Redis URIs for cluster configuration.
      *
      * @param uris The URI
      */

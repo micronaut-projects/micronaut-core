@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.cache;
 
 import io.lettuce.core.dynamic.Commands;
@@ -22,7 +23,7 @@ import io.lettuce.core.dynamic.annotation.Param;
 import java.util.List;
 
 /**
- * The synchronous operations required by {@link RedisCache}
+ * The synchronous operations required by {@link RedisCache}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,15 +31,16 @@ import java.util.List;
 public interface SyncCacheCommands extends Commands {
 
     /**
-     * See https://redis.io/commands/get
+     * See https://redis.io/commands/get.
      *
      * @param key The key to retrieve
+     * @return key as byte array
      */
     @Command("GET :key")
     byte[] get(@Param("key") byte[] key);
 
     /**
-     * See https://redis.io/commands/del
+     * See https://redis.io/commands/del.
      *
      * @param key The key to delete
      */
@@ -46,7 +48,7 @@ public interface SyncCacheCommands extends Commands {
     void remove(@Param("key") byte[] key);
 
     /**
-     * See https://redis.io/commands/set
+     * See https://redis.io/commands/set.
      *
      * @param key   The key
      * @param value The value
@@ -55,7 +57,7 @@ public interface SyncCacheCommands extends Commands {
     void put(@Param("key") byte[] key, @Param("value") byte[] value);
 
     /**
-     * See https://redis.io/commands/set
+     * See https://redis.io/commands/set.
      *
      * @param key     The key
      * @param value   The value
@@ -65,7 +67,7 @@ public interface SyncCacheCommands extends Commands {
     void put(@Param("key") byte[] key, @Param("value") byte[] value, @Param("timeout") long timeout);
 
     /**
-     * See https://redis.io/commands/expire
+     * See https://redis.io/commands/expire.
      *
      * @param key     The key to expire
      * @param timeout The timeout
