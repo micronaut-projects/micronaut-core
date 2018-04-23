@@ -34,7 +34,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-class EnvironmentConfiguration extends AbstractConfiguration implements ApplicationEventListener<RefreshEvent> {
+public class EnvironmentConfiguration extends AbstractConfiguration implements ApplicationEventListener<RefreshEvent> {
     private final Environment environment;
 
     /**
@@ -75,7 +75,7 @@ class EnvironmentConfiguration extends AbstractConfiguration implements Applicat
     @Override
     public Iterator<String> getKeys() {
         Iterator<PropertySource> propertySourceIterator = environment.getPropertySources().iterator();
-        if(!propertySourceIterator.hasNext()) {
+        if (!propertySourceIterator.hasNext()) {
             return Collections.emptyIterator();
         }
 
@@ -83,10 +83,10 @@ class EnvironmentConfiguration extends AbstractConfiguration implements Applicat
             Iterator<String> i = propertySourceIterator.next().iterator();
             @Override
             public boolean hasNext() {
-                if(i.hasNext()) {
+                if (i.hasNext()) {
                     return true;
                 } else {
-                    if(propertySourceIterator.hasNext()) {
+                    if (propertySourceIterator.hasNext()) {
                         i = propertySourceIterator.next().iterator();
                     }
                     return i.hasNext();
@@ -105,7 +105,7 @@ class EnvironmentConfiguration extends AbstractConfiguration implements Applicat
         Map<String, Object> changedProperties = event.getSource();
         for (Map.Entry<String, Object> entry : changedProperties.entrySet()) {
             Object value = entry.getValue();
-            if(value == null) {
+            if (value == null) {
                 fireEvent(EVENT_CLEAR_PROPERTY, entry.getKey(), null, false);
             } else {
                 fireEvent(EVENT_SET_PROPERTY, entry.getKey(), value, false);
