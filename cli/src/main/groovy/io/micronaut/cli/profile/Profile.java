@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile;
 
 import jline.console.completer.Completer;
@@ -31,7 +32,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @author Lari Hotari
  *
- * @since 3.0
+ * @since 1.0
  */
 public interface Profile {
 
@@ -81,7 +82,8 @@ public interface Profile {
     Iterable<Feature> getRequiredFeatures();
 
     /**
-     * The other {@link io.micronaut.cli.profile.Profile} instances that this {@link io.micronaut.cli.profile.Profile} extends
+     * The other {@link io.micronaut.cli.profile.Profile} instances that this {@link io.micronaut.cli.profile.Profile} extends.
+     *
      * @return zero or many {@link io.micronaut.cli.profile.Profile} instance that this profile extends from
      */
     Iterable<Profile> getExtends();
@@ -107,7 +109,7 @@ public interface Profile {
     Resource getProfileDir();
 
     /**
-     * Obtain a template by path
+     * Obtain a template by path.
      *
      * @param path The path to template
      * @return The resource or null if it doesn't exist
@@ -115,22 +117,24 @@ public interface Profile {
     Resource getTemplate(String path);
 
     /**
-     * Obtain a command by name
+     * Obtain a command by name.
      *
+     * @param context The {@link ProjectContext} instance
      * @param name Obtain a command by name
      * @return The command
      */
     Command getCommand(ProjectContext context, String name);
 
     /**
-     * The profile completers
-     * @param context The {@link io.micronaut.cli.profile.ProjectContext} instance
+     * The profile completers.
+     *
+     * @param context The {@link ProjectContext} instance
      * @return An {@link java.lang.Iterable} of {@link jline.console.completer.Completer} instances
      */
     Iterable<Completer> getCompleters(ProjectContext context);
 
     /**
-     * The profile {@link io.micronaut.cli.profile.Command} instances
+     * The profile {@link io.micronaut.cli.profile.Command} instances.
      *
      * @param context The {@link ProjectContext} instance
      * @return An {@link java.lang.Iterable} of {@link io.micronaut.cli.profile.Command} instances
@@ -138,15 +142,18 @@ public interface Profile {
     Iterable<Command> getCommands(ProjectContext context);
 
     /**
-     * Whether a command executes for the given context and name
+     * Whether a command executes for the given context and name.
+     *
      * @param context The {@link io.micronaut.cli.profile.ProjectContext}
      * @param name The command name
      * @return True if the command does exist
      */
     boolean hasCommand(ProjectContext context, String name);
+
     /**
-     * Obtains a {@link Command}
+     * Obtains a {@link Command}.
      *
+     * @param context The execution context
      * @return True if the command was handled
      */
     boolean handleCommand(ExecutionContext context);
@@ -172,6 +179,7 @@ public interface Profile {
     String getParentSkeletonDir();
 
     /**
+     * @param parent The parent folder
      * @return The directory the parent profile(s) skeleton should be copied into
      */
     File getParentSkeletonDir(File parent);

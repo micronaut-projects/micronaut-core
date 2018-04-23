@@ -32,9 +32,10 @@ import io.micronaut.cli.profile.Profile
 import java.nio.file.Paths
 
 /**
- *  Creates a federation
+ * The command to create a federation of services
  *
- * @author Ben Rhine
+ * @author James Kleeh
+ * @since 1.0
  */
 @CompileStatic
 class CreateFederationCommand extends CreateServiceCommand {
