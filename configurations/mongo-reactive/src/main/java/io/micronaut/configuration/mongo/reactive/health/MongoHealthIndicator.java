@@ -34,7 +34,7 @@ import java.util.Collections;
  */
 @Singleton
 @Requires(beans = MongoClient.class)
-class MongoHealthIndicator implements HealthIndicator {
+public class MongoHealthIndicator implements HealthIndicator {
 
     private final MongoClient[] mongoClients;
 
@@ -42,7 +42,7 @@ class MongoHealthIndicator implements HealthIndicator {
      * Constructor.
      * @param mongoClients array of mongo clients
      */
-    MongoHealthIndicator(MongoClient[] mongoClients) {
+    public MongoHealthIndicator(MongoClient[] mongoClients) {
         this.mongoClients = mongoClients;
     }
 

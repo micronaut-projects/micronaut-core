@@ -41,7 +41,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-abstract class AbstractReactiveMongoConfiguration {
+public abstract class AbstractReactiveMongoConfiguration {
 
     private String uri;
 
@@ -51,7 +51,7 @@ abstract class AbstractReactiveMongoConfiguration {
      * Constructor.
      * @param applicationConfiguration applicationConfiguration
      */
-    AbstractReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+    protected AbstractReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
     }
 
