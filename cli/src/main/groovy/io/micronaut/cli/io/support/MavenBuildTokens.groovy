@@ -75,6 +75,16 @@ class MavenBuildTokens {
         tokens
     }
 
+    Map getTokens(List<String> services) {
+        final StringWriter modulesWriter = new StringWriter()
+        MarkupBuilder modulesXml = new MarkupBuilder(modulesWriter)
+
+        services.each { String name ->
+            modulesXml.module(name)
+        }
+
+        ["services": prettyPrint(modulesWriter.toString(), 8)]
+    }
 
     String prettyPrint(String xml, int spaces) {
         xml.replaceAll("(?m)^", " " * spaces)
