@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import org.reactivestreams.Subscriber;
 
 import javax.inject.Singleton;
 
 /**
- * Builds a {@link Subscriber} for {@link MediaType#APPLICATION_FORM_URLENCODED}
+ * Builds a {@link org.reactivestreams.Subscriber} for {@link MediaType#APPLICATION_FORM_URLENCODED}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +34,9 @@ public class FormDataHttpContentSubscriberFactory implements HttpContentSubscrib
 
     private final NettyHttpServerConfiguration configuration;
 
+    /**
+     * @param configuration The {@link NettyHttpServerConfiguration}
+     */
     public FormDataHttpContentSubscriberFactory(NettyHttpServerConfiguration configuration) {
         this.configuration = configuration;
     }

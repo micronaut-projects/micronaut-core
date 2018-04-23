@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.interceptor;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -20,7 +21,7 @@ import io.micronaut.core.util.ArrayUtils;
 import java.lang.reflect.AnnotatedElement;
 
 /**
- * <p>A default implementation of the {@link CacheKeyGenerator} interface that uses the paramaters of the method only</p>
+ * <p>A default implementation of the {@link CacheKeyGenerator} interface that uses the parameters of the method only.</p>
  * <p>
  * <p>This implementation is appropriate for most common cases but note that collisions can occur for classes that
  * use the same cache and have overlapping signatures as the default implementation does not use the method itself

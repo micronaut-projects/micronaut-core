@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.interceptor;
 
 /**
- * An exception thrown when the Supplier of a cache value causes an exception
+ * An exception thrown when the Supplier of a cache value causes an exception.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -25,6 +26,13 @@ class ValueSupplierException extends RuntimeException {
 
     private final Object key;
 
+    /**
+     * Create a new exception with the key and cause.
+     *
+     * @param key The key for the given annotated element and parameters
+     * @param cause the cause (which is saved for later retrieval by the
+     *         {@link #getCause()} method).
+     */
     ValueSupplierException(Object key, RuntimeException cause) {
         super(cause);
         this.key = key;

@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.core.util.Toggleable;
 
 /**
- * Base class for common discovery configuration options
+ * Base class for common discovery configuration options.
  *
  * @author graemerocher
  * @since 1.0
@@ -26,7 +27,7 @@ import io.micronaut.core.util.Toggleable;
 public abstract class DiscoveryConfiguration implements Toggleable {
 
     /**
-     * The prefix to use for all client discovery settings
+     * The prefix to use for all client discovery settings.
      */
     public static final String PREFIX = "discovery";
 

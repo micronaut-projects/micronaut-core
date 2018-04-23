@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.server.event;
 
 import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
- * Event fired when the {@link EmbeddedServer} completes startup
+ * Event fired when the {@link EmbeddedServer} completes startup.
  *
  * @author graemerocher
  * @since 1.0

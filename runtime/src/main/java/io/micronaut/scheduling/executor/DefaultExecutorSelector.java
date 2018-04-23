@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.NonBlocking;
@@ -27,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Default implementation of the {@link ExecutorSelector} interface that regards methods that return reactive types as non-blocking
+ * Default implementation of the {@link ExecutorSelector} interface that regards methods that return reactive types as non-blocking.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +38,12 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     private final ExecutorService ioExecutor;
 
+    /**
+     * Construct a default implementation for the given executor service for asynchronous IO tasks.
+     *
+     * @param ioExecutor A service that provide method to manager termination and produce future for tracking
+     *                   progress of one or more asynchronous IO tasks.
+     */
     protected DefaultExecutorSelector(@Named(TaskExecutors.IO) ExecutorService ioExecutor) {
         this.ioExecutor = ioExecutor;
     }

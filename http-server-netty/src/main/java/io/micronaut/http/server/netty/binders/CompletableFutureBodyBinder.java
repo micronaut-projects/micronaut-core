@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
@@ -38,7 +39,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * A {@link NonBlockingBodyArgumentBinder} that handles {@link CompletableFuture} instances
+ * A {@link NonBlockingBodyArgumentBinder} that handles {@link CompletableFuture} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -50,6 +51,11 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
 
+    /**
+     * @param beanLocator             The bean locator
+     * @param httpServerConfiguration The Http server configuration
+     * @param conversionService       The conversion service
+     */
     public CompletableFutureBodyBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration, ConversionService conversionService) {
         super(conversionService);
         this.beanLocator = beanLocator;
@@ -118,7 +124,6 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                 return () -> Optional.of(future);
             } else {
-
                 return BindingResult.EMPTY;
             }
         } else {

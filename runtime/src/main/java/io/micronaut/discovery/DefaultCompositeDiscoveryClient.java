@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.context.annotation.Primary;
@@ -21,7 +22,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
- * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled
+ * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,6 +31,11 @@ import javax.inject.Singleton;
 @Singleton
 public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
 
+    /**
+     * Create a default composite discovery for the discovery clients.
+     *
+     * @param discoveryClients The Discovery clients used for service discovery
+     */
     @Inject
     public DefaultCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);

@@ -13,16 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.exceptions;
 
 /**
- * Thrown when the application fails to start
+ * Thrown when the application fails to start.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ApplicationStartupException extends RuntimeException {
 
+    /**
+     * Create exception with detailed message and cause.
+     *
+     * @param  message the detail message (which is saved for later retrieval
+     *         by the {@link #getMessage()} method).
+     * @param  cause the cause (which is saved for later retrieval by the
+     *         {@link #getCause()} method).  (A <tt>null</tt> value is
+     *         permitted, and indicates that the cause is nonexistent or
+     *         unknown.)
+     */
     public ApplicationStartupException(String message, Throwable cause) {
         super(message, cause);
     }

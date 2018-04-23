@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.http.codec;
 
 import io.micronaut.context.annotation.Value;
@@ -38,7 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * A codec that handles {@link MediaType#TEXT_PLAIN}
+ * A codec that handles {@link MediaType#TEXT_PLAIN}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,11 +49,17 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     private final Charset defaultCharset;
 
+    /**
+     * @param defaultCharset The default charset used for serialization and deserialization
+     */
     @Inject
     public TextPlainCodec(@Value("${" + ApplicationConfiguration.DEFAULT_CHARSET + "}") Optional<Charset> defaultCharset) {
         this.defaultCharset = defaultCharset.orElse(StandardCharsets.UTF_8);
     }
 
+    /**
+     * @param defaultCharset The default charset used for serialization and deserialization
+     */
     public TextPlainCodec(Charset defaultCharset) {
         this.defaultCharset = defaultCharset != null ? defaultCharset : StandardCharsets.UTF_8;
     }
