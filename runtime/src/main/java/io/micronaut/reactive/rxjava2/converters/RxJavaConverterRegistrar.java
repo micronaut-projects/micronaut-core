@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.reactive.rxjava2.converters;
 
 import io.micronaut.context.annotation.Requires;
@@ -29,7 +30,7 @@ import javax.inject.Singleton;
 import java.util.function.Function;
 
 /**
- * Converters for RxJava
+ * Converters for RxJava.
  *
  * @author graemerocher
  * @since 1.0

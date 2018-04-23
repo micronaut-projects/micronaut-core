@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cache;
 
-import io.micronaut.context.exceptions.ConfigurationException;
+package io.micronaut.cache;
 
 import java.util.Set;
 
 /**
- * <p>Simple CacheManager interface for managing caches</p>
+ * <p>Simple CacheManager interface for managing caches.</p>
+ *
+ * @param <C> The native cache implementation
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,11 +34,11 @@ public interface CacheManager<C> {
     Set<String> getCacheNames();
 
     /**
-     * Retrieve a cache for the given name
+     * Retrieve a cache for the given name.
      *
      * @param name The name of the cache
      * @return The {@link SyncCache} instance
-     * @throws ConfigurationException If no cache is found for the given name
+     * @throws io.micronaut.context.exceptions.ConfigurationException If no cache is found for the given name
      */
     SyncCache<C> getCache(String name);
 }

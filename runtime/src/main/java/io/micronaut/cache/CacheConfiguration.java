@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import io.micronaut.context.annotation.EachProperty;
@@ -26,7 +27,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 /**
- * <p>A base configuration class for configuring caches</p>
+ * <p>A base configuration class for configuring caches.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +36,7 @@ import java.util.OptionalLong;
 public class CacheConfiguration {
 
     /**
-     * The prefix for cache configuration
+     * The prefix for cache configuration.
      */
     public static final String PREFIX = "micronaut.caches";
 
@@ -49,6 +50,12 @@ public class CacheConfiguration {
 
     private final String cacheName;
 
+    /**
+     * Creates a new cache with the given name.
+     *
+     * @param cacheName Name or key of the cache
+     * @param applicationConfiguration The common application configuration
+     */
     public CacheConfiguration(@Parameter String cacheName, ApplicationConfiguration applicationConfiguration) {
         this.cacheName = cacheName;
         this.charset = applicationConfiguration.getDefaultCharset();
@@ -107,26 +114,48 @@ public class CacheConfiguration {
         return charset;
     }
 
+    /**
+     *
+     * @param initialCapacity The initial cache capacity.
+     */
     public void setInitialCapacity(Integer initialCapacity) {
         this.initialCapacity = initialCapacity;
     }
 
+    /**
+     *
+     * @param maximumSize Specifies the maximum number of entries the cache may contain
+     */
     public void setMaximumSize(Long maximumSize) {
         this.maximumSize = maximumSize;
     }
 
+    /**
+     *
+     * @param maximumWeight Specifies the maximum weight of entries
+     */
     public void setMaximumWeight(Long maximumWeight) {
         this.maximumWeight = maximumWeight;
     }
 
+    /**
+     *
+     * @param expireAfterWrite The cache expiration duration after writing into it.
+     */
     public void setExpireAfterWrite(Duration expireAfterWrite) {
         this.expireAfterWrite = expireAfterWrite;
     }
 
+    /**
+     * @param expireAfterAccess The cache expiration duration after accessing it
+     */
     public void setExpireAfterAccess(Duration expireAfterAccess) {
         this.expireAfterAccess = expireAfterAccess;
     }
 
+    /**
+     * @param charset The charset used to serialize and deserialize values
+     */
     public void setCharset(Charset charset) {
         this.charset = charset;
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.config;
 
 import io.micronaut.context.annotation.Primary;
@@ -28,7 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * The default {@link ConfigurationClient} implementation that
+ * The default {@link ConfigurationClient} implementation.
  *
  * @author graemerocher
  * @since 1.0
@@ -39,6 +40,11 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
 
     private final ConfigurationClient[] configurationClients;
 
+    /**
+     * Create a default composite configuration client from given configuration clients.
+     *
+     * @param configurationClients The configuration clients
+     */
     public DefaultCompositeConfigurationClient(ConfigurationClient[] configurationClients) {
         this.configurationClients = configurationClients;
     }

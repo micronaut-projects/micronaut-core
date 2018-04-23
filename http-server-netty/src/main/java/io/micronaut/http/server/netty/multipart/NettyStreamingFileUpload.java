@@ -13,45 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.micronaut.core.async.processor.SingleSubscriberProcessor;
-import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.internal.functions.Functions;
-import io.reactivex.internal.operators.flowable.FlowableFromObservable;
 import io.reactivex.schedulers.Schedulers;
-import io.reactivex.subjects.ReplaySubject;
-import io.reactivex.subjects.Subject;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 /**
- * An implementation of the {@link StreamingFileUpload} interface for Netty
+ * An implementation of the {@link StreamingFileUpload} interface for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -64,11 +52,18 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private final HttpServerConfiguration.MultipartConfiguration configuration;
     private final Flowable subject;
 
+    /**
+     * @param httpData               The file upload (the data)
+     * @param multipartConfiguration The multipart configuration
+     * @param ioExecutor             The IO executor
+     * @param subject                The subject
+     */
     public NettyStreamingFileUpload(
-            io.netty.handler.codec.http.multipart.FileUpload httpData,
-            HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
-            ExecutorService ioExecutor,
-            Flowable subject) {
+        io.netty.handler.codec.http.multipart.FileUpload httpData,
+        HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
+        ExecutorService ioExecutor,
+        Flowable subject) {
+
         this.configuration = multipartConfiguration;
         this.fileUpload = httpData;
         this.ioExecutor = ioExecutor;
@@ -111,7 +106,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     public Publisher<Boolean> transferTo(File destination) {
         Supplier<Boolean> transferOperation = () -> {
             try {
-                if(LOG.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     LOG.debug("Transferring file {} to location {}", fileUpload.getFilename(), destination);
                 }
                 return destination != null && fileUpload.renameTo(destination);
@@ -125,16 +120,16 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
             return Observable.<Boolean>create((emitter) -> {
 
                 subject.subscribeOn(Schedulers.from(ioExecutor))
-                        .subscribe(Functions.emptyConsumer(),
-                                (t) -> emitter.onError((Throwable) t),
-                                () -> {
-                    if (fileUpload.isCompleted()) {
-                        emitter.onNext(transferOperation.get());
-                        emitter.onComplete();
-                    } else {
-                        emitter.onError(new MultipartException("Transfer did not complete"));
-                    }
-                });
+                    .subscribe(Functions.emptyConsumer(),
+                        (t) -> emitter.onError((Throwable) t),
+                        () -> {
+                            if (fileUpload.isCompleted()) {
+                                emitter.onNext(transferOperation.get());
+                                emitter.onComplete();
+                            } else {
+                                emitter.onError(new MultipartException("Transfer did not complete"));
+                            }
+                        });
 
             }).firstOrError().toFlowable();
         }
@@ -148,8 +143,11 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
         });
     }
 
-
-    protected File createTemp(String location)  {
+    /**
+     * @param location The location for the temp file
+     * @return The temporal file
+     */
+    protected File createTemp(String location) {
         File tempFile;
         try {
             tempFile = File.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location);

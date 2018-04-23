@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.util.Toggleable;
@@ -22,8 +23,9 @@ import org.reactivestreams.Subscriber;
 
 /**
  * A reactive streams {@link org.reactivestreams.Processor} that processes incoming {@link ByteBufHolder} and
- * outputs a given type
+ * outputs a given type.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */

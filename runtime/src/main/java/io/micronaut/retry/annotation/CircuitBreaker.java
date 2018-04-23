@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -42,6 +43,8 @@ import java.lang.annotation.Target;
 @Type(DefaultRetryInterceptor.class)
 public @interface CircuitBreaker {
 
+    int MAX_RETRY_ATTEMPTS = 4;
+
     /**
      * @return The exception types to include (defaults to all)
      */
@@ -57,7 +60,7 @@ public @interface CircuitBreaker {
     /**
      * @return The maximum number of retry attempts
      */
-    @Digits(integer = 4, fraction = 0)
+    @Digits(integer = MAX_RETRY_ATTEMPTS, fraction = 0)
     @AliasFor(annotation = Retryable.class, member = "attempts")
     String attempts() default "3";
 
@@ -68,7 +71,7 @@ public @interface CircuitBreaker {
     String delay() default "500ms";
 
     /**
-     * @return The multiplier to use to calculate the delay between retries
+     * @return The multiplier to use to calculate the delay between retries.
      */
     @Digits(integer = 2, fraction = 2)
     @AliasFor(annotation = Retryable.class, member = "multiplier")
@@ -76,7 +79,7 @@ public @interface CircuitBreaker {
 
     /**
      * The maximum overall delay for an operation to complete until the Circuit state is set to
-     * {@link io.micronaut.retry.CircuitState#OPEN}
+     * {@link io.micronaut.retry.CircuitState#OPEN}.
      *
      * @return The maximum overall delay
      */
@@ -85,7 +88,7 @@ public @interface CircuitBreaker {
 
     /**
      * Sets the {@link java.time.Duration} of time before resetting the circuit to
-     * {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry
+     * {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry.
      *
      * @return The {@link java.time.Duration} of time before reset
      */

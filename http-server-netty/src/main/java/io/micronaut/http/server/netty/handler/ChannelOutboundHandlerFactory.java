@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.handler;
 
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelOutboundHandler;
 
 /**
- * Factory interface for building {@link ChannelOutboundHandler} instances
+ * Factory interface for building {@link ChannelOutboundHandler} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,9 +27,9 @@ import io.netty.channel.ChannelOutboundHandler;
 public interface ChannelOutboundHandlerFactory {
 
     /**
-     * Constructs a new {@link ChannelHandler}
+     * Constructs a new {@link io.netty.channel.ChannelHandler}.
      *
-     * @return The new {@link ChannelHandler}
+     * @return The new {@link io.netty.channel.ChannelHandler}
      */
     ChannelOutboundHandler build();
 }

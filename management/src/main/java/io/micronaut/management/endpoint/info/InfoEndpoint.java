@@ -27,9 +27,8 @@ import org.reactivestreams.Publisher;
  * @author Zachary Klein
  * @since 1.0
  */
-@Endpoint("info")
+@Endpoint(InfoEndpoint.NAME)
 public class InfoEndpoint {
-
 
     public static final String NAME = "info";
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
