@@ -81,10 +81,10 @@ public interface Profile {
     Iterable<Feature> getRequiredFeatures();
 
     /**
-     * @param featureName The feature name to get the dependent features
-     * @return The dependent features for the featureName
+     * @param feature The feature to get the dependent features
+     * @return The dependent features for the feature
      */
-    Iterable<Feature> getDependentFeaturesFor(String featureName);
+    Iterable<Feature> getDependentFeaturesFor(Feature feature);
 
     /**
      * The other {@link io.micronaut.cli.profile.Profile} instances that this {@link io.micronaut.cli.profile.Profile} extends
