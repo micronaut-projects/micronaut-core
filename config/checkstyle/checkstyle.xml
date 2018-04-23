@@ -80,7 +80,7 @@
 
         <!-- Needed for SuppressWarningsFilter -->
         <module name="SuppressWarningsHolder"/>
-
+             
         <!-- Checks for Javadoc comments.                     -->
         <!-- See http://checkstyle.sf.net/config_javadoc.html -->
         <module name="JavadocMethod">
@@ -154,6 +154,7 @@
         <module name="InnerAssignment"/>
         <module name="MagicNumber">
             <property name="ignoreFieldDeclaration" value="true"/>
+            <property name="ignoreHashCodeMethod" value="true"/>
         </module>
         <module name="MissingSwitchDefault"/>
         <module name="SimplifyBooleanExpression"/>

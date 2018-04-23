@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpRequest;
@@ -22,7 +23,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Represents a {@link Route} that matches an exception
+ * Represents a {@link Route} that matches an exception.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,18 +41,20 @@ public interface ErrorRoute extends MethodBasedRoute {
     Class<? extends Throwable> exceptionType();
 
     /**
-     * Match the given exception
+     * Match the given exception.
      *
      * @param exception The exception to match
+     * @param <T>       The type
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(Throwable exception);
 
     /**
-     * Match the given exception
+     * Match the given exception.
      *
      * @param originatingClass The class where the error originates from
      * @param exception        The exception to match
+     * @param <T>              The type
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception);

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.type.Argument;
@@ -31,20 +32,22 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * A {@link Route} that is executable
+ * A {@link Route} that is executable.
  *
+ * @param <R> The route
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
 
     /**
-     * @return The variable values following a successful match
+     * @return The variable values following a successful match.
      */
     Map<String, Object> getVariables();
 
     /**
-     * Execute the route with the given values. The passed map should contain values for every argument returned by {@link #getRequiredArguments()}
+     * Execute the route with the given values. The passed map should contain values for every argument returned by
+     * {@link #getRequiredArguments()}.
      *
      * @param argumentValues The argument values
      * @return The result
@@ -53,7 +56,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
 
     /**
      * Returns a new {@link RouteMatch} fulfilling arguments required by this route to execute. The new route will not
-     * return the given arguments from the {@link #getRequiredArguments()} method
+     * return the given arguments from the {@link #getRequiredArguments()} method.
      *
      * @param argumentValues The argument values
      * @return The fulfilled route
@@ -61,7 +64,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     RouteMatch<R> fulfill(Map<String, Object> argumentValues);
 
     /**
-     * Decorates the execution of the route with the given executor
+     * Decorates the execution of the route with the given executor.
      *
      * @param executor The executor
      * @return A new route match
@@ -69,7 +72,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
 
     /**
-     * Return whether the given named input is required by this route
+     * Return whether the given named input is required by this route.
      *
      * @param name The name of the input
      * @return True if it is
@@ -82,14 +85,14 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     Optional<Argument<?>> getBodyArgument();
 
     /**
-     * The media types able to produced by this route
+     * The media types able to produced by this route.
      *
      * @return A list of {@link MediaType} that this route can produce
      */
     List<MediaType> getProduces();
 
     /**
-     * <p>Returns the required arguments for this RouteMatch</p>
+     * <p>Returns the required arguments for this RouteMatch.</p>
      *
      * @return The required arguments in order to invoke this route
      */
@@ -97,10 +100,14 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
         return Collections.emptyList();
     }
 
+    /**
+     * @return The return type
+     */
     ReturnType<? extends R> getReturnType();
 
     /**
-     * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}
+     * Execute the route with the given values. Note if there are required arguments returned from
+     * {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}.
      *
      * @return The result
      */
@@ -109,7 +116,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     }
 
     /**
-     * Same as {@link #execute()}
+     * Same as {@link #execute()}.
      *
      * @return The result
      * @throws Exception When an exception occurs
@@ -120,14 +127,15 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     }
 
     /**
-     * @return Whether the route match can be executed without passing any additional arguments ie. via {@link #execute()}
+     * @return Whether the route match can be executed without passing any additional arguments ie. via
+     * {@link #execute()}
      */
     default boolean isExecutable() {
         return getRequiredArguments().size() == 0;
     }
 
     /**
-     * Return whether the given named input is required by this route
+     * Return whether the given named input is required by this route.
      *
      * @param name The name of the input
      * @return True if it is
@@ -137,7 +145,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     }
 
     /**
-     * Whether the specified content type is an accepted type
+     * Whether the specified content type is an accepted type.
      *
      * @param contentType The content type
      * @return True if it is
