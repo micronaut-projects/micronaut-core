@@ -15,9 +15,6 @@
  */
 package io.micronaut.management.endpoint.info;
 
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySource;
-import io.micronaut.management.endpoint.Endpoint;
 import org.reactivestreams.Publisher;
 
 /**
@@ -27,7 +24,6 @@ import org.reactivestreams.Publisher;
  * @author Zachary Klein
  * @since 1.0
  */
-@Endpoint("info")
 public interface InfoAggregator<T> {
 
     /**
