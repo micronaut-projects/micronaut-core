@@ -16,6 +16,8 @@
 
 package io.micronaut.security.token.validator;
 
+import io.micronaut.security.authentication.Authentication;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,8 +32,16 @@ public interface TokenValidator {
     /**
      * Validates the provided token and returns the claims.
      *
-     * @param token The JWT string
+     * @param token The token string
      * @return The claims contained in the token or {@link Optional#empty} if the validation fails
      */
     Optional<Map<String, Object>> validateTokenAndGetClaims(String token);
+
+    /**
+     * Validates the provided token and returns the authentication state.
+     *
+     * @param token The token string
+     * @return The authentication or {@link Optional#empty} if the validation fails
+     */
+    Optional<Authentication> validateToken(String token);
 }

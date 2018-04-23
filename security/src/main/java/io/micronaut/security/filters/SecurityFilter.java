@@ -22,6 +22,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
@@ -45,9 +46,11 @@ import java.util.stream.Collectors;
  */
 @Requires(property = SecurityConfiguration.PREFIX + ".enabled")
 @Filter("/**")
-public class JwtFilter extends OncePerRequestHttpServerFilter {
+public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
+
 
     protected final TokenConfiguration tokenConfiguration;
     protected final TokenReader tokenReader;
@@ -60,10 +63,10 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
      * @param tokenReader The {@link TokenReader} instance
      * @param securityRules The list of rules that will allow or reject the request
      */
-    public JwtFilter(TokenConfiguration tokenConfiguration,
-                     TokenValidator tokenValidator,
-                     TokenReader tokenReader,
-                     Collection<SecurityRule> securityRules) {
+    public SecurityFilter(TokenConfiguration tokenConfiguration,
+                          TokenValidator tokenValidator,
+                          TokenReader tokenReader,
+                          Collection<SecurityRule> securityRules) {
         this.tokenConfiguration = tokenConfiguration;
         this.tokenValidator = tokenValidator;
         this.tokenReader = tokenReader;
@@ -74,35 +77,38 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         return Publishers.just(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
     }
 
-    private Optional<RouteMatch> routeMatchOfRequest(HttpRequest<?> request) {
+    private Optional<RouteMatch> getRouteMatch(HttpRequest<?> request) {
         Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
         if (routeMatchAttribute.isPresent()) {
             return Optional.of((RouteMatch) routeMatchAttribute.get());
         } else {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("route match attribute for Request ({}) not found", request.getPath());
+                LOG.debug("Route match attribute for request ({}) not found", request.getPath());
             }
+            return Optional.empty();
         }
-        return Optional.empty();
     }
 
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         String method = request.getMethod().toString();
         String path = request.getPath();
+
         Optional<String> token = tokenReader.findToken(request);
-        Optional<Map<String, Object>> optionalClaims = token.flatMap(tokenValidator::validateTokenAndGetClaims);
-        Optional<RouteMatch> routeMatch = routeMatchOfRequest(request);
+        Optional<Authentication> authentication = token.flatMap(tokenValidator::validateToken);
+        authentication.ifPresent((a) -> request.setAttribute(AUTHENTICATION, a));
+        Optional<Map<String, Object>> attributes = authentication.map(Authentication::getAttributes);
+        Optional<RouteMatch> routeMatch = getRouteMatch(request);
 
         if (LOG.isDebugEnabled()) {
             if (token.isPresent()) {
                 LOG.debug("Token {} found in request {} {}", token.get(), method, path);
-                if (optionalClaims.isPresent()) {
-                        String claimsString = optionalClaims.get().entrySet()
+                if (attributes.isPresent()) {
+                        String claimsString = attributes.get().entrySet()
                                 .stream()
                                 .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
                                 .collect(Collectors.joining(", "));
-                        LOG.debug("Claims: {}", claimsString);
+                        LOG.debug("Attributes: {}", claimsString);
                 } else {
                     LOG.debug("Unauthenticated request {} {}. Failure to fetch claims because token validation failed.", method, path);
                 }
@@ -112,12 +118,12 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         }
 
         for (SecurityRule rule: securityRules) {
-            SecurityRuleResult result = rule.check(request, routeMatch, optionalClaims.orElse(null));
+            SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes.orElse(null));
             if (result == SecurityRuleResult.REJECTED) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
-                rejected(optionalClaims.isPresent());
+                rejected(attributes.isPresent());
             }
             if (result == SecurityRuleResult.ALLOWED) {
                 if (LOG.isDebugEnabled()) {
@@ -128,6 +134,6 @@ public class JwtFilter extends OncePerRequestHttpServerFilter {
         }
 
         //no rule found for the given request, reject
-        return rejected(optionalClaims.isPresent());
+        return rejected(attributes.isPresent());
     }
 }

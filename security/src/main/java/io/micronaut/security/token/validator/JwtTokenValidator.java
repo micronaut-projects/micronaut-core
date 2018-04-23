@@ -16,14 +16,15 @@
 
 package io.micronaut.security.token.validator;
 
+import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator;
 import io.micronaut.security.token.configuration.SignatureConfigurationGenerator;
 import org.pac4j.core.exception.TechnicalException;
 import org.pac4j.core.profile.CommonProfile;
-import org.pac4j.jwt.config.encryption.EncryptionConfiguration;
-import org.pac4j.jwt.config.signature.SignatureConfiguration;
+import org.pac4j.core.profile.jwt.JwtClaims;
 import org.pac4j.jwt.credentials.authenticator.JwtAuthenticator;
 import javax.inject.Singleton;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,27 +45,44 @@ public class JwtTokenValidator implements TokenValidator {
      * @param encryptionConfigurationGenerator Utility to retrieve a Pac4j EncryptionConfiguration
      */
     public JwtTokenValidator(SignatureConfigurationGenerator signatureConfigurationGenerator,
-                       EncryptionConfigurationGenerator encryptionConfigurationGenerator) {
+                             EncryptionConfigurationGenerator encryptionConfigurationGenerator) {
 
         jwtAuthenticator = new JwtAuthenticator();
-        Optional<SignatureConfiguration> signatureConfiguration = signatureConfigurationGenerator.getSignatureConfiguration();
-        signatureConfiguration.ifPresent(signatureConfiguration1 -> jwtAuthenticator.addSignatureConfiguration(signatureConfiguration1));
-        Optional<EncryptionConfiguration> encryptionConfiguration = encryptionConfigurationGenerator.getEncryptionConfiguration();
-        encryptionConfiguration.ifPresent(encryptionConfiguration1 -> jwtAuthenticator.addEncryptionConfiguration(encryptionConfiguration1));
+        signatureConfigurationGenerator.getSignatureConfiguration().ifPresent(signatureConfiguration ->
+                jwtAuthenticator.addSignatureConfiguration(signatureConfiguration));
+        encryptionConfigurationGenerator.getEncryptionConfiguration().ifPresent(encryptionConfiguration ->
+                jwtAuthenticator.addEncryptionConfiguration(encryptionConfiguration));
     }
 
     @Override
     public Optional<Map<String, Object>> validateTokenAndGetClaims(String token) {
-        try {
-            CommonProfile commonProfile = jwtAuthenticator.validateToken(token);
-            if (commonProfile != null) {
-                Map<String, Object> claims = jwtAuthenticator.validateTokenAndGetClaims(token);
-                return Optional.of(claims);
-            }
-            return Optional.empty();
+        return validateToken(token).map(Authentication::getAttributes);
+    }
 
+    @Override
+    public Optional<Authentication> validateToken(String token) {
+        CommonProfile profile;
+        try {
+            profile = jwtAuthenticator.validateToken(token);
         } catch (TechnicalException e) {
             return Optional.empty();
         }
+
+        if (profile != null) {
+            return Optional.of(new Authentication() {
+                @Override
+                public String getId() {
+                    return profile.getId();
+                }
+
+                @Override
+                public Map<String, Object> getAttributes() {
+                    final Map<String, Object> claims = new HashMap<>(profile.getAttributes());
+                    claims.put(JwtClaims.SUBJECT, profile.getId());
+                    return claims;
+                }
+            });
+        }
+        return Optional.empty();
     }
 }

@@ -3,6 +3,7 @@ package io.micronaut.security.authorization
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.security.Secured
+import io.micronaut.security.authentication.Authentication
 import io.micronaut.security.rules.SecurityRule
 
 @Controller("/secured")
@@ -10,13 +11,13 @@ import io.micronaut.security.rules.SecurityRule
 class SecuredController {
 
     @Get("/admin")
-    @Secured("ROLE_ADMIN")
+    @Secured(["ROLE_ADMIN", "ROLE_X"])
     String admin() {
         "You have admin"
     }
 
     @Get("/authenticated")
-    String authenticated() {
-        "You are authenticated"
+    String authenticated(Authentication authentication) {
+        "${authentication.id} is authenticated"
     }
 }

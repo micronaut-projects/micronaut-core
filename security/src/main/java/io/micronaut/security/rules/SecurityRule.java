@@ -51,5 +51,5 @@ public interface SecurityRule extends Ordered {
      * @param claims The claims from the token. Null if not authenticated
      * @return The result
      */
-    SecurityRuleResult check(HttpRequest request, Optional<RouteMatch> routeMatch, @Nullable  Map<String, Object> claims);
+    SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable  Map<String, Object> claims);
 }

@@ -21,7 +21,7 @@ class AuthorizationSpec extends Specification {
             "micronaut.security.endpoints.login": true,
             "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
             "micronaut.security.interceptUrlMap": [
-                    [pattern: "/urlMap/admin", access: "ROLE_ADMIN"],
+                    [pattern: "/urlMap/admin", access: ["ROLE_ADMIN", "ROLE_X"]],
                     [pattern: "/urlMap/**",    access: "isAuthenticated()"],
                     [pattern: "/anonymous/**", access: "isAnonymous()"],
             ]
@@ -67,7 +67,7 @@ class AuthorizationSpec extends Specification {
         HttpResponse<String> response = get("/urlMap/authenticated", token)
 
         then:
-        response.body() == "You are authenticated"
+        response.body() == "valid is authenticated"
     }
 
     void "test accessing the url map admin action without the required role"() {
@@ -110,7 +110,7 @@ class AuthorizationSpec extends Specification {
         HttpResponse<String> response = get("/secured/authenticated", token)
 
         then:
-        response.body() == "You are authenticated"
+        response.body() == "valid is authenticated"
     }
 
     void "test accessing the secured admin action without the required role"() {

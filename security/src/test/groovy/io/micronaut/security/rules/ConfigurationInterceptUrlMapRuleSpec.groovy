@@ -44,7 +44,8 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
         requiredRoles                | grantedRoles                                     | expected
         ['ROLE_ADMIN', 'ROLE_USER']  | ['ROLE_ADMIN', 'ROLE_USER']                      | SecurityRuleResult.ALLOWED
         ['isAuthenticated()']        | ['ROLE_ADMIN', 'ROLE_USER', 'isAuthenticated()'] | SecurityRuleResult.ALLOWED
-        ['ROLE_ADMIN', 'ROLE_USER']  | ['ROLE_USER']                                    | SecurityRuleResult.REJECTED
+        ['ROLE_ADMIN', 'ROLE_USER']  | ['ROLE_USER']                                    | SecurityRuleResult.ALLOWED
+        ['ROLE_ADMIN']               | ['ROLE_USER']                                    | SecurityRuleResult.REJECTED
         ['isAnonymous()']            | [SecurityRule.IS_ANONYMOUS]                      | SecurityRuleResult.ALLOWED
         ['isAuthenticated()']        | [SecurityRule.IS_AUTHENTICATED]                  | SecurityRuleResult.ALLOWED
         description = expected == SecurityRuleResult.ALLOWED ? 'Allowed' : 'Rejected'

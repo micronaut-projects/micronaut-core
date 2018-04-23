@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
+import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.token.validator.TokenValidator;
@@ -72,7 +73,7 @@ public class OauthController implements OauthControllerApi {
         }
         LOG.info("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
 
-        Optional<Map<String, Object>> claims = tokenValidator.validateTokenAndGetClaims(tokenRefreshRequest.getRefreshToken());
+        Optional<Map<String, Object>> claims = tokenValidator.validateToken(tokenRefreshRequest.getRefreshToken()).map(Authentication::getAttributes);
 
         if (claims.isPresent()) {
             return accessRefreshTokenGenerator.generate(tokenRefreshRequest.getRefreshToken(), claims.get());

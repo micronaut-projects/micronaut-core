@@ -40,7 +40,7 @@ public class SensitiveEndpointRule implements SecurityRule {
     public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER + 100;
 
     @Override
-    public SecurityRuleResult check(HttpRequest request, Optional<RouteMatch> routeMatch, @Nullable Map<String, Object> claims) {
+    public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
         return SecurityRuleResult.UNKNOWN;
     }
 

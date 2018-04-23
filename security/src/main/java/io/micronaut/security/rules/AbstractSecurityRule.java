@@ -79,6 +79,12 @@ public abstract class AbstractSecurityRule implements SecurityRule {
      *  appears in the required roles list. {@link SecurityRuleResult#ALLOWED} otherwise.
      */
     protected SecurityRuleResult compareRoles(List<String> requiredRoles, List<String> grantedRoles) {
-        return grantedRoles.containsAll(requiredRoles) ? SecurityRuleResult.ALLOWED : SecurityRuleResult.REJECTED;
+        requiredRoles = new ArrayList<>(requiredRoles);
+        requiredRoles.retainAll(grantedRoles);
+        if (requiredRoles.isEmpty()) {
+            return SecurityRuleResult.REJECTED;
+        } else {
+            return SecurityRuleResult.ALLOWED;
+        }
     }
 }

@@ -24,7 +24,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation which allows users to define {@link io.micronaut.security.rules.SecurityRule} for HTTP {@link io.micronaut.http.annotation.Controller} or HTTP {@link io.micronaut.http.annotation.Controller}actions.
+ * Used to mark a route as requiring authorization before execution. When the
+ * annotation is placed on a method, it overrides the value of the annotation
+ * at the class level, if it exists.
+ *
  * @author James Kleeh
  * @since 1.0
  */
@@ -35,7 +38,16 @@ import java.lang.annotation.Target;
 public @interface Secured {
 
     /**
-     * @return An Security expression such as {@link io.micronaut.security.rules.SecurityRule#IS_ANONYMOUS} or {@link io.micronaut.security.rules.SecurityRule#IS_AUTHENTICATED}
+     * The values supplied will be used to secure the target. The values will
+     * be compared using "OR". If the authenticated principal contains any of the
+     * roles or tokens provided, the principal will be authorized to access
+     * the resource.
+     *
+     * The values can be a role (eg ROLE_ADMIN), or a token.
+     * @see io.micronaut.security.rules.SecurityRule#IS_AUTHENTICATED
+     * @see io.micronaut.security.rules.SecurityRule#IS_ANONYMOUS
+     *
+     * @return The list of roles or tokens
      */
     String[] value();
 }
