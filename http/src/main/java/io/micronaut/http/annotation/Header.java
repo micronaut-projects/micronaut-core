@@ -19,25 +19,27 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.core.bind.annotation.Bindable;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
+ * This also can be used in conjection with @Headers to list headers on a client class that will always be applied.
  *
  * @author Graeme Rocher
+ * @author rvanderwerf
  * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
+@Target({ElementType.PARAMETER, ElementType.TYPE}) // this can be either type or param
+@Repeatable(value = Headers.class)
 public @interface Header {
 
     /**
      * @return The name of the header, otherwise it is inferred from the parameter name
      */
     String value() default "";
+
+    String name() default ""; // if used on a class this is the header name and value is the value
+
 }
