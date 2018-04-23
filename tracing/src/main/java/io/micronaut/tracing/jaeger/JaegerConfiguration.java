@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.jaeger;
 
-import brave.sampler.CountingSampler;
 import io.jaegertracing.Configuration;
 import io.jaegertracing.metrics.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -32,7 +32,7 @@ import static io.jaegertracing.Configuration.JAEGER_SERVICE_NAME;
 import static io.micronaut.tracing.jaeger.JaegerConfiguration.PREFIX;
 
 /**
- * Configuration for Jaeger tracing
+ * Configuration for Jaeger tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -41,16 +41,21 @@ import static io.micronaut.tracing.jaeger.JaegerConfiguration.PREFIX;
 public class JaegerConfiguration implements Toggleable  {
     public static final String PREFIX = "tracing.jaeger";
 
+    @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
+    protected final Configuration configuration;
+
     private boolean enabled;
     private boolean expandExceptionLogs;
     private boolean zipkinSharedRpcSpan;
 
-    @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
-    protected final Configuration configuration;
-
+    /**
+     * Initialize Jaeger with common application configurations.
+     *
+     * @param applicationConfiguration The common application configurations
+     */
     public JaegerConfiguration(
             ApplicationConfiguration applicationConfiguration) {
-        if(StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
+        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();
@@ -64,7 +69,8 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * Whether to expand exception logs
+     * Whether to expand exception logs.
+     *
      * @param expandExceptionLogs True if they should be expanded
      */
     public void setExpandExceptionLogs(boolean expandExceptionLogs) {
@@ -79,7 +85,8 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * Whether to use Zipkin shared RPC
+     * Whether to use Zipkin shared RPC.
+     *
      * @param zipkinSharedRpcSpan True if Zipkin shared RPC should be used
      */
     public void setZipkinSharedRpcSpan(boolean zipkinSharedRpcSpan) {
@@ -91,6 +98,11 @@ public class JaegerConfiguration implements Toggleable  {
         return enabled;
     }
 
+    /**
+     * Enable/Disable Jaeger.
+     *
+     * @param enabled A boolean to enable/disabled Jaeger
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
@@ -103,71 +115,78 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * Sets the sampler configuration
+     * Sets the sampler configuration.
+     *
      * @param samplerConfiguration The sampler configuration
      */
     @Inject
     public void setSamplerConfiguration(@Nullable Configuration.SamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             configuration.withSampler(samplerConfiguration);
         }
     }
 
     /**
-     * Sets the reporter configuration
+     * Sets the reporter configuration.
+     *
      * @param reporterConfiguration The reporter configuration
      */
     @Inject
     public void setReporterConfiguration(@Nullable Configuration.ReporterConfiguration reporterConfiguration) {
-        if(reporterConfiguration != null) {
+        if (reporterConfiguration != null) {
             configuration.withReporter(reporterConfiguration);
         }
     }
 
     /**
-     * Sets the sampler configuration
+     * Sets the sampler configuration.
+     *
      * @param samplerConfiguration The sampler configuration
      */
     @Inject
     public void setSamplerConfiguration(@Nullable JaegerSamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             configuration.withSampler(samplerConfiguration.configuration);
         }
     }
 
     /**
-     * Sets the reporter configuration
+     * Sets the reporter configuration.
+     *
      * @param reporterConfiguration The reporter configuration
      */
     @Inject
     public void setReporterConfiguration(@Nullable JaegerReporterConfiguration reporterConfiguration) {
-        if(reporterConfiguration != null) {
+        if (reporterConfiguration != null) {
             configuration.withReporter(reporterConfiguration.configuration);
         }
     }
 
     /**
-     * Sets the codec configuration
+     * Sets the codec configuration.
+     *
      * @param codecConfiguration The codec configuration
      */
     @Inject
     public void setCodecConfiguration(@Nullable Configuration.CodecConfiguration codecConfiguration) {
-        if(codecConfiguration != null) {
+        if (codecConfiguration != null) {
             configuration.withCodec(codecConfiguration);
         }
     }
 
     /**
-     * Sets the metrics factory to use
+     * Sets the metrics factory to use.
+     *
      * @param metricsFactory The metrics factory
      */
     @Inject void setMetricsFactory(@Nullable MetricsFactory metricsFactory) {
-        if(metricsFactory != null) {
+        if (metricsFactory != null) {
             configuration.withMetricsFactory(metricsFactory);
         }
     }
+
     /**
-     * The sampler configuration bean
+     * The sampler configuration bean.
      */
     @ConfigurationProperties("sampler")
     public static class JaegerSamplerConfiguration {
@@ -194,7 +213,7 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * The reporter configuration bean
+     * The reporter configuration bean.
      */
     @ConfigurationProperties("reporter")
     public static class JaegerReporterConfiguration {
@@ -202,24 +221,28 @@ public class JaegerConfiguration implements Toggleable  {
         @ConfigurationBuilder(prefixes = "with")
         protected Configuration.ReporterConfiguration configuration = Configuration.ReporterConfiguration .fromEnv();
 
+        /**
+         * @return The reporter configuration.
+         */
         public Configuration.ReporterConfiguration getReporterConfiguration() {
             return configuration;
         }
 
         /**
-         * Sets the sender configuration
+         * Sets the sender configuration.
+         *
          * @param senderConfiguration The sender configuration
          */
         @Inject
         public void setSenderConfiguration(@Nullable Configuration.SenderConfiguration senderConfiguration) {
-            if(senderConfiguration != null) {
+            if (senderConfiguration != null) {
                 configuration.withSender(senderConfiguration);
             }
         }
     }
 
     /**
-     * The sender configuration bean
+     * The sender configuration bean.
      */
     @ConfigurationProperties("sender")
     public static class JaegerSenderConfiguration {

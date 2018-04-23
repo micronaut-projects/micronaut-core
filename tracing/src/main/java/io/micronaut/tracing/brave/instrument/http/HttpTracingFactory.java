@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Tracing;
@@ -31,7 +32,7 @@ import java.net.InetSocketAddress;
 import java.util.Optional;
 
 /**
- * Adds HTTP tracing for Micronaut using Brave
+ * Adds HTTP tracing for Micronaut using Brave.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,7 +43,7 @@ import java.util.Optional;
 public class HttpTracingFactory {
 
     /**
-     * The {@link HttpTracing} bean
+     * The {@link HttpTracing} bean.
      *
      * @param tracing The {@link Tracing} bean
      * @return The {@link HttpTracing} bean
@@ -55,7 +56,7 @@ public class HttpTracingFactory {
     }
 
     /**
-     * The {@link HttpClientHandler} bean
+     * The {@link HttpClientHandler} bean.
      *
      * @param httpTracing The {@link HttpTracing} bean
      * @return The {@link HttpClientHandler} bean
@@ -93,19 +94,19 @@ public class HttpTracingFactory {
             @Override
             public String methodFromResponse(HttpResponse<?> httpResponse) {
                 return httpResponse.getAttribute(HttpAttributes.METHOD_NAME, String.class)
-                                   .orElseGet(()-> super.methodFromResponse(httpResponse) );
+                                   .orElseGet(() -> super.methodFromResponse(httpResponse));
             }
 
             @Override
             public String route(HttpResponse<?> response) {
                 Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(()->super.route(response));
+                return value.orElseGet(() -> super.route(response));
             }
         });
     }
 
     /**
-     * The {@link HttpServerHandler} bean
+     * The {@link HttpServerHandler} bean.
      *
      * @param httpTracing The {@link HttpTracing} bean
      * @return The {@link HttpServerHandler} bean
@@ -137,7 +138,7 @@ public class HttpTracingFactory {
             @Override
             public String route(HttpResponse<?> response) {
                 Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(()->super.route(response));
+                return value.orElseGet(() -> super.route(response));
             }
 
             @Override

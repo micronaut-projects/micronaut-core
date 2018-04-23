@@ -62,4 +62,9 @@ interface Feature {
      * @return The configuration for the feature
      */
     NavigableMap getConfiguration()
+
+    /**
+     * @return The dependent feature names
+     */
+    Iterable<Feature> getDependentFeatures(Profile profile)
 }

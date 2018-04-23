@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.cache.CacheConfiguration;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A composite implementation combining all registered {@link DiscoveryClient} instances
+ * A composite implementation combining all registered {@link DiscoveryClient} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +40,11 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     private final DiscoveryClient[] discoveryClients;
 
+    /**
+     * Construct the CompositeDiscoveryClient from all discovery clients.
+     *
+     * @param discoveryClients The service discovery clients
+     */
     protected CompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         this.discoveryClients = discoveryClients;
     }

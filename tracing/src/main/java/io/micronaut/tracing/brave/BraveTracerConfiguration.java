@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave;
 
 import brave.Clock;
@@ -28,7 +29,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.tracing.brave.sender.HttpClientSender;
 
@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
- * A Configuration properties for Brave
+ * A Configuration properties for Brave.
  *
  * @author graemerocher
  * @since 1.0
@@ -47,25 +47,24 @@ import javax.inject.Inject;
 public class BraveTracerConfiguration implements Toggleable {
 
     public static final String PREFIX = "tracing.zipkin";
+    public static final float DEFAULT_SAMPLER_PROBABILITY = 0.1f;
 
-    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser","clock","endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
+    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser", "clock", "endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
     protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
-
     private boolean enabled = false;
-    private float samplerProbability = 0.1f;
+    private float samplerProbability = DEFAULT_SAMPLER_PROBABILITY;
 
     /**
-     * Constructs a new {@link BraveTracerConfiguration}
+     * Constructs a new {@link BraveTracerConfiguration}.
      *
      * @param configuration The application configuration
      */
     public BraveTracerConfiguration(ApplicationConfiguration configuration) {
         tracingBuilder.sampler(CountingSampler.create(samplerProbability));
-        if(configuration != null) {
+        if (configuration != null) {
             tracingBuilder.localServiceName(configuration.getName().orElse(Environment.DEFAULT_NAME));
-        }
-        else {
+        } else {
             tracingBuilder.localServiceName(Environment.DEFAULT_NAME);
         }
     }
@@ -90,7 +89,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setSamplerConfiguration(@Nullable SamplerConfiguration samplerConfiguration) {
-        if(samplerConfiguration != null) {
+        if (samplerConfiguration != null) {
             tracingBuilder.sampler(CountingSampler.create(samplerConfiguration.getProbability()));
         }
     }
@@ -107,7 +106,7 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setSampler(@Nullable Sampler sampler) {
-        if(sampler != null) {
+        if (sampler != null) {
             tracingBuilder.sampler(sampler);
         }
     }
@@ -117,16 +116,17 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setErrorParser(@Nullable ErrorParser errorParser) {
-        if(errorParser != null) {
+        if (errorParser != null) {
             tracingBuilder.errorParser(errorParser);
         }
     }
+
     /**
      * @param propagationFactory The {@link Propagation.Factory} to use
      */
     @Inject
     public void setPropagationFactory(@Nullable Propagation.Factory propagationFactory) {
-        if(propagationFactory != null) {
+        if (propagationFactory != null) {
             tracingBuilder.propagationFactory(propagationFactory);
         }
     }
@@ -136,26 +136,26 @@ public class BraveTracerConfiguration implements Toggleable {
      */
     @Inject
     public void setClock(@Nullable Clock clock) {
-        if(clock != null) {
+        if (clock != null) {
             tracingBuilder.clock(clock);
         }
     }
 
     /**
-     * Sets the current trace context
+     * Sets the current trace context.
      *
      * @param traceContext The trace context
      */
     @Inject
     public void setCurrentTraceContext(CurrentTraceContext traceContext) {
-        if(traceContext != null) {
+        if (traceContext != null) {
             tracingBuilder.currentTraceContext(traceContext);
         }
     }
 
 
     /**
-     * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace
+     * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace.
      */
     @ConfigurationProperties("http")
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
@@ -165,23 +165,38 @@ public class BraveTracerConfiguration implements Toggleable {
         @ConfigurationBuilder(prefixes = "")
         protected final HttpClientSender.Builder clientSenderBuilder;
 
+        /**
+         * Initialize the builder with client configurations.
+         */
         public HttpClientSenderConfiguration() {
             this.clientSenderBuilder = new HttpClientSender.Builder(this);
         }
 
+        /**
+         * Creates builder.
+         *
+         * @return The builder to construct the {@link HttpClientSender}
+         */
         public HttpClientSender.Builder getBuilder() {
             return clientSenderBuilder;
         }
     }
 
-
-
+    /**
+     * The sampler configuration.
+     */
     @ConfigurationProperties("sampler")
     @Requires(classes = CountingSampler.class)
     @Requires(missingBeans = Sampler.class)
     public static class SamplerConfiguration {
-        private float probability = 0.1F;
+        private float probability = DEFAULT_SAMPLER_PROBABILITY;
 
+        /**
+         * Get sampler probability. A value of 1.0
+         * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         *
+         * @return probability
+         */
         public float getProbability() {
             return probability;
         }
@@ -189,6 +204,7 @@ public class BraveTracerConfiguration implements Toggleable {
         /**
          * Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
          * indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+         *
          * @param probability The probability
          */
         public void setProbability(float probability) {

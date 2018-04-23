@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator.discovery;
 
 import io.micronaut.context.annotation.Requires;
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A health indicator for the discovery client
+ * A health indicator for the discovery client.
  *
  * @author graemerocher
  * @since 1.0
@@ -45,6 +46,9 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
     private final DiscoveryClient discoveryClient;
 
+    /**
+     * @param discoveryClient The Discovery client
+     */
     public DiscoveryClientHealthIndicator(DiscoveryClient discoveryClient) {
         this.discoveryClient = discoveryClient;
     }

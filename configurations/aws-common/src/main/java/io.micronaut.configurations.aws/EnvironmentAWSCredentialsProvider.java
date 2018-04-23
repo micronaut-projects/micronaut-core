@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.aws;
 
 import com.amazonaws.SdkClientException;
@@ -24,7 +25,7 @@ import com.amazonaws.util.StringUtils;
 import io.micronaut.context.env.Environment;
 
 /**
- * A {@link AWSCredentialsProvider} that reads from the {@link Environment}
+ * A {@link AWSCredentialsProvider} that reads from the {@link Environment}.
  *
  * @author graemerocher
  * @since 1.0
@@ -32,32 +33,36 @@ import io.micronaut.context.env.Environment;
 public class EnvironmentAWSCredentialsProvider implements AWSCredentialsProvider {
 
     /**
-     * Environment variable name for the AWS access key ID
+     * Environment variable name for the AWS access key ID.
      */
     public static final String ACCESS_KEY_ENV_VAR = "aws.accessKeyId";
 
     /**
-     * Alternate environment variable name for the AWS access key ID
+     * Alternate environment variable name for the AWS access key ID.
      */
     public static final String ALTERNATE_ACCESS_KEY_ENV_VAR = "aws.accessKey";
 
     /**
-     * Environment variable name for the AWS secret key
+     * Environment variable name for the AWS secret key.
      */
     public static final String SECRET_KEY_ENV_VAR = "aws.secretKey";
 
     /**
-     * Alternate environment variable name for the AWS secret key
+     * Alternate environment variable name for the AWS secret key.
      */
     public static final String ALTERNATE_SECRET_KEY_ENV_VAR = "aws.secretAccessKey";
 
     /**
-     * Environment variable name for the AWS session token
+     * Environment variable name for the AWS session token.
      */
     public static final String AWS_SESSION_TOKEN_ENV_VAR = "aws.sessionToken";
 
     private final Environment environment;
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public EnvironmentAWSCredentialsProvider(Environment environment) {
         this.environment = environment;
     }

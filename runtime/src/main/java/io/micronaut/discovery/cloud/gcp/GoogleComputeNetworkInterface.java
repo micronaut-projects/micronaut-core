@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.cloud.NetworkInterface;
 
 /**
- * A {@link NetworkInterface} implementation for Google
+ * A {@link NetworkInterface} implementation for Google.
  *
  * @author graemerocher
  * @since 1.0

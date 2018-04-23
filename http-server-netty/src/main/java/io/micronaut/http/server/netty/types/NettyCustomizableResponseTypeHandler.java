@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.order.Ordered;
@@ -21,8 +22,7 @@ import io.micronaut.http.server.netty.NettyHttpResponse;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
- * Represents a class that is designed to handle specific types
- * that are returned from routes in a netty specific way.
+ * Represents a class that is designed to handle specific types that are returned from routes in a netty specific way.
  *
  * @param <T> The type to be handled
  * @author James Kleeh

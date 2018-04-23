@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.registration;
 
 import io.micronaut.context.event.ApplicationEventListener;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.util.regex.Pattern;
 
 /**
- * A base class for classes that automatically register the server with discovery services
+ * A base class for classes that automatically register the server with discovery services.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,6 +42,11 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
 
     private final RegistrationConfiguration registrationConfiguration;
 
+    /**
+     * Initialize given configurations.
+     *
+     * @param registrationConfiguration Common configurations for registration
+     */
     protected AutoRegistration(RegistrationConfiguration registrationConfiguration) {
         this.registrationConfiguration = registrationConfiguration;
     }
@@ -62,7 +68,7 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
     }
 
     /**
-     * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server
+     * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server.
      *
      * @param instance The instance
      * @param status   The {@link HealthStatus}
@@ -70,24 +76,35 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
     protected abstract void pulsate(ServiceInstance instance, HealthStatus status);
 
     /**
-     * Deregister the {@link ServiceInstance} from service discovery services
+     * Deregister the {@link ServiceInstance} from service discovery services.
      *
      * @param instance The {@link ServiceInstance}
      */
     protected abstract void deregister(ServiceInstance instance);
 
     /**
-     * Register the {@link ServiceInstance} with discovery services
+     * Register the {@link ServiceInstance} with discovery services.
      *
      * @param instance The {@link ServiceInstance}
      */
     protected abstract void register(ServiceInstance instance);
 
+    /**
+     * Validate the given application name.
+     *
+     * @param name The application name
+     */
     protected void validateApplicationName(String name) {
         String typeDescription = "Application name";
         validateName(name, typeDescription);
     }
 
+    /**
+     * Validate the given application name.
+     *
+     * @param name The application name
+     * @param typeDescription The detailed information about name
+     */
     protected void validateName(String name, String typeDescription) {
         if (!APPLICATION_NAME_PATTERN.matcher(name).matches()) {
             throw new DiscoveryException(typeDescription + " [" + name + "] must start with a letter, end with a letter or digit and contain only letters, digits or hyphens. Example: foo-bar");

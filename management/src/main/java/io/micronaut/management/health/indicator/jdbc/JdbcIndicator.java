@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
@@ -40,17 +41,30 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+/**
+ * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the jdbc
+ * status.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
 @Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = "false")
 public class JdbcIndicator implements HealthIndicator {
 
     private static final String NAME = "jdbc";
+    private static final int CONNECTION_TIMEOUT = 3;
 
     private final ExecutorService executorService;
     private final DataSource[] dataSources;
     private final HealthAggregator healthAggregator;
 
+    /**
+     * @param executorService  The executor service
+     * @param dataSources      The data sources
+     * @param healthAggregator The health aggregator
+     */
     @Inject
     public JdbcIndicator(@Named(TaskExecutors.IO) ExecutorService executorService,
                          DataSource[] dataSources,
@@ -71,7 +85,7 @@ public class JdbcIndicator implements HealthIndicator {
             Connection connection = null;
             try {
                 connection = dataSource.getConnection();
-                if (connection.isValid(3)) {
+                if (connection.isValid(CONNECTION_TIMEOUT)) {
                     DatabaseMetaData metaData = connection.getMetaData();
                     key = metaData.getURL();
                     details = new LinkedHashMap<>(1);

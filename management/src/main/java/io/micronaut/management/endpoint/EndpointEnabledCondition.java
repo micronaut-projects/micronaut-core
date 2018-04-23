@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.BeanContext;
@@ -25,7 +26,7 @@ import io.micronaut.core.value.PropertyResolver;
 import java.util.Optional;
 
 /**
- * A condition that checks whether an {@link Endpoint} is enabled
+ * A condition that checks whether an {@link Endpoint} is enabled.
  *
  * @author James Kleeh
  */

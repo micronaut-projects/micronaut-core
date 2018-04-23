@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.routes.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -28,6 +29,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Default route data implementation.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
 @Requires(beans = RoutesEndpoint.class)
 public class DefaultRouteData implements RouteData<Map<String, String>> {
@@ -43,6 +50,10 @@ public class DefaultRouteData implements RouteData<Map<String, String>> {
         return values;
     }
 
+    /**
+     * @param targetMethod The {@link MethodExecutionHandle}
+     * @return A String with the target method
+     */
     protected String getMethodString(MethodExecutionHandle targetMethod) {
         return new StringBuilder()
             .append(targetMethod.getReturnType().asArgument().getTypeString(false))

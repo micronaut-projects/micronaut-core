@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.Bean;
@@ -24,7 +25,8 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * A default executor service for scheduling adhoc tasks via {@link java.util.concurrent.ScheduledExecutorService}
+ * A default executor service for scheduling adhoc tasks via
+ * {@link java.util.concurrent.ScheduledExecutorService}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,6 +35,9 @@ import javax.inject.Singleton;
 @Factory
 public class ScheduledExecutorServiceConfig {
 
+    /**
+     * @return The executor configurations
+     */
     @Singleton
     @Bean
     @Named(TaskExecutors.SCHEDULED)

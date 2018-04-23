@@ -75,7 +75,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         if (discoveryClient == null) {
-            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
+            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
         }
         if (serviceId == null) {
             serviceId = route53ClientDiscoveryConfiguration.getAwsServiceId();  // we can default to the config file
@@ -102,7 +102,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Override
     public Publisher<List<String>> getServiceIds() {
         if (discoveryClient == null) {
-            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.clientConfiguration).build();
+            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
         }
 
         ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(route53ClientDiscoveryConfiguration.getNamespaceId());

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.rabbitmq;
 
 import com.rabbitmq.client.ConnectionFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * The default RabbitMQ configuration class
+ * The default RabbitMQ configuration class.
  *
  * Allows RabbitMQ client to leverage Micronaut properties configuration
  *

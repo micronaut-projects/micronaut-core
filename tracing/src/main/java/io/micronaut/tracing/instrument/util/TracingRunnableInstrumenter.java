@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
@@ -22,7 +23,7 @@ import javax.inject.Singleton;
 import java.util.function.Function;
 
 /**
- * A function that instruments an existing Runnable with {@link TracingRunnable}
+ * A function that instruments an existing Runnable with {@link TracingRunnable}.
  *
  * @author graemerocher
  * @since 1.0
@@ -33,6 +34,11 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
 
     private final Tracer tracer;
 
+    /**
+     * Create a function that instrument an existing Runnable.
+     *
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public TracingRunnableInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }

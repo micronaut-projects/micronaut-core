@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,7 +32,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Simple facade over a Jackson {@link ObjectNode} to make it a {@link ConvertibleValues}
+ * Simple facade over a Jackson {@link ObjectNode} to make it a {@link ConvertibleValues}.
+ *
+ * @param <V> The generic type for values
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,6 +44,10 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
     private final ObjectNode objectNode;
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param objectNode        The node that maps to JSON object structure
+     * @param conversionService To convert the JSON node into given type
+     */
     public ObjectNodeConvertibleValues(ObjectNode objectNode, ConversionService<?> conversionService) {
         this.objectNode = objectNode;
         this.conversionService = conversionService;

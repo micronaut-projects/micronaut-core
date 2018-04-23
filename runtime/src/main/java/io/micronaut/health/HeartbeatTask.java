@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.health;
 
+package io.micronaut.health;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
@@ -29,7 +29,7 @@ import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A scheduled task that sends a periodic heartbeat whilst the server is active
+ * A scheduled task that sends a periodic heartbeat whilst the server is active.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,12 +46,20 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     private final HeartbeatConfiguration configuration;
     private final CurrentHealthStatus currentHealthStatus;
 
+    /**
+     * @param eventPublisher      To publish the events related to heartbeat
+     * @param configuration       The configurations for heartbeat
+     * @param currentHealthStatus The current status of health indicator
+     */
     public HeartbeatTask(ApplicationEventPublisher eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.currentHealthStatus = currentHealthStatus;
     }
 
+    /**
+     * Publish the heartbeat event with current health status.
+     */
     @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initialDelay:5s}")
     public void pulsate() {
         ServiceInstance instance = eventReference.get();
