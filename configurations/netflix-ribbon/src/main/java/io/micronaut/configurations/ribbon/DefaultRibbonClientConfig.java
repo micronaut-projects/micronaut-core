@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -22,7 +23,7 @@ import io.micronaut.context.env.Environment;
 import javax.inject.Singleton;
 
 /**
- * The default configuration for Ribbon that delegates to the {@link Environment} to resolve properties
+ * The default configuration for Ribbon that delegates to the {@link Environment} to resolve properties.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +33,10 @@ import javax.inject.Singleton;
 @ConfigurationProperties(DefaultRibbonClientConfig.PREFIX)
 public class DefaultRibbonClientConfig extends AbstractRibbonClientConfig {
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public DefaultRibbonClientConfig(Environment environment) {
         super(environment);
     }

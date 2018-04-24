@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.qualifier;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -29,9 +29,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A {@link Bean} {@link Qualifier} that qualifies based on the
- * value of the media type defined in the {@link Consumes} annotation
+ * A {@link io.micronaut.context.annotation.Bean} {@link Qualifier} that qualifies based on the value of the media type
+ * defined in the {@link Consumes} annotation.
  *
+ * @param <T> The Type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -39,6 +40,9 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
 
     private final MediaType contentType;
 
+    /**
+     * @param contentType The content type as {@link MediaType}
+     */
     public ConsumesMediaTypeQualifier(MediaType contentType) {
         this.contentType = contentType;
     }
@@ -58,8 +62,12 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         ConsumesMediaTypeQualifier that = (ConsumesMediaTypeQualifier) o;
 

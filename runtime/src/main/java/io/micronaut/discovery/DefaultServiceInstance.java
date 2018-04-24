@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -29,6 +30,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
+ * The default implementation for {@link ServiceInstance}.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -43,6 +46,12 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
     private HealthStatus status = HealthStatus.UP;
     private ConvertibleValues<String> metadata = ConvertibleValues.empty();
 
+    /**
+     * Construct a default implementation for the given service identified by id and URI.
+     *
+     * @param id  The identifier of the service used for purposes of service discovery
+     * @param uri The service URI
+     */
     DefaultServiceInstance(String id, URI uri) {
         this.id = id;
 
@@ -101,11 +110,15 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultServiceInstance that = (DefaultServiceInstance) o;
         return Objects.equals(id, that.id) &&
-            Objects.equals(uri, that.uri);
+                Objects.equals(uri, that.uri);
     }
 
     @Override

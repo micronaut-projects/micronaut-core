@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator;
 
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
@@ -25,10 +26,10 @@ import javax.inject.Named;
 import java.util.concurrent.ExecutorService;
 
 /**
- * <p>A base health indicator class to extend from that catches exceptions
- * thrown from the {@link #getHealthInformation()} method and updates
- * the {@link HealthResult} with the exception information.</p>
+ * <p>A base health indicator class to extend from that catches exceptions thrown from the
+ * {@link #getHealthInformation()} method and updates the {@link HealthResult} with the exception information.</p>
  *
+ * @param <T> The health indication type
  * @author James Kleeh
  * @since 1.0
  */
@@ -37,6 +38,9 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
     protected ExecutorService executorService;
     protected HealthStatus healthStatus;
 
+    /**
+     * @param executorService The executor service
+     */
     @Inject
     public void setExecutorService(@Named(TaskExecutors.IO) ExecutorService executorService) {
         this.executorService = executorService;
@@ -51,9 +55,8 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
     }
 
     /**
-     * Provides information (typically a Map) to be returned. Set the
-     * {@link #healthStatus} field during execution, otherwise {@link HealthStatus#UNKNOWN}
-     * will be used.
+     * Provides information (typically a Map) to be returned. Set the {@link #healthStatus} field during execution,
+     * otherwise {@link HealthStatus#UNKNOWN} will be used.
      *
      * @return Any details to be included in the response.
      */
@@ -77,8 +80,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
     }
 
     /**
-     * Used to populate the {@link HealthResult}. Provides a key to go
-     * along with the health information.
+     * Used to populate the {@link HealthResult}. Provides a key to go along with the health information.
      *
      * @return The name of the indicator
      */

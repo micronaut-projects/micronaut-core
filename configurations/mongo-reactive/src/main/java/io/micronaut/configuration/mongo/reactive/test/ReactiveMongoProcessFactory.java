@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive.test;
 
 import com.mongodb.ConnectionString;
@@ -40,7 +41,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * This class will configure a {@link MongodProcess} if the class is on the classpath and the server is not configured
+ * This class will configure a {@link MongodProcess} if the class is on the classpath and the server is not configured.
  *
  * @author graemerocher
  * @since 1.0
@@ -78,7 +79,6 @@ public class ReactiveMongoProcessFactory implements BeanCreatedEventListener<Rea
         }
         return configuration;
     }
-
 
     @Override
     @PreDestroy

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
@@ -27,7 +28,7 @@ import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
 import java.util.Optional;
 
 /**
- * Abstract tracing filter shared across server and client
+ * Abstract tracing filter shared across server and client.
  *
  * @author graemerocher
  * @since 1.0
@@ -35,12 +36,17 @@ import java.util.Optional;
 abstract class AbstractBraveTracingFilter implements HttpFilter {
     protected final HttpTracing httpTracing;
 
+    /**
+     * Configure tracer in the filter for span creation and propagation across arbitrary transports.
+     *
+     * @param httpTracing HttpTracing
+     */
     AbstractBraveTracingFilter(HttpTracing httpTracing) {
         this.httpTracing = httpTracing;
     }
 
     /**
-     * Configures the request with the given Span
+     * Configures the request with the given Span.
      *
      * @param request The request
      * @param span The span
@@ -52,7 +58,8 @@ abstract class AbstractBraveTracingFilter implements HttpFilter {
     }
 
     /**
-     * Closes the scope after terminating the request
+     * Closes the scope after terminating the request.
+     *
      * @param request The request
      */
     void afterTerminate(HttpRequest<?> request) {
@@ -63,6 +70,13 @@ abstract class AbstractBraveTracingFilter implements HttpFilter {
         scope.ifPresent(Tracer.SpanInScope::close);
     }
 
+    /**
+     * Obtain the value of current span attribute on the HTTP method.
+     *
+     * @param request request
+     * @param response response
+     * @return current span attribute
+     */
     Optional<Span> configuredSpan(HttpRequest<?> request, HttpResponse<?> response) {
         Optional<Object> routeTemplate = request.getAttribute(HttpAttributes.URI_TEMPLATE);
         routeTemplate.ifPresent(o -> response.setAttribute(HttpAttributes.URI_TEMPLATE, o));

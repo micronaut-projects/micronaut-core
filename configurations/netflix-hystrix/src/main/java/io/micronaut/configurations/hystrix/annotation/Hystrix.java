@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Used to configure default Hystrix settings at type level
+ * Used to configure default Hystrix settings at type level.
  *
  * @author graemerocher
  * @since 1.0

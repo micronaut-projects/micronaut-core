@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -22,7 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A {@link PropertyResolver} that resolves values from a backing map
+ * A {@link PropertyResolver} that resolves values from a backing map.
  *
  * @author Graeme Rocher
  * @since 1.0

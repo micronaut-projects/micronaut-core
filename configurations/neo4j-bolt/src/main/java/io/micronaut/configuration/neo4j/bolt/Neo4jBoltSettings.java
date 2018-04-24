@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt;
 
 /**
@@ -21,15 +22,15 @@ package io.micronaut.configuration.neo4j.bolt;
  */
 public interface Neo4jBoltSettings {
     /**
-     * The prefix to use for all Neo4j settings
+     * The prefix to use for all Neo4j settings.
      */
     String PREFIX = "neo4j";
     /**
-     * Default Neo4j URI
+     * Default Neo4j URI.
      */
     String DEFAULT_URI = "bolt://localhost:7687";
     /**
-     * The default embedded data location
+     * The default embedded data location.
      */
     String DEFAULT_LOCATION = "data/neo4j";
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import java.util.Optional;
@@ -35,7 +36,7 @@ import java.util.function.Function;
 public interface TypeConverter<S, T> {
 
     /**
-     * Converts from the given source object type to the target type
+     * Converts from the given source object type to the target type.
      *
      * @param object     The object type
      * @param targetType The target type being converted to
@@ -57,7 +58,7 @@ public interface TypeConverter<S, T> {
     Optional<T> convert(S object, Class<T> targetType, ConversionContext context);
 
     /**
-     * Creates a new {@link TypeConverter} for the give source type, target type and conversion function
+     * Creates a new {@link TypeConverter} for the give source type, target type and conversion function.
      *
      * @param sourceType The source type
      * @param targetType The target type

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -27,9 +28,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * An implementation of {@link ConvertibleValues} backed by a map
+ * An implementation of {@link ConvertibleValues} backed by a map.
  *
  * @author Graeme Rocher
+ * @param <V> generic value
  * @since 1.0
  */
 public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
@@ -37,14 +39,26 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     protected final Map<? extends CharSequence, V> map;
     private final ConversionService<?> conversionService;
 
+    /**
+     * Constructor.
+     */
     public ConvertibleValuesMap() {
         this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
 
+    /**
+     * Constructor.
+     * @param map map of values.
+     */
     public ConvertibleValuesMap(Map<? extends CharSequence, V> map) {
         this(map, ConversionService.SHARED);
     }
 
+    /**
+     * Constructor.
+     * @param map map of values.
+     * @param conversionService conversionService
+     */
     public ConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
         this.map = map;
         this.conversionService = conversionService;
@@ -70,7 +84,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     }
 
     /**
-     * An empty {@link ConvertibleValuesMap}
+     * An empty {@link ConvertibleValuesMap}.
      *
      * @param <V> The generic type
      * @return The empty {@link ConvertibleValuesMap}

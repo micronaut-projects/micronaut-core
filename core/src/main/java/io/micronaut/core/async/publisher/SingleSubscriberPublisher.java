@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import org.reactivestreams.Publisher;
@@ -23,7 +24,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A {@link Publisher} that only allows a single {@link Subscriber}
+ * A {@link Publisher} that only allows a single {@link Subscriber}.
  *
  * @param <T> the type of element signaled.
  * @author Graeme Rocher
@@ -54,7 +55,7 @@ public abstract class SingleSubscriberPublisher<T> implements Publisher<T> {
     }
 
     /**
-     * Override to implement {@link Publisher#subscribe(Subscriber)}
+     * Override to implement {@link Publisher#subscribe(Subscriber)}.
      *
      * @param subscriber The subscriber
      * @see Publisher#subscribe(Subscriber)

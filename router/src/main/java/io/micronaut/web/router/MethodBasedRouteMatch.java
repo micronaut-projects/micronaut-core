@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.type.Argument;
@@ -21,13 +22,18 @@ import io.micronaut.inject.MethodExecutionHandle;
 import java.util.Arrays;
 import java.util.Collection;
 
+/**
+ * Match a route based on a method.
+ *
+ * @param <R> The route
+ */
 public interface MethodBasedRouteMatch<R> extends RouteMatch<R>, MethodExecutionHandle<R> {
 
     /**
-     * <p>Returns the required arguments for this RouteMatch</p>
+     * <p>Returns the required arguments for this RouteMatch<./p>
      * <p>
      * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments
-     * excluding those that have been subtracted from the URI variables</p>
+     * excluding those that have been subtracted from the URI variables.</p>
      *
      * @return The required arguments in order to invoke this route
      */

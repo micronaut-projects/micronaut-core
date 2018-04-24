@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -26,7 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Utility methods for dealing with generic types
+ * Utility methods for dealing with generic types.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ import java.util.Set;
 public class GenericTypeUtils {
 
     /**
-     * Resolves a single generic type argument from the super class of the given type
+     * Resolves a single generic type argument from the super class of the given type.
      *
      * @param type The type to resolve from
      * @return A single Class or null
@@ -77,7 +78,7 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolve a single type from the given generic type
+     * Resolve a single type from the given generic type.
      *
      * @param genericType The generic type
      * @return An {@link Optional} of the type
@@ -109,7 +110,7 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolves the type arguments for a generic type
+     * Resolves the type arguments for a generic type.
      *
      * @param genericType The generic type
      * @return The type arguments
@@ -125,7 +126,7 @@ public class GenericTypeUtils {
 
 
     /**
-     * Resolves a single generic type argument for the given field
+     * Resolves a single generic type argument for the given field.
      *
      * @param field The field
      * @return The type argument or {@link Optional#empty()}
@@ -143,7 +144,7 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolves all of the type arguments for the given field
+     * Resolves all of the type arguments for the given field.
      *
      * @param field The field
      * @return The type arguments as a class array
@@ -184,7 +185,7 @@ public class GenericTypeUtils {
 
 
     /**
-     * Resolve all of the type arguments for the given super type from the given type
+     * Resolve all of the type arguments for the given super type from the given type.
      *
      * @param type      The type to resolve from
      * @param superType The interface to resolve from

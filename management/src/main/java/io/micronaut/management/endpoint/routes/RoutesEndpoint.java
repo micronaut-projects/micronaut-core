@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.routes;
 
-import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.web.router.Router;
 import io.reactivex.Single;
-import org.reactivestreams.Publisher;
 
 /**
- * <p>Exposes an {@link Endpoint} to display application routes</p>
+ * <p>Exposes an {@link Endpoint} to display application routes.</p>
  *
  * @author James Kleeh
- * @see HttpMethodMapping
+ * @see io.micronaut.http.annotation.HttpMethodMapping
  * @since 1.0
  */
 @Endpoint("routes")
@@ -35,11 +34,18 @@ public class RoutesEndpoint {
     private final Router router;
     private final RouteDataCollector routeDataCollector;
 
+    /**
+     * @param router The {@link Router}
+     * @param routeDataCollector The {@link RouteDataCollector}
+     */
     public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
         this.router = router;
         this.routeDataCollector = routeDataCollector;
     }
 
+    /**
+     * @return The routes as a {@link Single}
+     */
     @Read
     public Single getRoutes() {
         return Single.fromPublisher(routeDataCollector.getData(router.uriRoutes()));

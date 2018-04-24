@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix;
 
 import com.netflix.hystrix.HystrixCommand;
@@ -48,7 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 /**
- * A {@link MethodInterceptor} that adds support for decorating methods for Hystrix
+ * A {@link MethodInterceptor} that adds support for decorating methods for Hystrix.
  *
  * @author graemerocher
  * @since 1.0
@@ -57,12 +58,12 @@ import java.util.concurrent.ExecutionException;
 public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
     /**
-     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}
+     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}.
      */
     public static final String ATTRIBUTE_COMMAND = "hystrix.command";
 
     /**
-     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}
+     * The attribute used the Hystrix command to be executed within the {@link MethodInvocationContext}.
      */
     public static final String ATTRIBUTE_GROUP = "hystrix.group";
 
@@ -73,6 +74,10 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
     private final RecoveryInterceptor recoveryInterceptor;
 
+    /**
+     * Constructor.
+     * @param recoveryInterceptor recoveryInterceptor
+     */
     public HystrixInterceptor(RecoveryInterceptor recoveryInterceptor) {
         this.recoveryInterceptor = recoveryInterceptor;
     }

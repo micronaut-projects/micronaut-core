@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
@@ -32,7 +33,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * Registers a Jaeger tracer based on the jaeger configuration
+ * Registers a Jaeger tracer based on the jaeger configuration.
  *
  * @author graemerocher
  * @since 1.0
@@ -45,12 +46,18 @@ public class JaegerTracerFactory implements Closeable {
     private Reporter reporter;
     private Sampler sampler;
 
+    /**
+     * Initialize Jaeger trace factory with the configurations.
+     *
+     * @param configuration Jaeger configurations
+     */
     public JaegerTracerFactory(JaegerConfiguration configuration) {
         this.configuration = configuration;
     }
 
     /**
-     * Allows setting a custom reporter
+     * Allows setting a custom reporter.
+     *
      * @param reporter The {@link Reporter}
      */
     @Inject
@@ -59,7 +66,7 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Allows setting a custom sampler
+     * Allows setting a custom sampler.
      *
      * @param sampler {@link Sampler}
      */
@@ -69,7 +76,8 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Adds a Jaeger based Open Tracing {@link Tracer}
+     * Adds a Jaeger based Open Tracing {@link Tracer}.
+     *
      * @return The {@link Tracer}
      */
     @Singleton
@@ -77,25 +85,24 @@ public class JaegerTracerFactory implements Closeable {
     Tracer jaegerTracer() {
         Configuration configuration = this.configuration.getConfiguration();
         io.jaegertracing.Tracer.Builder tracerBuilder = resolveBuilder(configuration);
-        if(this.configuration.isExpandExceptionLogs()) {
+        if (this.configuration.isExpandExceptionLogs()) {
             tracerBuilder.withExpandExceptionLogs();
         }
-        if(this.configuration.isZipkinSharedRpcSpan()) {
+        if (this.configuration.isZipkinSharedRpcSpan()) {
             tracerBuilder.withZipkinSharedRpcSpan();
         }
-        if(reporter != null) {
+        if (reporter != null) {
             tracerBuilder.withReporter(reporter);
         }
-        if(sampler != null) {
+        if (sampler != null) {
             tracerBuilder.withSampler(sampler);
         }
         Tracer tracer = tracerBuilder.build();
-        if(!GlobalTracer.isRegistered()) {
+        if (!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);
         }
         return tracer;
     }
-
 
     @Override
     @PreDestroy
@@ -104,7 +111,8 @@ public class JaegerTracerFactory implements Closeable {
     }
 
     /**
-     * Hooks for sub classes to override
+     * Hooks for sub classes to override.
+     *
      * @param configuration The configuration
      */
     @SuppressWarnings("WeakerAccess")

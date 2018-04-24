@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisURI;
@@ -30,7 +31,7 @@ import javax.inject.Singleton;
 import java.util.List;
 
 /**
- * Allows connecting to a Redis cluster via the the {@code "redis.uris"} setting
+ * Allows connecting to a Redis cluster via the the {@code "redis.uris"} setting.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +41,11 @@ import java.util.List;
 @Factory
 public class DefaultRedisClusterClientFactory {
 
+    /**
+     * Create the client based on config URIs.
+     * @param config config
+     * @return client
+     */
     @Bean(preDestroy = "shutdown")
     @Singleton
     @Primary
@@ -51,6 +57,11 @@ public class DefaultRedisClusterClientFactory {
         return RedisClusterClient.create(uris);
     }
 
+    /**
+     * Establish redis connection.
+     * @param redisClient client.
+     * @return connection
+     */
     @Bean(preDestroy = "close")
     @Singleton
     @Primary
@@ -58,6 +69,11 @@ public class DefaultRedisClusterClientFactory {
         return redisClient.connect();
     }
 
+    /**
+     *
+     * @param redisClient redisClient
+     * @return connection
+     */
     @Bean(preDestroy = "close")
     @Singleton
     public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(@Primary RedisClusterClient redisClient) {

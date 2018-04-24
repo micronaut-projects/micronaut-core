@@ -13,19 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 /**
- * An exception that occurs related to configuration
+ * An exception that occurs related to configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ValueException extends RuntimeException {
+    /**
+     * Constructor.
+     * @param message message
+     * @param cause cause
+     */
     public ValueException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * Constructor.
+     * @param message message
+     */
     public ValueException(String message) {
         super(message);
     }

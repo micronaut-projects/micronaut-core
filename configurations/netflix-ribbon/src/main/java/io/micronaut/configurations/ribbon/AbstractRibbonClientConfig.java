@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.VipAddressResolver;
@@ -32,7 +33,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Abstract implementation of the {@link IClientConfig} interface
+ * Abstract implementation of the {@link IClientConfig} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractRibbonClientConfig implements IClientConfig {
 
     /**
-     * The prefix to use for all Ribbon settings
+     * The prefix to use for all Ribbon settings.
      */
     public static final String PREFIX = "ribbon";
 
@@ -48,12 +49,16 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     private Map<IClientConfigKey, Object> customSettings = new ConcurrentHashMap<>();
     private VipAddressResolver resolver = null;
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public AbstractRibbonClientConfig(Environment environment) {
         this.environment = environment;
     }
 
     /**
-     * Sets an optional {@link VipAddressResolver}
+     * Sets an optional {@link VipAddressResolver}.
      *
      * @param resolver The {@link VipAddressResolver}
      */
@@ -211,8 +216,18 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         return getVipAddressResolver().resolve(deploymentContextBasedVipAddressesMacro, this);
     }
 
+    /**
+     * Get a property based on the parameters.
+     * @param key key
+     * @param type type
+     * @param defaultValue defaultValue
+     * @param <T> type of config key
+     * @return The property
+     */
     protected <T> T get(IClientConfigKey<T> key, Class<T> type, T defaultValue) {
-        if (key == null) return null;
+        if (key == null) {
+            return null;
+        }
         if (customSettings.containsKey(key)) {
             return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
         } else {
@@ -220,6 +235,11 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         }
     }
 
+    /**
+     * Return the namespace + key.
+     * @param key key
+     * @return concatenated result
+     */
     protected String qualifyKey(IClientConfigKey key) {
         return getNameSpace() + "." + key.key();
     }

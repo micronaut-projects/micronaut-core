@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.service;
 
 import java.util.function.Supplier;
 
 /**
- * A service that may or may not be present on the classpath
+ * A service that may or may not be present on the classpath.
  *
  * @param <T> The service type
  */
@@ -35,7 +36,7 @@ public interface ServiceDefinition<T> {
     boolean isPresent();
 
     /**
-     * Load the service of throw the given exception
+     * Load the service of throw the given exception.
      *
      * @param exceptionSupplier The exception supplier
      * @param <X>               The exception type

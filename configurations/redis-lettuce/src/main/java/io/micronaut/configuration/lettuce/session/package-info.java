@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Configuration for Redis sessions
+ * Configuration for Redis sessions.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,10 +24,6 @@
 @Requires(classes = SessionStore.class)
 package io.micronaut.configuration.lettuce.session;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.session.SessionStore;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;

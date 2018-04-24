@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
@@ -27,8 +28,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Represents a match for an error
+ * Represents a match for an error.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -38,6 +40,11 @@ class ErrorRouteMatch<T> extends StatusRouteMatch<T> {
     private final Throwable error;
     private final Map<String, Object> variables;
 
+    /**
+     * @param error The throwable
+     * @param abstractRoute The abstract route
+     * @param conversionService The conversion service
+     */
     ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         super(HttpStatus.INTERNAL_SERVER_ERROR, abstractRoute, conversionService);
         this.error = error;

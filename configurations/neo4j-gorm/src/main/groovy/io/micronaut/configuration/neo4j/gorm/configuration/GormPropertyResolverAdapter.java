@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.gorm.configuration;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -21,12 +22,17 @@ import io.micronaut.spring.core.env.PropertyResolverAdapter;
 import org.grails.datastore.mapping.config.Settings;
 
 /**
- * Resolves default settings for GORM
+ * Resolves default settings for GORM.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
+    /**
+     * Constructor.
+     * @param propertyResolver propertyResolver
+     * @param placeholderResolver placeholderResolver
+     */
     public GormPropertyResolverAdapter(PropertyResolver propertyResolver, PropertyPlaceholderResolver placeholderResolver) {
         super(propertyResolver, placeholderResolver);
     }
@@ -41,6 +47,11 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
         return v;
     }
 
+    /**
+     * Is the failed on error key set.
+     * @param key key
+     * @return boolean
+     */
     protected boolean isKeyFailedOnError(String key) {
         return key.equalsIgnoreCase(Settings.SETTING_FAIL_ON_ERROR) || key.equalsIgnoreCase(org.grails.datastore.gorm.neo4j.config.Settings.PREFIX + ".failOnError");
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -78,15 +79,18 @@ import java.util.function.Function;
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
+    private static final int CACHE_MAX = 60;
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()
-                                                                                 .maximumSize(60)
+                                                                                 .maximumSize(CACHE_MAX)
                                                                                  .build();
 
+    /**
+     * Constructor.
+     */
     public DefaultConversionService() {
         registerDefaultConverters();
     }
-
 
     @SuppressWarnings("unchecked")
     @Override
@@ -154,6 +158,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return this;
     }
 
+    /**
+     * Default Converters.
+     */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
 
@@ -231,7 +238,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // String[] -> String
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
-            if (object == null || object.length == 0) return Optional.empty();
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
 
             StringJoiner joiner = new StringJoiner("");
             for (String string : object) {
@@ -683,6 +692,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Map.class, ConvertibleValues.class, (object, targetType, context) -> Optional.of(new ConvertibleValuesMap<Object>(object)));
     }
 
+    /**
+     * Find the type converter.
+     * @param sourceType sourceType
+     * @param targetType  targetType
+     * @param formattingAnnotation formattingAnnotation
+     * @param <T> Generic type
+     * @return type converter
+     */
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, Class<? extends Annotation> formattingAnnotation) {
         TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = resolveHierarchy(sourceType);
@@ -768,6 +785,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return hierarchy;
     }
 
+    /**
+     * Binds the source and target.
+     */
     private class ConvertiblePair {
         final Class source;
         final Class target;
@@ -785,13 +805,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             ConvertiblePair pair = (ConvertiblePair) o;
 
-            if (!source.equals(pair.source)) return false;
-            if (!target.equals(pair.target)) return false;
+            if (!source.equals(pair.source)) {
+                return false;
+            }
+            if (!target.equals(pair.target)) {
+                return false;
+            }
             return formattingAnnotation != null ? formattingAnnotation.equals(pair.formattingAnnotation) : pair.formattingAnnotation == null;
         }
 

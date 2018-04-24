@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.databind.BeanDescription;
@@ -28,7 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Modifies serialization for {@link Resource}
+ * Modifies serialization for {@link Resource}.
  *
  * @author Graeme Rocher
  * @since 1.0

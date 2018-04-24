@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.format;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -32,7 +33,7 @@ import java.lang.annotation.Retention;
 public @interface Format {
 
     /**
-     * @return The format to use
+     * @return The format to use.
      */
     String value();
 }

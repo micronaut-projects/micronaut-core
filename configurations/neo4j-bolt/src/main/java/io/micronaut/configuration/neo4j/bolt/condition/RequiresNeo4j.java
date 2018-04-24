@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt.condition;
 
 import io.micronaut.configuration.neo4j.bolt.Neo4jBoltSettings;

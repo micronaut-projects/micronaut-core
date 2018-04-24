@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind.annotation;
 
 import io.micronaut.core.bind.ArgumentBinder;
@@ -20,7 +21,7 @@ import io.micronaut.core.bind.ArgumentBinder;
 import java.lang.annotation.Annotation;
 
 /**
- * An {@link ArgumentBinder} whose lookup is driven by an annotation definition
+ * An {@link ArgumentBinder} whose lookup is driven by an annotation definition.
  *
  * @param <A> The annotation type
  * @param <T> The argument type
@@ -31,7 +32,7 @@ import java.lang.annotation.Annotation;
 public interface AnnotatedArgumentBinder<A extends Annotation, T, S> extends ArgumentBinder<T, S> {
 
     /**
-     * @return The annotation type
+     * @return The annotation type.
      */
     Class<A> getAnnotationType();
 }

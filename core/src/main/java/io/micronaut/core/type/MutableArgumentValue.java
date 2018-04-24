@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 /**
- * A mutable version of the {@link ArgumentValue} interface
+ * A mutable version of the {@link ArgumentValue} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,7 +25,7 @@ package io.micronaut.core.type;
 public interface MutableArgumentValue<V> extends ArgumentValue<V> {
 
     /**
-     * Sets the argument value
+     * Sets the argument value.
      *
      * @param value The value
      * @throws IllegalArgumentException If the argument is not a compatible argument
@@ -32,7 +33,7 @@ public interface MutableArgumentValue<V> extends ArgumentValue<V> {
     void setValue(V value);
 
     /**
-     * Create a new {@link MutableArgumentValue} for the given {@link Argument} and value
+     * Create a new {@link MutableArgumentValue} for the given {@link Argument} and value.
      *
      * @param argument The argument
      * @param value    The value
