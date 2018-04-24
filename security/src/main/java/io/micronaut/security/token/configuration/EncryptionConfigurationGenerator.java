@@ -16,6 +16,7 @@
 
 package io.micronaut.security.token.configuration;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.token.generator.EncryptionKeyProvider;
 import org.pac4j.jwt.config.encryption.ECEncryptionConfiguration;
 import org.pac4j.jwt.config.encryption.EncryptionConfiguration;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
 public class EncryptionConfigurationGenerator {
 

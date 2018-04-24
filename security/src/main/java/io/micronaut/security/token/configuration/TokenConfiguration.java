@@ -16,13 +16,21 @@
 
 package io.micronaut.security.token.configuration;
 
+import io.micronaut.core.util.Toggleable;
+
 /**
  * Represents configuration of the JWT token.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenConfiguration {
+public interface TokenConfiguration extends Toggleable {
+
+    /**
+     *
+     * @return a boolean flag indicating whether {@link io.micronaut.security.token.validator.JwtTokenValidator} bean should be enabled or not
+     */
+    boolean isEnabled();
 
     /**
      * The name in the claims object that stores the granted roles.

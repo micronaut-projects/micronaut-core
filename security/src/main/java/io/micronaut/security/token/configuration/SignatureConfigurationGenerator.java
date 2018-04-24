@@ -16,6 +16,7 @@
 
 package io.micronaut.security.token.configuration;
 
+import io.micronaut.context.annotation.Requires;
 import org.pac4j.jwt.config.signature.ECSignatureConfiguration;
 import org.pac4j.jwt.config.signature.RSASignatureConfiguration;
 import org.pac4j.jwt.config.signature.SecretSignatureConfiguration;
@@ -33,6 +34,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
 public class SignatureConfigurationGenerator {
     Optional<SignatureConfiguration> signatureConfiguration;

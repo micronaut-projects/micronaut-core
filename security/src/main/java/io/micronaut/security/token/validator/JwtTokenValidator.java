@@ -16,9 +16,11 @@
 
 package io.micronaut.security.token.validator;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.token.configuration.EncryptionConfigurationGenerator;
 import io.micronaut.security.token.configuration.SignatureConfigurationGenerator;
+import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 import org.pac4j.core.exception.TechnicalException;
 import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.core.profile.jwt.JwtClaims;
@@ -34,6 +36,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
 public class JwtTokenValidator implements TokenValidator {
 

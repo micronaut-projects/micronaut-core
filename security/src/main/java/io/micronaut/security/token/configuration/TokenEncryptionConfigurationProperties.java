@@ -19,6 +19,7 @@ package io.micronaut.security.token.configuration;
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -28,6 +29,7 @@ import java.io.File;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @ConfigurationProperties(TokenEncryptionConfigurationProperties.PREFIX)
 public class TokenEncryptionConfigurationProperties implements TokenEncryptionConfiguration {
 

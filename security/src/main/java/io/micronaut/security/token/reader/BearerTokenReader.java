@@ -21,6 +21,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Requires(property = BearerTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
 public class BearerTokenReader implements TokenReader {
 

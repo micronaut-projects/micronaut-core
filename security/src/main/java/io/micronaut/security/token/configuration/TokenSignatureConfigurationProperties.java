@@ -18,6 +18,7 @@ package io.micronaut.security.token.configuration;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
@@ -27,6 +28,7 @@ import javax.validation.constraints.NotNull;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @ConfigurationProperties(TokenSignatureConfigurationProperties.PREFIX)
 public class TokenSignatureConfigurationProperties implements TokenSignatureConfiguration {
 

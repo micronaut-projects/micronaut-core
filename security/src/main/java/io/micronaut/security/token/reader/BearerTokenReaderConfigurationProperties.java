@@ -17,6 +17,7 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 
 /**
@@ -25,6 +26,7 @@ import io.micronaut.security.token.configuration.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @ConfigurationProperties(BearerTokenReaderConfigurationProperties.PREFIX)
 public class BearerTokenReaderConfigurationProperties implements BearerTokenReaderConfiguration {
 

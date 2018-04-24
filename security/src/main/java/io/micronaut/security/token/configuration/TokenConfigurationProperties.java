@@ -33,9 +33,15 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     private static final String DEFAULT_ROLES_CLAIM_NAME = "roles";
     private static final Integer DEFAULT_EXPIRATION = 3600;
 
+    protected boolean enabled = true;
     protected Integer refreshTokenExpiration = null;
     protected Integer accessTokenExpiration = DEFAULT_EXPIRATION;
     protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     @Override
     public Integer getRefreshTokenExpiration() {
