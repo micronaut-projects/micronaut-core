@@ -33,6 +33,7 @@ import java.lang.annotation.*;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER, ElementType.TYPE}) // this can be either type or param
 @Repeatable(value = Headers.class)
+@Bindable
 public @interface Header {
 
     /**
