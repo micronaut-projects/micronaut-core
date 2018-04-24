@@ -56,7 +56,6 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -160,15 +159,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-
-/*
-            headersAnnotation.getClass()
-
-            // this annotation adds a header for each request the client makes
-            if (headerAnnotation!=null && headerAnnotation.name()!= null && headerAnnotation.name().length()>0) {
-                headers.put(headerAnnotation.name(),headerAnnotation.value());
-            }
-*/
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {
