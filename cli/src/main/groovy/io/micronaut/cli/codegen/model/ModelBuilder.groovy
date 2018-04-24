@@ -106,7 +106,11 @@ trait ModelBuilder {
 
         @Override
         String convention(String conventionName) {
-            "${simpleName}${conventionName}"
+            if(simpleName.endsWith(conventionName)) {
+                simpleName
+            } else {
+                "${simpleName}${conventionName}"
+            }
         }
 
         @Override
