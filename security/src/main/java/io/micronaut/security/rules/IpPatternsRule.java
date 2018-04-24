@@ -67,12 +67,10 @@ public class IpPatternsRule extends AbstractSecurityRule {
         if (patternList.isEmpty()) {
             return SecurityRuleResult.UNKNOWN;
         } else {
-            if (patternList.size() == 1 && patternList.get(0).pattern().equals(SecurityConfiguration.ANYWHERE)) {
-                return SecurityRuleResult.UNKNOWN;
-            }
             if (patternList.stream().anyMatch(pattern ->
+                    pattern.pattern().equals(SecurityConfiguration.ANYWHERE) ||
                     pattern.matcher(request.getRemoteAddress().getAddress().getHostAddress()).matches())) {
-                return SecurityRuleResult.ALLOWED;
+                return SecurityRuleResult.UNKNOWN;
             } else {
                 return SecurityRuleResult.REJECTED;
             }

@@ -29,4 +29,13 @@ class IpAuthorizationApprovedSpec extends Specification implements Authorization
         then:
         response.body() == "World"
     }
+
+    void "even if you are in the correct ip range, accessing the secured controller without authentication should return unauthorized"() {
+        when:
+        get("/secured/authenticated")
+
+        then:
+        HttpClientResponseException e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 }
