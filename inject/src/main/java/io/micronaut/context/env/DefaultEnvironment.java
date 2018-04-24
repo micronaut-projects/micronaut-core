@@ -58,6 +58,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -200,6 +201,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             if (reading.compareAndSet(false, true)) {
+
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
             }
@@ -431,8 +433,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     // do nothing here
                     break;
             }
-
         }
+        String environmentProperty = System.getProperty(ENVIRONMENTS_PROPERTY);
+        if (environmentProperty != null) {
+            for (String env: environmentProperty.split(",")) {
+                enviroments.add(env.trim());
+            }
+        }
+
         if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
             LOG.info("Established active environments: {}", enviroments);
         }
