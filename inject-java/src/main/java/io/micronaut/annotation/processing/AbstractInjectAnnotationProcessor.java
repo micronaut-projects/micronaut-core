@@ -18,6 +18,8 @@ package io.micronaut.annotation.processing;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.GeneratedFile;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -28,10 +30,18 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
-import java.io.File;
+import java.io.*;
 import java.net.URI;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+/**
+ * Abstract annotation processor base class
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     protected Messager messager;
@@ -41,6 +51,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected AnnotationUtils annotationUtils;
     protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
+    protected ClassWriterOutputVisitor classWriterOutputVisitor;
     private File targetDirectory;
 
     @Override
@@ -48,6 +59,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         super.init(processingEnv);
         this.messager = processingEnv.getMessager();
         this.filer = processingEnv.getFiler();
+        this.classWriterOutputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
@@ -125,4 +137,5 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected void note(String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
     }
+
 }

@@ -17,10 +17,12 @@ package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.GeneratedFile;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -36,12 +38,12 @@ public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWri
 
     @Override
     public void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        Optional<File> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName());
+        Optional<GeneratedFile> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName());
         if (opt.isPresent()) {
-            File file = opt.get();
+            GeneratedFile file = opt.get();
             List<ConfigurationMetadata> configurations = metadataBuilder.getConfigurations();
             List<PropertyMetadata> properties = metadataBuilder.getProperties();
-            try (FileWriter writer = new FileWriter(file)) {
+            try (Writer writer = file.openWriter()) {
                 writer.write('{');
                 boolean hasGroups = !configurations.isEmpty();
                 boolean hasProps = !properties.isEmpty();
@@ -63,7 +65,7 @@ public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWri
         return "configuration-metadata.json";
     }
 
-    private void writeMetadata(String attr, List<? extends Writable> configurations, FileWriter writer) throws IOException {
+    private void writeMetadata(String attr, List<? extends Writable> configurations, Writer writer) throws IOException {
         writer.write('"');
         writer.write(attr);
         writer.write("\":[");
