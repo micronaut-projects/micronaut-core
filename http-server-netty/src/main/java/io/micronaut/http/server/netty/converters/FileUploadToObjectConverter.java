@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -29,7 +30,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts file uploads
+ * Converts file uploads.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +41,10 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
     private final ConversionService conversionService;
     private final MediaTypeCodecRegistry decoderRegistry;
 
+    /**
+     * @param conversionService The conversion service
+     * @param decoderRegistry   The media type decoder registry
+     */
     protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeCodecRegistry decoderRegistry) {
         this.conversionService = conversionService;
         this.decoderRegistry = decoderRegistry;

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.http.MediaType;
@@ -27,18 +28,19 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 /**
- * An extension of {@link HttpContentCompressor} that skips encoding
- * if the content type is not compressible or if the content is too small.
+ * An extension of {@link HttpContentCompressor} that skips encoding if the content type is not compressible or if
+ * the content is too small.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class SmartHttpContentCompressor extends HttpContentCompressor {
 
+    private static final int LENGTH_1KB = 1024;
     private boolean skipEncoding = false;
 
     /**
-     * Determines if encoding should occur based on the content type and length
+     * Determines if encoding should occur based on the content type and length.
      *
      * @param contentType   The content type
      * @param contentLength The content length
@@ -48,11 +50,11 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
         if (contentType == null) {
             return true;
         }
-        return !MediaType.isTextBased(contentType) || (contentLength != null && contentLength >= 0 && contentLength < 1024);
+        return !MediaType.isTextBased(contentType) || (contentLength != null && contentLength >= 0 && contentLength < LENGTH_1KB);
     }
 
     /**
-     * Determines if encoding should occur based on the content type and length
+     * Determines if encoding should occur based on the content type and length.
      *
      * @param headers The headers that contain the content type and length
      * @return True if the content is compressible and larger than 1KB

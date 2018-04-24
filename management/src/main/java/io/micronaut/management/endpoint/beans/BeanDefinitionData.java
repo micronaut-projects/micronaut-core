@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.inject.BeanDefinition;
 
 /**
- * <p>Returns data for a given bean definition to be used for the {@link BeansEndpoint}</p>
+ * <p>Returns data for a given bean definition to be used for the {@link BeansEndpoint}.</p>
  *
+ * @param <T> The type
  * @author James Kleeh
  * @since 1.0
  */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import io.micronaut.core.type.Argument;
@@ -22,7 +23,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /**
- * <p>A cache implementation that supports async non-blocking caching operations</p>
+ * <p>A cache implementation that supports async non-blocking caching operations.</p>
+ *
+ * @param <C> The native cache implementation
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +33,7 @@ import java.util.function.Supplier;
 public interface AsyncCache<C> extends Cache<C> {
 
     /**
-     * Resolve the given value for the given key
+     * Resolve the given value for the given key.
      *
      * @param key          The cache key
      * @param requiredType The required type
@@ -52,25 +55,26 @@ public interface AsyncCache<C> extends Cache<C> {
     <T> CompletableFuture<T> get(Object key, Argument<T> requiredType, Supplier<T> supplier);
 
     /**
-     * <p>Cache the specified value using the specified key if it is not already present</p>
+     * <p>Cache the specified value using the specified key if it is not already present.</p>
      *
-     * @param key   the key with which the specified value is to be associated
-     * @param value the value to be associated with the specified key
+     * @param key   The key with which the specified value is to be associated
+     * @param value The value to be associated with the specified key
+     * @param <T> The concrete type
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
     <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value);
 
     /**
-     * <p>Cache the specified value using the specified key</p>
+     * <p>Cache the specified value using the specified key.</p>
      *
-     * @param key   the key with which the specified value is to be associated
-     * @param value the value to be associated with the specified key
+     * @param key   The key with which the specified value is to be associated
+     * @param value The value to be associated with the specified key
      * @return A future with a boolean indicating whether the operation was succesful or not
      */
     CompletableFuture<Boolean> put(Object key, Object value);
 
     /**
-     * Invalidate the value for the given key
+     * Invalidate the value for the given key.
      *
      * @param key The key to invalid
      * @return A future with a boolean indicating whether the operation was succesful or not
@@ -78,14 +82,14 @@ public interface AsyncCache<C> extends Cache<C> {
     CompletableFuture<Boolean> invalidate(Object key);
 
     /**
-     * Invalidate all cached values within this cache
+     * Invalidate all cached values within this cache.
      *
      * @return A future with a boolean indicating whether the operation was succesful or not
      */
     CompletableFuture<Boolean> invalidateAll();
 
     /**
-     * Resolve the given value for the given key
+     * Resolve the given value for the given key.
      *
      * @param key          The cache key
      * @param requiredType The required type

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.serialize;
 
 import io.micronaut.core.convert.ConversionService;
@@ -28,7 +29,7 @@ import java.io.OutputStream;
 import java.util.Optional;
 
 /**
- * A {@link ObjectSerializer} that uses JDK serialization
+ * A {@link ObjectSerializer} that uses JDK serialization.
  *
  * @author Graeme Rocher
  * @since 1.0

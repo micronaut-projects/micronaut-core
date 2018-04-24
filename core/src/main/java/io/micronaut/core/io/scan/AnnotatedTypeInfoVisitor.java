@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.scan;
 
 import io.micronaut.core.annotation.AnnotatedTypeInfo;
@@ -26,7 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Discovers the annotation names of a class
+ * Discovers the annotation names of a class.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
@@ -21,26 +22,20 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingServerFilter;
 import io.micronaut.tracing.instrument.util.TracingPublisher;
-import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
-import io.reactivex.Flowable;
-import io.reactivex.functions.Action;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nonnull;
-import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
- * An HTTP server instrumentation filter that uses Open Tracing
+ * An HTTP server instrumentation filter that uses Open Tracing.
  *
  * @author graemerocher
  * @since 1.0
@@ -53,6 +48,11 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
 
     private static final CharSequence APPLIED = OpenTracingServerFilter.class.getName() + "-applied";
 
+    /**
+     * Creates an HTTP server instrumentation filter.
+     *
+     * @param tracer For span creation and propagation across transport
+     */
     public OpenTracingServerFilter(Tracer tracer) {
         super(tracer);
     }
@@ -61,10 +61,9 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
-        if( request.getAttribute(APPLIED, Boolean.class).isPresent() ) {
+        if (request.getAttribute(APPLIED, Boolean.class).isPresent()) {
             return responsePublisher;
-        }
-        else {
+        } else {
             request.setAttribute(APPLIED, true);
             SpanContext spanContext = tracer.extract(
                     Format.Builtin.HTTP_HEADERS,
@@ -86,7 +85,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
 
                 @Override
                 protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
-                    if(object instanceof HttpResponse) {
+                    if (object instanceof HttpResponse) {
                         HttpResponse<?> response = (HttpResponse<?>) object;
                         tracer.inject(
                                 span.context(),

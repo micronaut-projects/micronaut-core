@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import io.micronaut.context.annotation.Primary;
@@ -26,7 +27,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Default implementation of the {@link CacheManager} interface
+ * Default implementation of the {@link CacheManager} interface.
+ *
+ * @param <C> The native cache implementation
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,6 +39,11 @@ import java.util.Set;
 public class DefaultCacheManager<C> implements CacheManager<C> {
     private final Map<String, SyncCache<C>> cacheMap;
 
+    /**
+     * Create default cache manager for the given caches.
+     *
+     * @param caches List of synchronous cache implementations
+     */
     public DefaultCacheManager(SyncCache<C>... caches) {
         if (ArrayUtils.isEmpty(caches)) {
             this.cacheMap = Collections.emptyMap();

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -27,7 +28,7 @@ import java.io.OutputStream;
 import java.util.Optional;
 
 /**
- * An implementation of the {@link ObjectSerializer} interface for Jackson
+ * An implementation of the {@link ObjectSerializer} interface for Jackson.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +38,9 @@ public class JacksonObjectSerializer implements ObjectSerializer {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * @param objectMapper To read/write JSON
+     */
     public JacksonObjectSerializer(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }

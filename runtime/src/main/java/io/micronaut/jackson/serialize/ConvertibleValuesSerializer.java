@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -25,7 +26,7 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Serializer for {@link ConvertibleValues}
+ * Serializer for {@link ConvertibleValues}.
  *
  * @author graemerocher
  * @since 1.0

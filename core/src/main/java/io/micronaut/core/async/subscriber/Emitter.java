@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
-
 /**
- * Base interface for classes that emit data. See {@link org.reactivestreams.Subscriber}
+ * Base interface for classes that emit data. See {@link org.reactivestreams.Subscriber}.
  *
+ * @param <T> type of element
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface Emitter<T> extends Completable {
     /**
-     * Data notification sent by the {@link Publisher} in response to requests to {@link Subscription#request(long)}.
+     * Data notification sent by the {@link org.reactivestreams.Publisher} in response to requests to {@link org.reactivestreams.Subscription#request(long)}.
      *
      * @param t the element signaled
      */
@@ -35,7 +34,7 @@ public interface Emitter<T> extends Completable {
     /**
      * Failed terminal state.
      * <p>
-     * No further events will be sent even if {@link Subscription#request(long)} is invoked again.
+     * No further events will be sent even if {@link org.reactivestreams.Subscription#request(long)} is invoked again.
      *
      * @param t the throwable signaled
      */

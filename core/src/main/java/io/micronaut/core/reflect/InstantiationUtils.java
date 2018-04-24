@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.reflect.exception.InstantiationException;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Utility methods for instantiating objects
+ * Utility methods for instantiating objects.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ public class InstantiationUtils {
     private static final Logger LOG = LoggerFactory.getLogger(InstantiationUtils.class);
 
     /**
-     * Try to instantiate the given class
+     * Try to instantiate the given class.
      *
      * @param name        The class name
      * @param classLoader The class loader to use
@@ -53,7 +54,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Try to instantiate the given class
+     * Try to instantiate the given class.
      *
      * @param type The type
      * @param <T>  The generic type
@@ -75,7 +76,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Try to instantiate the given class
+     * Try to instantiate the given class.
      *
      * @param type The type
      * @param args The arguments to the constructor
@@ -94,7 +95,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
      * @param type The type
      * @param <T>  The generic type
@@ -110,7 +111,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
      * @param type The type
      * @return The instantiated instance
@@ -127,7 +128,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
      * @param type The type
      * @return The instantiated instance

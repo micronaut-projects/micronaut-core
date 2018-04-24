@@ -13,34 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.env.*;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.async.SupplierUtil;
-import io.micronaut.core.cli.Option;
-import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
-import java.io.IOException;
-import java.net.URL;
-import java.util.*;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * <p>An {@link InfoSource} that retrieves info from Git properties. </p>
+ * <p>An {@link io.micronaut.management.endpoint.info.InfoSource} that retrieves info from Git properties.</p>
  *
  * @author Zachary Klein
  * @since 1.0
  */
-
 @Refreshable
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.git.enabled", notEquals = "false")
@@ -55,6 +49,9 @@ public class GitInfoSource implements PropertiesInfoSource {
     private ResourceResolver resourceResolver;
     private final Supplier<Optional<PropertySource>> supplier;
 
+    /**
+     * @param resourceResolver A {@link ResourceResolver}
+     */
     public GitInfoSource(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
         this.supplier = SupplierUtil.memoized(this::retrieveGitInfo);

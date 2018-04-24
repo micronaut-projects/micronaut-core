@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An empty representation of {@link AnnotationMetadata}
+ * An empty representation of {@link AnnotationMetadata}.
  *
  * @author Graeme Rocher
  * @since 1.0

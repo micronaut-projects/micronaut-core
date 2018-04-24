@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.bind;
 
 import io.micronaut.core.type.Argument;
@@ -20,15 +21,15 @@ import io.micronaut.core.type.Argument;
 import java.util.Optional;
 
 /**
- * A registry of {@link ArgumentBinder} instances
- *
+ * A registry of {@link ArgumentBinder} instances.
+ * @param <S> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ArgumentBinderRegistry<S> {
 
     /**
-     * Locate an {@link ArgumentBinder} for the given argument and source type
+     * Locate an {@link ArgumentBinder} for the given argument and source type.
      *
      * @param argument The argument
      * @param source   The source

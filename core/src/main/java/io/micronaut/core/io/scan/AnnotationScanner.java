@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.scan;
 
 import java.lang.annotation.Annotation;
@@ -21,14 +22,14 @@ import java.util.Collection;
 import java.util.stream.Stream;
 
 /**
- * Interface for classes that scan for classes with a given annotation
+ * Interface for classes that scan for classes with a given annotation.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface AnnotationScanner {
     /**
-     * Scan the given packages
+     * Scan the given packages.
      *
      * @param annotation The annotation to scan for
      * @param pkg        The package to scan
@@ -37,7 +38,7 @@ public interface AnnotationScanner {
     Stream<Class> scan(String annotation, String pkg);
 
     /**
-     * Scan the given packages
+     * Scan the given packages.
      *
      * @param annotation The annotation to scan for
      * @param packages   The packages to scan
@@ -50,7 +51,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation to scan
      * @param packages   The packages
@@ -61,7 +62,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scan the given packages
+     * Scan the given packages.
      *
      * @param annotation The annotation to scan for
      * @param pkg        The package to scan
@@ -72,7 +73,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation name to scan
      * @param packages   The package names
@@ -84,7 +85,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation name to scan
      * @param packages   The package names
@@ -95,7 +96,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation name to scan
      * @param packages   The package names
@@ -106,7 +107,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation name to scan
      * @param packages   The package names
@@ -119,7 +120,7 @@ public interface AnnotationScanner {
     }
 
     /**
-     * Scans the given package names
+     * Scans the given package names.
      *
      * @param annotation The annotation to scan
      * @param packages   The package names

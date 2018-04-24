@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.buffer;
 
 /**
- * An allocator for {@link ByteBuffer} instances
+ * An allocator for {@link ByteBuffer} instances.
  *
  * @author Graeme Rocher
  * @since 1.0

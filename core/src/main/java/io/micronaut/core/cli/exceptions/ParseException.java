@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.cli.exceptions;
 
 /**
@@ -25,10 +26,18 @@ public class ParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1;
 
+    /**
+     * Constructor.
+     * @param message message
+     */
     public ParseException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor.
+     * @param cause cause
+     */
     public ParseException(Throwable cause) {
         super(cause);
     }

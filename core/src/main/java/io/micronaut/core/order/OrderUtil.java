@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.order;
 
 import java.util.Arrays;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Apply the {@link Ordered} interface to lists or arrays
+ * Apply the {@link Ordered} interface to lists or arrays.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +31,7 @@ import java.util.stream.Stream;
 public class OrderUtil {
 
     /**
-     * Provide a comparator for collections
+     * Provide a comparator for collections.
      *
      * @return the comparator
      */
@@ -41,14 +42,14 @@ public class OrderUtil {
     };
 
     /**
-     * Provide a comparator, in reversed order, for collections
+     * Provide a comparator, in reversed order, for collections.
      *
      * @return the comparator
      */
     public static final Comparator<Object> REVERSE_COMPARATOR = Collections.reverseOrder(COMPARATOR);
 
     /**
-     * Sort the given list
+     * Sort the given list.
      *
      * @param list The list to sort
      */
@@ -57,7 +58,7 @@ public class OrderUtil {
     }
 
     /**
-     * Sort the given list
+     * Sort the given list.
      *
      * @param list The list to sort
      * @param <T>  The stream generic type
@@ -68,7 +69,7 @@ public class OrderUtil {
     }
 
     /**
-     * Sort the given list
+     * Sort the given list.
      *
      * @param list The list to sort
      */
@@ -77,7 +78,7 @@ public class OrderUtil {
     }
 
     /**
-     * Sort the given array in reverse order
+     * Sort the given array in reverse order.
      *
      * @param array The array to sort
      */
@@ -86,7 +87,7 @@ public class OrderUtil {
     }
 
     /**
-     * Sort the given array
+     * Sort the given array.
      *
      * @param objects The array to sort
      */
@@ -95,7 +96,7 @@ public class OrderUtil {
     }
 
     /**
-     * Sort the given array
+     * Sort the given array.
      *
      * @param objects The array to sort
      */

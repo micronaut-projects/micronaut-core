@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.serialize;
 
 import io.micronaut.core.serialize.exceptions.SerializationException;
@@ -26,7 +27,7 @@ import java.io.OutputStream;
 import java.util.Optional;
 
 /**
- * Interface for implementations capable of serializing objects
+ * Interface for implementations capable of serializing objects.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,12 +35,12 @@ import java.util.Optional;
 public interface ObjectSerializer {
 
     /**
-     * The default JDK serializer
+     * The default JDK serializer.
      */
     ObjectSerializer JDK = new JdkSerializer();
 
     /**
-     * Serialize the given object to a byte[]
+     * Serialize the given object to a byte[].
      *
      * @param object       The object to serialize
      * @param outputStream The output stream
@@ -47,7 +48,7 @@ public interface ObjectSerializer {
     void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException;
 
     /**
-     * Deserialize the given object to bytes
+     * Deserialize the given object to bytes.
      *
      * @param inputStream  The input stream
      * @param requiredType The required type
@@ -57,13 +58,15 @@ public interface ObjectSerializer {
     <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException;
 
     /**
-     * Serialize the given object to a byte[]
+     * Serialize the given object to a byte[].
      *
      * @param object The object to serialize
      * @return An optional of the bytes of the object
      */
     default Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
-        if (object == null) return Optional.empty();
+        if (object == null) {
+            return Optional.empty();
+        }
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         serialize(object, outputStream);
@@ -71,7 +74,7 @@ public interface ObjectSerializer {
     }
 
     /**
-     * Deserialize the given object to bytes
+     * Deserialize the given object to bytes.
      *
      * @param bytes        The byte array
      * @param requiredType The required type
@@ -79,7 +82,9 @@ public interface ObjectSerializer {
      * @return An {@link Optional} of the object
      */
     default <T> Optional<T> deserialize(@Nullable byte[] bytes, Class<T> requiredType) throws SerializationException {
-        if (bytes == null) return Optional.empty();
+        if (bytes == null) {
+            return Optional.empty();
+        }
         try {
             try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
                 return deserialize(input, requiredType);
@@ -90,13 +95,15 @@ public interface ObjectSerializer {
     }
 
     /**
-     * Deserialize the given object to bytes
+     * Deserialize the given object to bytes.
      *
      * @param bytes The byte array
      * @return An {@link Optional} of the object
      */
     default Optional<Object> deserialize(@Nullable byte[] bytes) throws SerializationException {
-        if (bytes == null) return Optional.empty();
+        if (bytes == null) {
+            return Optional.empty();
+        }
         return deserialize(bytes, Object.class);
     }
 }

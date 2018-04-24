@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.cache;
 
 import io.lettuce.core.RedisFuture;
@@ -37,7 +38,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
- * An implementation of {@link SyncCache} for Lettuce / Redis
+ * An implementation of {@link SyncCache} for Lettuce / Redis.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,7 +55,7 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
     private final StatefulConnection<String, String> connection;
 
     /**
-     * Creates a new redis cache for the given arguments
+     * Creates a new redis cache for the given arguments.
      *
      * @param redisCacheConfiguration The configuration
      * @param conversionService       The conversion service
@@ -122,7 +123,9 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> putIfAbsent(Object key, T value) {
-        if (value == null) return Optional.empty();
+        if (value == null) {
+            return Optional.empty();
+        }
 
         byte[] serializedKey = serializeKey(key);
         Optional<T> existing = getValue(Argument.of((Class<T>) value.getClass()), commands, serializedKey);
@@ -157,6 +160,14 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
         return asyncCache;
     }
 
+    /**
+     * Get the value based on the parameters.
+     * @param requiredType requiredType
+     * @param commands commands
+     * @param serializedKey serializedKey
+     * @param <T> type of the argument
+     * @return value
+     */
     protected <T> Optional<T> getValue(Argument<T> requiredType, SyncCacheCommands commands, byte[] serializedKey) {
         byte[] data = commands.get(serializedKey);
         if (expireAfterAccess != null) {
@@ -171,12 +182,19 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
     }
 
     /**
-     * @return The default keys pattern
+     * @return The default keys pattern.
      */
     protected String getKeysPattern() {
         return getName() + ":*";
     }
 
+    /**
+     * Place the value in the cache.
+     * @param commands commands
+     * @param serializedKey serializedKey
+     * @param value value
+     * @param <T> type of the value
+     */
     protected <T> void putValue(SyncCacheCommands commands, byte[] serializedKey, T value) {
         Optional<byte[]> serialized = valueSerializer.serialize(value);
         if (serialized.isPresent()) {
@@ -191,20 +209,42 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
         }
     }
 
+    /**
+     * Serialize the key.
+     * @param key The key
+     * @return bytes of the object
+     */
     protected byte[] serializeKey(Object key) {
         return keySerializer.serialize(key).orElseThrow(() -> new IllegalArgumentException("Key cannot be null"));
     }
 
+    /**
+     * Get the synchronous commands for the stateful connection.
+     * @param connection stateful connection
+     * @return commands
+     */
     protected SyncCacheCommands syncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
         return redisCommandFactory.getCommands(SyncCacheCommands.class);
     }
 
+    /**
+     * Get the asynchronous commands for the stateful connection.
+     * @param connection stateful connection
+     * @return commands
+     */
     protected AsyncCacheCommands asyncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
         return redisCommandFactory.getCommands(AsyncCacheCommands.class);
     }
 
+    private DefaultStringKeySerializer newDefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
+        return new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService);
+    }
+
+    /**
+     * Redis Async cache implementation.
+     */
     protected class RedisAsyncCache implements AsyncCache<StatefulConnection<?, ?>> {
 
         private final AsyncCacheCommands async = asyncCommands(connection);
@@ -411,9 +451,5 @@ public class RedisCache implements SyncCache<StatefulConnection<?, ?>> {
             return future;
         }
 
-    }
-
-    private DefaultStringKeySerializer newDefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
-        return new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService);
     }
 }

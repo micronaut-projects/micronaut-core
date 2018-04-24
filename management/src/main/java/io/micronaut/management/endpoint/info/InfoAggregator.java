@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info;
 
 import org.reactivestreams.Publisher;
@@ -21,13 +22,14 @@ import org.reactivestreams.Publisher;
  * <p>Aggregates all registered info sources into a single response.</p>
  * <p>In case of conflicts, priority is set based on the order of info sources {@link io.micronaut.core.order.Ordered}</p>
  *
+ * @param <T> The type
  * @author Zachary Klein
  * @since 1.0
  */
 public interface InfoAggregator<T> {
 
     /**
-     * Aggregate an array of {@link InfoSource} and return a publisher
+     * Aggregate an array of {@link InfoSource} and return a publisher.
      *
      * @param sources an array of InfoSources
      * @return A {@link Publisher} of <code>T</code>

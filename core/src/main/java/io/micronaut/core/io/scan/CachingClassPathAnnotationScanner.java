@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.scan;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -23,22 +24,30 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan</p>
+ * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanner {
 
+    private static final int CACHE_MAX = 5;
     private final Cache<CacheKey, List<Class>> initializedObjectsByType = Caffeine.newBuilder()
-                                                                                  .maximumSize(5)
+                                                                                  .maximumSize(CACHE_MAX)
                                                                                   .expireAfterAccess(2, TimeUnit.MINUTES)
                                                                                   .build();
 
+    /**
+     * Constructor.
+     * @param classLoader classLoader
+     */
     public CachingClassPathAnnotationScanner(ClassLoader classLoader) {
         super(classLoader);
     }
 
+    /**
+     * Default Constructor.
+     */
     public CachingClassPathAnnotationScanner() {
     }
 
@@ -47,6 +56,9 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
         return initializedObjectsByType.get(new CacheKey(annotation, pkg), (key) -> super.doScan(annotation, pkg));
     }
 
+    /**
+     * Inner class CacheKey
+     */
     private final class CacheKey implements Serializable {
         final String annotation;
         final String pkg;

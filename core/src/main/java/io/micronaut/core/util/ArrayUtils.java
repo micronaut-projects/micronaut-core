@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
@@ -21,7 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Utility methods for working with arrays
+ * Utility methods for working with arrays.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,12 +30,12 @@ import java.util.List;
 public class ArrayUtils {
 
     /**
-     * An empty object array
+     * An empty object array.
      */
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     /**
-     * Concatenate two arrays
+     * Concatenate two arrays.
      *
      * @param a   The first array
      * @param b   The second array
@@ -45,8 +46,12 @@ public class ArrayUtils {
         int aLen = a.length;
         int bLen = b.length;
 
-        if (bLen == 0) return a;
-        if (aLen == 0) return b;
+        if (bLen == 0) {
+            return a;
+        }
+        if (aLen == 0) {
+            return b;
+        }
 
         @SuppressWarnings("unchecked")
         T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
@@ -57,7 +62,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Whether the given array is empty
+     * Whether the given array is empty.
      *
      * @param array The array
      * @return True if it is
@@ -67,7 +72,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Whether the given array is not empty
+     * Whether the given array is not empty.
      *
      * @param array The array
      * @return True if it is
@@ -77,7 +82,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Produce a string representation of the given array
+     * Produce a string representation of the given array.
      *
      * @param array The array
      * @return The string representation
@@ -88,7 +93,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Produce a string representation of the given array
+     * Produce a string representation of the given array.
      *
      * @param delimiter The delimiter
      * @param array     The array

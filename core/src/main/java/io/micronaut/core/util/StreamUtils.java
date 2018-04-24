@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import java.util.*;
@@ -23,7 +24,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 /**
- * Utility methods for working with streams
+ * Utility methods for working with streams.
  *
  * @author James Kleeh
  * @since 1.0
@@ -46,15 +47,24 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
             if (!acc.hasAny) {
@@ -67,8 +77,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp >= 0)
+                if (cmp >= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {
@@ -108,15 +119,24 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
             if (!acc.hasAny) {
@@ -129,8 +149,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp <= 0)
+                if (cmp <= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {

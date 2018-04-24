@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ConversionService;
@@ -26,8 +27,9 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * A {@link RouteMatch} for a status code
+ * A {@link RouteMatch} for a status code.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,6 +37,11 @@ class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
 
     final HttpStatus httpStatus;
 
+    /**
+     * @param httpStatus The HTTP status
+     * @param abstractRoute The abstract route
+     * @param conversionService The conversion service
+     */
     StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;

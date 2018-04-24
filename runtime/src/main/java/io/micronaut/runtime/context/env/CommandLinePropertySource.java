@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.env;
 
 import io.micronaut.context.env.MapPropertySource;
-import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.cli.CommandLine;
 
@@ -25,7 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A {@link PropertySource} for properties parsed from the command line
+ * A {@link io.micronaut.context.env.PropertySource} for properties parsed from the command line.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,15 +33,20 @@ import java.util.Map;
 public class CommandLinePropertySource extends MapPropertySource {
 
     /**
-     * The position of the loader
+     * The position of the loader.
      */
     public static final int POSITION = SystemPropertiesPropertySource.POSITION + 100;
 
     /**
-     * The name of the property source
+     * The name of the property source.
      */
     public static final String NAME = "cli";
 
+    /**
+     * Construct the CommandLinePropertySource from properties passed from command line.
+     *
+     * @param commandLine Represents the parsed command line options.
+     */
     public CommandLinePropertySource(CommandLine commandLine) {
         super(NAME, resolveValues(commandLine));
     }

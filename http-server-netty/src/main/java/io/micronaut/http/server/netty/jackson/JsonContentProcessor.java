@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -29,14 +30,14 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCountUtil;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Optional;
 
 /**
- * This class will handle subscribing to a JSON stream and binding once the events are complete in a non-blocking manner
+ * This class will handle subscribing to a JSON stream and binding once the events are complete in a non-blocking
+ * manner.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,6 +47,11 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     private final JsonFactory jsonFactory;
     private JacksonProcessor jacksonProcessor;
 
+    /**
+     * @param nettyHttpRequest The Netty Http request
+     * @param configuration    The Http server configuration
+     * @param jsonFactory      The json factory
+     */
     public JsonContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration, Optional<JsonFactory> jsonFactory) {
         super(nettyHttpRequest, configuration);
         this.jsonFactory = jsonFactory.orElse(new JsonFactory());
@@ -57,25 +63,21 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             return;
         }
 
-        if(subscriber instanceof TypedSubscriber) {
+        if (subscriber instanceof TypedSubscriber) {
             TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
             Argument typeArgument = typedSubscriber.getTypeArgument();
 
             Class targetType = typeArgument.getType();
-            if(Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
+            if (Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
                 Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
-                if(genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType())) {
+                if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType())) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
                     this.jacksonProcessor = new JacksonProcessor(jsonFactory, true);
-                }
-                else {
+                } else {
                     this.jacksonProcessor = new JacksonProcessor(jsonFactory);
                 }
-
             }
-        }
-        else {
-
+        } else {
             this.jacksonProcessor = new JacksonProcessor(jsonFactory);
         }
 

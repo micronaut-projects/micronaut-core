@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.event;
 
 import io.micronaut.context.event.ApplicationEvent;
@@ -20,13 +21,18 @@ import io.micronaut.inject.ExecutableMethod;
 
 /**
  * An event fired when a Circuit is {@link io.micronaut.retry.CircuitState#CLOSED} and has resumed
- * accepting requests
+ * accepting requests.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class CircuitClosedEvent extends ApplicationEvent {
 
+    /**
+     * Constructs an Event.
+     *
+     * @param source A compile time produced invocation of a method call
+     */
     public CircuitClosedEvent(
         ExecutableMethod<?, ?> source) {
         super(source);

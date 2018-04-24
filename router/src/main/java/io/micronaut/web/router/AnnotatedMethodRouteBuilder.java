@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.context.ExecutionHandleLocator;
@@ -45,7 +46,8 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Responsible for building {@link Route} instances for the annotations found in the {@link io.micronaut.http.annotation} package
+ * Responsible for building {@link Route} instances for the annotations found in the {@link io.micronaut.http.annotation}
+ * package.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -55,6 +57,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     private final Map<Class, BiConsumer<BeanDefinition, ExecutableMethod>> httpMethodsHandlers = new LinkedHashMap<>();
 
+    /**
+     * @param executionHandleLocator The execution handler locator
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (BeanDefinition bean, ExecutableMethod method) -> {
@@ -186,18 +193,16 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                     value.ifPresent(httpStatus -> status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes()));
                 } else if (method.isPresent(Error.class, "value")) {
                     Optional<Class> aClass = method.classValue(Error.class);
-                    aClass.ifPresent(exceptionType ->
-                        {
-                            if (Throwable.class.isAssignableFrom(exceptionType)) {
-                                if (isGlobal) {
-                                    //noinspection unchecked
-                                    error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                                } else {
-                                    error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                                }
+                    aClass.ifPresent(exceptionType -> {
+                        if (Throwable.class.isAssignableFrom(exceptionType)) {
+                            if (isGlobal) {
+                                //noinspection unchecked
+                                error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                            } else {
+                                error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                             }
                         }
-                    );
+                    });
                 } else {
                     if (isGlobal) {
                         error(Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 
 /**
- * Default implementation of {@link MutableArgumentValue}
+ * Default implementation of {@link MutableArgumentValue}.
  *
  * @author Graeme Rocher
  * @since 1.0
