@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
