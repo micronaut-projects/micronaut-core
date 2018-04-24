@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -25,7 +26,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts an {@link ObjectNode} to a {@link ConvertibleValues} instance
+ * Converts an {@link ObjectNode} to a {@link ConvertibleValues} instance.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,6 +36,9 @@ public class ObjectNodeToConvertibleValuesConverter implements TypeConverter<Obj
 
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param conversionService To convert from JSON node to a {@link ConvertibleValues} instance
+     */
     public ObjectNodeToConvertibleValuesConverter(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -33,6 +34,9 @@ public class HttpDataToStringConverter implements TypeConverter<HttpData, CharSe
 
     private final ConversionService conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     protected HttpDataToStringConverter(ConversionService conversionService) {
         this.conversionService = conversionService;
     }

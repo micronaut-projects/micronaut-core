@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.cli;
 
 import java.util.ArrayList;
@@ -79,7 +80,6 @@ class DefaultCommandLine implements CommandLine {
         return null;
     }
 
-
     @Override
     public String getRemainingArgsString() {
         return remainingArgsToString(" ", false);
@@ -112,30 +112,54 @@ class DefaultCommandLine implements CommandLine {
         return rawArguments;
     }
 
+    /**
+     * @param option option
+     */
     void addDeclaredOption(Option option) {
         addDeclaredOption(option, Boolean.TRUE);
     }
 
+    /**
+     * @param option option
+     */
     void addUndeclaredOption(String option) {
         undeclaredOptions.put(option, Boolean.TRUE);
     }
 
+    /**
+     * @param option option
+     * @param value value
+     */
     void addUndeclaredOption(String option, Object value) {
         undeclaredOptions.put(option, value);
     }
 
+    /**
+     * @param option option
+     * @param value value
+     */
     void addDeclaredOption(Option option, Object value) {
         declaredOptions.put(option, value);
     }
 
+    /**
+     * @param arg arg
+     */
     void addRemainingArg(String arg) {
         remainingArgs.add(arg);
     }
 
+    /**
+     * @param name name
+     * @param value value
+     */
     void addSystemProperty(String name, String value) {
         systemProperties.put(name, value);
     }
 
+    /**
+     * @param args array of args
+     */
     void setRawArguments(String[] args) {
         this.rawArguments = args;
     }

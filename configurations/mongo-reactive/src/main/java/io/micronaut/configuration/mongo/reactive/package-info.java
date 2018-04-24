@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Configuration group for Mongo Reactive Streams
+ * Configuration group for Mongo Reactive Streams.
  *
  * @author James Kleeh
  * @since 1.0
@@ -22,7 +22,6 @@
 @Configuration
 @RequiresMongo
 package io.micronaut.configuration.mongo.reactive;
-import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
-import io.micronaut.context.annotation.Configuration;
+
 import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
 import io.micronaut.context.annotation.Configuration;

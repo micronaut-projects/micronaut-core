@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import java.util.List;
 
 /**
- * Interface for types that expose a list of {@link ServiceInstance}
+ * Interface for types that expose a list of {@link ServiceInstance}.
  *
  * @author graemerocher
  * @since 1.0

@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.serialize.exceptions;
 
 /**
- * A generic exception that occurs during serialization or deserialization
+ * A generic exception that occurs during serialization or deserialization.
  *
  * @author Graeme Rocher
  * @since 1.0

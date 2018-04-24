@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jdbc;
 
 /**
- * A contract for data source configuration classes to implement
- * that allows for the calculation of several properties based on
- * other properties.
+ * A contract for data source configuration classes to implement that allows for the calculation of several
+ * properties based on other properties.
  *
  * @author James Kleeh
  * @since 1.0

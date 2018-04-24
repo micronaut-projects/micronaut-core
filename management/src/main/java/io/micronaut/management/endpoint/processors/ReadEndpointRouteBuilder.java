@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**
- * A processor that processes references to {@link Read} operations {@link Endpoint} instances
+ * A processor that processes references to {@link Read} operations {@link io.micronaut.management.endpoint.Endpoint}
+ * instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +35,11 @@ import java.lang.annotation.Annotation;
 @Singleton
 public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
+    /**
+     * @param beanContext The application context
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     */
     public ReadEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }

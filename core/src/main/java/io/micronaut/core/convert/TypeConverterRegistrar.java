@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 /**
- * An interface for classes that register type conversions with the {@link ConversionService}
+ * An interface for classes that register type conversions with the {@link ConversionService}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,7 +25,7 @@ package io.micronaut.core.convert;
 public interface TypeConverterRegistrar {
 
     /**
-     * Interface for registrars of {@link TypeConverter} instances
+     * Interface for registrars of {@link TypeConverter} instances.
      *
      * @param conversionService The {@link ConversionService}
      */

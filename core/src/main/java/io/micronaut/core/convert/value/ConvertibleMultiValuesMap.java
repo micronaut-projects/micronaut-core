@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -29,7 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * An implementation of {@link ConvertibleMultiValues} that uses a backing {@link LinkedHashMap}
+ * An implementation of {@link ConvertibleMultiValues} that uses a backing {@link LinkedHashMap}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,14 +42,14 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     private final ConversionService<?> conversionService;
 
     /**
-     * Construct an empty {@link ConvertibleValuesMap}
+     * Construct an empty {@link ConvertibleValuesMap}.
      */
     public ConvertibleMultiValuesMap() {
         this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
 
     /**
-     * Construct a {@link ConvertibleValuesMap} from the given map
+     * Construct a {@link ConvertibleValuesMap} from the given map.
      *
      * @param values The map
      */
@@ -57,7 +58,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     }
 
     /**
-     * Construct a {@link ConvertibleValuesMap} from the given map and conversion service
+     * Construct a {@link ConvertibleValuesMap} from the given map and conversion service.
      *
      * @param values            The map
      * @param conversionService The conversion service

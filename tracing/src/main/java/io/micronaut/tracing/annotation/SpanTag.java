@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.annotation;
 
 import java.lang.annotation.*;
 
 /**
- * <p>Applied to parameters of a method to indicate which parameters should be included in span tags</p>
+ * <p>Applied to parameters of a method to indicate which parameters should be included in span tags.</p>
  *
  * <p>Annotation Inspired by Spring Sleuth but using Open Tracing and Micronaut AOP</p>
  *

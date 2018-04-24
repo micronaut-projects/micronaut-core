@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.util;
 
 import java.util.*;
@@ -22,7 +23,8 @@ import java.util.*;
  * for example from class names -> property names and vice-versa. The
  * key aspect of this class is that it has no dependencies outside the JDK!
  */
-public class NameUtils {
+@SuppressWarnings("MagicNumber")
+public final class NameUtils {
 
     private static final String PROPERTY_SET_PREFIX = "set";
     private static final String PROPERTY_GET_PREFIX = "get";
@@ -31,7 +33,8 @@ public class NameUtils {
     }
 
     /**
-     * Retrieves the name of a setter for the specified property name
+     * Retrieves the name of a setter for the specified property name.
+     *
      * @param propertyName The property name
      * @return The setter equivalent
      */
@@ -41,7 +44,8 @@ public class NameUtils {
     }
 
     /**
-     * Calculate the name for a getter method to retrieve the specified property
+     * Calculate the name for a getter method to retrieve the specified property.
+     *
      * @param propertyName
      * @return The name for the getter method for this property, if it were to exist, i.e. getConstraints
      */
@@ -63,7 +67,7 @@ public class NameUtils {
     }
 
     /**
-     * Returns the class name for the given logical name and trailing name. For example "person" and "Controller" would evaluate to "PersonController"
+     * Returns the class name for the given logical name and trailing name. For example "person" and "Controller" would evaluate to "PersonController".
      *
      * @param logicalName The logical name
      * @param trailingName The trailing name
@@ -287,7 +291,7 @@ public class NameUtils {
     /**
      * Returns the class name without the package prefix.
      *
-     * @param className The class name to get a short name for
+     * @param className The class name from which to get a short name
      * @return The short name of the class
      */
     public static String getShortName(String className) {
@@ -299,9 +303,9 @@ public class NameUtils {
     }
 
     /**
-     * Returns the class name without the package prefix.
+     * Returns the package name without the class.
      *
-     * @param className The class name to get a short name for
+     * @param className The class name from which to get a package name
      * @return The short name of the class
      */
     public static String getPackageName(String className) {
@@ -310,7 +314,7 @@ public class NameUtils {
         if (i > -1) {
             packageName = className.substring(0, i);
         }
-        return packageName;
+        return packageName.toLowerCase();
     }
 
     /**
@@ -629,16 +633,24 @@ public class NameUtils {
      * @return true if it is a javabean property getter
      */
     public static boolean isGetter(String name, Class returnType, Class<?>[] args) {
-        if (name == null || name.length() == 0 || args == null)return false;
-        if (args.length != 0)return false;
+        if (name == null || name.length() == 0 || args == null) {
+            return false;
+        }
+        if (args.length != 0) {
+            return false;
+        }
 
         if (name.startsWith("get")) {
             name = name.substring(3);
-            if (isPropertyMethodSuffix(name)) return true;
+            if (isPropertyMethodSuffix(name)) {
+                return true;
+            }
         }
         else if (name.startsWith("is") && returnType == boolean.class) {
             name = name.substring(2);
-            if (isPropertyMethodSuffix(name)) return true;
+            if (isPropertyMethodSuffix(name)) {
+                return true;
+            }
         }
         return false;
     }
@@ -684,9 +696,15 @@ public class NameUtils {
      * @return true if suffix indicates a property name
      */
     protected static boolean isPropertyMethodSuffix(String suffix) {
-        if(suffix.length() == 0) return false;
-        if(!Character.isJavaIdentifierStart(suffix.charAt(0))) return false;
-        if(suffix.length() == 1) return Character.isUpperCase(suffix.charAt(0));
+        if (suffix.length() == 0) {
+            return false;
+        }
+        if (!Character.isJavaIdentifierStart(suffix.charAt(0))) {
+            return false;
+        }
+        if (suffix.length() == 1) {
+            return Character.isUpperCase(suffix.charAt(0));
+        }
         return Character.isUpperCase(suffix.charAt(0)) || Character.isUpperCase(suffix.charAt(1));
     }
 
@@ -698,7 +716,9 @@ public class NameUtils {
      * @return The property name equivalent
      */
     public static String getPropertyForSetter(String setterName) {
-        if (setterName == null || setterName.length() == 0) return null;
+        if (setterName == null || setterName.length() == 0) {
+            return null;
+        }
 
         if (setterName.startsWith("set")) {
             String prop = setterName.substring(3);

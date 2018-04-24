@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.attr;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
 
 /**
  *
- * An interface for objects that have attributes
+ * An interface for objects that have attributes.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,7 +31,7 @@ import java.util.Optional;
 public interface AttributeHolder {
 
     /**
-     * <p>A {@link MutableConvertibleValues} of the attributes for object.</p>
+     * <p>A {@link io.micronaut.core.convert.value.MutableConvertibleValues} of the attributes for object.</p>
      *
      * @return The attributes of the object
      */
@@ -40,7 +40,7 @@ public interface AttributeHolder {
 
 
     /**
-     * Obtain the value of an attribute on the HTTP method
+     * Obtain the value of an attribute on the HTTP method.
      * @param name The name of the attribute
      * @return An {@link Optional} value
      */
@@ -52,9 +52,10 @@ public interface AttributeHolder {
     }
 
     /**
-     * Obtain the value of an attribute on the HTTP method
+     * Obtain the value of an attribute on the HTTP method.
      * @param name The name of the attribute
      * @param type The required type
+     * @param <T> type Generic
      * @return An {@link Optional} value
      */
     default <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
@@ -63,6 +64,4 @@ public interface AttributeHolder {
         }
         return Optional.empty();
     }
-
-
 }

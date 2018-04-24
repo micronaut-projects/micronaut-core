@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.loadbalancer.LoadBalancerContext;
@@ -25,7 +26,7 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * Adapts the {@link Server} object to the {@link ServiceInstance} interface
+ * Adapts the {@link Server} object to the {@link ServiceInstance} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,6 +36,11 @@ public class RibbonServiceInstance implements ServiceInstance {
     private final Server server;
     private final LoadBalancerContext lb;
 
+    /**
+     * Constructor.
+     * @param server server
+     * @param lb loadBalancerContext
+     */
     public RibbonServiceInstance(Server server, LoadBalancerContext lb) {
         this.server = server;
         this.lb = lb;

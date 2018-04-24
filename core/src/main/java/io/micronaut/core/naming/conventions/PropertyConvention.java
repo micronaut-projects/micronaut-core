@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.naming.conventions;
 
 import java.util.Locale;
@@ -25,7 +26,7 @@ import java.util.Locale;
  */
 public enum PropertyConvention {
     /**
-     * The ID property used in REST endpoints and object mapping
+     * The ID property used in REST endpoints and object mapping.
      */
     ID;
 

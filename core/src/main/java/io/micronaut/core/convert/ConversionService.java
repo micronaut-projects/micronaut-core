@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import io.micronaut.core.type.Argument;
@@ -21,7 +22,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A service for allowing conversion from one type to another
+ * A service for allowing conversion from one type to another.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,12 +30,12 @@ import java.util.function.Function;
 public interface ConversionService<Impl extends ConversionService> {
 
     /**
-     * The default shared conversion service
+     * The default shared conversion service.
      */
     ConversionService<?> SHARED = new DefaultConversionService();
 
     /**
-     * Adds a type converter
+     * Adds a type converter.
      *
      * @param sourceType    The source type
      * @param targetType    The target type
@@ -46,7 +47,7 @@ public interface ConversionService<Impl extends ConversionService> {
     <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter);
 
     /**
-     * Adds a type converter
+     * Adds a type converter.
      *
      * @param sourceType    The source type
      * @param targetType    The target type
@@ -58,7 +59,7 @@ public interface ConversionService<Impl extends ConversionService> {
     <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
 
     /**
-     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
+     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.
      *
      * @param object     The object to convert
      * @param targetType The target type
@@ -69,7 +70,7 @@ public interface ConversionService<Impl extends ConversionService> {
     <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context);
 
     /**
-     * Return whether the given source type is convertible to the given target type
+     * Return whether the given source type is convertible to the given target type.
      *
      * @param sourceType The source type
      * @param targetType The target type
@@ -80,7 +81,7 @@ public interface ConversionService<Impl extends ConversionService> {
     <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType);
 
     /**
-     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
+     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.
      *
      * @param object     The object to convert
      * @param targetType The target type
@@ -92,7 +93,7 @@ public interface ConversionService<Impl extends ConversionService> {
     }
 
     /**
-     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
+     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.
      *
      * @param object     The object to convert
      * @param targetType The target type
@@ -104,7 +105,7 @@ public interface ConversionService<Impl extends ConversionService> {
     }
 
     /**
-     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
+     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.
      *
      * @param object  The object to convert
      * @param context The {@link ArgumentConversionContext}

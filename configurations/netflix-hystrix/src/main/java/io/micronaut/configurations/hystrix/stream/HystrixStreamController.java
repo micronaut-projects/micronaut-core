@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix.stream;
 
 import com.netflix.hystrix.HystrixCollapserMetrics;
@@ -35,7 +36,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A controller that produces a hystrix event stream as Server Sent events
+ * A controller that produces a hystrix event stream as Server Sent events.
  *
  * @author graemerocher
  * @since 1.0
@@ -47,15 +48,26 @@ public class HystrixStreamController {
 
     private final Duration interval;
 
+    /**
+     * Constructor.
+     * @param interval interval value injected
+     */
     @Inject
     public HystrixStreamController(@Value("${hystrix.stream.interval:1s}") Duration interval) {
         this.interval = interval;
     }
 
+    /**
+     * Constructor.
+     */
     public HystrixStreamController() {
         this(Duration.ofSeconds(1));
     }
 
+    /**
+     * Hystrix stream endpoint.
+     * @return hystrix stream as an event
+     */
     @Get(uri = "/", produces = MediaType.TEXT_EVENT_STREAM)
     public Flowable<Event<String>> hystrixStream() {
         return Flowable.interval(interval.toMillis(), TimeUnit.MILLISECONDS)

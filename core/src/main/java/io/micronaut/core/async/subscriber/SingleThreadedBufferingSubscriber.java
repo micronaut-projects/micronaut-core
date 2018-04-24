@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
@@ -22,7 +23,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 /**
- * A {@link Subscriber} designed to be used by a single thread that buffers incoming data for the purposes of managing back pressure
+ * A {@link Subscriber} designed to be used by a single thread that buffers incoming data for the purposes of managing back pressure.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -119,22 +120,22 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
     }
 
     /**
-     * Implement {@link Subscriber#onSubscribe(Subscription)}
+     * Implement {@link Subscriber#onSubscribe(Subscription)}.
      */
     protected abstract void doOnSubscribe(Subscription subscription);
 
     /**
-     * Implement {@link Subscriber#onNext(Object)}
+     * Implement {@link Subscriber#onNext(Object)}.
      */
     protected abstract void doOnNext(T message);
 
     /**
-     * Implement {@link Subscriber#onError(Throwable)}
+     * Implement {@link Subscriber#onError(Throwable)}.
      */
     protected abstract void doOnError(Throwable t);
 
     /**
-     * Implement {@link Subscriber#onComplete()}
+     * Implement {@link Subscriber#onComplete()}.
      */
     protected abstract void doOnComplete();
 
@@ -148,32 +149,32 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     protected enum BackPressureState {
         /**
-         * There is no subscriber
+         * There is no subscriber.
          */
         NO_SUBSCRIBER,
 
         /**
-         * There is no demand yet and no buffering has taken place
+         * There is no demand yet and no buffering has taken place.
          */
         IDLE,
 
         /**
-         * Buffering has stared, but not demand present
+         * Buffering has stared, but not demand present.
          */
         BUFFERING,
 
         /**
-         * The buffer is empty but there demand
+         * The buffer is empty but there demand.
          */
         DEMANDING,
 
         /**
-         * The data has been read, however the buffer is not empty
+         * The data has been read, however the buffer is not empty.
          */
         FLOWING,
 
         /**
-         * Finished
+         * Finished.
          */
         DONE
     }

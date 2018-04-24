@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * A {@link ServiceInstanceList} for Zipkin
+ * A {@link ServiceInstanceList} for Zipkin.
  *
  * @author graemerocher
  * @since 1.0
@@ -37,6 +38,11 @@ public class ZipkinServiceInstanceList implements ServiceInstanceList {
 
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
+    /**
+     * Create a {@link ServiceInstanceList} for Zipkin with existing configuration.
+     *
+     * @param configuration Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace.
+     */
     public ZipkinServiceInstanceList(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
         this.configuration = configuration;
     }

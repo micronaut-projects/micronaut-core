@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.brave.sender;
 
 import io.micronaut.context.annotation.Bean;
@@ -25,7 +26,7 @@ import zipkin2.reporter.Sender;
 import javax.inject.Singleton;
 
 /**
- * A Factory for creating a Zipkin {@link Sender} based on {@link io.micronaut.tracing.brave.BraveTracerConfiguration.HttpClientSenderConfiguration}
+ * A Factory for creating a Zipkin {@link Sender} based on {@link io.micronaut.tracing.brave.BraveTracerConfiguration.HttpClientSenderConfiguration}.
  *
  * @author graemerocher
  * @since 1.0
@@ -35,11 +36,17 @@ import javax.inject.Singleton;
 public class HttpClientSenderFactory {
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
 
+    /**
+     * Initialize the factory for creating Zipkin {@link Sender} with configurations.
+     *
+     * @param configuration The HTTP client sender configurations
+     */
     protected HttpClientSenderFactory(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
         this.configuration = configuration;
     }
 
     /**
+     * @param loadBalancerResolver A resolver capable of resolving references to services into a concrete loadbalance
      * @return The {@link Sender}
      */
     @Bean

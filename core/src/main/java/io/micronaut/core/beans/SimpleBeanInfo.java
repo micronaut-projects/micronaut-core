@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import static io.micronaut.core.naming.NameUtils.decapitalize;
@@ -30,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Note: Based on code found in Apache Harmony
+ * Note: Based on code found in Apache Harmony.
  *
  * @author graemerocher
  * @since 1.0
@@ -53,6 +54,10 @@ class SimpleBeanInfo implements BeanInfo {
     private final Class<?> beanClass;
     private final Map<String, PropertyDescriptor> properties;
 
+    /**
+     * Constructor.
+     * @param beanClass beanClass
+     */
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
         List<PropertyDescriptor> propertyList = introspectProperties(introspectMethods(beanClass));
@@ -79,7 +84,7 @@ class SimpleBeanInfo implements BeanInfo {
 
     /**
      * Introspects the supplied class and returns a list of the Properties of
-     * the class
+     * the class.
      *
      * @param methodDescriptors the method descriptors
      * @return The list of Properties as an array of PropertyDescriptors
@@ -246,14 +251,17 @@ class SimpleBeanInfo implements BeanInfo {
         // Get the list of methods belonging to this class
         Method[] basicMethods = beanClass.getMethods();
 
-        if (ArrayUtils.isEmpty(basicMethods))
+        if (ArrayUtils.isEmpty(basicMethods)) {
             return null;
+        }
 
         ArrayList<Method> methodList = new ArrayList<>(basicMethods.length);
 
         // Loop over the methods found, looking for public non-static methods
         for (Method basicMethod : basicMethods) {
-            if (basicMethod.getDeclaringClass() == Object.class) break;
+            if (basicMethod.getDeclaringClass() == Object.class) {
+                break;
+            }
             int modifiers = basicMethod.getModifiers();
             if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers) && !basicMethod.isBridge() && !basicMethod.isSynthetic() && basicMethod.getName().indexOf('$') == -1) {
                 methodList.add(basicMethod);

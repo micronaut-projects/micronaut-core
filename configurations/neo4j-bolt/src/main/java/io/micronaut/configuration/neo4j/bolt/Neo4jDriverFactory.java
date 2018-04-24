@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt;
 
 import io.micronaut.context.annotation.Bean;
@@ -21,7 +22,7 @@ import io.micronaut.runtime.context.scope.Refreshable;
 import org.neo4j.driver.v1.Driver;
 
 /**
- * Default factory for creating the Neo4j {@link Driver}
+ * Default factory for creating the Neo4j {@link Driver}.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,6 +32,10 @@ public class Neo4jDriverFactory {
 
     private final Neo4jDriverBuilder driverBuilder;
 
+    /**
+     * Constructor.
+     * @param driverBuilder driverBuilder
+     */
     public Neo4jDriverFactory(Neo4jDriverBuilder driverBuilder) {
         this.driverBuilder = driverBuilder;
     }

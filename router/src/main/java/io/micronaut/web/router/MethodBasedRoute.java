@@ -13,17 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.inject.MethodExecutionHandle;
 
 /**
- * Represents a {@link Route} that is backed by a method
+ * Represents a {@link Route} that is backed by a method.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public interface MethodBasedRoute extends Route {
 
+    /**
+     * @return The {@link MethodExecutionHandle}
+     */
     MethodExecutionHandle getTargetMethod();
 }

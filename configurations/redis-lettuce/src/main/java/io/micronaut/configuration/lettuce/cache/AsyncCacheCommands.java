@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.cache;
 
 import io.lettuce.core.RedisFuture;
@@ -23,7 +24,7 @@ import io.lettuce.core.dynamic.annotation.Param;
 import java.util.List;
 
 /**
- * The asynchronous operations required by {@link RedisCache}
+ * The asynchronous operations required by {@link RedisCache}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,45 +32,50 @@ import java.util.List;
 public interface AsyncCacheCommands extends Commands {
 
     /**
-     * See https://redis.io/commands/get
+     * See https://redis.io/commands/get.
      *
      * @param key The key to retrieve
+     * @return result of completion
      */
     @Command("GET :key")
     RedisFuture<byte[]> get(@Param("key") byte[] key);
 
     /**
-     * See https://redis.io/commands/del
+     * See https://redis.io/commands/del.
      *
      * @param key The key to delete
+     * @return result of completion
      */
     @Command("DEL :key")
     RedisFuture<Long> remove(@Param("key") byte[] key);
 
     /**
-     * See https://redis.io/commands/set
+     * See https://redis.io/commands/set.
      *
      * @param key   The key
      * @param value The value
+     * @return result of completion
      */
     @Command("SET :key :value")
     RedisFuture<Void> put(@Param("key") byte[] key, @Param("value") byte[] value);
 
     /**
-     * See https://redis.io/commands/set
+     * See https://redis.io/commands/set.
      *
      * @param key     The key
      * @param value   The value
      * @param timeout The timeout
+     * @return result of completion
      */
     @Command("SET :key :value EX :timeout")
     RedisFuture<Void> put(@Param("key") byte[] key, @Param("value") byte[] value, @Param("timeout") long timeout);
 
     /**
-     * See https://redis.io/commands/expire
+     * See https://redis.io/commands/expire.
      *
      * @param key     The key to expire
      * @param timeout The timeout
+     * @return result of completion
      */
     @Command("EXPIRE :key :timeout")
     RedisFuture<Void> expire(@Param("key") byte[] key, @Param("timeout") long timeout);

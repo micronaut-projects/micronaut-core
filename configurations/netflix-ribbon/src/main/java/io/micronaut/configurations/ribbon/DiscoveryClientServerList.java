@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.AbstractServerList;
 import com.netflix.loadbalancer.Server;
-import com.netflix.loadbalancer.ServerList;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.reactivex.Flowable;
@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A {@link ServerList} implementation that uses the {@link DiscoveryClient}
+ * A {@link com.netflix.loadbalancer.ServerList} implementation that uses the {@link DiscoveryClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +39,11 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
     private final DiscoveryClient discoveryClient;
     private final String serviceID;
 
+    /**
+     * Constructor.
+     * @param discoveryClient discoveryClient
+     * @param serviceID serviceID
+     */
     public DiscoveryClientServerList(DiscoveryClient discoveryClient, String serviceID) {
         this.discoveryClient = discoveryClient;
         this.serviceID = serviceID;
@@ -67,6 +72,11 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
         // ignore
     }
 
+    /**
+     * Return ribbon servers discovered.
+     *
+     * @return list of servers
+     */
     protected List<Server> resolveServerList() {
         List<ServiceInstance> serviceInstances = Flowable.fromPublisher(discoveryClient.getInstances(serviceID)).blockingFirst();
         List<Server> servers = new ArrayList<>(serviceInstances.size());

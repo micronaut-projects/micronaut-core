@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,7 +25,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * <p>A {@link TypeConverter} that can convert objects to JSON with Jackson</p>
+ * <p>A {@link TypeConverter} that can convert objects to JSON with Jackson.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +35,9 @@ public class ObjectToJsonNodeConverter implements TypeConverter<Object, JsonNode
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * @param objectMapper To read/write JSON
+     */
     public ObjectToJsonNodeConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
