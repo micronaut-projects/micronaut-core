@@ -17,13 +17,9 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.micronaut.security.token.configuration.TokenConfigurationProperties;
+
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  *
@@ -33,7 +29,7 @@ import java.util.Optional;
 @Requires(property = BearerTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
-public class BearerTokenReader implements TokenReader {
+public class BearerTokenReader extends HttpHeaderTokenReader implements TokenReader {
 
     private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
 
@@ -47,37 +43,14 @@ public class BearerTokenReader implements TokenReader {
         this.bearerTokenReaderConfiguration = bearerTokenReaderConfiguration;
     }
 
-    /**
-     * Search for a JWT token in a HTTP request.
-     * @param request The request to look for the token in
-     * @return if the JWT token is found it is returned, empty if not
-     */
     @Override
-    public Optional<String> findToken(HttpRequest<?> request) {
-        LOG.debug("Looking for bearer token in Authorization header");
-        HttpHeaders headers = request.getHeaders();
-        Optional<String> authorizationHeader = headers.findFirst(bearerTokenReaderConfiguration.getHeaderName());
-        return authorizationHeader.flatMap(this::extractTokenFromAuthorization);
+    protected String getHeaderName() {
+        return bearerTokenReaderConfiguration.getHeaderName();
     }
 
-    /**
-     *
-     * @param authorization Authorization header value
-     * @return If prefix is 'Bearer' for 'Bearer XXX' it returns 'XXX'
-     */
-    protected Optional<String> extractTokenFromAuthorization(String authorization) {
-        StringBuilder sb = new StringBuilder();
-        final String prefix = bearerTokenReaderConfiguration.getPrefix();
-        if (prefix != null && !prefix.isEmpty()) {
-            sb.append(prefix);
-            sb.append(" ");
-        }
-        String str = sb.toString();
-        if (authorization.startsWith(str)) {
-            return Optional.of(authorization.substring(str.length(), authorization.length()));
-        } else {
-            LOG.debug("{} does not start with {}", authorization, str);
-            return Optional.empty();
-        }
+    @Override
+    protected String getPrefix() {
+        return bearerTokenReaderConfiguration.getPrefix();
+    }
     }
 }
