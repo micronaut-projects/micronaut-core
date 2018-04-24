@@ -18,10 +18,10 @@ trait AuthorizationUtils {
         resp.body().accessToken
     }
 
-    HttpResponse get(RxHttpClient client, String path, String token = null) {
+    HttpResponse get(RxHttpClient client, String path, String token = null, String prefix = 'Bearer') {
         HttpRequest req = HttpRequest.GET(path)
         if (token != null) {
-            req = req.header("Authorization", "Bearer ${token}".toString())
+            req = req.header("Authorization", "${prefix} ${token}".toString())
         }
         client.toBlocking().exchange(req, String)
     }
@@ -30,7 +30,7 @@ trait AuthorizationUtils {
         loginWith(client, username)
     }
 
-    HttpResponse get(String path, String token = null) {
-        get(client, path, token)
+    HttpResponse get(String path, String token = null, String prefix = 'Bearer') {
+        get(client, path, token, prefix)
     }
 }

@@ -1,0 +1,24 @@
+Micronaut supports https://tools.ietf.org/html/rfc7617[Basic HTTP Authentication Scheme] out-of-the-box.
+
+In order to enable Basic Auth, first you need to disable JWT Token authentication and enable Basic Auth:
+
+
+[source, yaml]
+----
+include::{testssecurity}/security/BasicAuthSpec.groovy[tag=yamlconfig,indent=0]
+----
+
+After credentials are read from the HTTP Header, they are feed into an link:{api}/io/micronaut/security/authentication/Authenticator.html[Authenticator]
+which attempts to validate them.
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.basicAuth.enabled` | `false` | link:{api}/io/micronaut/security/token/reader/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
+
+| `micronaut.security.basicAuth.headerName` | `Authorization` | Header name
+
+| `micronaut.security.basicAuth.prefix` | `Basic` | e.g. `Basic dXNlcjp1c2Vy`
+
+|===

@@ -86,6 +86,7 @@ management:
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
+  basicAuth: Basic Auth
   securityRule:
     title: Security Rules
     ipPattern: IP Pattern Rule
