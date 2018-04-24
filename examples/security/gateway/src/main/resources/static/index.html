@@ -25,6 +25,7 @@
 </head>
 <body>
 <button id="logoutButton" style="display: none;" class="btn btn-primary" onclick="javascript:logout();">Logout</button>
+<div id="loggedUser"></div>
 <div id="loginForm" style="display: none;">
     <div class="form-group">
         <label for="username">Username</label>
@@ -93,10 +94,19 @@
         return html;
     }
 
+    function welcomeMsg() {
+        return 'Logged In as: ' + getUsername();
+    }
+    function populateLoggedUser(msg) {
+        console.log('Populating welcome' + msg);
+        document.getElementById('loggedUser').innerHTML = '<span>'+msg+'</span>';
+    }
+
     function loadBooks() {
         document.getElementById('loginFormErrors').innerHTML = '';
         $('#loginForm').hide();
         $('#logoutButton').show();
+        populateLoggedUser(welcomeMsg());
 
         document.getElementById('books').innerHTML = '';
         console.log("Roles: " + getRoles());
@@ -143,6 +153,10 @@
         return "<img src='"+serverUrl + "/images/"+book.image + "' alt='" + book.title + "' width='130' height='160'/>";
     }
 
+    function getUsername() {
+        return localStorage.getItem("username");
+    }
+
     function getRoles() {
         return localStorage.getItem("roles");
     }
@@ -176,6 +190,7 @@
     function logout() {
         $('#loginForm').show();
         $('#logoutButton').hide();
+        populateLoggedUser('');
         document.getElementById('books').innerHTML = '';
         clearLocalStorageJwt();
     }
