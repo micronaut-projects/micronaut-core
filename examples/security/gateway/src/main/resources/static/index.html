@@ -109,14 +109,11 @@
         populateLoggedUser(welcomeMsg());
 
         document.getElementById('books').innerHTML = '';
-        console.log("Roles: " + getRoles());
         if ( getRoles().indexOf('ROLE_GRAILS') > -1 ) {
-            console.log('has role GRAILS');
             var path = 'grails';
             loadBooksByPathWithCallbacks(path)
         }
         if ( getRoles().indexOf('ROLE_GROOVY') > -1 ) {
-            console.log('has role groovy');
             var path = 'groovy';
             loadBooksByPathWithCallbacks(path)
         }
@@ -124,13 +121,10 @@
 
     function loadBooksByPathWithCallbacks(path) {
         loadBooksByPath(path, function(data) {
-            console.log(path + " books returned");
-
             var html = document.getElementById('books').innerHTML;
             html += booksHtml(data);
             document.getElementById('books').innerHTML = html;
         }, function() {
-            console.log("unauthorized while loading "+ path +" books");
             refreshAccessToken(function() {
                 console.log("token refreshed. loading books again");
                 loadBooks();
@@ -140,7 +134,6 @@
 
     function booksHtml(data) {
         var html = "";
-        console.log("# books: " + data.length);
 
         for ( var x = 0; x < data.length; x++ ) {
             var book = data[x];
@@ -149,7 +142,6 @@
         return html;
     }
     function bookHtml(book) {
-        console.log("book: " + book);
         return "<img src='"+serverUrl + "/images/"+book.image + "' alt='" + book.title + "' width='130' height='160'/>";
     }
 
@@ -170,20 +162,13 @@
     }
 
     function populateLocalStorageWithAccessToken(data) {
-        console.log("Access token: " + data.accessToken);
         localStorage.setItem("accessToken", data.accessToken);
-
-        console.log("Refresh token: " + data.refreshToken);
         localStorage.setItem("refreshToken", data.refreshToken);
     }
 
     function populateLocalStorageWithJwt(data) {
         populateLocalStorageWithAccessToken(data);
-
-        console.log("Username: " + data.username);
         localStorage.setItem("username", data.username);
-
-        console.log("Roles: " + data.roles);
         localStorage.setItem("roles", data.roles);
     }
 
@@ -204,7 +189,6 @@
 
     function loadBooksByPath(path, callback, unauthorizedCallback) {
         var accessToken = getAccessToken();
-        console.log("load books by path - accessToken:" + accessToken);
         jQuery.ajax({
             headers: {
                 'Accept': 'application/json',
@@ -239,7 +223,6 @@
     }
 
     $(document).ready(function() {
-        console.log("on document ready");
         $("#password").keyup(function(event){
             if(event.keyCode == 13){
                 $("#submit-btn").click();
