@@ -172,7 +172,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
         this.consoleLogger = executionContext.console
         this.templateRenderer = new TemplateRendererImpl(executionContext, profile, profileRepository)
         this.fileSystemInteraction = new FileSystemInteractionImpl(executionContext)
-        setDefaultPackage( executionContext.navigateConfig('grails', 'codegen', 'defaultPackage') )
+        setDefaultPackage( executionContext.navigateConfig('defaultPackage') )
     }
 
     ExecutionContext getExecutionContext() {

@@ -46,7 +46,7 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  */
-class GenericUtils {
+public class GenericUtils {
 
     private final Elements elementUtils;
     private final Types typeUtils;
@@ -98,7 +98,7 @@ class GenericUtils {
      * @param interfaceName The interface
      * @return The generic types or an empty list
      */
-    List<? extends TypeMirror> interfaceGenericTypesFor(TypeElement element, String interfaceName) {
+    public List<? extends TypeMirror> interfaceGenericTypesFor(TypeElement element, String interfaceName) {
         for (TypeMirror tm : element.getInterfaces()) {
             DeclaredType declaredType = (DeclaredType) tm;
             TypeElement interfaceType = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
