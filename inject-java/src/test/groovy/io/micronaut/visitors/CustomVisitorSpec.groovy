@@ -1,10 +1,6 @@
-package io.micronaut.aop.compile
+package io.micronaut.visitors
 
-import io.micronaut.visitors.AllClassesVisitor
-import io.micronaut.visitors.AllElementsVisitor
-import io.micronaut.visitors.ControllerGetVisitor
 import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.visitors.InjectVisitor
 
 class CustomVisitorSpec extends AbstractTypeElementSpec {
 

@@ -196,7 +196,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if (classStreams == null) {
                         classStreams = [:]
                     }
-                    def visitor = new ClassWriterOutputVisitor() {
+                    ClassWriterOutputVisitor visitor = new ClassWriterOutputVisitor() {
                         @Override
                         OutputStream visitClass(String classname) throws IOException {
                             ByteArrayOutputStream stream = new ByteArrayOutputStream()
