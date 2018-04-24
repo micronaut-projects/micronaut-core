@@ -16,6 +16,7 @@
 
 package io.micronaut.security.token.reader;
 
+import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 
 import java.util.Optional;
@@ -26,7 +27,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenReader {
+public interface TokenReader extends Ordered {
 
     /**
      * Attempts to retrieve a token in a request.

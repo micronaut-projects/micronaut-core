@@ -32,6 +32,12 @@ import java.util.Optional;
 @Singleton
 public class CookieTokenReader implements TokenReader {
 
+    /*
+     *
+     * The order of the TokenReader.
+     */
+    public static final Integer ORDER = 0;
+
     protected final CookieTokenReaderConfiguration cookieTokenReaderConfiguration;
 
     /**
@@ -46,5 +52,10 @@ public class CookieTokenReader implements TokenReader {
     public Optional<String> findToken(HttpRequest<?> request) {
         Optional<Cookie> optionalCookie = request.getCookies().findCookie(cookieTokenReaderConfiguration.getCookieName());
         return optionalCookie.map(Cookie::getValue);
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }

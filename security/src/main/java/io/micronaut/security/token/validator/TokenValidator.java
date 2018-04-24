@@ -16,6 +16,7 @@
 
 package io.micronaut.security.token.validator;
 
+import io.micronaut.core.order.Ordered;
 import io.micronaut.security.authentication.Authentication;
 
 import java.util.Map;
@@ -27,7 +28,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenValidator {
+public interface TokenValidator extends Ordered {
 
     /**
      * Validates the provided token and returns the claims.

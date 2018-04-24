@@ -30,7 +30,6 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
-import io.micronaut.security.token.configuration.TokenConfiguration;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.micronaut.web.router.RouteMatch;
@@ -59,24 +58,20 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
 
-    protected final TokenConfiguration tokenConfiguration;
-    protected final TokenReader tokenReader;
-    protected final TokenValidator tokenValidator;
+    protected final Collection<TokenReader> tokenReaders;
+    protected final Collection<TokenValidator> tokenValidators;
     private final Collection<SecurityRule> securityRules;
 
     /**
-     * @param tokenConfiguration The {@link TokenConfiguration} instance
-     * @param tokenValidator The {@link TokenValidator} instance
-     * @param tokenReader The {@link TokenReader} instance
+     * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
+     * @param tokenReaders The list {@link TokenReader} which attempt to read the request
      * @param securityRules The list of rules that will allow or reject the request
      */
-    public SecurityFilter(TokenConfiguration tokenConfiguration,
-                          TokenValidator tokenValidator,
-                          TokenReader tokenReader,
+    public SecurityFilter(Collection<TokenValidator> tokenValidators,
+                          Collection<TokenReader> tokenReaders,
                           Collection<SecurityRule> securityRules) {
-        this.tokenConfiguration = tokenConfiguration;
-        this.tokenValidator = tokenValidator;
-        this.tokenReader = tokenReader;
+        this.tokenValidators = tokenValidators;
+        this.tokenReaders = tokenReaders;
         this.securityRules = securityRules;
     }
 
@@ -101,8 +96,21 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         String method = request.getMethod().toString();
         String path = request.getPath();
 
-        Optional<String> token = tokenReader.findToken(request);
-        Optional<Authentication> authentication = token.flatMap(tokenValidator::validateToken);
+        Optional<String> token = Optional.empty();
+        for (TokenReader tokenReader : tokenReaders) {
+            token = tokenReader.findToken(request);
+            if (token.isPresent()) {
+                break;
+            }
+        }
+        Optional<Authentication> authentication = Optional.empty();
+        for (TokenValidator tokenValidator : tokenValidators) {
+            authentication = token.flatMap(tokenValidator::validateToken);
+            if (authentication.isPresent()) {
+                break;
+            }
+        }
+
         authentication.ifPresent((a) -> request.setAttribute(AUTHENTICATION, a));
         Optional<Map<String, Object>> attributes = authentication.map(Authentication::getAttributes);
         Optional<RouteMatch> routeMatch = getRouteMatch(request);

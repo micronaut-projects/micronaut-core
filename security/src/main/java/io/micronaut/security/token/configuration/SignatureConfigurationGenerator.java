@@ -67,7 +67,9 @@ public class SignatureConfigurationGenerator {
         try {
             switch (tokenSignatureConfiguration.getType()) {
                 case SECRET:
-                    return Optional.of(new SecretSignatureConfiguration(tokenSignatureConfiguration.getSecret(), tokenSignatureConfiguration.getJwsAlgorithm()));
+                    if (tokenSignatureConfiguration.getSecret() != null) {
+                        return Optional.of(new SecretSignatureConfiguration(tokenSignatureConfiguration.getSecret(), tokenSignatureConfiguration.getJwsAlgorithm()));
+                    }
                 case RSA:
                     KeyPairGenerator rsakeyGen = KeyPairGenerator.getInstance("RSA");
                     KeyPair rsaKeyPair = rsakeyGen.generateKeyPair();

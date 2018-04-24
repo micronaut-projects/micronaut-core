@@ -40,6 +40,11 @@ import java.util.Optional;
 @Singleton
 public class JwtTokenValidator implements TokenValidator {
 
+    /**
+     * The order of the TokenValidator.
+     */
+    public static final Integer ORDER = BasicAuthTokenValidator.ORDER - 100;
+
     private JwtAuthenticator jwtAuthenticator;
 
     /**
@@ -87,5 +92,10 @@ public class JwtTokenValidator implements TokenValidator {
             });
         }
         return Optional.empty();
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }

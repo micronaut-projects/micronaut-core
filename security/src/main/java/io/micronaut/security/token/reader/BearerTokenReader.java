@@ -31,7 +31,11 @@ import javax.inject.Singleton;
 @Singleton
 public class BearerTokenReader extends HttpHeaderTokenReader implements TokenReader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    /*
+     *
+     * The order of the TokenReader.
+     */
+    public static final Integer ORDER = CookieTokenReader.ORDER - 100;
 
     protected final BearerTokenReaderConfiguration bearerTokenReaderConfiguration;
 
@@ -52,5 +56,9 @@ public class BearerTokenReader extends HttpHeaderTokenReader implements TokenRea
     protected String getPrefix() {
         return bearerTokenReaderConfiguration.getPrefix();
     }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }
