@@ -292,7 +292,7 @@ public class GenericUtils {
     public DeclaredType resolveTypeVariable(Element element, TypeVariable typeVariable) {
         Element enclosing = element.getEnclosingElement();
 
-        while (enclosing != null && enclosing instanceof Parameterizable) {
+        while (enclosing instanceof Parameterizable) {
             Parameterizable parameterizable = (Parameterizable) enclosing;
             String name = typeVariable.toString();
             for (TypeParameterElement typeParameter : parameterizable.getTypeParameters()) {
@@ -311,7 +311,7 @@ public class GenericUtils {
         return null;
     }
 
-    public Map<String, Object> resolveBoundTypes(DeclaredType type) {
+    Map<String, Object> resolveBoundTypes(DeclaredType type) {
         Map<String, Object> boundTypes = new LinkedHashMap<>(2);
         TypeElement element = (TypeElement) type.asElement();
 
