@@ -143,11 +143,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
-        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, source.classLoader)
-        List<LoadedVisitor> loadedVisitors = []
+        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, InjectTransform.classLoader)
+        Map<String, LoadedVisitor> loadedVisitors = [:]
         for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
             if (definition.isPresent()) {
-                loadedVisitors.add(new LoadedVisitor(definition.load(), visitorContext))
+                LoadedVisitor newLoadedVisitor = new LoadedVisitor(definition.load(), visitorContext)
+                loadedVisitors.put(definition.getName(), newLoadedVisitor)
             }
         }
 
@@ -155,7 +156,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             } else {
-                List<LoadedVisitor> matchedVisitors = loadedVisitors.findAll { v -> v.matches(classNode) }
+                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
                 if (classNode.isInterface()) {
                     if (AstAnnotationUtils.hasStereotype(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
                         InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
