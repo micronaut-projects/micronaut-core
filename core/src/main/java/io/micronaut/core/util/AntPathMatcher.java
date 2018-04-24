@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package io.micronaut.core.util;
 
 /**
@@ -59,7 +60,7 @@ package io.micronaut.core.util;
 public class AntPathMatcher implements PathMatcher {
 
     /**
-     * Default path separator: "/"
+     * Default path separator: "/".
      */
     public static final String DEFAULT_PATH_SEPARATOR = "/";
 

@@ -22,6 +22,10 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.util.Arrays;
+
 /**
  * Base class for types that also write {@link io.micronaut.core.annotation.AnnotationMetadata}
  *
@@ -109,4 +113,5 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
         staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);
     }
+
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
@@ -67,7 +68,7 @@ public class Publishers {
     }
 
     /**
-     * Build a {@link Publisher} from a {@link CompletableFuture}
+     * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param futureSupplier The supplier of the {@link CompletableFuture}
      * @param <T>
@@ -78,7 +79,7 @@ public class Publishers {
     }
 
     /**
-     * A {@link Publisher} that emits a fixed single value
+     * A {@link Publisher} that emits a fixed single value.
      *
      * @param value The value to emit
      * @param <T>   The value type
@@ -89,7 +90,7 @@ public class Publishers {
     }
 
     /**
-     * A {@link Publisher} that emits a fixed single value
+     * A {@link Publisher} that emits a fixed single value.
      *
      * @param error The error to emit
      * @param <T>   The value type
@@ -100,7 +101,7 @@ public class Publishers {
     }
 
     /**
-     * Map the result from a publisher using the given mapper
+     * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
      * @param mapper    The mapper
@@ -140,7 +141,7 @@ public class Publishers {
     }
 
     /**
-     * Map the result from a publisher using the given mapper
+     * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
      * @param consumer  The mapper
@@ -177,7 +178,7 @@ public class Publishers {
     }
 
     /**
-     * Allow executing logic on completion of a Publisher
+     * Allow executing logic on completion of a Publisher.
      *
      * @param publisher The publisher
      * @param future    The runnable
@@ -220,7 +221,7 @@ public class Publishers {
     }
 
     /**
-     * Is the given type a Publisher or convertible to a publisher
+     * Is the given type a Publisher or convertible to a publisher.
      *
      * @param type The type to check
      * @return True if it is
@@ -239,19 +240,23 @@ public class Publishers {
     }
 
     /**
-     * Is the given object a Publisher or convertible to a publisher
+     * Is the given object a Publisher or convertible to a publisher.
      * @param object The object
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Object object) {
-        if(object == null) return false;
-        if(object instanceof Publisher) return true;
-        else {
+        if(object == null) {
+            return false;
+        }
+        if(object instanceof Publisher) {
+            return true;
+        } else {
             return isConvertibleToPublisher(object.getClass());
         }
     }
+
     /**
-     * Does the given reactive type emit a single result
+     * Does the given reactive type emit a single result.
      *
      * @param type The type
      * @return True it does
@@ -279,7 +284,9 @@ public class Publishers {
 
                 @Override
                 public void request(long n) {
-                    if (done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onNext(value);
                     subscriber.onComplete();
@@ -308,7 +315,9 @@ public class Publishers {
 
                 @Override
                 public void request(long n) {
-                    if (done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onError(error);
                 }

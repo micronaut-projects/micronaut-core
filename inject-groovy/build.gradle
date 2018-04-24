@@ -49,3 +49,5 @@ shadowJar {
 tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
     t.enabled = false
 }
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

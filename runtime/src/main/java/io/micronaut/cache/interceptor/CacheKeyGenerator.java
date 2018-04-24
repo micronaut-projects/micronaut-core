@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.interceptor;
 
 import java.lang.reflect.AnnotatedElement;
 
 /**
- * <p>An interface for generating keys used by {@link io.micronaut.cache.annotation.Cacheable}</p>
+ * <p>An interface for generating keys used by {@link io.micronaut.cache.annotation.Cacheable}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +27,7 @@ import java.lang.reflect.AnnotatedElement;
 public interface CacheKeyGenerator {
 
     /**
-     * Generate a key for the given annotated element and parameters
+     * Generate a key for the given annotated element and parameters.
      *
      * @param annotatedElement The annotated element
      * @param params           The parameters

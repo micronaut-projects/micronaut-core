@@ -23,4 +23,3 @@ package io.micronaut.configuration.neo4j.bolt;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.configuration.neo4j.bolt.condition.RequiresNeo4j;
-import io.micronaut.context.annotation.Configuration;

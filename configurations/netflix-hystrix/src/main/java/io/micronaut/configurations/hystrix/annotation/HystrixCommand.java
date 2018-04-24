@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -29,7 +30,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Applies AOP advise applied to Hystrix
+ * Applies AOP advise applied to Hystrix.
  *
  * @author graemerocher
  * @since 1.0
@@ -60,9 +61,10 @@ public @interface HystrixCommand {
     String value() default "";
 
     /**
-     * Same as {@link #value()}
+     * Same as {@link #value()}.
      *
      * @see #value()
+     * @return command value
      */
     @AliasFor(member = "value")
     String command() default "";

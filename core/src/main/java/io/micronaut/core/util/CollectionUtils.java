@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import io.micronaut.core.convert.ConversionService;
@@ -35,7 +36,7 @@ import java.util.Queue;
 import java.util.Set;
 
 /**
- * <p>Utility methods for working with {@link java.util.Collection} types</p>
+ * <p>Utility methods for working with {@link java.util.Collection} types</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -43,7 +44,7 @@ import java.util.Set;
 public class CollectionUtils {
 
     /**
-     * Null safe empty check
+     * Null safe empty check.
      *
      * @param map The map
      * @return True if it is empty or null
@@ -53,7 +54,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Null safe not empty check
+     * Null safe not empty check.
      *
      * @param map The ,ap
      * @return True if it is not null and not empty
@@ -63,7 +64,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Null safe empty check
+     * Null safe empty check.
      *
      * @param collection The collection
      * @return True if it is empty or null
@@ -73,7 +74,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Null safe not empty check
+     * Null safe not empty check.
      *
      * @param collection The collection
      * @return True if it is not null and not empty
@@ -83,7 +84,7 @@ public class CollectionUtils {
     }
 
     /**
-     * <p>Attempts to convert a collection to the given iterabable type</p>
+     * <p>Attempts to convert a collection to the given iterabable type</p>.
      *
      * @param iterableType The iterable type
      * @param collection   The collection
@@ -113,15 +114,16 @@ public class CollectionUtils {
     }
 
     /**
-     * Create a {@link LinkedHashMap} from an array of values
+     * Create a {@link LinkedHashMap} from an array of values.
      *
      * @param values The values
      * @return The created map
      */
     public static Map mapOf(Object... values) {
         int len = values.length;
-        if (len % 2 != 0)
+        if (len % 2 != 0) {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
 
         Map answer = new LinkedHashMap(len / 2);
         int i = 0;
@@ -132,7 +134,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Convert an {@link Iterator} to a {@link Set}
+     * Convert an {@link Iterator} to a {@link Set}.
      *
      * @param iterator The iterator
      * @param <T>      The type
@@ -147,7 +149,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Convert an {@link Enumeration} to a {@link Set}
+     * Convert an {@link Enumeration} to a {@link Set}.
      *
      * @param enumeration The iterator
      * @param <T>         The type
@@ -162,7 +164,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Creates a set of the given objects
+     * Creates a set of the given objects.
      *
      * @param objects The objects
      * @param <T>     The type
@@ -176,7 +178,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Produce a string representation of the given iterable
+     * Produce a string representation of the given iterable.
      *
      * @param iterable The iterable
      * @return The string representation
@@ -186,7 +188,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Produce a string representation of the given iterable
+     * Produce a string representation of the given iterable.
      *
      * @param delimiter The delimiter
      * @param iterable  The iterable

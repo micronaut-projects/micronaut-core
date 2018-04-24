@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 
 /**
- * Allows the configuration of multiple redis servers
+ * Allows the configuration of multiple redis servers.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,6 +28,10 @@ import io.micronaut.context.annotation.Parameter;
 @EachProperty(value = RedisSetting.REDIS_SERVERS)
 public class NamedRedisServersConfiguration extends AbstractRedisConfiguration {
 
+    /**
+     * Constructor.
+     * @param name name from configuration
+     */
     public NamedRedisServersConfiguration(@Parameter String name) {
         setClientName(name);
     }

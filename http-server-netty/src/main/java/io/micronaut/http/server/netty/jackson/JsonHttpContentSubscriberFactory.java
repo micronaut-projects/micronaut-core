@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -22,13 +23,12 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import org.reactivestreams.Subscriber;
 
 import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Builds the {@link Subscriber} for JSON requests
+ * Builds the {@link org.reactivestreams.Subscriber} for JSON requests.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +40,10 @@ public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFa
     private final HttpServerConfiguration httpServerConfiguration;
     private final Optional<JsonFactory> jsonFactory;
 
+    /**
+     * @param httpServerConfiguration The Http server configuration
+     * @param jsonFactory             The json factory
+     */
     public JsonHttpContentSubscriberFactory(HttpServerConfiguration httpServerConfiguration, Optional<JsonFactory> jsonFactory) {
         this.httpServerConfiguration = httpServerConfiguration;
         this.jsonFactory = jsonFactory;

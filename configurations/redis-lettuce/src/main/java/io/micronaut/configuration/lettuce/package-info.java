@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Configuration group for Lettuce
+ * Configuration group for Lettuce.
  *
  * @author Graeme Rocher
  * @since 1.0

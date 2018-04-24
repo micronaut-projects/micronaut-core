@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import java.lang.annotation.Documented;
@@ -20,7 +21,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Annotates a class or method regarded as internal and not for public consumption
+ * Annotates a class or method regarded as internal and not for public consumption.
  *
  * @author Graeme Rocher
  * @since 1.0

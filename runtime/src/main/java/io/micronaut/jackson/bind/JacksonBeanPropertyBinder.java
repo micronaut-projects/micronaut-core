@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.bind;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,7 +22,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -37,7 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An {@link ArgumentBinder} capable of binding from an object from a map
+ * An {@link io.micronaut.core.bind.ArgumentBinder} capable of binding from an object from a map.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,6 +49,10 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     private final ObjectMapper objectMapper;
     private final int arraySizeThreshhold;
 
+    /**
+     * @param objectMapper To read/write JSON
+     * @param configuration The configuration for Jackson JSON parser
+     */
     public JacksonBeanPropertyBinder(ObjectMapper objectMapper, JacksonConfiguration configuration) {
         this.objectMapper = objectMapper;
         this.arraySizeThreshhold = configuration.getArraySizeThreshold();
@@ -97,6 +101,11 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
         }
     }
 
+    /**
+     * @param object The bean
+     * @param e      The exception object
+     * @return The new conversion error
+     */
     protected ConversionErrorException newConversionError(Object object, Exception e) {
         ConversionError conversionError = new ConversionError() {
             @Override

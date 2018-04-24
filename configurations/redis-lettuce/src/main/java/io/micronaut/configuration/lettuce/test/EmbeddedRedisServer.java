@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.test;
 
 import io.lettuce.core.RedisURI;
@@ -35,7 +36,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * A bean for an embedded Redis server
+ * A bean for an embedded Redis server.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,6 +49,10 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
     private final Configuration embeddedConfiguration;
     private RedisServer redisServer;
 
+    /**
+     * Constructor.
+     * @param embeddedConfiguration embeddedConfiguration
+     */
     public EmbeddedRedisServer(Configuration embeddedConfiguration) {
         this.embeddedConfiguration = embeddedConfiguration;
     }
@@ -83,7 +88,7 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
     }
 
     /**
-     * Configuration properties for embedded Redis
+     * Configuration properties for embedded Redis.
      */
     @ConfigurationProperties(RedisSetting.REDIS_EMBEDDED)
     @Requires(classes = RedisServerBuilder.class)

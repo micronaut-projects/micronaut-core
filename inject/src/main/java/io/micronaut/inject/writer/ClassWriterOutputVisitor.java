@@ -15,10 +15,12 @@
  */
 package io.micronaut.inject.writer;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface to be consumed by class writers allowing visiting file names and returning appropriate streams
@@ -28,6 +30,8 @@ import java.util.Optional;
 public interface ClassWriterOutputVisitor {
 
     /**
+     * Visits a new class and returns the output stream with which should be written the bytes of the class to be generated
+     *
      * @param classname the fully qualified classname
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
@@ -35,11 +39,14 @@ public interface ClassWriterOutputVisitor {
     OutputStream visitClass(String classname) throws IOException;
 
     /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class name
+     *
+     * @param type the fully qualified service name
      * @param classname the fully qualified classname
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
      */
-    Optional<File> visitServiceDescriptor(String classname) throws IOException;
+    void visitServiceDescriptor(String type, String classname) ;
 
     /**
      * Visit a file within the META-INF directory
@@ -48,14 +55,32 @@ public interface ClassWriterOutputVisitor {
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
      */
-    Optional<File> visitMetaInfFile(String path) throws IOException;
+    Optional<GeneratedFile> visitMetaInfFile(String path) ;
 
     /**
+     * Finish writing and flush any service entries to disk
+     */
+    void finish();
+
+    /**
+     * The META-INF/services entries to write
+     *
+     * @return A map of service to class entries
+     */
+    default Map<String, Set<String>> getServiceEntries() {
+        return Collections.emptyMap();
+    }
+    /**
+     *
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class name
+     *
      * @param type The service type
+     * @param classname the fully qualified classname
+     *
      * @return the output directory
      * @throws IOException If the file couldn't be created
      */
-    default Optional<File> visitServiceDescriptor(Class type) throws IOException {
-        return visitServiceDescriptor(type.getName());
+    default void visitServiceDescriptor(Class type, String classname) {
+        visitServiceDescriptor(type.getName(), classname);
     }
 }

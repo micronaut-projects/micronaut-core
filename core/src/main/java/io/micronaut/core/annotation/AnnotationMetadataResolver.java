@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.AnnotatedElement;
 
 /**
- * An interface for types capable of resolving {@link AnnotationMetadata}
+ * An interface for types capable of resolving {@link AnnotationMetadata}.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface AnnotationMetadataResolver {
     /**
-     * The default resolver
+     * The default resolver.
      */
     AnnotationMetadataResolver DEFAULT = new AnnotationMetadataResolver() {};
 
     /**
-     * Resolve the {@link AnnotationSource} for the given type
+     * Resolve the {@link AnnotationSource} for the given type.
      *
      * @param type The type
      * @return The {@link AnnotationSource}
@@ -44,7 +45,7 @@ public interface AnnotationMetadataResolver {
     }
 
     /**
-     * Resolve the {@link AnnotationMetadata} for the given type
+     * Resolve the {@link AnnotationMetadata} for the given type.
      *
      * @param type The type
      * @return The {@link AnnotationMetadata}
@@ -54,7 +55,7 @@ public interface AnnotationMetadataResolver {
     }
 
     /**
-     * Resolve the {@link AnnotationSource} for the given object
+     * Resolve the {@link AnnotationSource} for the given object.
      *
      * @param object The object
      * @return The {@link AnnotationSource}
@@ -64,7 +65,7 @@ public interface AnnotationMetadataResolver {
     }
 
     /**
-     * Resolve the {@link AnnotationMetadata} for the given object
+     * Resolve the {@link AnnotationMetadata} for the given object.
      *
      * @param object The object
      * @return The {@link AnnotationMetadata}

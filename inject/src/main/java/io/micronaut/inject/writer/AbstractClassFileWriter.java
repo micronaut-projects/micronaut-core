@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ReflectionUtils;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -26,17 +24,12 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.reflect.Constructor;
+import java.io.*;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -50,9 +43,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
     protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     protected static final Type TYPE_OBJECT = Type.getType(Object.class);
-    protected static final Type TYPE_METHOD = Type.getType(java.lang.reflect.Method.class);
-    protected static final int ACC_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
-    protected static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
 
@@ -68,6 +58,23 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("double", "D");
         NAME_TO_TYPE_MAP.put("float", "F");
     }
+
+
+    /**
+     * Write the class to the target directory
+     *
+     * @param targetDir The target directory
+     */
+    public void writeTo(File targetDir) throws IOException {
+        accept(newClassWriterOutputVisitor(targetDir));
+    }
+
+    /**
+     * Accept a ClassWriterOutputVisitor to write this writer to disk
+     *
+     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     */
+    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
     protected static String getTypeDescriptor(Object type) {
         if (type instanceof Class) {
@@ -484,31 +491,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected ClassWriterOutputVisitor newClassWriterOutputVisitor(File compilationDir) {
-        return new ClassWriterOutputVisitor() {
-            @Override
-            public OutputStream visitClass(String className) throws IOException {
-                File targetFile = new File(compilationDir, getClassFileName(className)).getCanonicalFile();
-                File parentDir = targetFile.getParentFile();
-                if (!parentDir.exists() && !parentDir.mkdirs()) {
-                    throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
-                }
-                return new FileOutputStream(targetFile);
-            }
-
-            @Override
-            public Optional<File> visitServiceDescriptor(String classname) {
-                return Optional.ofNullable(compilationDir).map(root ->
-                    new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
-                );
-            }
-
-            @Override
-            public Optional<File> visitMetaInfFile(String path) throws IOException {
-                return Optional.ofNullable(compilationDir).map(root ->
-                    new File(root, "META-INF" + File.separator + path)
-                );
-            }
-        };
+        return new DirectoryClassWriterOutputVisitor(compilationDir);
     }
 
     protected void returnVoid(GeneratorAdapter overriddenMethodGenerator) {
@@ -533,53 +516,27 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             getMethodDescriptor(returnType, argumentTypes));
     }
 
-    /**
-     * Write the class to the target directory
-     *
-     * @param targetDir The target directory
-     */
-    public void writeTo(File targetDir) throws IOException {
-        accept(newClassWriterOutputVisitor(targetDir));
-    }
 
     /**
-     * Accept a ClassWriterOutputVisitor to write this writer to disk
-     *
-     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     * Generates a service discovery for the given class name and file
+     * @param className The class name
+     * @throws IOException An exception if an error occurs
      */
-    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
-
-    /**
-     * Represents a method {@link AnnotationSource} reference
-     */
-    protected class MethodAnnotationSource extends TypeAnnotationSource {
-        final String methodName;
-        final Map<String, Object> parameters;
-
-        public MethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-            super(declaringType);
-            this.methodName = methodName;
-            this.parameters = parameters;
+    protected void generateServiceDescriptor(String className, GeneratedFile generatedFile) throws IOException {
+        CharSequence contents = generatedFile.getTextContent();
+        if(contents != null) {
+            String[] entries = contents.toString().split("\\n");
+            if (!Arrays.asList(entries).contains(className)) {
+                try(BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
+                    w.newLine();
+                    w.write(className);
+                }
+            }
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-
-            MethodAnnotationSource that = (MethodAnnotationSource) o;
-
-            if (!methodName.equals(that.methodName)) return false;
-            return parameters.equals(that.parameters);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = super.hashCode();
-            result = 31 * result + methodName.hashCode();
-            result = 31 * result + parameters.hashCode();
-            return result;
+        else {
+            try(BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
+                w.write(className);
+            }
         }
     }
 }

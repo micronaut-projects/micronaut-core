@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.naming;
 
 /**
- * An interface for types that are described by a description
+ * An interface for types that are described by a description.
  *
  * @author graemerocher
  * @since 1.0
@@ -24,7 +25,7 @@ package io.micronaut.core.naming;
 public interface Described {
 
     /**
-     * A description that describes this object
+     * A description that describes this object.
      *
      * @return The description
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -30,7 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and stereotypes (meta-annotations)</p>
+ * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and stereotypes (meta-annotations)</p>.
  * <p>
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective tricks to read
  * the annotation metadata</p>
@@ -44,22 +45,22 @@ import java.util.stream.Collectors;
  */
 public interface AnnotationMetadata extends AnnotatedElement {
     /**
-     * A constant for representing empty metadata
+     * A constant for representing empty metadata.
      */
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
-     * The default <tt>value()</tt> member
+     * The default <tt>value()</tt> member.
      */
     String VALUE_MEMBER = "value";
 
     /**
-     * The suffix used when saving compiled metadata to classes
+     * The suffix used when saving compiled metadata to classes.
      */
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
-     * Checks whether this object has the given annotation directly declared on the object
+     * Checks whether this object has the given annotation directly declared on the object.
      *
      * @param annotation The annotation
      * @return True if the annotation is present
@@ -67,7 +68,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     boolean hasDeclaredAnnotation(@Nullable String annotation);
 
     /**
-     * Checks whether this object has the given annotation on the object itself or inherited from a parent
+     * Checks whether this object has the given annotation on the object itself or inherited from a parent.
      *
      * @param annotation The annotation
      * @return True if the annotation is present
@@ -75,7 +76,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     boolean hasAnnotation(@Nullable String annotation);
 
     /**
-     * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>
+     * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
      * <p>
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
@@ -85,7 +86,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     boolean hasStereotype(@Nullable String annotation);
 
     /**
-     * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>
+     * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>.
      * <p>
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
@@ -95,7 +96,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     boolean hasDeclaredStereotype(@Nullable String annotation);
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype
+     * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -103,7 +104,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     Set<String> getAnnotationNamesByStereotype(String stereotype);
 
     /**
-     * Resolve all of the annotations names for the given stereotype that are declared annotations
+     * Resolve all of the annotations names for the given stereotype that are declared annotations.
      *
      * @param stereotype The stereotype
      * @return The declared annotations
@@ -111,7 +112,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
 
     /**
-     * Get all of the values for the given annotation
+     * Get all of the values for the given annotation.
      *
      * @param annotation The annotation name
      * @return A {@link ConvertibleValues} instance
@@ -119,7 +120,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     ConvertibleValues<Object> getValues(String annotation);
 
     /**
-     * Get all of the values for the given annotation that are directly declared on the annotated element
+     * Get all of the values for the given annotation that are directly declared on the annotated element.
      *
      * @param annotation The annotation name
      * @return A {@link ConvertibleValues} instance
@@ -127,15 +128,17 @@ public interface AnnotationMetadata extends AnnotatedElement {
     ConvertibleValues<Object> getDeclaredValues(String annotation);
 
     /**
-     * Get all of the values for the given annotation and type of the underlying values
+     * Get all of the values for the given annotation and type of the underlying values.
      *
      * @param annotation The annotation name
+     * @param valueType valueType
+     * @param <T> Generic type
      * @return The {@link OptionalValues}
      */
     <T> OptionalValues<T> getValues(String annotation, Class<T> valueType);
 
     /**
-     * Return the default value for the given annotation member
+     * Return the default value for the given annotation member.
      *
      * @param annotation   The annotation
      * @param member       The member
@@ -146,7 +149,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType);
 
     /**
-     * Return the default value for the given annotation member
+     * Return the default value for the given annotation member.
      *
      * @param annotation   The annotation
      * @param member       The member
@@ -159,7 +162,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of the given annotation member
+     * Get the value of the given annotation member.
      *
      * @param annotation   The annotation class
      * @param member       The annotation member
@@ -178,7 +181,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -188,7 +191,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -198,7 +201,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -208,7 +211,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first declared annotation name for the given stereotype
+     * Find the first declared annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -218,7 +221,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -232,7 +235,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -246,7 +249,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Find the first annotation name for the given stereotype
+     * Find the first annotation name for the given stereotype.
      *
      * @param stereotype The stereotype
      * @return The annotation name
@@ -256,9 +259,11 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get all of the values for the given annotation
+     * Get all of the values for the given annotation.
      *
      * @param annotation The annotation name
+     * @param valueType valueType
+     * @param <T> Generic type
      * @return The {@link ConvertibleValues}
      */
     default <T> OptionalValues<T> getValues(Class<? extends Annotation> annotation, Class<T> valueType) {
@@ -266,7 +271,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype
+     * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -276,7 +281,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype
+     * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -291,7 +296,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get all of the values for the given annotation
+     * Get all of the values for the given annotation.
      *
      * @param annotation The annotation name
      * @return The {@link ConvertibleValues}
@@ -301,7 +306,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of the given annotation member
+     * Get the value of the given annotation member.
      *
      * @param annotation   The annotation class
      * @param member       The annotation member
@@ -320,7 +325,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value as an {@link OptionalLong} for the given annotation and member
+     * The value as an {@link OptionalLong} for the given annotation and member.
      *
      * @param annotation The annotation
      * @param member     The member
@@ -332,7 +337,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value of the annotation as a Class
+     * The value of the annotation as a Class.
      *
      * @param annotation The annotation
      * @return An {@link Optional} class
@@ -342,7 +347,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value of the annotation as a Class
+     * The value of the annotation as a Class.
      *
      * @param annotation The annotation
      * @param member     The annotation member
@@ -353,7 +358,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value of the annotation as a Class
+     * The value of the annotation as a Class.
      *
      * @param annotation The annotation
      * @return An {@link Optional} class
@@ -363,7 +368,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value of the annotation as a Class
+     * The value of the annotation as a Class.
      *
      * @param annotation The annotation
      * @param member     The annotation member
@@ -374,7 +379,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value as an {@link OptionalInt} for the given annotation and member
+     * The value as an {@link OptionalInt} for the given annotation and member.
      *
      * @param annotation The annotation
      * @param member     The member
@@ -386,7 +391,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * The value as an {@link OptionalDouble} for the given annotation and member
+     * The value as an {@link OptionalDouble} for the given annotation and member.
      *
      * @param annotation The annotation
      * @param member     The member
@@ -398,7 +403,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of default "value" the given annotation
+     * Get the value of default "value" the given annotation.
      *
      * @param annotation   The annotation class
      * @param requiredType The required type
@@ -410,7 +415,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of the given annotation member
+     * Get the value of the given annotation member.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -421,7 +426,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of the given annotation member
+     * Get the value of the given annotation member.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -432,7 +437,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>
+     * Returns whether the value of the given member is <em>true</em>.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -443,7 +448,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>
+     * Returns whether the value of the given member is <em>true</em>.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -454,7 +459,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is present
+     * Returns whether the value of the given member is present.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -465,7 +470,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>
+     * Returns whether the value of the given member is <em>true</em>.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -476,7 +481,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>
+     * Returns whether the value of the given member is <em>true</em>.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -487,7 +492,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>
+     * Returns whether the value of the given member is <em>true</em>.
      *
      * @param annotation The annotation class
      * @param member     The annotation member
@@ -498,7 +503,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of default "value" the given annotation
+     * Get the value of default "value" the given annotation.
      *
      * @param annotation The annotation class
      * @return An {@link Optional} of the value
@@ -508,7 +513,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of default "value" the given annotation
+     * Get the value of default "value" the given annotation.
      *
      * @param annotation The annotation class
      * @return An {@link Optional} of the value
@@ -518,9 +523,11 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Get the value of default "value" the given annotation
+     * Get the value of default "value" the given annotation.
      *
      * @param annotation The annotation class
+     * @param requiredType requiredType
+     * @param <T> Generic type
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {
@@ -528,7 +535,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Checks whether this object has the given annotation on the object itself or inherited from a parent
+     * Checks whether this object has the given annotation on the object itself or inherited from a parent.
      *
      * @param annotation The annotation
      * @return True if the annotation is present
@@ -538,7 +545,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>
+     * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
      * <p>
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
@@ -550,7 +557,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Check whether any of the given stereotypes is present
+     * Check whether any of the given stereotypes is present.
      *
      * @param annotations The annotations
      * @return True if any of the given stereotypes are present
@@ -566,7 +573,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Check whether any of the given stereotypes is present
+     * Check whether any of the given stereotypes is present.
      *
      * @param annotations The annotations
      * @return True if any of the given stereotypes are present
@@ -582,7 +589,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Checks whether this object has the given annotation directly declared on the object
+     * Checks whether this object has the given annotation directly declared on the object.
      *
      * @param annotation The annotation
      * @return True if the annotation is present
@@ -592,7 +599,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Checks whether this object has the given stereotype directly declared on the object
+     * Checks whether this object has the given stereotype directly declared on the object.
      *
      * @param stereotype The annotation
      * @return True if the annotation is present
@@ -602,7 +609,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     }
 
     /**
-     * Checks whether this object has any of the given stereotype directly declared on the object
+     * Checks whether this object has any of the given stereotype directly declared on the object.
      *
      * @param annotations The annotations
      * @return True if any of the given stereotypes are present
@@ -624,4 +631,5 @@ public interface AnnotationMetadata extends AnnotatedElement {
     default boolean isEmpty() {
         return this == AnnotationMetadata.EMPTY_METADATA;
     }
+
 }

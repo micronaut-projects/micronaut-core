@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.Bean;
@@ -24,7 +25,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Configures the default I/O thread pool if none is configured by the user
+ * Configures the default I/O thread pool if none is configured by the user.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,6 +34,9 @@ import javax.inject.Singleton;
 @Factory
 public class IOExecutorServiceConfig {
 
+    /**
+     * @return The default thread pool configurations
+     */
     @Singleton
     @Bean
     @Named(TaskExecutors.IO)

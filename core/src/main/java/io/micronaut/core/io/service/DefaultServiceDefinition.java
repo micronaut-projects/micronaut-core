@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -22,7 +23,7 @@ import java.util.ServiceConfigurationError;
 import java.util.function.Supplier;
 
 /**
- * Default implementation of {@link ServiceDefinition}
+ * Default implementation of {@link ServiceDefinition}.
  *
  * @author Graeme Rocher
  * @since 1.0

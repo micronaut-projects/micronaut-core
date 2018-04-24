@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
@@ -22,7 +23,7 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * A filter route is a route that matches an {@link HttpFilter}
+ * A filter route is a route that matches an {@link HttpFilter}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +36,7 @@ public interface FilterRoute {
     HttpFilter getFilter();
 
     /**
-     * Matches the given path to this filter route
+     * Matches the given path to this filter route.
      *
      * @param method The HTTP method
      * @param uri    The URI
@@ -44,7 +45,7 @@ public interface FilterRoute {
     Optional<HttpFilter> match(HttpMethod method, URI uri);
 
     /**
-     * Add an addition pattern to this filter route
+     * Add an addition pattern to this filter route.
      *
      * @param pattern The pattern
      * @return This route
@@ -52,7 +53,7 @@ public interface FilterRoute {
     FilterRoute pattern(String pattern);
 
     /**
-     * Restrict the methods this filter route matches
+     * Restrict the methods this filter route matches.
      *
      * @param methods The methods
      * @return This route

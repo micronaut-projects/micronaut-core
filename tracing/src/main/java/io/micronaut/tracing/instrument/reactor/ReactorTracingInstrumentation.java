@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.reactor;
 
 import io.micronaut.context.annotation.Context;
@@ -32,7 +33,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 
 /**
- * Instrumentation for Reactor
+ * Instrumentation for Reactor.
  *
  * @author graemerocher
  * @since 1.0
@@ -43,6 +44,13 @@ import java.util.function.Supplier;
 @Context
 public class ReactorTracingInstrumentation {
     private static final Logger LOG = LoggerFactory.getLogger(ReactorTracingInstrumentation.class);
+
+    /**
+     * Initialize instrumentation for reactor with the tracer and factory.
+     *
+     * @param tracer For Span creation and propagation across arbitrary transports
+     * @param threadFactory The factory to create new threads on-demand
+     */
     @PostConstruct
     void init(Tracer tracer, ThreadFactory threadFactory) {
         try {
@@ -84,7 +92,7 @@ public class ReactorTracingInstrumentation {
                     }
             );
         } catch (Exception e) {
-            if(LOG.isErrorEnabled()) {
+            if (LOG.isErrorEnabled()) {
                 LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
             }
         }

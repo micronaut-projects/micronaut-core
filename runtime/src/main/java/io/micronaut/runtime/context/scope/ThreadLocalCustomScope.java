@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -28,7 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A {@link CustomScope} that stores values in thread local storage
+ * A {@link CustomScope} that stores values in thread local storage.
  *
  * @author Graeme Rocher
  * @since 1.0

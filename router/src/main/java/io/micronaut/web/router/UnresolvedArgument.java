@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.bind.ArgumentBinder;
@@ -20,8 +21,9 @@ import io.micronaut.core.bind.ArgumentBinder;
 import java.util.function.Supplier;
 
 /**
- * Represents an unresolved argument to a {@link io.micronaut.web.router.Route}
+ * Represents an unresolved argument to a {@link io.micronaut.web.router.Route}.
  *
+ * @param <T> The Type
  * @author Graeme Rocher
  * @since 1.0
  */

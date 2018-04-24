@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.config.IClientConfig;
@@ -50,7 +51,7 @@ import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Extended version of {@link DefaultHttpClient} adapted to Ribbon
+ * Extended version of {@link DefaultHttpClient} adapted to Ribbon.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -64,6 +65,17 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
     private final RibbonLoadBalancer loadBalancer;
     private final List<? extends ExecutionListener<?, HttpResponse<?>>> executionListeners;
 
+    /**
+     * Constructor.
+     * @param loadBalancer loadBalancer
+     * @param configuration configuration
+     * @param threadFactory threadFactory
+     * @param nettyClientSslBuilder nettyClientSslBuilder
+     * @param codecRegistry codecRegistry
+     * @param executionListeners executionListeners
+     * @param annotationMetadataResolver annotationMetadataResolver
+     * @param filters filters
+     */
     @Inject
     public RibbonRxHttpClient(
         @Parameter LoadBalancer loadBalancer,
@@ -169,6 +181,11 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         }
     }
 
+    /**
+     * Build the command using the load balancer builder.
+     * @param <O> entity type of the command
+     * @return entity type
+     */
     protected <O> LoadBalancerCommand<O> buildLoadBalancerCommand() {
         LoadBalancerCommand.Builder<O> commandBuilder = LoadBalancerCommand.builder();
         commandBuilder.withLoadBalancer(loadBalancer.getLoadBalancer())

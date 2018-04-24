@@ -40,12 +40,14 @@ import io.micronaut.cli.profile.commands.CommandCompleter
 import io.micronaut.cli.profile.commands.CommandRegistry
 import io.micronaut.cli.profile.repository.RepositoryConfiguration
 import io.micronaut.cli.profile.repository.MavenProfileRepository
+import io.micronaut.cli.profile.repository.StaticJarProfileRepository
 import io.micronaut.cli.util.CliSettings
 import io.micronaut.cli.config.NavigableMap
 import jline.UnixTerminal
 import jline.console.UserInterruptException
 import jline.console.completer.ArgumentCompleter
 import jline.internal.NonBlockingInputStream
+import org.codehaus.plexus.util.ExceptionUtils
 
 import java.util.concurrent.*
 
@@ -216,10 +218,10 @@ class MicronautCli {
             exit(0)
         }
 
-        File grailsAppDir = new File("grails-app")
-        File applicationGroovy =new File("Application.groovy")
+        File micronautCli =new File("micronaut-cli.yml")
         File profileYml =new File("profile.yml")
-        if(!grailsAppDir.isDirectory() && !applicationGroovy.exists() && !profileYml.exists()) {
+        if(!micronautCli.exists() && !profileYml.exists()) {
+            //Execution path for CLI outside of a project
             profileRepository = createMavenProfileRepository()
             if(!mainCommandLine || !mainCommandLine.commandName) {
                 integrateGradle = false
@@ -255,6 +257,7 @@ class MicronautCli {
             }
 
         } else {
+            //Execution path for CLI within a project
             initializeApplication(mainCommandLine)
             if(mainCommandLine.commandName) {
                 return handleCommand(mainCommandLine) ? 0 : 1
@@ -490,12 +493,7 @@ class MicronautCli {
     private initializeProfile() {
         CliSettings.TARGET_DIR?.mkdirs()
 
-        if(!new File(CliSettings.BASE_DIR, "profile.yml").exists()) {
-            //populateContextLoader()
-        }
-        else {
-            this.profileRepository = createMavenProfileRepository()
-        }
+        this.profileRepository = createMavenProfileRepository()
 
         String profileName = applicationConfig.get(CliSettings.PROFILE) ?: getSetting(CliSettings.PROFILE, String, DEFAULT_PROFILE_NAME)
         this.profile = profileRepository.getProfile(profileName)
@@ -504,68 +502,6 @@ class MicronautCli {
             throw new IllegalStateException("No profile found for name [$profileName].")
         }
     }
-
-    /*protected void populateContextLoader() {
-        try {
-            if(new File(BuildSettings.BASE_DIR, "build.gradle").exists()) {
-                def dependencyMap = new MapReadingCachedGradleOperation<List<URL>>(projectContext, ".dependencies") {
-
-                    @Override
-                    void updateStatusMessage() {
-                        MicronautConsole.instance.updateStatus("Resolving Dependencies. Please wait...")
-                    }
-
-                    @Override
-                    List<URL> createMapValue(Object value) {
-                        if(value instanceof List) {
-                            return ((List)value).collect() { new URL(it.toString()) } as List<URL>
-                        }
-                        else {
-                            return []
-                        }
-                    }
-
-
-                    @Override
-                    Map<String, List<URL>> readFromGradle(ProjectConnection connection) {
-                        def config = applicationConfig
-
-                        BuildActionExecuter buildActionExecuter = connection.action(new ClasspathBuildAction())
-                        buildActionExecuter.standardOutput = System.out
-                        buildActionExecuter.standardError  = System.err
-                        buildActionExecuter.withArguments("-Dgrails.profile=${config.navigate("grails", "profile")}")
-
-                        def grailsClasspath = buildActionExecuter.run()
-                        if(grailsClasspath.error) {
-                            MicronautConsole.instance.error("${grailsClasspath.error} Type 'gradle dependencies' for more information")
-                            exit 1
-                        }
-                        return [
-                            dependencies: grailsClasspath.dependencies,
-                            profiles: grailsClasspath.profileDependencies
-                        ]
-                    }
-                }.call()
-
-                def urls = (List<URL>)dependencyMap.get("dependencies")
-                try {
-                    // add tools.jar
-                    urls.add(new File("${System.getenv('JAVA_HOME')}/lib/tools.jar").toURI().toURL())
-                } catch (Throwable e) {
-                    // ignore
-                }
-                def profiles = (List<URL>)dependencyMap.get("profiles")
-                URLClassLoader classLoader = new URLClassLoader(urls as URL[], Thread.currentThread().contextClassLoader)
-                this.profileRepository = new StaticJarProfileRepository(classLoader, profiles as URL[])
-                Thread.currentThread().contextClassLoader = classLoader
-            }
-        } catch (Throwable e) {
-            e = ExceptionUtils.getRootCause(e)
-            MicronautConsole.instance.error("Error initializing classpath: $e.message", e)
-            exit(1)
-        }
-    }*/
-
 
     private CodeGenConfig loadApplicationConfig() {
         CodeGenConfig config = new CodeGenConfig()

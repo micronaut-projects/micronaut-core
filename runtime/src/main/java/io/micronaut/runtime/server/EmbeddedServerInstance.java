@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.server;
 
 import io.micronaut.discovery.ServiceInstance;
 
 /**
- * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}
+ * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}.
  *
  * @author graemerocher
  * @since 1.0

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.cli;
 
 import io.micronaut.core.cli.exceptions.ParseException;
@@ -42,7 +43,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
     private String usageMessage;
 
     /**
-     * Adds a declared option
+     * Adds a declared option.
      *
      * @param name        The name of the option
      * @param description The description
@@ -70,11 +71,21 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         return parse(cl, args);
     }
 
+    /**
+     * Parse the command line entry.
+     * @param cl commandLine
+     * @param args args passed in
+     * @return commandLine
+     */
     CommandLine parse(DefaultCommandLine cl, String[] args) {
         parseInternal(cl, args, true);
         return cl;
     }
 
+    /**
+     * Build the options message.
+     * @return message
+     */
     public String getOptionsHelpMessage() {
         String ls = System.getProperty("line.separator");
         usageMessage = "Available options:";
@@ -97,7 +108,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         cl.setRawArguments(args);
         String lastOptionName = null;
         for (String arg : args) {
-            if (arg == null) continue;
+            if (arg == null) {
+                continue;
+            }
             String trimmed = arg.trim();
             if (StringUtils.isNotEmpty(trimmed)) {
                 if (trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {
@@ -122,10 +135,20 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         }
     }
 
+    /**
+     * Create a default command line.
+     * @return commandLine
+     */
     protected DefaultCommandLine createCommandLine() {
         return new DefaultCommandLine();
     }
 
+    /**
+     * Process the passed in options.
+     * @param cl cl
+     * @param arg arg
+     * @return argument processed
+     */
     protected String processOption(DefaultCommandLine cl, String arg) {
         if (arg.length() < 2) {
             return null;
@@ -160,6 +183,11 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         return arg;
     }
 
+    /**
+     * Process System property arg.
+     * @param cl cl
+     * @param arg system arg
+     */
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
         int i = arg.indexOf("=");
         String name = arg.substring(2, i);
@@ -168,7 +196,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
     }
 
     private void validateOptionName(String name) {
-        if (name.contains(" ")) throw new ParseException("Invalid argument: " + name);
+        if (name.contains(" ")) {
+            throw new ParseException("Invalid argument: " + name);
+        }
     }
 
     /**

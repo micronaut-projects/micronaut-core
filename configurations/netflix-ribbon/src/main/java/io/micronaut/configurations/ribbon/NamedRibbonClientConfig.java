@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import io.micronaut.context.annotation.EachProperty;
@@ -20,7 +21,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.env.Environment;
 
 /**
- * This bean creates a named {@link com.netflix.client.config.IClientConfig} for each property under the prefix {@link #PREFIX}
+ * This bean creates a named {@link com.netflix.client.config.IClientConfig} for each property under the prefix {@link #PREFIX}.
  *
  * @author graemerocher
  * @since 1.0
@@ -30,6 +31,11 @@ public class NamedRibbonClientConfig extends AbstractRibbonClientConfig {
     public static final String PREFIX = "ribbon.clients";
     private final String name;
 
+    /**
+     * Constructor.
+     * @param name name from configuration
+     * @param environment environment
+     */
     public NamedRibbonClientConfig(@Parameter String name, Environment environment) {
         super(environment);
         this.name = name;

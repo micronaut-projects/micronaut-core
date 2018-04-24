@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.context.BeanContext;
@@ -32,11 +33,18 @@ public class BeansEndpoint {
     private BeanContext beanContext;
     private BeanDefinitionDataCollector beanDefinitionDataCollector;
 
+    /**
+     * @param beanContext                 The {@link BeanContext}
+     * @param beanDefinitionDataCollector The {@link BeanDefinitionDataCollector}
+     */
     public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector beanDefinitionDataCollector) {
         this.beanContext = beanContext;
         this.beanDefinitionDataCollector = beanDefinitionDataCollector;
     }
 
+    /**
+     * @return A {@link Publisher} with the beans
+     */
     @Read
     public Publisher getBeans() {
         return beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions());

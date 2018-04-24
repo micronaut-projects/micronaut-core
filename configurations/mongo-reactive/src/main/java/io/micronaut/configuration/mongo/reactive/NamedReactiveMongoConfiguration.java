@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.async.client.MongoClientSettings;
@@ -27,7 +28,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
- * Creates a named configuration for each entry under {@link MongoSettings#MONGODB_SERVERS}
+ * Creates a named configuration for each entry under {@link MongoSettings#MONGODB_SERVERS}.
  *
  * @author graemerocher
  * @since 1.0
@@ -55,6 +56,11 @@ public class NamedReactiveMongoConfiguration extends AbstractReactiveMongoConfig
 
     private final String serverName;
 
+    /**
+     * Constructor.
+     * @param serverName serverName from properties
+     * @param applicationConfiguration applicationConfiguration
+     */
     public NamedReactiveMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.serverName = serverName;
