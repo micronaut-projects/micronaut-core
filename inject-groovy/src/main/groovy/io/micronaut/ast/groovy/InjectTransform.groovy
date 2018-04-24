@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
@@ -111,7 +112,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-
+        File classesDir = source.configuration.targetDirectory
+        DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                classesDir
+        )
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
             ClassNode classNode = classes[0]
@@ -120,7 +124,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (AstAnnotationUtils.hasStereotype(packageNode, Configuration)) {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(packageNode))
                     try {
-                        writer.writeTo(source.configuration.targetDirectory)
+                        writer.accept(outputVisitor)
+                        outputVisitor.finish()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }
@@ -148,9 +153,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
         Map<String, ByteArrayOutputStream> classStreams = null
+
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
-            File classesDir = source.configuration.targetDirectory
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
@@ -169,8 +174,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
-                    beanReferenceWriter.writeTo(classesDir)
-                    beanDefWriter.writeTo(classesDir)
+                    beanReferenceWriter.accept(outputVisitor)
+                    beanDefWriter.accept(outputVisitor)
                 } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
                     if (classStreams == null) {
                         classStreams = [:]
@@ -184,13 +189,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
                         @Override
-                        Optional<File> visitServiceDescriptor(String classname) throws IOException {
-                            return Optional.empty()
+                        void visitServiceDescriptor(String type, String classname) {
+                            // no-op
                         }
 
                         @Override
                         Optional<File> visitMetaInfFile(String path) throws IOException {
                             return Optional.empty()
+                        }
+
+                        @Override
+                        void finish() {
+                            // no-op
                         }
                     }
                     beanReferenceWriter.accept(visitor)
@@ -198,8 +208,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 }
 
+
+
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
+                if (e.message == null) {
+                    e.printStackTrace(System.err)
+                }
+            }
+        }
+        if(!beanDefinitionWriters.isEmpty()) {
+
+            try {
+                outputVisitor.finish()
+            } catch (Throwable e) {
+                AstMessageUtils.error(source, moduleNode, "Error generating META-INF/services files: $e.message")
                 if (e.message == null) {
                     e.printStackTrace(System.err)
                 }

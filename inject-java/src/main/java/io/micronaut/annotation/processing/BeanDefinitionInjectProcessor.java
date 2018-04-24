@@ -42,7 +42,6 @@ import io.micronaut.inject.processing.ProcessedTypes;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -71,6 +70,10 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
+import javax.tools.Diagnostic;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -105,7 +108,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
-    private ClassWriterOutputVisitor classWriterOutputVisitor;
     private Set<String> processed = new HashSet<>();
 
     @Override
@@ -113,7 +115,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils);
         this.beanDefinitionWriters = new LinkedHashMap<>();
-        this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
 
     @Override
@@ -175,6 +176,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     });
                 });
+
+                try {
+                    classWriterOutputVisitor.finish();
+                } catch (Exception e) {
+                    String message = e.getMessage();
+                    error("Error occurred writing META-INF files: %s", message != null ? message : e);
+                }
+
+
                 if (metadataBuilder.hasMetadata()) {
                     ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
 
@@ -195,6 +205,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
         return false;
     }
+
 
     private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
         try {
@@ -219,7 +230,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         } catch (IOException e) {
             // raise a compile error
-            error("Unexpected error: %s", e.getMessage());
+            String message = e.getMessage();
+            error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
         }
     }
 
