@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.discovery.aws.parameterStore;
 
 import com.amazonaws.SdkClientException;
@@ -6,7 +22,6 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.PropertySource;
@@ -16,7 +31,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.client.ClientUtil;
 import io.micronaut.discovery.config.ConfigurationClient;
-import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -24,7 +38,6 @@ import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -37,26 +50,33 @@ import java.util.concurrent.Future;
  * @author Rvanderwerf
  */
 @Singleton
-@Requires(env= Environment.AMAZON_EC2)
+@Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = AWSParameterStoreConfiguration.class)
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
-
-    final AWSClientConfiguration awsConfiguration;
-    final AWSParameterStoreConfiguration awsParameterStoreConfiguration;
-    final Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
-    AWSSimpleSystemsManagementAsync client;
+    private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
+    private final int PRIORITY_TOP = 150;
+    private final int PRIORITY_DOWN = 100;
+    private final int PRIORITY_INCREMENT = 10;
+    private final AWSClientConfiguration awsConfiguration;
+    private final AWSParameterStoreConfiguration awsParameterStoreConfiguration;
+    private final Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
+    private AWSSimpleSystemsManagementAsync client;
     private ExecutorService executionService;
 
-    protected static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
-    @Value("${" + ApplicationConfiguration.APPLICATION_NAME + "}") String applicationName;
 
+    /**
+     * Initialize @Singleton.
+     * @param awsConfiguration your aws configuration credentials
+     * @param awsParameterStoreConfiguration configuration for the parameter store
+     * @param route53ClientDiscoveryConfiguration configuration for route53 service discovery, if you are using this (not required)
+     */
     AWSParameterStoreConfigClient(AWSClientConfiguration awsConfiguration, AWSParameterStoreConfiguration awsParameterStoreConfiguration, Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
 
         try {
-            this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.clientConfiguration).build();
+            this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
         } catch (SdkClientException sce) {
             LOG.warn("Error creating Simple Systems Management client - check your credentials");
         }
@@ -66,12 +86,13 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
 
     /**
+     * Get your PropertySources from AWS Parameter Store.
      * Property sources are expected to be set up in this way:
      * \ configuration \ micronaut \ environment name \ app name \
      * If you want to change the base \configuration\micronaut set the property aws.systemManager.parameterStore.rootHierarchyPath
      *
      * @param environment The environment
-     * @return
+     * @return property source objects by environment.
      */
     @Override
     public Publisher<PropertySource> getPropertySources(Environment environment) {
@@ -101,10 +122,10 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     configurationValues,
                     Flowable.fromPublisher(getParameters(applicationSpecificPath)));
         }
-        if (activeNames!=null && activeNames.size() > 0) {
+        if (activeNames != null && activeNames.size() > 0) {
             // look for the environment configs since we can't wildcard partial paths on aws
             for (String activeName : activeNames) {
-                String environmentSpecificPath = commonConfigPath+"_"+activeName;
+                String environmentSpecificPath = commonConfigPath + "_" + activeName;
                 configurationValues = Flowable.concat(
                         configurationValues,
                         Flowable.fromPublisher(getParameters(environmentSpecificPath)));
@@ -127,17 +148,17 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
                     if (!isFolder && validKey) {
 
-                        String fullName = key.substring(pathPrefix.length()+1);
+                        String fullName = key.substring(pathPrefix.length() + 1);
                         if (!fullName.contains("/")) {
                             Set<String> propertySourceNames = calcPropertySourceNames(fullName, activeNames);
                             String lookupKey = key;
                             if (!lookupKey.startsWith("/")) {
-                                lookupKey = "/"+lookupKey;
+                                lookupKey = "/" + lookupKey;
                             }
 
                             Flowable<Map<String, Object>> properties = Flowable.fromPublisher(convertParameterHierarchyToMap(keyValues));
                             // if we we have child properties
-                            Flowable<GetParametersByPathResult> hierarchy = Flowable.fromPublisher(getHierarchy(lookupKey,true));
+                            Flowable<GetParametersByPathResult> hierarchy = Flowable.fromPublisher(getHierarchy(lookupKey));
                             Flowable<Map<String, Object>> propertiesHierarchy = Flowable.fromPublisher(convertParameterHierarchyToMap(hierarchy.blockingFirst()));
                             properties = Flowable.concat(
                                     properties,
@@ -161,9 +182,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
                 for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
                     String name = entry.getKey();
-                    int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? 150 : 100);
-                    if (hasApplicationSpecificConfig && serviceId.isPresent() && name.startsWith(serviceId.get())) {
-                        priority += 10;
+                    int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? PRIORITY_TOP : PRIORITY_DOWN);
+                    if (hasApplicationSpecificConfig && name.startsWith(serviceId.get())) {
+                        priority += PRIORITY_INCREMENT;
                     }
                     emitter.onNext(PropertySource.of(Route53ClientDiscoveryConfiguration.SERVICE_ID + '-' + name, entry.getValue(), priority));
                 }
@@ -189,18 +210,28 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
     }
 
+    /**
+     * Description.
+     * @return the description
+     */
     @Override
     public String getDescription() {
         return "AWS Parameter Store";
     }
 
-    Publisher<GetParametersByPathResult> getHierarchy(String path, Boolean recursive) {
+    /**
+     * Gets the Parameter hierarchy from AWS parameter store.
+     * Please note this only returns something if the current node has children and will not return itself.
+     * @param path path based on the parameter names PRIORITY_TOP.e. /config/application/.*
+     * @return Publisher for GetParametersByPathResult
+     */
+    private Publisher<GetParametersByPathResult> getHierarchy(String path) {
 
-        GetParametersByPathRequest getRequest = new GetParametersByPathRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withPath(path).withRecursive(recursive);
+        GetParametersByPathRequest getRequest = new GetParametersByPathRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withPath(path).withRecursive(true);
 
         Future<GetParametersByPathResult> future = client.getParametersByPathAsync(getRequest);
 
-        Flowable<GetParametersByPathResult> invokeFlowable = Flowable.fromFuture(future,Schedulers.io());
+        Flowable<GetParametersByPathResult> invokeFlowable = Flowable.fromFuture(future, Schedulers.io());
 
 
         invokeFlowable = invokeFlowable.onErrorResumeNext(throwable -> {
@@ -215,13 +246,18 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     }
 
 
-    Publisher<GetParametersResult> getParameters(String path) {
+    /**
+     * Gets the parameters from AWS.
+     * @param path this is the hierarchy path (via name field) from the property store
+     * @return invokeFlowable - converted future from AWS SDK Async
+     */
+    private Publisher<GetParametersResult> getParameters(String path) {
 
         GetParametersRequest getRequest = new GetParametersRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withNames(path);
 
         Future<GetParametersResult> future = client.getParametersAsync(getRequest);
 
-        Flowable<GetParametersResult> invokeFlowable = Flowable.fromFuture(future,Schedulers.io());
+        Flowable<GetParametersResult> invokeFlowable = Flowable.fromFuture(future, Schedulers.io());
 
 
         invokeFlowable = invokeFlowable.onErrorResumeNext(throwable -> {
@@ -235,10 +271,20 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
     }
 
+    /**
+     * Calculates property names to look for.
+     * @param prefix
+     * @param activeNames active environment names
+     * @return
+     */
     private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        return ClientUtil.calcPropertySourceNames(prefix,activeNames);
+        return ClientUtil.calcPropertySourceNames(prefix, activeNames);
     }
 
+    /**
+     * Execution service to make call to AWS.
+     * @param executionService ExectorService
+     */
     @Inject
     void setExecutionService(@Named(TaskExecutors.IO) @Nullable ExecutorService executionService) {
         if (executionService != null) {
@@ -246,20 +292,34 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         }
     }
 
-    public Publisher<Map<String,Object>> convertParameterHierarchyToMap(GetParametersByPathResult result) {
+    /**
+     * Helper class for converting parameters from amazon format to a map.
+     * @param result Result from AWS
+     * @return map of the results, converted
+     */
+    private Publisher<Map<String, Object>> convertParameterHierarchyToMap(GetParametersByPathResult result) {
         return convertParametersToMap(result.getParameters());
 
     }
 
-    public Publisher<Map<String,Object>> convertParameterHierarchyToMap(GetParametersResult result) {
+    /**
+     * Helper class for converting parameters from amazon format to a map.
+     * @param result Result from AWS
+     * @return map of the results, converted
+     */
+    private Publisher<Map<String, Object>> convertParameterHierarchyToMap(GetParametersResult result) {
         return convertParametersToMap(result.getParameters());
 
     }
 
+    /**
+     * Helper class for converting parameters from amazon format to a map.
+     * @param params Result from AWS
+     * @return map of the results, converted
+     */
+    private Publisher<Map<String, Object>> convertParametersToMap(List<Parameter> params) {
 
-    private Publisher<Map<String,Object>> convertParametersToMap(List<Parameter> params) {
-
-        Map output = new HashMap<String,Object>();
+        Map<String, Object> output = new HashMap<String, Object>();
         for (Parameter param : params) {
             switch (param.getType()) {
                 case "StringList":
@@ -268,7 +328,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     for (String item : items) {
                         // now split to key value
                         String[] keyValue = item.split("=");
-                        output.put(keyValue[0],keyValue[1]);
+                        output.put(keyValue[0], keyValue[1]);
 
                     }
                     break;
@@ -278,22 +338,20 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     // back an encoded encrypted string of gobbly gook. It uses the default account key unless
                     // one is specified in the config
                     String[] keyValue = param.getValue().split("=");
-                    output.put(keyValue[0],keyValue[1]);
+                    output.put(keyValue[0], keyValue[1]);
 
                     break;
 
                 default:
                 case "String":
                     String[] keyVal = param.getValue().split("=");
-                    output.put(keyVal[0],keyVal[1]);
+                    output.put(keyVal[0], keyVal[1]);
                     break;
             }
         }
         return Publishers.just(output);
 
     }
-
-
 
 }
 

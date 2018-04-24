@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.propertyStore
 
+package io.micronaut.discovery.propertyStore
 
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
@@ -33,10 +33,10 @@ import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
 import java.util.concurrent.FutureTask
 
 /**
+ * Test for mocking of aws property store.
  * @author RVanderwerf
  */
 class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
