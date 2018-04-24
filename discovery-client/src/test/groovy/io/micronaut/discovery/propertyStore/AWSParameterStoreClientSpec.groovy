@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery.propertyStore
 
-
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClientBuilder
 import com.amazonaws.services.simplesystemsmanagement.model.DeleteParametersRequest
@@ -40,14 +39,14 @@ import spock.lang.Specification
 import spock.lang.Stepwise
 
 /**
+ * Tests real calling to AWS Property store. If you are having trouble getting the feature working get this test running.
+ * Set the environment variable ENABLE_AWS_PARAMETER_STORE to enable running of this test.
  * @author Rvanderwerf
  * @since 1.0
  */
 @IgnoreIf({!System.getenv('ENABLE_AWS_PARAMETER_STORE')})
 @Stepwise
 class AWSParameterStoreClientSpec extends Specification {
-
-
 
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
@@ -61,7 +60,6 @@ class AWSParameterStoreClientSpec extends Specification {
     // just for creating/dropping test data we use async version for micronaut
     @Shared AWSSimpleSystemsManagement awsSimpleSystemsManagement = AWSSimpleSystemsManagementClientBuilder.standard().withClientConfiguration(client.awsConfiguration.clientConfiguration).build()
 
-
     def setupSpec() {
         createTestData()
     }
@@ -71,7 +69,6 @@ class AWSParameterStoreClientSpec extends Specification {
         client instanceof AWSParameterStoreConfigClient
         client instanceof ConfigurationClient
     }
-
 
     void "test discovery property sources from AWS Systems Manager Parameter Store - StringList, String, and SecureString"() {
 
@@ -104,7 +101,6 @@ class AWSParameterStoreClientSpec extends Specification {
        deleteTestData()
     }
 
-
     private createTestData() {
 
         PutParameterRequest putParameterRequest = new PutParameterRequest()
@@ -135,7 +131,6 @@ class AWSParameterStoreClientSpec extends Specification {
         GetParametersResult pathResult = awsSimpleSystemsManagement.getParameters(request)
         assert pathResult.parameters
         assert pathResult.parameters.size() > 0
-
 
         request = new GetParametersRequest().withNames("/config/application_test").withWithDecryption(true)
         pathResult = awsSimpleSystemsManagement.getParameters(request)
