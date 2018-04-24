@@ -63,11 +63,6 @@ public class JwtTokenValidator implements TokenValidator {
     }
 
     @Override
-    public Optional<Map<String, Object>> validateTokenAndGetClaims(String token) {
-        return validateToken(token).map(Authentication::getAttributes);
-    }
-
-    @Override
     public Optional<Authentication> validateToken(String token) {
         CommonProfile profile;
         try {

@@ -61,7 +61,7 @@ class TokenGenerationAndValidationOnlyWithSignatureSpec extends Specification {
         TokenValidator tokenValidator = new JwtTokenValidator(new SignatureConfigurationGenerator(tokenSignatureConfiguration),
                 new EncryptionConfigurationGenerator(tokenEncryptionConfiguration, null)
         )
-        Optional<Map<String,Object>> claims = tokenValidator.validateTokenAndGetClaims(jwtToken)
+        Optional<Map<String,Object>> claims = tokenValidator.validateToken(jwtToken).get().attributes
 
         then:
         claims.isPresent()

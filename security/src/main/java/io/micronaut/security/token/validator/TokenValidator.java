@@ -31,14 +31,6 @@ import java.util.Optional;
 public interface TokenValidator extends Ordered {
 
     /**
-     * Validates the provided token and returns the claims.
-     *
-     * @param token The token string
-     * @return The claims contained in the token or {@link Optional#empty} if the validation fails
-     */
-    Optional<Map<String, Object>> validateTokenAndGetClaims(String token);
-
-    /**
      * Validates the provided token and returns the authentication state.
      *
      * @param token The token string

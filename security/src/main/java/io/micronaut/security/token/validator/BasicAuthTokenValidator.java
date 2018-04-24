@@ -59,11 +59,6 @@ public class BasicAuthTokenValidator implements TokenValidator {
     }
 
     @Override
-    public Optional<Map<String, Object>> validateTokenAndGetClaims(String encodedToken) {
-        return validateToken(encodedToken).map(Authentication::getAttributes);
-    }
-
-    @Override
     public Optional<Authentication> validateToken(String encodedToken) {
 
         Optional<UsernamePasswordCredentials> creds = credsFromEncodedToken(encodedToken);
