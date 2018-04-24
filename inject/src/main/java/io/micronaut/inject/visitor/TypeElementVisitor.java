@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-
 /**
  * Provides a hook into the compilation process to allow user
  * defined functionality to be created at compile time.

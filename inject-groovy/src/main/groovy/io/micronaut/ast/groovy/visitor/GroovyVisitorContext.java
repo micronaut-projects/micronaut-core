@@ -20,14 +20,17 @@ import io.micronaut.inject.visitor.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.ErrorCollector;
+import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
  * The visitor context when visiting Groovy code.
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 public class GroovyVisitorContext implements VisitorContext {
@@ -40,16 +43,24 @@ public class GroovyVisitorContext implements VisitorContext {
         this.errorCollector = sourceUnit.getErrorCollector();
     }
 
-    private SyntaxErrorMessage buildMessage(String message, Element element) {
+    @Override
+    public void fail(String message, Element element) {
+        errorCollector.addError(buildErrorMessage(message, element));
+    }
+
+    @Override
+    public void warn(String message, Element element) {
+        ASTNode expr = (ASTNode) element.getNativeType();
+        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+        System.err.println("WARNING: " + message + "\n\n" + sample);
+
+    }
+
+    private SyntaxErrorMessage buildErrorMessage(String message, Element element) {
         ASTNode expr = (ASTNode) element.getNativeType();
         return new SyntaxErrorMessage(
                 new SyntaxException(message + '\n', expr.getLineNumber(), expr.getColumnNumber(),
                         expr.getLastLineNumber(), expr.getLastColumnNumber()), sourceUnit);
-    }
-
-    @Override
-    public void fail(String message, Element element) {
-        errorCollector.addError(buildMessage(message, element));
     }
 
 }

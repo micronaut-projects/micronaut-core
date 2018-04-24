@@ -20,9 +20,24 @@ package io.micronaut.inject.visitor;
  * log messages during compilation and fail compilation.
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface VisitorContext {
 
+    /**
+     * Allows failing compilation for a given element with the given message
+     *
+     * @param message The message
+     * @param element The element
+     */
     void fail(String message, Element element);
+
+    /**
+     * Allows printing a warning for the given message and element
+     *
+     * @param message The message
+     * @param element The element
+     */
+    void warn(String message, Element element);
 }

@@ -41,4 +41,10 @@ public class JavaVisitorContext implements VisitorContext {
         Element el = (Element) element.getNativeType();
         messager.printMessage(Diagnostic.Kind.ERROR, message, el);
     }
+
+    @Override
+    public void warn(String message, io.micronaut.inject.visitor.Element element) {
+        Element el = (Element) element.getNativeType();
+        messager.printMessage(Diagnostic.Kind.WARNING, message, el);
+    }
 }
