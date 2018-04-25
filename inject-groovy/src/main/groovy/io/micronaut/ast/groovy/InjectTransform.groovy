@@ -109,7 +109,7 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
+@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
@@ -834,7 +834,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             constructorGenericTypeMap
                     )
                 } else {
-                    addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
+                    addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", targetClass)
                 }
 
             }
@@ -848,7 +848,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitField(FieldNode fieldNode) {
             if (fieldNode.name == 'metaClass') return
             int modifiers = fieldNode.modifiers
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) || fieldNode.isSynthetic()) {
+            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
+                return
+            }
+            if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
                 return
             }
             ClassNode declaringClass = fieldNode.declaringClass
@@ -1130,7 +1133,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap
                         )
                     } else {
-                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
+                        addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
 
@@ -1145,13 +1148,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
-            List<ConstructorNode> publicConstructors = findPublicConstructors(constructors)
+            List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors)
 
             ConstructorNode constructorNode
-            if (publicConstructors.size() == 1) {
-                constructorNode = publicConstructors[0]
+            if (nonPrivateConstructors.size() == 1) {
+                constructorNode = nonPrivateConstructors[0]
             } else {
-                constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
+                constructorNode = nonPrivateConstructors.find { it.getAnnotations(makeCached(Inject)) }
+                if (!constructorNode) {
+                    constructorNode = nonPrivateConstructors.find { Modifier.isPublic(it.modifiers) }
+                }
             }
             constructorNode
         }
@@ -1168,14 +1174,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        private List<ConstructorNode> findPublicConstructors(List<ConstructorNode> constructorNodes) {
-            List<ConstructorNode> publicConstructors = []
+        private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
+            List<ConstructorNode> nonPrivateConstructors = []
             for (node in constructorNodes) {
-                if (Modifier.isPublic(node.modifiers)) {
-                    publicConstructors.add(node)
+                if (!Modifier.isPrivate(node.modifiers)) {
+                    nonPrivateConstructors.add(node)
                 }
             }
-            return publicConstructors
+            return nonPrivateConstructors
         }
 
         private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {
