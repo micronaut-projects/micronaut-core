@@ -86,6 +86,7 @@ public class StringUtils {
      * @param objects The objects
      * @return An set of strings
      */
+    @SuppressWarnings("unused")
     public static Set<String> internSetOf(Object... objects) {
         if (objects == null || objects.length == 0) {
             return Collections.emptySet();
@@ -104,6 +105,7 @@ public class StringUtils {
      * @return An unmodifiable set of strings
      * @see CollectionUtils#mapOf(Object...)
      */
+    @SuppressWarnings("unused")
     public static Map<String, Object> internMapOf(Object... values) {
         if (values == null) {
             return Collections.emptyMap();

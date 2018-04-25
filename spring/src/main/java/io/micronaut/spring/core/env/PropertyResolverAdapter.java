@@ -17,6 +17,7 @@
 package io.micronaut.spring.core.env;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import org.springframework.core.env.PropertyResolver;
 
@@ -46,34 +47,34 @@ public class PropertyResolverAdapter implements PropertyResolver {
 
     @Override
     public boolean containsProperty(String key) {
-        return propertyResolver.getProperty(key, String.class).isPresent();
+        return propertyResolver.getProperty(NameUtils.hyphenate(key), String.class).isPresent();
     }
 
     @Override
     public String getProperty(String key) {
-        return propertyResolver.getProperty(key, String.class).orElse(null);
+        return propertyResolver.getProperty(NameUtils.hyphenate(key), String.class).orElse(null);
     }
 
     @Override
     public String getProperty(String key, String defaultValue) {
-        return getProperty(key, String.class, null);
+        return getProperty(NameUtils.hyphenate(key), String.class, null);
     }
 
     @Override
     public <T> T getProperty(String key, Class<T> targetType) {
-        return getProperty(key, targetType, null);
+        return getProperty(NameUtils.hyphenate(key), targetType, null);
     }
 
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
-        return propertyResolver.getProperty(key, targetType, defaultValue);
+        return propertyResolver.getProperty(NameUtils.hyphenate(key), targetType, defaultValue);
     }
 
     @Override
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
-        Optional<String> property = propertyResolver.getProperty(key, String.class);
+        Optional<String> property = propertyResolver.getProperty(NameUtils.hyphenate(key), String.class);
         if (property.isPresent()) {
-            Optional<Class> aClass = ClassUtils.forName(key, Thread.currentThread().getContextClassLoader());
+            Optional<Class> aClass = ClassUtils.forName(property.get(), Thread.currentThread().getContextClassLoader());
             if (aClass.isPresent()) {
                 return aClass.get();
             }
@@ -83,12 +84,12 @@ public class PropertyResolverAdapter implements PropertyResolver {
 
     @Override
     public String getRequiredProperty(String key) throws IllegalStateException {
-        return getRequiredProperty(key, String.class);
+        return getRequiredProperty(NameUtils.hyphenate(key), String.class);
     }
 
     @Override
     public <T> T getRequiredProperty(String key, Class<T> targetType) throws IllegalStateException {
-        T v = getProperty(key, targetType, null);
+        T v = getProperty(NameUtils.hyphenate(key), targetType, null);
         if (v == null) {
             throw new IllegalStateException("Property [" + key + "] not found");
         }

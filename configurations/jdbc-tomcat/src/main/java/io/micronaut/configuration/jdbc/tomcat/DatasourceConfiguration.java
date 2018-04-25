@@ -18,11 +18,14 @@ package io.micronaut.configuration.jdbc.tomcat;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.convert.format.KeyFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 
 import javax.annotation.PostConstruct;
+import java.util.Properties;
 
 /**
  * Allows the configuration of Tomcat JDBC data sources. All properties on
@@ -61,6 +64,11 @@ public class DatasourceConfiguration extends PoolProperties implements BasicJdbc
         getUsername();
         getPassword();
         getValidationQuery();
+    }
+
+    @Override
+    public void setDbProperties(@KeyFormat(StringConvention.UNDER_SCORE_SEPARATED) Properties dbProperties) {
+        super.setDbProperties(dbProperties);
     }
 
     /**

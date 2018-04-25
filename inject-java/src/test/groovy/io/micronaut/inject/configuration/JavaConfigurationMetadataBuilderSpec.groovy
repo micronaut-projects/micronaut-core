@@ -68,7 +68,7 @@ class MyProperties {
 
         builder.properties.size() == 1
         propertyMetadata.name == 'setterTest'
-        propertyMetadata.path == 'foo.setterTest'
+        propertyMetadata.path == 'foo.setter-test'
         propertyMetadata.type == 'java.lang.String'
         propertyMetadata.declaringType == 'test.MyProperties'
         propertyMetadata.description == 'some description'
@@ -237,7 +237,7 @@ class ParentProperties {
 
         builder.properties.size() == 1
         builder.properties[0].name == 'setterTest'
-        builder.properties[0].path == 'parent.child.setterTest'
+        builder.properties[0].path == 'parent.child.setter-test'
         builder.properties[0].type == 'java.lang.String'
         builder.properties[0].declaringType == 'test.ChildProperties'
         builder.properties[0].description == 'some description'
@@ -279,7 +279,7 @@ class GrandParentProperties {
 
         builder.properties.size() == 1
         builder.properties[0].name == 'setterTest'
-        builder.properties[0].path == 'grand.parent.child.setterTest'
+        builder.properties[0].path == 'grand.parent.child.setter-test'
         builder.properties[0].type == 'java.lang.String'
         builder.properties[0].declaringType == 'test.ChildProperties'
         builder.properties[0].description == 'some description'
@@ -382,13 +382,13 @@ class GrandParentProperties {
 
         then:
         builder.configurations.size() == 1
-        builder.configurations[0].name == 'grand.parent.child.innerParent.inner'
+        builder.configurations[0].name == 'grand.parent.child.inner-parent.inner'
         builder.configurations[0].description == 'some description'
         builder.configurations[0].type == 'test.ChildProperties$InnerProperties'
 
         builder.properties.size() == 1
         builder.properties[0].name == 'foo'
-        builder.properties[0].path == 'grand.parent.child.innerParent.inner.foo'
+        builder.properties[0].path == 'grand.parent.child.inner-parent.inner.foo'
         builder.properties[0].type == 'java.lang.String'
         builder.properties[0].declaringType == 'test.ChildProperties$InnerProperties'
         builder.properties[0].description == 'some description'

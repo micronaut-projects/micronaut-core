@@ -17,22 +17,7 @@ package io.micronaut.discovery.eureka
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.eureka.client.v2.ApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.EurekaOperations
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfos
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.eureka.client.v2.ApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.EurekaOperations
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfos
+import io.micronaut.discovery.eureka.client.v2.*
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -41,7 +26,8 @@ import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 import javax.validation.Valid
-import javax.validation.constraints.*
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
 
 /**

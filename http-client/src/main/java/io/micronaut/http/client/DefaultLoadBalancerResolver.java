@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
@@ -94,6 +95,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 return Optional.empty();
             }
         } else {
+            reference = NameUtils.hyphenate(reference);
             return resolveLoadBalancerForServiceID(reference);
         }
     }

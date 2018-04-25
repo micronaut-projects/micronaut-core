@@ -104,7 +104,7 @@ class Book {
 @Singleton
 abstract class BookService {
 
-    @Value('${dataSource.dbCreate}')
+    @Value('${data-source.db-create}')
     String dbCreate
 
     abstract List<Book> list()

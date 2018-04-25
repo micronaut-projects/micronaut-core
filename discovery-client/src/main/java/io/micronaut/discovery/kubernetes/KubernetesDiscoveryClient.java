@@ -16,6 +16,7 @@
 package io.micronaut.discovery.kubernetes;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
@@ -42,7 +43,7 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
-
+        serviceId = NameUtils.hyphenate(serviceId);
         Map<String, String> environment = resolveEnvironment();
 
         String envName = serviceId.toUpperCase(Locale.ENGLISH).replace('-', '_');
