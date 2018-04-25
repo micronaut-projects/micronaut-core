@@ -62,9 +62,9 @@ class Parent {
         beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedMethods[0].name == 'setParentTest'
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.parentTest'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.parent-test'
         beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.setterTest'
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.*.setter-test'
         beanDefinition.injectedMethods[1].name == 'setSetterTest'
 
     }

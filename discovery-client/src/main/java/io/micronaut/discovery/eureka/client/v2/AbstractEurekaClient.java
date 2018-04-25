@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.discovery.eureka.EurekaServiceInstance;
@@ -65,6 +66,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        serviceId = NameUtils.hyphenate(serviceId);
         Flowable<List<ServiceInstance>> flowable = Flowable.fromPublisher(getApplicationInfo(serviceId)).map(applicationInfo -> {
             List<InstanceInfo> instances = applicationInfo.getInstances();
             return instances.stream()

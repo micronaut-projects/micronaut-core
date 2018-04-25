@@ -17,6 +17,7 @@
 package io.micronaut.discovery;
 
 import io.micronaut.cache.CacheConfiguration;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -56,10 +57,12 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
+        serviceId = NameUtils.hyphenate(serviceId);
         if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
-        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(serviceId)));
+        String finalServiceId = serviceId;
+        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(finalServiceId)));
         Maybe<List<ServiceInstance>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((instances, otherInstances) -> {
             instances.addAll(otherInstances);
             return instances;

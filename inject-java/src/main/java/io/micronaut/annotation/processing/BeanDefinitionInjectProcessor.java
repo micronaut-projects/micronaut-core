@@ -101,10 +101,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(processingEnv.getMessager());
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
-        List<LoadedVisitor> loadedVisitors = new ArrayList<>();
+        Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
         for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
             if (definition.isPresent()) {
-                loadedVisitors.add(new LoadedVisitor(definition.load(), visitorContext, genericUtils, processingEnv, annotationUtils));
+                loadedVisitors.put(definition.getName(), new LoadedVisitor(definition.load(), visitorContext, genericUtils, processingEnv, annotationUtils));
             }
         }
 
@@ -125,7 +125,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String name = typeElement.getQualifiedName().toString();
                         if (!beanDefinitionWriters.containsKey(name)) {
                             if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                                Stream<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement));
+                                Stream<LoadedVisitor> matchedVisitors = loadedVisitors.values().stream().filter((v) -> v.matches(typeElement));
                                 boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
                                 if (!isInterface) {
                                     if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {

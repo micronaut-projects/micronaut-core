@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.naming.NameUtils;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +44,7 @@ public class ApplicationConfiguration {
     /**
      * Property name for Micronaut default charset.
      */
-    public static final String DEFAULT_CHARSET = PREFIX + ".defaultCharset";
+    public static final String DEFAULT_CHARSET = PREFIX + ".default-charset";
 
     /**
      * Property name for Micronaut application name.
@@ -83,7 +84,9 @@ public class ApplicationConfiguration {
      * @param name Set the application name
      */
     public void setName(String name) {
-        this.name = name;
+        if(name != null) {
+            this.name = NameUtils.hyphenate(name);
+        }
     }
 
     /**

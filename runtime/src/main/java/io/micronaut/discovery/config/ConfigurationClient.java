@@ -32,7 +32,7 @@ public interface ConfigurationClient extends Described {
     /**
      * The prefix used to configure the config client.
      */
-    String CONFIGURATION_PREFIX = "micronaut.configClient";
+    String CONFIGURATION_PREFIX = "micronaut.config-client";
 
     /**
      * The read timeout used when reading distributed configuration.
@@ -42,7 +42,7 @@ public interface ConfigurationClient extends Described {
     /**
      * The read timeout used when reading distributed configuration.
      */
-    String READ_TIMEOUT = CONFIGURATION_PREFIX + ".readTimeout";
+    String READ_TIMEOUT = CONFIGURATION_PREFIX + ".read-timeout";
 
     /**
      * Retrieves all of the {@link PropertySource} registrations for the given environment.

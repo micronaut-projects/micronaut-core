@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@Configuration
-@Requires(property = "data-source.url")
-package io.micronaut.inject.configurations.requiresproperty;
+package io.micronaut.core.convert.format;
+import io.micronaut.core.naming.conventions.StringConvention;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+/**
+ * Allows configuring the format of Map keys when injecting map configuration
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Documented
+@Retention(RUNTIME)
+public @interface KeyFormat {
+    /**
+     * @return The string conversion to use
+     */
+    StringConvention value();
+}
