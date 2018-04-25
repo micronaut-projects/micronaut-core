@@ -29,6 +29,11 @@ import io.reactivex.Flowable
  */
 class UploadSpec extends AbstractMicronautSpec {
 
+    void cleanup() {
+        File file = File.createTempFile("file.json", "temp")
+        file.delete()
+    }
+
     void "test file upload"() {
         given:
         MultipartBody body = MultipartBody.builder()

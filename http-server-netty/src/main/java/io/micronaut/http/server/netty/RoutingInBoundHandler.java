@@ -24,6 +24,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.HttpAttributes;
@@ -37,7 +38,6 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
@@ -527,7 +527,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 } else if (StreamingFileUpload.class.isAssignableFrom(typeVariableType)) {
                                     typeVariable = Argument.of(PartData.class);
-                                } else if (CompletedFileUpload.class.isAssignableFrom(typeVariableType)) {
+                                } else if (!ClassUtils.isJavaLangType(typeVariableType)) {
                                     partialUpload = false;
                                 }
 
