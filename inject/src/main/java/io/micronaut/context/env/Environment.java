@@ -75,6 +75,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String ENVIRONMENTS_PROPERTY = "micronaut.environments";
 
     /**
+     * The environment key that stores additional environments
+     */
+    String ENVIRONMENTS_ENV = "MICRONAUT_ENVIRONMENTS";
+
+    /**
      * The default bootstrap config name
      */
     String BOOTSTRAP_NAME = "bootstrap";
