@@ -16,6 +16,7 @@
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.naming.NameUtils
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.DiscoveryClient
@@ -56,7 +57,7 @@ class TtlHeartbeatSpec extends Specification implements MockConsulSpec {
         conditions.eventually {
             Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
             Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
-            MockConsulServer.passingReports.find { it.contains(serviceId)} != null
+            MockConsulServer.passingReports.find { it.contains(NameUtils.hyphenate(serviceId))} != null
         }
 
         cleanup:

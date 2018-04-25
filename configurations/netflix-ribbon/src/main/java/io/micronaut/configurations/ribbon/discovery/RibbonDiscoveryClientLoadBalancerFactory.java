@@ -27,6 +27,7 @@ import io.micronaut.configurations.ribbon.DiscoveryClientServerList;
 import io.micronaut.configurations.ribbon.RibbonLoadBalancer;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
@@ -63,12 +64,14 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
 
     @Override
     public LoadBalancer create(String serviceID) {
+        serviceID = NameUtils.hyphenate(serviceID);
         IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(defaultClientConfig);
         IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IRule.class));
         IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IPing.class));
         ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(ServerListFilter.class));
 
-        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> new DiscoveryClientServerList(getDiscoveryClient(), serviceID));
+        String finalServiceID = serviceID;
+        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> new DiscoveryClientServerList(getDiscoveryClient(), finalServiceID));
 
         if (niwsClientConfig.getPropertyAsBoolean(CommonClientConfigKey.InitializeNFLoadBalancer, true)) {
             return createRibbonLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);

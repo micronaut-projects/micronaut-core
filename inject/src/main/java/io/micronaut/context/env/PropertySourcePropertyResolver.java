@@ -17,6 +17,8 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.format.KeyFormat;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
@@ -184,7 +186,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     value = resolvePlaceHoldersIfNecessary(value);
                     return conversionService.convert(value, conversionContext);
                 } else if (Properties.class.isAssignableFrom(requiredType)) {
-                    Properties properties = resolveSubProperties(name, entries);
+                    Properties properties = resolveSubProperties(name, entries, conversionContext);
                     return Optional.of((T) properties);
                 } else if (Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
@@ -247,9 +249,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
 
-    protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
+    protected Properties resolveSubProperties(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
+        KeyFormat keyFormat = conversionContext.getAnnotation(KeyFormat.class);
         String prefix = name + '.';
         entries.entrySet().stream()
                 .filter(map -> map.getKey().startsWith(prefix))
@@ -257,6 +260,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     Object value = entry.getValue();
                     if (value != null) {
                         String key = entry.getKey().substring(prefix.length());
+                        if(keyFormat != null) {
+                            key = keyFormat.value().format(key);
+                        }
                         properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
                     }
                 });
@@ -339,26 +345,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
-                List<String> properties = new ArrayList<>();
-                String[] tokens = property.split("_");
-
-                StringBuilder path = new StringBuilder();
-                int len = tokens.length;
-                if (len > 1) {
-                    for (int i = 0; i < len; i++) {
-                        String token = tokens[i];
-                        if (i < (len - 1)) {
-                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
-                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
-                            properties.add(path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
-                        }
-                    }
-                } else {
-                    return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
-                }
-                return properties;
+                // environment variables are converted to lower case and dot separated
+                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH).replace('_', '.'));
             default:
-                return Arrays.asList(property, property.toLowerCase(Locale.ENGLISH));
+                return Collections.singletonList(
+                        NameUtils.hyphenate(property, true)
+                );
         }
     }
 

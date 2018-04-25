@@ -79,7 +79,7 @@ public class AnnotatedFunctionRouteBuilder
         UriNamingStrategy uriNamingStrategy,
         ConversionService<?> conversionService,
         MediaTypeCodecRegistry codecRegistry,
-        @Value("${function.contextPath:/}") String contextPath) {
+        @Value("${function.context-path:/}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.localFunctionRegistry = new DefaultLocalFunctionRegistry(codecRegistry);
         this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';

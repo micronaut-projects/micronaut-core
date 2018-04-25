@@ -18,10 +18,6 @@ package io.micronaut.context.env.yaml
 import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySourceLoader
-import io.micronaut.context.env.DefaultEnvironment
-import io.micronaut.context.env.Environment
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.env.PropertySourceLoader
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import spock.lang.Specification
@@ -79,8 +75,8 @@ dataSource:
 
         then:
         env.get("hibernate.cache.queries", Boolean).get() == false
-        env.get("dataSource.pooled", Boolean).get() == true
-        env.get("dataSource.password", String).get() == 'test'
-        env.get("dataSource.jmxExport", boolean).get() == true
+        env.get("data-source.pooled", Boolean).get() == true
+        env.get("data-source.password", String).get() == 'test'
+        env.get("data-source.jmx-export", boolean).get() == true
     }
 }

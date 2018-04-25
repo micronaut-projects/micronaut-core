@@ -16,6 +16,7 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.naming.NameUtils;
 
 import javax.annotation.Nullable;
 import javax.lang.model.element.TypeElement;
@@ -67,7 +68,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
 
         String path = buildTypePath(type, type);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
-        configurationMetadata.name = path;
+        configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = getTypeString(type);
         configurationMetadata.description = description;
         this.configurations.add(configurationMetadata);
@@ -95,7 +96,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = getTypeString(declaringType);
         metadata.name = name;
-        metadata.path = buildPropertyPath(owningType,declaringType, name);
+        metadata.path = NameUtils.hyphenate( buildPropertyPath(owningType,declaringType, name), true);
         metadata.type = propertyType;
         metadata.description = description;
         metadata.defaultValue = defaultValue;
@@ -122,7 +123,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
             PropertyMetadata metadata = new PropertyMetadata();
             metadata.declaringType = last.type;
             metadata.name = name;
-            metadata.path = last.name + "." + name;
+            metadata.path = NameUtils.hyphenate( last.name + "." + name, true) ;
             metadata.type = propertyType;
             metadata.description = description;
             metadata.defaultValue = defaultValue;
