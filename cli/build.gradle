@@ -5,14 +5,14 @@ repositories {
 
 dependencies {
     compile "org.apache.ant:ant:1.9.7"
-    compile "org.codehaus.groovy:groovy-ant:$groovyVersion"
-    compile "org.codehaus.groovy:groovy-json:$groovyVersion"
-    compile "org.codehaus.groovy:groovy-jmx:$groovyVersion"
+    compile dependencyVersions.groovyAnt
+    compile dependencyVersions.groovyJson
+    compile dependencyVersions.groovyJmx
     compile "org.fusesource.jansi:jansi:1.14"
     compile "jline:jline:2.12"
     compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
-    compile "org.yaml:snakeyaml:1.14"
-    runtime "org.slf4j:slf4j-simple:$slf4jVersion"
+    compile dependencyVersions.yaml
+    runtime dependencyVersions.slf4jSimple
     runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 
     testCompile "net.sf.expectit:expectit-core:0.5.0"

@@ -5,7 +5,7 @@ shadowJar {
     dependencies {
         exclude(project(":core"))
 
-        exclude(dependency(group:'org.slf4j',name:'slf4j-api',version:slf4jVersion))
+        exclude(dependency(dependencyVersions.slf4jApi))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))
@@ -26,13 +26,14 @@ dependencies {
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
     compile project(path: ':core')
 
-    compileOnly "org.codehaus.groovy:groovy:$groovyVersion"
-    compileOnly group: 'org.ow2.asm', name: 'asm', version: asmVersion
-    compileOnly group: 'org.ow2.asm', name: 'asm-commons', version: asmVersion
-    compileOnly group: 'org.ow2.asm', name: 'asm-tree', version: asmVersion
-    compileOnly group: 'com.github.ben-manes.caffeine', name: 'caffeine', version: caffeineVersion
+    compileOnly dependencyVersions.groovy
+    compile dependencyVersions.asm
+    compile dependencyVersions.asmCommons
+    compile dependencyVersions.asmTree
+    compileOnly dependencyVersions.caffeine
+
     ['javax.validation:validation-api:1.1.0.Final',
-     'org.yaml:snakeyaml:1.18'].each { String dep ->
+     dependencyVersions.yaml].each { String dep ->
         compileOnly dep
         testCompile dep
     }

@@ -20,8 +20,8 @@ dependencies {
 
     compile group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'
     compile group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'
-    compile group:'org.ow2.asm', name: 'asm', version:asmVersion
-    compile group:'org.ow2.asm', name: 'asm-commons', version:asmVersion
-    compile group:'org.ow2.asm', name: 'asm-tree', version:asmVersion
-    compile group:'com.github.ben-manes.caffeine',name:'caffeine', version: caffeineVersion
+    compile dependencyVersions.asm
+    compile dependencyVersions.asmCommons
+    compile dependencyVersions.asmTree
+    compile dependencyVersions.caffeine
 }

@@ -158,26 +158,26 @@ subprojects { subproject ->
 
     dependencies {
         if (subproject.name != "bom") {
-            compile "org.slf4j:slf4j-api:$slf4jVersion"
+            compile dependencyVersions.slf4jApi
         }
-//        shadowCompile group:"org.slf4j", name:"slf4j-api", version:slf4jVersion
+//        shadowCompile dependencyVersions.slf4jApi
 
-        compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
-        testCompile([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
-        testCompile "org.codehaus.groovy:groovy:$groovyVersion"
-        testCompile("org.spockframework:spock-core:${spockVersion}") {
+        compileOnly dependencyVersions.caffeine
+        testCompile dependencyVersions.caffeine
+        testCompile dependencyVersions.groovy
+        testCompile(dependencyVersions.spock) {
             exclude module:'groovy-all'
         }
         testCompile "cglib:cglib-nodep:2.2.2"
         testCompile "org.objenesis:objenesis:1.4"
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
-        compileOnly "org.ow2.asm:asm:$asmVersion"
-        compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+        testCompile dependencyVersions.groovyTest
+        compileOnly dependencyVersions.asm
+        compileOnly dependencyVersions.asmCommons
 
-        testCompile "org.ow2.asm:asm:$asmVersion"
-        testCompile "org.ow2.asm:asm-commons:$asmVersion"
+        testCompile dependencyVersions.asm
+        testCompile dependencyVersions.asmCommons
     }
 
     task allDeps(type: DependencyReportTask) {}
