@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -24,6 +25,8 @@ import java.lang.annotation.*;
 /**
  * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
  * This also can be used in conjection with @Headers to list headers on a client class that will always be applied.
+ * Example on a class:
+ *
  *
  * @author Graeme Rocher
  * @author rvanderwerf
@@ -37,10 +40,15 @@ import java.lang.annotation.*;
 public @interface Header {
 
     /**
+     * If used as a bound parameter, this is the header name. If used on a class level this is value and not the header name.
      * @return The name of the header, otherwise it is inferred from the parameter name
      */
     String value() default "";
 
-    String name() default ""; // if used on a class this is the header name and value is the value
+    /**
+     * If used on a class level with @Headers this is the header name and value is the value.
+     * @return name of header when using with @Headers
+     */
+    String name() default "";
 
 }

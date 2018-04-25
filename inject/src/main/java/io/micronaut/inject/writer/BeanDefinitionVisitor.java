@@ -21,9 +21,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.annotation.AnnotationValue;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 

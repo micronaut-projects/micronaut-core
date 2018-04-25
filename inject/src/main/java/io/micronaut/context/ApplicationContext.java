@@ -64,10 +64,22 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     ApplicationContext stop();
 
     @Override
-    <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier);
+    <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier, boolean inject);
 
     @Override
-    <T> ApplicationContext registerSingleton(Class<T> type, T singleton);
+    default <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier) {
+        return registerSingleton(type, singleton, qualifier, true);
+    }
+
+    @Override
+    default <T> ApplicationContext registerSingleton(Class<T> type, T singleton) {
+        return registerSingleton(type, singleton, null, true);
+    }
+
+    @Override
+    default ApplicationContext registerSingleton(Object singleton, boolean inject) {
+        return (ApplicationContext) BeanContext.super.registerSingleton(singleton, inject);
+    }
 
     /**
      * Allow configuration the {@link Environment}
