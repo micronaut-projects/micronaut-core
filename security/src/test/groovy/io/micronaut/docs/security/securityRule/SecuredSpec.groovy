@@ -4,10 +4,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.YamlAsciidocTagCleaner
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authorization.AuthorizationUtils
+import io.micronaut.security.endpoints.LoginController
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -20,7 +22,10 @@ class SecuredSpec extends Specification implements AuthorizationUtils {
             'spec.authentication': true,
             "micronaut.security.enabled": true,
             "micronaut.security.endpoints.login": true,
-            "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            "micronaut.security.token.bearer.enabled": true,
+            "micronaut.security.jwt.enabled": true,
+            "micronaut.security.jwt.generator.signature.enabled": true,
+            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ]
 
     @Shared
@@ -41,7 +46,13 @@ class SecuredSpec extends Specification implements AuthorizationUtils {
 
     void "verify you can access an endpoint annotated with @Secured('isAuthenticated()') with an authenticated user"() {
         given:
+        embeddedServer.applicationContext.getBean(LoginController.class)
+
+        when:
         String token = loginWith("valid")
+
+        then:
+        token
 
         when:
         get("/example/authenticated")
@@ -51,7 +62,7 @@ class SecuredSpec extends Specification implements AuthorizationUtils {
         e.status == HttpStatus.UNAUTHORIZED
 
         when:
-        HttpResponse<String> response = get("/example/authenticated", token)
+        get("/example/authenticated", token)
 
         then:
         noExceptionThrown()

@@ -21,7 +21,7 @@ import io.micronaut.core.util.PathMatcher;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.InterceptUrlMapPattern;
-import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
 import java.net.URI;
@@ -45,10 +45,10 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param tokenConfiguration The TokenConfiguration used by the parent class.
+     * @param jwtGeneratorConfiguration The JwtConfiguration used by the parent class.
      */
-    InterceptUrlMapRule(TokenConfiguration tokenConfiguration) {
-        super(tokenConfiguration);
+    InterceptUrlMapRule(JwtGeneratorConfiguration jwtGeneratorConfiguration) {
+        super(jwtGeneratorConfiguration);
         this.pathMatcher = PathMatcher.ANT;
     }
 

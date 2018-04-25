@@ -70,6 +70,7 @@ class BooksControllerSpec extends Specification {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"), List)
 
         then:
+        noExceptionThrown()
         booksRsp.status.code == 200
         booksRsp.body.isPresent()
         booksRsp.body.get().size() == BooksRepositoryService.GROOVY_BOOKS.size()
@@ -110,6 +111,6 @@ class BooksControllerSpec extends Specification {
 
     protected String accessToken(String username, List<String> roles) {
         TokenGenerator tokenGenerator = embeddedServer.applicationContext.getBean(TokenGenerator.class)
-        tokenGenerator.generateToken(new UserDetails(username, roles), 3600)
+        tokenGenerator.generateToken(new UserDetails(username, roles), 3600).get()
     }
 }

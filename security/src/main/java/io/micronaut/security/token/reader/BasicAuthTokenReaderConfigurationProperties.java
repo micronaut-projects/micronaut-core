@@ -17,7 +17,6 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.security.config.SecurityConfiguration;
 
 /**
  * Default implementation of {@link BearerTokenReaderConfiguration}.
@@ -28,7 +27,7 @@ import io.micronaut.security.config.SecurityConfiguration;
 @ConfigurationProperties(BasicAuthTokenReaderConfigurationProperties.PREFIX)
 public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTokenReaderConfiguration {
 
-    public static final String PREFIX = SecurityConfiguration.PREFIX + ".basicAuth";
+    public static final String PREFIX = TokenReader.PREFIX + ".basicAuth";
 
     protected boolean enabled = false;
     protected String headerName = "Authorization";

@@ -17,7 +17,6 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 
 import javax.inject.Singleton;
 
@@ -26,8 +25,7 @@ import javax.inject.Singleton;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = BearerTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = BearerTokenReaderConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class BearerTokenReader extends HttpHeaderTokenReader implements TokenReader {
 

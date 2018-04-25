@@ -3,6 +3,7 @@ package io.micronaut.security.authorization
 import groovy.transform.CompileStatic
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.render.BearerAccessRefreshToken
@@ -12,8 +13,8 @@ trait AuthorizationUtils {
 
     abstract RxHttpClient getClient()
 
-    String loginWith(RxHttpClient client, String username = "valid") {
-        def creds = new UsernamePasswordCredentials(username, "valid")
+    String loginWith(RxHttpClient client, String username = "valid", String password = "valid") {
+        def creds = new UsernamePasswordCredentials(username, password)
         def resp = client.toBlocking().exchange(HttpRequest.POST('/login', creds), BearerAccessRefreshToken)
         resp.body().accessToken
     }

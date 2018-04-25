@@ -18,8 +18,6 @@ package io.micronaut.security.token.validator;
 
 import io.micronaut.core.order.Ordered;
 import io.micronaut.security.authentication.Authentication;
-
-import java.util.Map;
 import java.util.Optional;
 
 /**

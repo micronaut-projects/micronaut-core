@@ -21,7 +21,10 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
             'endpoints.health.sensitive': true,
             "micronaut.security.enabled": true,
             "micronaut.security.endpoints.login": true,
-            "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            "micronaut.security.token.bearer.enabled": true,
+            "micronaut.security.jwt.enabled": true,
+            "micronaut.security.jwt.generator.signature.enabled": true,
+            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
             "micronaut.security.interceptUrlMap": [
                     [pattern: "/urlMap/admin", access: ["ROLE_ADMIN", "ROLE_X"]],
                     [pattern: "/urlMap/**",    access: "isAuthenticated()"],
@@ -57,8 +60,11 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing the url map controller"() {
-        given:
+        when:
         String token = loginWith("valid")
+
+        then:
+        token
 
         when:
         HttpResponse<String> response = get("/urlMap/authenticated", token)

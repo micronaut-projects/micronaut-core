@@ -3,8 +3,9 @@ package io.micronaut.security.rules
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.security.config.InterceptUrlMapPattern
-import io.micronaut.security.config.SecurityConfiguration
-import io.micronaut.security.token.configuration.TokenConfiguration
+import io.micronaut.security.config.SecurityConfigurationProperties
+import io.micronaut.security.jwt.config.JwtConfiguration
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -13,14 +14,14 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
     @Unroll('#description')
     def "verify behaviour different intercept url map configurations"(SecurityRuleResult securityRuleResult, List<InterceptUrlMapPattern> interceptUrlMap, String description) {
         given:
-        def securityConfiguration = Stub(SecurityConfiguration) {
+        def securityConfiguration = Stub(SecurityConfigurationProperties) {
             getInterceptUrlMap() >> interceptUrlMap
         }
         def request = Stub(HttpRequest) {
             getUri() >> new URI('/books')
             getMethod() >> HttpMethod.GET
         }
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(TokenConfiguration), securityConfiguration)
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(JwtGeneratorConfiguration), securityConfiguration)
 
         expect:
         provider.check(request, null, null) == securityRuleResult
@@ -35,7 +36,7 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
     @Unroll("comparing required: #requiredRoles and granted should return #description")
     def 'verify compare role behaviour'(List<String> requiredRoles, List<String> grantedRoles, SecurityRuleResult expected, String description) {
         given:
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(TokenConfiguration), Mock(SecurityConfiguration))
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(JwtGeneratorConfiguration), Mock(SecurityConfigurationProperties))
 
         expect:
         expected == provider.compareRoles(requiredRoles, grantedRoles)

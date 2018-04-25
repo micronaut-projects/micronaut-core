@@ -27,9 +27,9 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-abstract class HttpHeaderTokenReader implements TokenReader {
+public abstract class HttpHeaderTokenReader implements TokenReader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BearerTokenReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HttpHeaderTokenReader.class);
 
     /**
      *

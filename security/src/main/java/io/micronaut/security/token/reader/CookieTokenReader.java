@@ -19,6 +19,7 @@ package io.micronaut.security.token.reader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookie;
+
 import javax.inject.Singleton;
 import java.util.Optional;
 

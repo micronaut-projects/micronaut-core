@@ -17,8 +17,8 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
-import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * A security rule implementation backed by the {@link SecurityConfiguration#getIpPatterns()} ()}.
+ * A security rule implementation backed by the {@link SecurityConfigurationProperties#getIpPatterns()} ()}.
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -44,13 +44,13 @@ public class IpPatternsRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param tokenConfiguration The token configuration
-     * @param securityConfiguration The security Configuration
+     * @param jwtGeneratorConfiguration The token configuration
+     * @param securityConfigurationProperties The security Configuration
      */
-    public IpPatternsRule(TokenConfiguration tokenConfiguration,
-                          SecurityConfiguration securityConfiguration) {
-        super(tokenConfiguration);
-        this.patternList = securityConfiguration.getIpPatterns()
+    public IpPatternsRule(JwtGeneratorConfiguration jwtGeneratorConfiguration,
+                          SecurityConfigurationProperties securityConfigurationProperties) {
+        super(jwtGeneratorConfiguration);
+        this.patternList = securityConfigurationProperties.getIpPatterns()
                         .stream()
                         .map(Pattern::compile)
                         .collect(Collectors.toList());
@@ -68,7 +68,7 @@ public class IpPatternsRule extends AbstractSecurityRule {
             return SecurityRuleResult.UNKNOWN;
         } else {
             if (patternList.stream().anyMatch(pattern ->
-                    pattern.pattern().equals(SecurityConfiguration.ANYWHERE) ||
+                    pattern.pattern().equals(SecurityConfigurationProperties.ANYWHERE) ||
                     pattern.matcher(request.getRemoteAddress().getAddress().getHostAddress()).matches())) {
                 return SecurityRuleResult.UNKNOWN;
             } else {

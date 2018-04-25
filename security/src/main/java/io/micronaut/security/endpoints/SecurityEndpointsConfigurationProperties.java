@@ -17,7 +17,7 @@
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.security.config.SecurityConfiguration;
+import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
  * Retrieves configuration for the security endpoints.
@@ -28,7 +28,7 @@ import io.micronaut.security.config.SecurityConfiguration;
 @ConfigurationProperties(SecurityEndpointsConfigurationProperties.PREFIX)
 public class SecurityEndpointsConfigurationProperties implements SecurityEndpointsConfiguration {
 
-    public static final String PREFIX = SecurityConfiguration.PREFIX + ".endpoints";
+    public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints";
 
     protected boolean login = false;
     protected boolean refresh = false;

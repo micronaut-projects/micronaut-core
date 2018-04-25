@@ -17,6 +17,7 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.Requires;
+
 import javax.inject.Singleton;
 
 /**

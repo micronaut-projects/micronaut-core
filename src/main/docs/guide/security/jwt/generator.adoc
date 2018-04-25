@@ -1,0 +1,13 @@
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.jwt.generator.defaultExpiration` |  `3600` | Access token expiration time in milliseconds
+
+| `micronaut.security.jwt.generator.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds. By default, they don't expire.
+
+| `micronaut.security.jwt.generator.rolesClaimName` | `roles` | Default claim name
+
+|===
+
+

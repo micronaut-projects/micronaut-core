@@ -18,7 +18,7 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.Secured;
-import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
@@ -41,10 +41,10 @@ public class SecuredAnnotationRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param tokenConfiguration Token Configuration used by parent class.
+     * @param jwtGeneratorConfiguration Token Configuration used by parent class.
      */
-    SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
-        super(tokenConfiguration);
+    SecuredAnnotationRule(JwtGeneratorConfiguration jwtGeneratorConfiguration) {
+        super(jwtGeneratorConfiguration);
     }
 
     /**

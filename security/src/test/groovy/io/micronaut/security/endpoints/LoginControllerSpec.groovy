@@ -12,7 +12,7 @@ import io.micronaut.security.authentication.Authenticator
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator
-import io.micronaut.security.token.configuration.TokenConfiguration
+import io.micronaut.security.jwt.config.JwtConfiguration
 import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
@@ -27,7 +27,9 @@ class LoginControllerSpec extends Specification {
                     "spec.name": "endpoints",
                     "micronaut.security.enabled": true,
                     "micronaut.security.endpoints.login": true,
-                    "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                    "micronaut.security.jwt.enabled": true,
+                    "micronaut.security.jwt.generator.signature.enabled": true,
+                    "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
 
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -83,7 +85,7 @@ class LoginControllerSpec extends Specification {
     def "if authenticator returns empty, return empty"() {
         given:
         def accessRefreshTokenGenerator = Mock(AccessRefreshTokenGenerator)
-        def tokenConfiguration = Mock(TokenConfiguration)
+        def tokenConfiguration = Mock(JwtConfiguration)
         def authenticator = Stub(Authenticator) {
             authenticate(_) >> Optional.empty()
         }
@@ -100,7 +102,7 @@ class LoginControllerSpec extends Specification {
     def "if authenticator returns user details authenticate, it is returned"() {
         given:
         def accessRefreshTokenGenerator = Mock(AccessRefreshTokenGenerator)
-        def tokenConfiguration = Mock(TokenConfiguration)
+        def tokenConfiguration = Mock(JwtConfiguration)
         def authenticator = Stub(Authenticator) {
             authenticate(_) >> Optional.of(new UserDetails('admin', ['ROLE_USER']))
         }

@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.security.authentication.Authentication;
-import io.micronaut.security.config.SecurityConfiguration;
+import io.micronaut.security.config.SecurityConfigurationProperties;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.security.token.reader.TokenReader;
@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = SecurityConfiguration.PREFIX + ".enabled")
+@Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled")
 @Filter("/**")
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
@@ -119,11 +119,10 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
             if (token.isPresent()) {
                 LOG.debug("Token {} found in request {} {}", token.get(), method, path);
                 if (attributes.isPresent()) {
-                        String claimsString = attributes.get().entrySet()
+                        LOG.debug("Attributes: {}", attributes.get().entrySet()
                                 .stream()
                                 .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                                .collect(Collectors.joining(", "));
-                        LOG.debug("Attributes: {}", claimsString);
+                                .collect(Collectors.joining(", ")));
                 } else {
                     LOG.debug("Unauthenticated request {} {}. Failure to fetch claims because token validation failed.", method, path);
                 }

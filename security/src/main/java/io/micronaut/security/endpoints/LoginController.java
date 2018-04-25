@@ -24,7 +24,7 @@ import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.*;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
-import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.jwt.config.JwtConfiguration;
 
 import java.util.Optional;
 
@@ -41,18 +41,18 @@ public class LoginController implements LoginControllerApi {
     public static final String LOGIN_PATH = "/login";
 
     protected final AccessRefreshTokenGenerator accessRefreshTokenGenerator;
-    protected final TokenConfiguration tokenConfiguration;
+    protected final JwtConfiguration jwtConfiguration;
     protected final Authenticator authenticator;
 
     /**
      *
      * @param accessRefreshTokenGenerator AccessRefresh Token generator
-     * @param tokenConfiguration Token configuration
+     * @param jwtConfiguration Token configuration
      * @param authenticator {@link Authenticator} collaborator
      */
-    public LoginController(AccessRefreshTokenGenerator accessRefreshTokenGenerator, TokenConfiguration tokenConfiguration, Authenticator authenticator) {
+    public LoginController(AccessRefreshTokenGenerator accessRefreshTokenGenerator, JwtConfiguration jwtConfiguration, Authenticator authenticator) {
         this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
-        this.tokenConfiguration = tokenConfiguration;
+        this.jwtConfiguration = jwtConfiguration;
         this.authenticator = authenticator;
     }
 

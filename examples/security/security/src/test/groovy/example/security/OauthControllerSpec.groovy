@@ -8,11 +8,12 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.authentication.Authentication
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.endpoints.TokenRefreshRequest
+import io.micronaut.security.jwt.generator.claims.JwtClaims
 import io.micronaut.security.token.render.AccessRefreshToken
 import io.micronaut.security.token.validator.TokenValidator
-import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.Shared
@@ -73,12 +74,12 @@ class OauthControllerSpec extends Specification {
 
         when:
         TokenValidator tokenValidator = embeddedServer.applicationContext.getBean(TokenValidator)
-        Map<String, Object> claims = tokenValidator.validateTokenAndGetClaims(accessToken)
+        Optional<Authentication> authentication = tokenValidator.validateToken(accessToken)
 
         then:
-        claims
+        authentication.isPresent()
 
         and:
-        claims.get(JwtClaims.EXPIRATION_TIME)
+        authentication.get().getAttributes().get(JwtClaims.EXPIRATION_TIME)
     }
 }

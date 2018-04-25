@@ -8,10 +8,11 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.authentication.Authentication
 import io.micronaut.security.authentication.UsernamePasswordCredentials
+import io.micronaut.security.jwt.generator.claims.JwtClaims
 import io.micronaut.security.token.render.AccessRefreshToken
 import io.micronaut.security.token.validator.TokenValidator
-import org.pac4j.core.profile.jwt.JwtClaims
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -88,15 +89,15 @@ class LoginControllerSpec extends Specification {
 
         then:
         accessToken
-
+        
         when:
-        Optional<Map<String, Object>> claims = getTokenValidator().validateTokenAndGetClaims(accessToken)
+        Optional<Authentication> authentication = tokenValidator.validateToken(accessToken)
 
         then:
-        claims.isPresent()
+        authentication.isPresent()
 
         and:
-        claims.get().get(JwtClaims.EXPIRATION_TIME)
+        authentication.get().getAttributes().get(JwtClaims.EXPIRATION_TIME)
     }
 
     void 'refresh token does not contain expiration date'() {
@@ -116,13 +117,13 @@ class LoginControllerSpec extends Specification {
         refreshToken
 
         when:
-        Optional<Map<String, Object>> claims = getTokenValidator().validateTokenAndGetClaims(refreshToken)
+        Optional<Authentication> authentication = getTokenValidator().validateToken(refreshToken)
 
         then:
-        claims.isPresent()
+        authentication.isPresent()
 
         and:
-        !claims.get().get(JwtClaims.EXPIRATION_TIME)
+        !authentication.get().getAttributes().get(JwtClaims.EXPIRATION_TIME)
     }
 
     TokenValidator getTokenValidator() {

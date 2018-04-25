@@ -12,9 +12,16 @@ micronaut:
       login: true
       refresh: true
     token:
-      signature:
-        secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
-      defaultExpiration: 30
+      bearer:
+        enabled: true
+    jwt:
+      enabled: true
+      generator:
+        defaultExpiration: 30
+        signature:
+          enabled: true
+          secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+
 endpoints:
   health:
     enabled: true

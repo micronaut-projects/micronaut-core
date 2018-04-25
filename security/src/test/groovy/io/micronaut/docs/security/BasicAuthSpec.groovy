@@ -7,9 +7,11 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authorization.AuthorizationUtils
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Ignore
 class BasicAuthSpec extends Specification implements YamlAsciidocTagCleaner, AuthorizationUtils {
 
     String yamlConfig = '''\

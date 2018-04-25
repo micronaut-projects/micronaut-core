@@ -18,7 +18,7 @@ package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.token.configuration.TokenConfigurationProperties;
+import io.micronaut.security.jwt.config.JwtConfigurationProperties;
 
 /**
  * Default implementation of {@link BearerTokenReaderConfiguration}.
@@ -26,13 +26,13 @@ import io.micronaut.security.token.configuration.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = JwtConfigurationProperties.PREFIX + ".enabled")
 @ConfigurationProperties(BearerTokenReaderConfigurationProperties.PREFIX)
 public class BearerTokenReaderConfigurationProperties implements BearerTokenReaderConfiguration {
 
-    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".bearer";
+    public static final String PREFIX = TokenReader.PREFIX + ".bearer";
 
-    protected boolean enabled = true;
+    protected boolean enabled = false;
     protected String headerName = "Authorization";
     protected String prefix = "Bearer";
 

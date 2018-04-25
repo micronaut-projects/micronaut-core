@@ -16,8 +16,14 @@ micronaut:
   security:
     enabled: true
     token:
-      signature:
-        secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+      bearer:
+        enabled: true
+    jwt:
+      enabled: true
+      generator:
+        signature:
+          enabled: true
+          secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
     interceptUrlMap:
       -
         pattern: /images/*

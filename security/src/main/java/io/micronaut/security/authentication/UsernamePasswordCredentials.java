@@ -81,6 +81,10 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
         return getUsername();
     }
 
+    /**
+     * Returns password conforming to {@link AuthenticationRequest} blueprint.
+     * @return secret string.
+     */
     @Override
     public String getSecret() {
         return getPassword();

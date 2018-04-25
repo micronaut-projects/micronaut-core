@@ -19,7 +19,9 @@ class AuthorizationWithoutInterceptUrlMapSpec extends Specification implements A
             'spec.authentication': true,
             "micronaut.security.enabled": true,
             "micronaut.security.endpoints.login": true,
-            "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            "micronaut.security.jwt.enabled": true,
+            "micronaut.security.jwt.generator.signature.enabled": true,
+            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ], "test")
 
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())

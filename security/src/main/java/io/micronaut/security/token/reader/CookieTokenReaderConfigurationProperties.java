@@ -17,7 +17,6 @@
 package io.micronaut.security.token.reader;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 
 /**
  * Default implementation of {@link CookieTokenReaderConfiguration}.
@@ -28,7 +27,7 @@ import io.micronaut.security.token.configuration.TokenConfigurationProperties;
 @ConfigurationProperties(CookieTokenReaderConfigurationProperties.PREFIX)
 public class CookieTokenReaderConfigurationProperties implements CookieTokenReaderConfiguration {
 
-    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".cookie";
+    public static final String PREFIX = TokenReader.PREFIX + ".cookie";
 
     protected boolean enabled = false;
     protected String cookieName = "JWT";

@@ -94,11 +94,11 @@ security:
     interceptUrlMap: Intercept URL Map
     builtInEndpointsAccess: Built-In Endpoints Security
   jwt: JSON Web Token
-  generation:
-    title: Token Generation
-    token: JWT configuration
-    signature: JWT Signature
-    encryption: Encrypted JWTs
+    generator:
+      title: Token Generation
+      token: JWT configuration
+      signature: JWT Signature
+      encryption: Encrypted JWTs
   filter:
     title: Token Read
     bearerToken: Bearer Token Reader

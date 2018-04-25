@@ -44,7 +44,10 @@ endpoints:
             'micronaut.security.endpoints.login': true,
             'spec.authentication': true,
             "micronaut.security.enabled": true,
-            "micronaut.security.token.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            "micronaut.security.token.bearer.enabled": true,
+            "micronaut.security.jwt.enabled": true,
+            "micronaut.security.jwt.generator.signature.enabled": true,
+            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ] << flatten(endpointsMap)
 
     @Shared

@@ -16,8 +16,7 @@
 
 package io.micronaut.security.rules;
 
-import io.micronaut.security.token.configuration.TokenConfiguration;
-
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,14 +31,14 @@ import java.util.Map;
  */
 public abstract class AbstractSecurityRule implements SecurityRule {
 
-    private final TokenConfiguration tokenConfiguration;
+    private final JwtGeneratorConfiguration jwtGeneratorConfiguration;
 
     /**
      *
-     * @param tokenConfiguration General Token Configuration
+     * @param jwtGeneratorConfiguration General Token Configuration
      */
-    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
-        this.tokenConfiguration = tokenConfiguration;
+    AbstractSecurityRule(JwtGeneratorConfiguration jwtGeneratorConfiguration) {
+        this.jwtGeneratorConfiguration = jwtGeneratorConfiguration;
     }
 
     /**
@@ -55,7 +54,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
         if (claims == null) {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
-            Object rolesObject = claims.get(tokenConfiguration.getRolesClaimName());
+            Object rolesObject = claims.get(jwtGeneratorConfiguration.getRolesClaimName());
             if (rolesObject instanceof Iterable) {
                 for (Object o : ((Iterable) rolesObject)) {
                     roles.add(o.toString());

@@ -17,13 +17,13 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.security.config.InterceptUrlMapPattern;
-import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.token.configuration.TokenConfiguration;
+import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
 import javax.inject.Singleton;
 import java.util.List;
 
 /**
- * A security rule implementation backed by the {@link SecurityConfiguration#getInterceptUrlMap()}.
+ * A security rule implementation backed by the {@link SecurityConfigurationProperties#getInterceptUrlMap()}.
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -39,13 +39,13 @@ public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
 
     /**
      *
-     * @param tokenConfiguration The token configuration
-     * @param securityConfiguration The security Configuration
+     * @param jwtGeneratorConfiguration The token configuration
+     * @param securityConfigurationProperties The security Configuration
      */
-    public ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
-                                            SecurityConfiguration securityConfiguration) {
-        super(tokenConfiguration);
-        this.patternList = securityConfiguration.getInterceptUrlMap();
+    public ConfigurationInterceptUrlMapRule(JwtGeneratorConfiguration jwtGeneratorConfiguration,
+                                            SecurityConfigurationProperties securityConfigurationProperties) {
+        super(jwtGeneratorConfiguration);
+        this.patternList = securityConfigurationProperties.getInterceptUrlMap();
     }
 
     @Override
