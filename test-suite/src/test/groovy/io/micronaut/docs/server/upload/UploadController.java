@@ -48,36 +48,28 @@ public class UploadController {
 
     // tag::upload[]
     @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public Single<HttpResponse<String>> upload(StreamingFileUpload file, Optional<String> anotherAttribute) throws IOException { // <2>
+    public Single<HttpResponse<String>> upload(StreamingFileUpload file) throws IOException { // <2>
         File tempFile = File.createTempFile(file.getFilename(), "temp");
-        if (tempFile.exists()) {
-            tempFile.delete();
-        }
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
         return Single.fromPublisher(uploadPublisher)  // <4>
-                    .map(success -> {
-                        if (success) {
-                            return HttpResponse.ok("Uploaded");
-                        } else {
-                            return HttpResponse.<String>status(HttpStatus.CONFLICT)
-                                               .body("Upload Failed");
-                        }
-                    });
+            .map(success -> {
+                if (success) {
+                    return HttpResponse.ok("Uploaded");
+                } else {
+                    return HttpResponse.<String>status(HttpStatus.CONFLICT)
+                                       .body("Upload Failed");
+                }
+            });
     }
     // end::upload[]
 
     // tag::completedUpload[]
     @Post(value = "/completed", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public HttpResponse<String> uploadCompleted(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
-
+    public HttpResponse<String> uploadCompleted(CompletedFileUpload file) { // <2>
         try {
             File tempFile = File.createTempFile(file.getFilename(), "temp"); //<3>
-            if (tempFile.exists()) {
-                tempFile.delete();
-            }
             Path path = Paths.get(tempFile.getAbsolutePath());
             Files.write(path, file.getBytes()); //<3>
-
             return HttpResponse.ok("Uploaded");
         } catch (IOException exception) {
             return HttpResponse.badRequest("Upload Failed");
@@ -88,15 +80,10 @@ public class UploadController {
     // tag::bytesUpload[]
     @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
     public HttpResponse<String> uploadBytes(byte[] file, String fileName) { // <2>
-
         try {
             File tempFile = File.createTempFile(fileName, "temp");
-            if (tempFile.exists()) {
-                tempFile.delete();
-            }
             Path path = Paths.get(tempFile.getAbsolutePath());
             Files.write(path, file); // <3>
-
             return HttpResponse.ok("Uploaded");
         } catch (IOException exception) {
             return HttpResponse.badRequest("Upload Failed");
