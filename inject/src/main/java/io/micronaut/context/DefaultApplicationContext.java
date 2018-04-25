@@ -83,6 +83,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    public <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier, boolean inject) {
+        return (ApplicationContext) super.registerSingleton(type, singleton, qualifier, inject);
+    }
+
+    @Override
     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
         if (resolvedConfigurations != null) {
             return resolvedConfigurations;
@@ -96,21 +101,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return resolvedBeanReferences;
         }
         return super.resolveBeanDefinitionReferences();
-    }
-
-    @Override
-    public ApplicationContext registerSingleton(Object singleton) {
-        return (ApplicationContext) super.registerSingleton(singleton);
-    }
-
-    @Override
-    public <T> ApplicationContext registerSingleton(Class<T> beanType, T singleton) {
-        return (ApplicationContext) super.registerSingleton(beanType, singleton);
-    }
-
-    @Override
-    public <T> ApplicationContext registerSingleton(Class<T> beanType, T singleton, Qualifier<T> qualifier) {
-        return (ApplicationContext) super.registerSingleton(beanType, singleton, qualifier);
     }
 
     /**

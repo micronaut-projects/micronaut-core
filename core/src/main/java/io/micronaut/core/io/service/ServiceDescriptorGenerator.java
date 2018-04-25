@@ -34,6 +34,12 @@ import java.util.Collections;
  */
 public class ServiceDescriptorGenerator {
 
+    /**
+     * Generates a service discovery for the given class name and file
+     * @param className The class name
+     * @param descriptor The descriptor file
+     * @throws IOException An exception if an error occurs
+     */
     public static void generate(String className, File descriptor) throws IOException {
         descriptor.getParentFile().mkdirs();
         Charset charset = StandardCharsets.UTF_8;
