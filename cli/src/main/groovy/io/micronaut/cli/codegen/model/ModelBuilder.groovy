@@ -89,7 +89,6 @@ trait ModelBuilder {
         final String packagePath
 
         ModelImpl(String className) {
-            println "ModelImpl: ${className}"
             this.className = MetaClassHelper.capitalize(NameUtils.getShortName(className))
             this.fullName = className
             this.propertyName = NameUtils.getPropertyName(className)
@@ -101,8 +100,6 @@ trait ModelBuilder {
 
 
         ModelImpl(String className, String convention) {
-            println "ModelImpl: ${className}/${convention}"
-
             className = this.convention(className, convention)
 
             this.className = MetaClassHelper.capitalize(NameUtils.getShortName(className))
