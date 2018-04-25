@@ -35,7 +35,6 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -45,7 +44,6 @@ import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -1724,10 +1722,10 @@ public class DefaultBeanContext implements BeanContext {
         beansOfTypeList.add(bean);
     }
 
-    private static abstract class AbstractExectionHandle<T, R> implements MethodExecutionHandle<R> {
+    private static abstract class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<R> {
         protected final ExecutableMethod<T, R> method;
 
-        public AbstractExectionHandle(ExecutableMethod<T, R> method) {
+        public AbstractExecutionHandle(ExecutableMethod<T, R> method) {
             this.method = method;
         }
 
@@ -1752,22 +1750,12 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-            return method.getAnnotation(annotationClass);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getDeclaredAnnotations();
+        public AnnotationMetadata getAnnotationMetadata() {
+            return method.getAnnotationMetadata();
         }
     }
 
-    private static final class ObjectExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {
+    private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
         private final T target;
 
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
@@ -1792,7 +1780,7 @@ public class DefaultBeanContext implements BeanContext {
 
     }
 
-    private static final class BeanExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {
+    private static final class BeanExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
         private final BeanContext beanContext;
         private final Class<T> beanType;
         private final Qualifier<T> qualifier;
