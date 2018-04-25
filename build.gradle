@@ -30,6 +30,50 @@ ext {
     homeSrcDir = file("src")
 }
 
+ext {
+    dependencyVersions = [
+        caffeine             : "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
+        yaml                 : "org.yaml:snakeyaml:$yamlVersion",
+        lombok               : "org.projectlombok:lombok:$lombokVersion",
+        cglib                : "cglib:cglib:$cglibVersion",
+        asm                  : "org.ow2.asm:asm:$asmVersion",
+        asmCommons           : "org.ow2.asm:asm-commons:$asmVersion",
+        asmTree              : "org.ow2.asm:asm-tree:$asmVersion",
+        gormCore             : "org.grails:grails-datastore-core:$gormVersion",
+        gormDatastore        : "org.grails:grails-datastore-gorm:$gormVersion",
+        gormHibernate5       : "org.grails:grails-datastore-gorm-hibernate5:$gormVersion",
+        grailsDocs           : "org.grails:grails-docs:$grailsVersion",
+        groovy               : "org.codehaus.groovy:groovy:$groovyVersion",
+        groovyTest           : "org.codehaus.groovy:groovy-test:$groovyVersion",
+        groovyAnt            : "org.codehaus.groovy:groovy-ant:$groovyVersion",
+        groovyJson           : "org.codehaus.groovy:groovy-json:$groovyVersion",
+        groovyJmx            : "org.codehaus.groovy:groovy-jmx:$groovyVersion",
+        jacksonDatabind      : "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
+        jacksonAfterburner   : "com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion",
+        jacksonDatatypeJdk8  : "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
+        jacksonDatatypeJsr310: "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion",
+        lettuce              : "io.lettuce:lettuce-core:$lettuceVersion",
+        nettyHandler         : "io.netty:netty-handler:$nettyVersion",
+        nettyHandlerProxy    : "io.netty:netty-handler-proxy:$nettyVersion",
+        nettyCodecHttp       : "io.netty:netty-codec-http:$nettyVersion",
+        reactor              : "io.projectreactor:reactor-core:$reactorVersion",
+        rxJava2              : "io.reactivex.rxjava2:rxjava:$rxJava2Version",
+        rxJavaInterop        : "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion",
+        rxJava1              : "io.reactivex:rxjava:$rxJava1Version",
+        validation           : "javax.validation:validation-api:$validationVersion",
+        slf4jSimple          : "org.slf4j:slf4j-simple:$slf4jVersion",
+        slf4jApi             : "org.slf4j:slf4j-api:$slf4jVersion",
+        spock                : "org.spockframework:spock-core:$spockVersion",
+        neo4j                : "org.neo4j.test:neo4j-harness:$neo4jVersion",
+        spring               : "org.springframework:spring-core:$springVersion",
+        springContext        : "org.springframework:spring-context:$springVersion",
+        hystrixCore          : "com.netflix.hystrix:hystrix-core:$hystrixVersion",
+        hystrixSerialization : "com.netflix.hystrix:hystrix-serialization:$hystrixVersion",
+        mongoDriver          : "org.mongodb:mongo-java-driver:$mongoVersion",
+        mongoDriverAsync     : "org.mongodb:mongodb-driver-async:$mongoVersion",
+    ]
+}
+
 subprojects { subproject ->
 
     version project.projectVersion
