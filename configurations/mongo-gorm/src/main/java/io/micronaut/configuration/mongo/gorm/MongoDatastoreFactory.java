@@ -64,7 +64,9 @@ public class MongoDatastoreFactory {
             entities);
         Iterable services = datastore.getServices();
         for (Object service : services) {
-            applicationContext.registerSingleton(service);
+            applicationContext.registerSingleton(
+                    service, false
+            );
         }
         for (Object service : services) {
             applicationContext.inject(service);

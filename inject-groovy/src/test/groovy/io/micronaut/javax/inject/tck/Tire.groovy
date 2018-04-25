@@ -29,13 +29,13 @@ class Tire extends RoundThing {
 
     protected static final Set<String> moreProblems = new LinkedHashSet<String>()
 
-    FuelTank constructorInjection = NEVER_INJECTED
-    @Inject protected FuelTank fieldInjection = NEVER_INJECTED
-    FuelTank methodInjection = NEVER_INJECTED
-    @Inject static FuelTank staticFieldInjection = NEVER_INJECTED
-    static FuelTank staticMethodInjection = NEVER_INJECTED
+    @PackageScope FuelTank constructorInjection = NEVER_INJECTED
+    @Inject @PackageScope protected FuelTank fieldInjection = NEVER_INJECTED
+    @PackageScope FuelTank methodInjection = NEVER_INJECTED
+    @Inject @PackageScope static FuelTank staticFieldInjection = NEVER_INJECTED
+    @PackageScope static FuelTank staticMethodInjection = NEVER_INJECTED
 
-    boolean constructorInjected
+    @PackageScope boolean constructorInjected
 
     protected boolean superPrivateMethodInjected
     protected boolean superPackagePrivateMethodInjected

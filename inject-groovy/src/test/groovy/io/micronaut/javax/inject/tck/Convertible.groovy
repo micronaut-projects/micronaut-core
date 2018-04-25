@@ -16,13 +16,7 @@
 package io.micronaut.javax.inject.tck
 
 import groovy.transform.PackageScope
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.javax.inject.tck.accessories.Cupholder
-import io.micronaut.javax.inject.tck.accessories.RoundThing
-import io.micronaut.javax.inject.tck.accessories.SpareTire
 import junit.framework.TestCase
-import org.junit.Ignore
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.javax.inject.tck.accessories.Cupholder
@@ -37,9 +31,9 @@ class Convertible implements Car {
 
     @Inject @Drivers Seat driversSeatA
     @Inject @Drivers Seat driversSeatB
-    @Inject SpareTire spareTire
-    @Inject Cupholder cupholder
-    @Inject Provider<Engine> engineProvider
+    @Inject @PackageScope SpareTire spareTire
+    @Inject @PackageScope Cupholder cupholder
+    @Inject @PackageScope Provider<Engine> engineProvider
 
     private boolean methodWithZeroParamsInjected
     private boolean methodWithMultipleParamsInjected
@@ -72,14 +66,14 @@ class Convertible implements Car {
     private Provider<Tire> methodPlainTireProvider = nullProvider()
     private Provider<Tire> methodSpareTireProvider = nullProvider()
 
-    @Inject static Seat staticFieldPlainSeat
-    @Inject @Drivers static Seat staticFieldDriversSeat
-    @Inject static Tire staticFieldPlainTire
-    @Inject @Named("spare") static Tire staticFieldSpareTire
-    @Inject static Provider<Seat> staticFieldPlainSeatProvider = nullProvider()
-    @Inject @Drivers static Provider<Seat> staticFieldDriversSeatProvider = nullProvider()
-    @Inject static Provider<Tire> staticFieldPlainTireProvider = nullProvider()
-    @Inject @Named("spare") static Provider<Tire> staticFieldSpareTireProvider = nullProvider()
+    @Inject @PackageScope static Seat staticFieldPlainSeat
+    @Inject @PackageScope @Drivers static Seat staticFieldDriversSeat
+    @Inject @PackageScope static Tire staticFieldPlainTire
+    @Inject @PackageScope @Named("spare") static Tire staticFieldSpareTire
+    @Inject @PackageScope static Provider<Seat> staticFieldPlainSeatProvider = nullProvider()
+    @Inject @PackageScope @Drivers static Provider<Seat> staticFieldDriversSeatProvider = nullProvider()
+    @Inject @PackageScope static Provider<Tire> staticFieldPlainTireProvider = nullProvider()
+    @Inject @PackageScope @Named("spare") static Provider<Tire> staticFieldSpareTireProvider = nullProvider()
 
     private static Seat staticMethodPlainSeat
     private static Seat staticMethodDriversSeat
@@ -113,20 +107,20 @@ class Convertible implements Car {
         throw new AssertionError("Unexpected call to non-injectable constructor")
     }
 
-    void setSeat(Seat unused) {
+    @PackageScope void setSeat(Seat unused) {
         throw new AssertionError("Unexpected call to non-injectable method")
     }
 
-    @Inject void injectMethodWithZeroArgs() {
+    @Inject @PackageScope void injectMethodWithZeroArgs() {
         methodWithZeroParamsInjected = true
     }
 
-    @Inject String injectMethodWithNonVoidReturn() {
+    @Inject @PackageScope String injectMethodWithNonVoidReturn() {
         methodWithNonVoidReturnInjected = true
         return "unused"
     }
 
-    @Inject void injectInstanceMethodWithManyArgs(
+    @Inject @PackageScope void injectInstanceMethodWithManyArgs(
             Seat plainSeat,
             @Drivers Seat driversSeat,
             Tire plainTire,
@@ -147,7 +141,7 @@ class Convertible implements Car {
         methodSpareTireProvider = spareTireProvider
     }
 
-    @Inject static void injectStaticMethodWithManyArgs(
+    @Inject @PackageScope static void injectStaticMethodWithManyArgs(
             Seat plainSeat,
             @Drivers Seat driversSeat,
             Tire plainTire,

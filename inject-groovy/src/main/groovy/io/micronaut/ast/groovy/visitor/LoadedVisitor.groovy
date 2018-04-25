@@ -59,6 +59,25 @@ class LoadedVisitor {
         elementAnnotation = generics[1].type.name
     }
 
+    boolean equals(o) {
+        if (this.is(o)) return true
+        if (getClass() != o.class) return false
+
+        LoadedVisitor that = (LoadedVisitor) o
+
+        if (visitor.getClass() != that.getClass() ) return false
+
+        return true
+    }
+
+    int hashCode() {
+        return visitor.getClass().hashCode()
+    }
+
+    @Override
+    String toString() {
+        visitor.toString()
+    }
     /**
      * @param classNode The class node
      * @return True if the class node should be visited

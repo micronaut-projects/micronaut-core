@@ -367,26 +367,22 @@ public class DefaultBeanContext implements BeanContext {
         return Optional.empty();
     }
 
-    @Override
-    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
-        return registerSingleton(beanType, singleton, null);
-    }
 
     @Override
-    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton, Qualifier<T> qualifier) {
+    public <T> BeanContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier, boolean inject) {
         if (singleton == null) {
             throw new IllegalArgumentException("Passed singleton cannot be null");
         }
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+        BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null);
+            BeanDefinition<T> beanDefinition = inject ? findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null) : null;
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
-                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(beanType);
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(type);
                 beanDefinitionsClasses.add(dynamicRegistration);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
             }

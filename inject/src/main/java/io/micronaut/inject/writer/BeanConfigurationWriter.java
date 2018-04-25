@@ -25,9 +25,14 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -66,11 +71,9 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-        Optional<File> file = classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class);
-        if (file.isPresent()) {
-            ServiceDescriptorGenerator.generate(configurationClassName, file.get());
-        }
+        classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName);
     }
+
 
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);

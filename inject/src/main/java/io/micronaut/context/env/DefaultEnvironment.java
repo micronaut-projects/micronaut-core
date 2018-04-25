@@ -200,6 +200,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             if (reading.compareAndSet(false, true)) {
+
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
             }
@@ -431,8 +432,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     // do nothing here
                     break;
             }
-
         }
+        String environmentProperty = System.getProperty(ENVIRONMENTS_PROPERTY);
+        if (environmentProperty != null) {
+            for (String env: environmentProperty.split(",")) {
+                enviroments.add(env.trim());
+            }
+        }
+
         if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
             LOG.info("Established active environments: {}", enviroments);
         }

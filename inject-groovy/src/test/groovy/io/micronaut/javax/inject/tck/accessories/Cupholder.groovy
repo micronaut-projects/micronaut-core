@@ -15,6 +15,7 @@
  */
 package io.micronaut.javax.inject.tck.accessories
 
+import groovy.transform.PackageScope
 import io.micronaut.javax.inject.tck.Seat
 
 import javax.inject.Inject
@@ -27,6 +28,7 @@ class Cupholder {
     public final Provider<Seat> seatProvider
 
     @Inject
+    @PackageScope
     Cupholder(Provider<Seat> seatProvider) {
         this.seatProvider = seatProvider
     }
