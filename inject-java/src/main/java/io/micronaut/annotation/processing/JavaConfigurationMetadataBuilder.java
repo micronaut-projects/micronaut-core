@@ -42,7 +42,6 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
     private final Elements elements;
-    private final Map<String, String> typePaths = new HashMap<>();
 
     public JavaConfigurationMetadataBuilder(Elements elements, Types types) {
         this.elements = elements;
