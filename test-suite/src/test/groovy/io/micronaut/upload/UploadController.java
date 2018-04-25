@@ -119,8 +119,13 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> recieveFlowData(Data data) {
+    public Publisher<HttpResponse> receiveFlowData(Data data) {
         return Flowable.just(HttpResponse.ok(data.toString()));
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public Single<HttpResponse> receiveMultipleFlowData(Publisher<Data> data) {
+        return Flowable.fromPublisher(data).toList().map(list -> HttpResponse.ok(list.toString()));
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
