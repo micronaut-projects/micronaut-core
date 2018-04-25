@@ -157,7 +157,7 @@ class SyncCacheSpec extends Specification {
         syncCache.put("three", 3)
         syncCache.put("four", 4)
         syncCache.nativeCache.cleanUp()
-        PollingConditions conditions = new PollingConditions(timeout: 2)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         then:
         conditions.eventually {
