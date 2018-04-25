@@ -3,7 +3,7 @@ dependencies {
     compile project(":configurations:gorm")
     compile project(":configurations:hibernate-validator")
 
-    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compile dependencyVersions.groovy
     compileOnly project(":inject-groovy")
     compileOnly project(":http-server")
     compile project(":runtime-groovy")
@@ -14,5 +14,5 @@ dependencies {
 
     testCompile project(":http-server")
     testCompile project(":http-client")
-    testRuntime "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    testRuntime dependencyVersions.neo4j
 }

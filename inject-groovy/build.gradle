@@ -6,8 +6,8 @@ dependencies {
     compile project(":inject")
     shadowCompile project(":aop")
     compile project(":aop")
-    shadowCompile "org.codehaus.groovy:groovy:$groovyVersion"
-    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    shadowCompile dependencyVersions.groovy
+    compile dependencyVersions.groovy
 
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
@@ -17,7 +17,7 @@ dependencies {
 
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
-    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    testCompile dependencyVersions.groovyJson
 }
 
 
@@ -34,7 +34,7 @@ shadowJar {
         exclude(project(":inject"))
         exclude(project(":core"))
 
-        exclude(dependency(group:'org.slf4j',name:'slf4j-api',version:slf4jVersion))
+        exclude(dependency(dependencyVersions.slf4jApi))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))

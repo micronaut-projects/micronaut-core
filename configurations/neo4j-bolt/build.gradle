@@ -5,8 +5,8 @@ dependencies {
 
     compileOnly project(":inject-java")
     compileOnly project(":management")
-    compileOnly "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    compileOnly dependencyVersions.neo4j
 
-    testCompile "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    testCompile dependencyVersions.neo4j
     testCompile project(":management")
 }
