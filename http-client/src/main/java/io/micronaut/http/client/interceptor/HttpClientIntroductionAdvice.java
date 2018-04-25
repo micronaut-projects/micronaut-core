@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.interceptor;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -62,7 +63,6 @@ import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -74,7 +74,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Introduction advice that implements the {@link Client} annotation
+ * Introduction advice that implements the {@link Client} annotation.
  *
  * @author graemerocher
  * @since 1.0
@@ -85,15 +85,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
     /**
-     * The default Accept-Types
+     * The default Accept-Types.
      */
-    public static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
+    private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
+    final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
 
+    /**
+     * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
+     * @param beanContext context to resolve beans
+     * @param loadBalancerResolver load balancer resolver
+     * @param transformers transformation classes
+     */
     public HttpClientIntroductionAdvice(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver,
@@ -104,6 +111,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         this.transformers = transformers != null ? transformers : new ReactiveClientResultTransformer[0];
     }
 
+    /**
+     * Interceptor to apply headers, cookies, parameter and body arguements.
+     * @param context The context
+     * @return httpClient or future
+     */
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Client clientAnnotation = context.getAnnotation(Client.class);
@@ -149,10 +161,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
 
-            Map<String, String> headers = new LinkedHashMap<>(3);
+
+            Map<String, String> headers = new LinkedHashMap<>(HEADERS_INITIAL_CAPACITY);
 
             Headers headersAnnotation = context.getAnnotation(Headers.class);
-            if (headersAnnotation!=null) {
+            if (headersAnnotation != null) {
                 Header[] headerArray = headersAnnotation.value();
                 for (Header header : headerArray) {
                     String headerName = header.name();
@@ -246,7 +259,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             // Set the URI template used to make the request for tracing purposes
-            request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()) );
+            request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
             String serviceId = clientAnnotation.value()[0];
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
@@ -369,15 +382,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return context.proceed();
     }
 
+    /**
+     * Resolve the template for the client annotation.
+     * @param clientAnnotation client annotation reference
+     * @param templateString template to be applied
+     * @return resolved template contents
+     */
     private String resolveTemplate(Client clientAnnotation, String templateString) {
         String path = clientAnnotation.path();
-        if(StringUtils.isNotEmpty(path)) {
+        if (StringUtils.isNotEmpty(path)) {
             return path + templateString;
-        }
-        else {
+        } else {
             String[] value = clientAnnotation.value();
-            if(ArrayUtils.isNotEmpty(value)) {
-                if(value[0].startsWith("/")) {
+            if (ArrayUtils.isNotEmpty(value)) {
+                if (value[0].startsWith("/")) {
                     return value[0] + templateString;
                 }
             }
@@ -385,9 +403,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
+    /**
+     * Gets the client registration for the http request.
+     * @param context application contextx
+     * @param clientAnn client annotation
+     * @return client registration
+     */
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
         String[] clientId = clientAnn.value();
-        if(ArrayUtils.isEmpty(clientId)) {
+        if (ArrayUtils.isEmpty(clientId)) {
             return null;
         }
 
@@ -446,6 +470,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         });
     }
 
+    /**
+     * Cleanup method to prevent resource leaking.
+     * @throws IOException
+     */
     @Override
     @PreDestroy
     public void close() throws IOException {
@@ -455,11 +483,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
+    /**
+     * Client registration inner class.
+     */
     class ClientRegistration {
         final HttpClient httpClient;
         final String contextPath;
 
-        public ClientRegistration(HttpClient httpClient, String contextPath) {
+        /**
+         * Constructor for client registration.
+         * @param httpClient http client for outgoing connection
+         * @param contextPath application context path
+         */
+        ClientRegistration(HttpClient httpClient, String contextPath) {
             this.httpClient = httpClient;
             this.contextPath = contextPath;
         }
