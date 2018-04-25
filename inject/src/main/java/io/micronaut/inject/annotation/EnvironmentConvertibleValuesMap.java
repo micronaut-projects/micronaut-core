@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
  * @author graemerocher
  * @since 1.0
  */
-class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
+class
+EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
 
     private final Environment environment;
 
@@ -54,7 +55,19 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
                 a[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
             return environment.convert(a, conversionContext);
-        } else {
+        } else if(value instanceof AnnotationValue[]) {
+            AnnotationValue[] annotationValues = (AnnotationValue[]) value;
+            for (int i = 0; i < annotationValues.length; i++) {
+                AnnotationValue annotationValue = annotationValues[i];
+                annotationValues[i] = new AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
+            }
+            return environment.convert(annotationValues, conversionContext);
+        } else if(value instanceof AnnotationValue) {
+            AnnotationValue av = (AnnotationValue) value;
+            av = new AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
+            return environment.convert(av, conversionContext);
+        }
+        else {
             return super.get(name, conversionContext);
         }
     }
