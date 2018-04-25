@@ -33,13 +33,13 @@ import java.util.Properties;
  *
  * If the url, driver class, username, or password are missing, sensible defaults
  * will be provided when possible. If no configuration beyond the datasource name
- * is provided, an in memory datastore will be configured based on the available
+ * is provided, an in memory datasource will be configured based on the available
  * drivers on the classpath.
  *
  * @author James Kleeh
  * @since 1.0
  */
-@EachProperty(value = "datasources", primary = "default")
+@EachProperty(value = BasicJdbcConfiguration.PREFIX, primary = "default")
 public class DatasourceConfiguration extends PoolProperties implements BasicJdbcConfiguration {
 
     private CalculatedSettings calculatedSettings;
