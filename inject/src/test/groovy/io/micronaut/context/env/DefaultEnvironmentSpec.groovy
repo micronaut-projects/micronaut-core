@@ -79,4 +79,25 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("test.bar.foo", "")
         System.setProperty("test.foo.baz", "")
     }
+
+    void "test getting environments from a system property"() {
+        when:
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "foo ,x")
+        Environment env = new DefaultEnvironment("test").start()
+
+        then:
+        env.activeNames.contains("foo")
+        env.activeNames.contains("x")
+        //coming from application-foo.yml
+        env.getProperty("foo", String).get() == "bar"
+
+        when:
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "")
+        env = new DefaultEnvironment("test").start()
+
+        then:
+        !env.activeNames.contains("foo")
+        !env.activeNames.contains("x")
+        !env.containsProperty("foo")
+    }
 }

@@ -15,12 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
-import static javax.lang.model.element.ElementKind.CLASS;
-import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
-import static javax.lang.model.element.ElementKind.FIELD;
-import static javax.lang.model.type.TypeKind.ARRAY;
-
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Interceptor;
@@ -47,7 +41,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -58,22 +51,8 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.TypeParameterElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
@@ -81,6 +60,9 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.type.TypeKind.ARRAY;
 
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -102,7 +84,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
-    private ClassWriterOutputVisitor classWriterOutputVisitor;
     private Set<String> processed = new HashSet<>();
 
     @Override
@@ -110,7 +91,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils);
         this.beanDefinitionWriters = new LinkedHashMap<>();
-        this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
 
     @Override
@@ -183,6 +163,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     });
                 });
+
+                try {
+                    classWriterOutputVisitor.finish();
+                } catch (Exception e) {
+                    String message = e.getMessage();
+                    error("Error occurred writing META-INF files: %s", message != null ? message : e);
+                }
+
+
                 if (metadataBuilder.hasMetadata()) {
                     ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
 
@@ -203,6 +192,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
         return false;
     }
+
 
     private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
         try {
@@ -227,7 +217,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         } catch (IOException e) {
             // raise a compile error
-            error("Unexpected error: %s", e.getMessage());
+            String message = e.getMessage();
+            error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
         }
     }
 

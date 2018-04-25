@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
@@ -108,7 +109,7 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
+@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
@@ -118,7 +119,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-
+        File classesDir = source.configuration.targetDirectory
+        DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                classesDir
+        )
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
             ClassNode classNode = classes[0]
@@ -127,7 +131,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (AstAnnotationUtils.hasStereotype(packageNode, Configuration)) {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(packageNode))
                     try {
-                        writer.writeTo(source.configuration.targetDirectory)
+                        writer.accept(outputVisitor)
+                        outputVisitor.finish()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }
@@ -138,11 +143,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
-        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, source.classLoader)
-        List<LoadedVisitor> loadedVisitors = []
+        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, InjectTransform.classLoader)
+        Map<String, LoadedVisitor> loadedVisitors = [:]
         for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
             if (definition.isPresent()) {
-                loadedVisitors.add(new LoadedVisitor(definition.load(), visitorContext))
+                LoadedVisitor newLoadedVisitor = new LoadedVisitor(definition.load(), visitorContext)
+                loadedVisitors.put(definition.getName(), newLoadedVisitor)
             }
         }
 
@@ -150,7 +156,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             } else {
-                List<LoadedVisitor> matchedVisitors = loadedVisitors.findAll { v -> v.matches(classNode) }
+                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
                 if (classNode.isInterface()) {
                     if (AstAnnotationUtils.hasStereotype(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
                         InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
@@ -169,9 +175,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
         Map<String, ByteArrayOutputStream> classStreams = null
+
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
-            File classesDir = source.configuration.targetDirectory
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
@@ -190,8 +196,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
-                    beanReferenceWriter.writeTo(classesDir)
-                    beanDefWriter.writeTo(classesDir)
+                    beanReferenceWriter.accept(outputVisitor)
+                    beanDefWriter.accept(outputVisitor)
                 } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
                     if (classStreams == null) {
                         classStreams = [:]
@@ -205,13 +211,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
                         @Override
-                        Optional<File> visitServiceDescriptor(String classname) throws IOException {
-                            return Optional.empty()
+                        void visitServiceDescriptor(String type, String classname) {
+                            // no-op
                         }
 
                         @Override
                         Optional<File> visitMetaInfFile(String path) throws IOException {
                             return Optional.empty()
+                        }
+
+                        @Override
+                        void finish() {
+                            // no-op
                         }
                     }
                     beanReferenceWriter.accept(visitor)
@@ -219,8 +230,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 }
 
+
+
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
+                if (e.message == null) {
+                    e.printStackTrace(System.err)
+                }
+            }
+        }
+        if(!beanDefinitionWriters.isEmpty()) {
+
+            try {
+                outputVisitor.finish()
+            } catch (Throwable e) {
+                AstMessageUtils.error(source, moduleNode, "Error generating META-INF/services files: $e.message")
                 if (e.message == null) {
                     e.printStackTrace(System.err)
                 }
@@ -810,7 +834,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             constructorGenericTypeMap
                     )
                 } else {
-                    addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
+                    addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", targetClass)
                 }
 
             }
@@ -824,7 +848,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitField(FieldNode fieldNode) {
             if (fieldNode.name == 'metaClass') return
             int modifiers = fieldNode.modifiers
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) || fieldNode.isSynthetic()) {
+            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
+                return
+            }
+            if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
                 return
             }
             ClassNode declaringClass = fieldNode.declaringClass
@@ -1106,7 +1133,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap
                         )
                     } else {
-                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
+                        addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
 
@@ -1121,13 +1148,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
-            List<ConstructorNode> publicConstructors = findPublicConstructors(constructors)
+            List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors)
 
             ConstructorNode constructorNode
-            if (publicConstructors.size() == 1) {
-                constructorNode = publicConstructors[0]
+            if (nonPrivateConstructors.size() == 1) {
+                constructorNode = nonPrivateConstructors[0]
             } else {
-                constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
+                constructorNode = nonPrivateConstructors.find { it.getAnnotations(makeCached(Inject)) }
+                if (!constructorNode) {
+                    constructorNode = nonPrivateConstructors.find { Modifier.isPublic(it.modifiers) }
+                }
             }
             constructorNode
         }
@@ -1144,14 +1174,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        private List<ConstructorNode> findPublicConstructors(List<ConstructorNode> constructorNodes) {
-            List<ConstructorNode> publicConstructors = []
+        private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
+            List<ConstructorNode> nonPrivateConstructors = []
             for (node in constructorNodes) {
-                if (Modifier.isPublic(node.modifiers)) {
-                    publicConstructors.add(node)
+                if (!Modifier.isPrivate(node.modifiers)) {
+                    nonPrivateConstructors.add(node)
                 }
             }
-            return publicConstructors
+            return nonPrivateConstructors
         }
 
         private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {
