@@ -96,7 +96,6 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.close()
     }
 
-    @Ignore // fails intermittently. TODO: investigate
     void "test properties are bindable"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")

@@ -22,7 +22,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * Allows configuring the format of Map keys.
+ * Allows configuring the format of Map keys when injecting map configuration
  *
  * @author Graeme Rocher
  * @since 1.0

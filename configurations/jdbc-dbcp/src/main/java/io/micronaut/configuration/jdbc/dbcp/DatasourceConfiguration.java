@@ -38,7 +38,7 @@ import java.sql.SQLException;
  * @author James Kleeh
  * @since 1.0
  */
-@EachProperty(value = "datasources", primary = "default")
+@EachProperty(value = BasicJdbcConfiguration.PREFIX, primary = "default")
 public class DatasourceConfiguration extends BasicDataSource implements BasicJdbcConfiguration {
 
     private final CalculatedSettings calculatedSettings;

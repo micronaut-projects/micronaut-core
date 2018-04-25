@@ -36,7 +36,7 @@ import javax.annotation.PostConstruct;
  * @author James Kleeh
  * @since 1.0
  */
-@EachProperty(value = "datasources", primary = "default")
+@EachProperty(value = BasicJdbcConfiguration.PREFIX, primary = "default")
 public class DatasourceConfiguration extends HikariConfig implements BasicJdbcConfiguration {
 
     private CalculatedSettings calculatedSettings;
