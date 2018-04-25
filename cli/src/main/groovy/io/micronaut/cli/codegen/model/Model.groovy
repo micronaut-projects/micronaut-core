@@ -73,9 +73,19 @@ interface Model {
     /**
      * Returns the convention of this model for the given name. For example given a {@link #getSimpleName()} of "Foo" this method will return "FooController" where the name argument is "Controller"
      * @param conventionName The name
+     * @param conventionName The convention name
      * @return The convention for the given convention name
      */
-    String convention(String conventionName)
+    String convention(String name, String conventionName)
+
+    /**
+     * Returns given name without the convention if present. For example given a name of "FooController" this method will return "Foo" where the name argument is "Controller"
+     * @param name The name
+     * @param conventionName The convention name
+     * @return The given name without the convention
+     */
+    String trimConvention(String name, String conventionName)
+
 
     /**
      * @return The model as a map
