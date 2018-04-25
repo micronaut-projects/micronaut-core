@@ -2,7 +2,12 @@ import java.util.regex.Pattern
 
 Pattern pattern = Pattern.compile("([\\w\\-.]+):([\\w\\-]+):([\\w\\.]+)")
 
-List<String> excludedDependencies = ['asm', 'caffeine']
+List<String> excludedDependencies = [
+    'caffeine', 'yaml', 'lombok', 'cglib', 'asm', 'gormCore', 'gormDatastore', 'gormHibernate5', 'grailsDocs',
+    'groovyTest', 'groovyAnt', 'groovyJson', 'groovyJmx', 'jacksonAfterburner', 'jacksonDatatypeJdk8',
+    'jacksonDatatypeJsr310', 'lettuce', 'reactor', 'rxJavaInterop', 'rxJava1', 'slf4jSimple', 'slf4jApi', 'spock',
+    'neo4j', 'hystrixCore', 'hystrixSerialization', 'mongoDriver', 'mongoDriverAsync',
+]
 
 publishing {
     publications {
