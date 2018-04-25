@@ -34,7 +34,9 @@ import spock.lang.Specification
  */
 
 class HeadersSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+            'foo.bar':'Another'
+    )
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive header"() {
@@ -42,15 +44,17 @@ class HeadersSpec extends Specification {
         UserClient userClient = context.getBean(UserClient)
         User user = userClient.get("Freddy")
 
+
         expect:
+        user.myparam == 'Another'
         user.username == "Freddy"
         user.age == 10
-
     }
 
 
     @Headers([
-        @Header(name="X-Username",value="Freddy"),
+        @Header(name="X-Username",value='Freddy'),
+        @Header(name="X-MyParam",value='${foo.bar}'),
         @Header(name="Content-length",value="2048")
     ])
     @Client('/headersTest')
@@ -59,11 +63,11 @@ class HeadersSpec extends Specification {
     }
 
     @Controller('/headersTest')
-    static class UserController implements MyApi {
+    static class UserController {
 
-        @Override
-        User get(@Header('X-Username') String username) {
-            return new User(username:username, age: 10)
+        @Get('/user')
+        User get(@Header('X-Username') String username, @Header('X-MyParam') String myparam) {
+            return new User(username:username, age: 10, myparam:myparam)
         }
     }
 
@@ -76,6 +80,7 @@ class HeadersSpec extends Specification {
     static class User {
         String username
         Integer age
+        String myparam
     }
 
 }

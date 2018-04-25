@@ -155,7 +155,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (headersAnnotation!=null) {
                 Header[] headerArray = headersAnnotation.value();
                 for (Header header : headerArray) {
-                    headers.put(header.name(), header.value());
+                    String headerName = header.name();
+                    String headerValue = header.value();
+                    headers.put(headerName, headerValue);
                 }
             }
 
