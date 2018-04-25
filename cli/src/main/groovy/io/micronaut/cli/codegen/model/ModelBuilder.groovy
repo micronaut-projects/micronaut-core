@@ -89,9 +89,25 @@ trait ModelBuilder {
         final String packagePath
 
         ModelImpl(String className) {
+            println "ModelImpl: ${className}"
             this.className = MetaClassHelper.capitalize(NameUtils.getShortName(className))
             this.fullName = className
             this.propertyName = NameUtils.getPropertyName(className)
+            this.packageName = NameUtils.getPackageName(className)
+            this.packagePath = packageName.replace('.' as char, File.separatorChar)
+            this.simpleName = this.className
+            this.lowerCaseName = NameUtils.getScriptName(className)
+        }
+
+
+        ModelImpl(String className, String convention) {
+            println "ModelImpl: ${className}/${convention}"
+
+            className = this.convention(className, convention)
+
+            this.className = MetaClassHelper.capitalize(NameUtils.getShortName(className))
+            this.fullName = className
+            this.propertyName = trimConvention(NameUtils.getPropertyName(className), convention)
             this.packageName = NameUtils.getPackageName(className)
             this.packagePath = packageName.replace('.' as char, File.separatorChar)
             this.simpleName = this.className
@@ -105,11 +121,25 @@ trait ModelBuilder {
         }
 
         @Override
-        String convention(String conventionName) {
-            if(simpleName.endsWith(conventionName)) {
-                simpleName
+        String convention(String name, String conventionName) {
+            if(name.endsWith(conventionName)) {
+                name
             } else {
-                "${simpleName}${conventionName}"
+                "${name}${conventionName}"
+            }
+        }
+
+        Model forConvention(String convention) {
+            return new ModelImpl(fullName, convention)
+        }
+
+        @Override
+        String trimConvention(String name, String conventionName) {
+            if(name.endsWith(conventionName)) {
+                int end = name.lastIndexOf(conventionName)
+                name.substring(0, end)
+            } else {
+                "${name}"
             }
         }
 
