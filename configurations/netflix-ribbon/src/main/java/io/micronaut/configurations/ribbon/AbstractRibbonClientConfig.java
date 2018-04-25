@@ -22,6 +22,7 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.client.config.IClientConfigKey;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 
@@ -241,7 +242,8 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
      * @return concatenated result
      */
     protected String qualifyKey(IClientConfigKey key) {
-        return getNameSpace() + "." + key.key();
+        String property = NameUtils.hyphenate(key.key());
+        return getNameSpace() + "." + property;
     }
 
     private VipAddressResolver getVipAddressResolver() {

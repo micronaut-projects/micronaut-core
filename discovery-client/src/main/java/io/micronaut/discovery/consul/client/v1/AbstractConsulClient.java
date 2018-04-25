@@ -17,6 +17,7 @@ package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.consul.ConsulConfiguration;
@@ -59,6 +60,7 @@ public abstract class AbstractConsulClient implements ConsulClient {
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        serviceId = NameUtils.hyphenate(serviceId);
         if (SERVICE_ID.equals(serviceId)) {
             return Publishers.just(
                 Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))

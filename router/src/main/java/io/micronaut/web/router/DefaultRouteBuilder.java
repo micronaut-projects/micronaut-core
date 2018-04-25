@@ -125,7 +125,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         if (executionHandleLocator instanceof ApplicationContext) {
             ApplicationContext applicationContext = (ApplicationContext) executionHandleLocator;
             Environment environment = applicationContext.getEnvironment();
-            defaultCharset = environment.get("micronaut.application.defaultCharset", Charset.class, StandardCharsets.UTF_8);
+            defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
         } else {
             defaultCharset = StandardCharsets.UTF_8;
         }

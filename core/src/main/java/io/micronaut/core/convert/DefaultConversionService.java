@@ -475,7 +475,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.of(val);
             } catch (IllegalArgumentException e) {
                 try {
-                    Enum val = Enum.valueOf(targetType, NameUtils.underscoreSeparate(stringValue).toUpperCase(Locale.ENGLISH));
+                    Enum val = Enum.valueOf(targetType, NameUtils.environmentName(stringValue));
                     return Optional.of(val);
                 } catch (Exception e1) {
                     context.reject(object, e);

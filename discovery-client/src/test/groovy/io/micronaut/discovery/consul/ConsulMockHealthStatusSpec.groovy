@@ -57,7 +57,7 @@ class ConsulMockHealthStatusSpec extends Specification {
 
         when:"An application is set to fail"
 
-        HttpStatus status = Flowable.fromPublisher(consulClient.fail("service:myService:${application.port}")).blockingFirst()
+        HttpStatus status = Flowable.fromPublisher(consulClient.fail("service:my-service:${application.port}")).blockingFirst()
 
         then:"The status is ok"
         status == HttpStatus.OK

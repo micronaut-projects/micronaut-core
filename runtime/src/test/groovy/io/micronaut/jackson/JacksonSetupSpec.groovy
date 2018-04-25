@@ -15,11 +15,9 @@
  */
 package io.micronaut.jackson
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
@@ -52,7 +50,8 @@ class JacksonSetupSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'jackson.dateFormat':'yyMMdd',
-                'jackson.serialization.indentOutput':true
+                'jackson.serialization.indentOutput':true,
+//                'jackson.deserialization.UNWRAP_ROOT_VALUE': true
         ))
         applicationContext.start()
 
@@ -61,6 +60,7 @@ class JacksonSetupSpec extends Specification {
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
         applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
+//        applicationContext.getBean(JacksonConfiguration).deserializationSettings.get(DeserializationFeature.UNWRAP_ROOT_VALUE)
         applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
 
         cleanup:

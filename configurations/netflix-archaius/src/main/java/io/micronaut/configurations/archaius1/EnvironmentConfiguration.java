@@ -16,6 +16,7 @@
 
 package io.micronaut.configurations.archaius1;
 
+import io.micronaut.core.naming.NameUtils;
 import org.apache.commons.configuration.AbstractConfiguration;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -64,12 +65,12 @@ public class EnvironmentConfiguration extends AbstractConfiguration implements A
 
     @Override
     public boolean containsKey(String key) {
-        return environment.containsProperty(key);
+        return environment.containsProperty(NameUtils.hyphenate(key));
     }
 
     @Override
     public Object getProperty(String key) {
-        return environment.getProperty(key, Object.class).orElse(null);
+        return environment.getProperty(NameUtils.hyphenate(key), Object.class).orElse(null);
     }
 
     @Override

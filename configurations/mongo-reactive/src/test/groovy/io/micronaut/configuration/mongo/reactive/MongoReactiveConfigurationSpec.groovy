@@ -130,9 +130,9 @@ class MongoReactiveConfigurationSpec extends Specification {
                 ("mongodb.servers.myServer.connectionPool.${property}".toString()): value
         )
 
-        NamedReactiveMongoConfiguration configuration = context.getBean(NamedReactiveMongoConfiguration, Qualifiers.byName('myServer'))
+        NamedReactiveMongoConfiguration configuration = context.getBean(NamedReactiveMongoConfiguration, Qualifiers.byName('my-server'))
         MongoClientSettings clientSettings = configuration.buildSettings()
-        MongoClient mongoClient = context.getBean(MongoClient, Qualifiers.byName('myServer'))
+        MongoClient mongoClient = context.getBean(MongoClient, Qualifiers.byName('my-server'))
 
         expect:
         mongoClient != null

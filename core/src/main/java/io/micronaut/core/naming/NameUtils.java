@@ -96,7 +96,7 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         char separatorChar = '-';
-        return separateCamelCase(name, lowerCase, separatorChar);
+        return separateCamelCase(name.replace('_','-'), lowerCase, separatorChar);
     }
 
     /**
@@ -138,6 +138,17 @@ public class NameUtils {
      */
     public static String underscoreSeparate(String camelCase) {
         return separateCamelCase(camelCase, false, '_');
+    }
+
+    /**
+     * Returns the underscore separated version of the given camel case string.
+     *
+     * @param camelCase The camel case name
+     * @return The underscore separated version
+     */
+    public static String environmentName(String camelCase) {
+        return separateCamelCase(camelCase.replace('-', '_').replace('.', '_'), false, '_')
+                        .toUpperCase(Locale.ENGLISH);
     }
 
     /**
@@ -222,12 +233,20 @@ public class NameUtils {
                     first = false;
                 } else {
                     if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
-                        newName.append(separatorChar).append(c);
+                        if(c != separatorChar) {
+                            newName.append(separatorChar);
+                        }
+                        newName.append(c);
                     } else {
                         if (c == '.') {
                             first = true;
                         }
-                        newName.append(c);
+                        if(c != separatorChar) {
+                            if(last == separatorChar) {
+                                newName.append(separatorChar);
+                            }
+                            newName.append(c);
+                        }
                     }
                 }
                 last = c;
@@ -239,10 +258,14 @@ public class NameUtils {
             boolean first = true;
             char last = '0';
             for (char c : chars) {
-
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
-                    newName.append(c);
+                    if(c != separatorChar) {
+                        if(last == separatorChar) {
+                            newName.append(separatorChar);
+                        }
+                        newName.append(c);
+                    }
                 } else {
                     char lowerCaseChar = Character.toLowerCase(c);
                     if (first) {
@@ -280,5 +303,28 @@ public class NameUtils {
         } else {
             return filename.substring(index + 1);
         }
+    }
+
+    /**
+     * The camel case version of the string with the first letter in lower case
+     * @param str The string
+     * @return The new string in camel case
+     */
+    public static String camelCase(String str) {
+        return camelCase(str, true);
+    }
+
+    /**
+     * The camel case version of the string with the first letter in lower case
+     * @param str The string
+     * @param lowerCaseFirstLetter Whether the first letter is in upper case or lower case
+     * @return The new string in camel case
+     */
+    public static String camelCase(String str, boolean lowerCaseFirstLetter) {
+        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        if(lowerCaseFirstLetter) {
+            return decapitalize(result);
+        }
+        return result;
     }
 }

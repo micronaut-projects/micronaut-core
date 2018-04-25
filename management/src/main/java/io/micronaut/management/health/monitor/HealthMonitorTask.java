@@ -67,7 +67,7 @@ public class HealthMonitorTask {
      */
     @Scheduled(
         fixedDelay = "${micronaut.health.monitor.interval:1m}",
-        initialDelay = "${micronaut.health.monitor.initialDelay:1m}")
+        initialDelay = "${micronaut.health.monitor.initial-delay:1m}")
     void monitor() {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");

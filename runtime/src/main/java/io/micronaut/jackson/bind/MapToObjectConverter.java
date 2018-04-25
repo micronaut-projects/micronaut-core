@@ -19,11 +19,15 @@ package io.micronaut.jackson.bind;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 
 import javax.inject.Singleton;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances.
@@ -47,6 +51,17 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
         return InstantiationUtils
             .tryInstantiate(targetType)
-            .map(object -> beanPropertyBinder.bind(object, map));
+
+            .map(object ->
+                    {
+                        Map<?,?> theMap = map;
+                        Map bindMap = new LinkedHashMap(map.size());
+                        for (Map.Entry<?, ?> entry : theMap.entrySet()) {
+                            Object key = entry.getKey();
+                            bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+                        }
+                        return beanPropertyBinder.bind(object, bindMap);
+                    }
+            );
     }
 }
