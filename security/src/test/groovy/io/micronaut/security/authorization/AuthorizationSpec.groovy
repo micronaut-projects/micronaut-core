@@ -50,6 +50,20 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         response.body() == 'You are anonymous'
     }
 
+    void "an authenticated user can access an anonymous endpoint"() {
+        when:
+        String token = loginWith("valid")
+
+        then:
+        token
+
+        when:
+        HttpResponse<String> response = get("/anonymous/hello", token)
+
+        then:
+        response.body() == 'You are anonymous'
+    }
+
     void "test accessing the url map controller without authentication"() {
         when:
         get("/urlMap/authenticated")

@@ -62,6 +62,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
             } else {
                 roles.add(rolesObject.toString());
             }
+            roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);
         }
 
