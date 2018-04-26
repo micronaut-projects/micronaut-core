@@ -16,7 +16,6 @@
 
 package io.micronaut.security.authentication;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -31,13 +30,12 @@ import java.security.Principal;
 import java.util.Optional;
 
 /**
- * Responsible for binding Principal to a route argument.
+ * Responsible for binding a {@link Principal} to a route argument.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 @Singleton
-@Requires(classes = SecurityFilter.class)
 public class PrincipalArgumentBinder implements TypedRequestArgumentBinder<Principal> {
 
     @Override
@@ -51,11 +49,10 @@ public class PrincipalArgumentBinder implements TypedRequestArgumentBinder<Princ
             MutableConvertibleValues<Object> attrs = source.getAttributes();
             Optional<Authentication> existing = attrs.get(SecurityFilter.AUTHENTICATION, Authentication.class);
             if (existing.isPresent()) {
-                return () -> Optional.of((Principal) () -> existing.get().getId());
+                return () -> existing.map(e -> (Principal) e::getId);
             }
-            return ArgumentBinder.BindingResult.EMPTY;
         }
 
-        return BindingResult.UNSATISFIED;
-   }
+        return ArgumentBinder.BindingResult.EMPTY;
+    }
 }

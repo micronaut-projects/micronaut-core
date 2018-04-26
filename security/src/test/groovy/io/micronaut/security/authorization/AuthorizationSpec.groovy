@@ -186,7 +186,18 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         HttpResponse<String> response = get("/nonSensitive")
 
         then:
-        response.body() == "World"
+        response.body() == "Not logged in"
+    }
+
+    void "test accessing a non sensitive endpoint with authentication"() {
+        given:
+        String token = loginWith("valid")
+
+        when:
+        HttpResponse<String> response = get("/nonSensitive", token)
+
+        then:
+        response.body() == "Logged in as valid"
     }
 
     void "test accessing a sensitive endpoint without authentication"() {
@@ -206,6 +217,6 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         HttpResponse<String> response = get("/sensitive", token)
 
         then:
-        response.body() == "World"
+        response.body() == "Hello valid"
     }
 }
