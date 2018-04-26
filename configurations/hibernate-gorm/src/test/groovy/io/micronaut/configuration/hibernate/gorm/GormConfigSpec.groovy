@@ -46,7 +46,7 @@ class GormConfigSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.build(
                 [(Settings.SETTING_DB_CREATE):'create-drop',
                  'dataSource.url':'jdbc:h2:mem:someOtherDb',
-                 'dataSource.properties.initialSize':15]
+                 'dataSource.properties.initialSize':25]
                 )
                 .mainClass(GormConfigSpec)
                 .start()
@@ -56,7 +56,7 @@ class GormConfigSpec extends Specification {
 
         expect:
         dataSource.poolProperties.url == 'jdbc:h2:mem:someOtherDb'
-        dataSource.poolProperties.initialSize == 15
+        dataSource.poolProperties.initialSize == 25
 
         cleanup:
         applicationContext.close()

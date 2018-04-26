@@ -43,9 +43,14 @@ public enum StringConvention {
     HYPHENATED,
 
     /**
+     * Raw unconverted string
+     */
+    RAW,
+    /**
      * Hyphenated, in upper case.  Example FOO_BAR
      */
     UNDER_SCORE_SEPARATED;
+
 
     /**
      * Format the string with this format
@@ -66,8 +71,11 @@ public enum StringConvention {
             case UNDER_SCORE_SEPARATED:
                 return NameUtils.environmentName(str);
             case CAMEL_CASE_CAPITALIZED:
-            default:
                 return NameUtils.camelCase(str, false);
+            case RAW:
+            default:
+                return str;
+
         }
     }
 }

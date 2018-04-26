@@ -254,13 +254,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         KeyFormat keyFormat = conversionContext.getAnnotation(KeyFormat.class);
-        StringConvention keyConvention;
-        if(keyFormat != null) {
-            keyConvention = keyFormat.value();
-        }
-        else {
-            keyConvention = StringConvention.CAMEL_CASE;
-        }
+        StringConvention keyConvention = keyFormat != null ? keyFormat.value() : StringConvention.RAW;
         String prefix = name + '.';
         entries.entrySet().stream()
                 .filter(map -> map.getKey().startsWith(prefix))
@@ -280,13 +274,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         // special handling for maps for resolving sub keys
         Map<String, Object> subMap = new LinkedHashMap<>();
         KeyFormat keyFormat = conversionContext.getAnnotation(KeyFormat.class);
-        StringConvention keyConvention;
-        if(keyFormat != null) {
-            keyConvention = keyFormat.value();
-        }
-        else {
-            keyConvention = StringConvention.CAMEL_CASE;
-        }
+        StringConvention keyConvention = keyFormat != null ? keyFormat.value() : StringConvention.RAW;
         String prefix = name + '.';
         for (Map.Entry<String, Object> map : entries.entrySet()) {
             if (map.getKey().startsWith(prefix)) {
