@@ -4,6 +4,7 @@ dependencies {
     compile project(":aop")
     compile project(":jdbc")
     compile project(":spring")
+    compile "org.springframework:spring-orm:$springVersion"
     compile project(":runtime")
     compile project(":configurations:hibernate-validator")
     compileOnly project(":inject-java")
