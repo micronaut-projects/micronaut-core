@@ -7,9 +7,11 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.authentication.PrincipalArgumentBinder
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
+import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -50,7 +52,11 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         response.body() == 'You are anonymous'
     }
 
-    void "an authenticated user can access an anonymous endpoint"() {
+    @PendingFeature
+    void "java.security.Principal Argument Binders binds even if Optional<Principal>"() {
+        expect:
+        embeddedServer.applicationContext.getBean(PrincipalArgumentBinder.class)
+
         when:
         String token = loginWith("valid")
 
@@ -61,7 +67,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         HttpResponse<String> response = get("/anonymous/hello", token)
 
         then:
-        response.body() == 'You are anonymous'
+        response.body() == 'You are valid'
     }
 
     void "test accessing the url map controller without authentication"() {
@@ -82,6 +88,20 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
         when:
         HttpResponse<String> response = get("/urlMap/authenticated", token)
+
+        then:
+        response.body() == "valid is authenticated"
+    }
+
+    void "test accessing the url map controller and bind to java.util.Principal"() {
+        when:
+        String token = loginWith("valid")
+
+        then:
+        token
+
+        when:
+        HttpResponse<String> response = get("/urlMap/principal", token)
 
         then:
         response.body() == "valid is authenticated"

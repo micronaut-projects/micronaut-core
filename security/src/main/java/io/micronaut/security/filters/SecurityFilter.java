@@ -110,8 +110,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
                 break;
             }
         }
-
-        authentication.ifPresent((a) -> request.setAttribute(AUTHENTICATION, a));
+        request.setAttribute(AUTHENTICATION, authentication.orElse(null));
         Optional<Map<String, Object>> attributes = authentication.map(Authentication::getAttributes);
         Optional<RouteMatch> routeMatch = getRouteMatch(request);
 

@@ -4,6 +4,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.security.authentication.Authentication
 
+import java.security.Principal
+
 @Controller("/urlMap")
 class UrlMapController {
 
@@ -15,5 +17,10 @@ class UrlMapController {
     @Get("/authenticated")
     String authenticated(Authentication authentication) {
         "${authentication.id} is authenticated"
+    }
+
+    @Get("/principal")
+    String authenticated(Principal principal) {
+        "${principal.getName()} is authenticated"
     }
 }
