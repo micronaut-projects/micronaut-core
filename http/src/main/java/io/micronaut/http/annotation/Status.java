@@ -36,5 +36,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD})
 public @interface Status {
 
-    HttpStatus value() default HttpStatus.OK;
+    HttpStatus value();
 }
