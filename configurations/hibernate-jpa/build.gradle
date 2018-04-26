@@ -1,0 +1,15 @@
+dependencies {
+    compile 'org.hibernate:hibernate-core:5.2.16.Final'
+
+    compile project(":aop")
+    compile project(":jdbc")
+    compile project(":spring")
+    compile project(":runtime")
+    compile project(":configurations:hibernate-validator")
+    compileOnly project(":inject-java")
+    compileOnly project(":management")
+
+    testCompile project(":inject-groovy")
+    testRuntime project(":configurations:jdbc-tomcat")
+    testRuntime 'com.h2database:h2:1.4.196'
+}

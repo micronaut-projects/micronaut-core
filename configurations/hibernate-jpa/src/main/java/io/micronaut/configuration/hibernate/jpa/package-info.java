@@ -13,25 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.convert.format;
-import io.micronaut.core.naming.conventions.StringConvention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
 /**
- * Allows configuring the format of Map keys when injecting map configuration
+ * This package contains a configuration for Hibernate and JPA
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-public @interface KeyFormat {
-    /**
-     * @return The string conversion to use
-     */
-    StringConvention value();
-}
+@Configuration
+@Requires(classes = {SessionFactory.class, Entity.class})
+package io.micronaut.configuration.hibernate.jpa;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import org.hibernate.SessionFactory;
+
+import javax.persistence.Entity;
