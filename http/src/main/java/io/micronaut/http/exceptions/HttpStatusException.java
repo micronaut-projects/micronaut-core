@@ -27,6 +27,7 @@ import io.micronaut.http.HttpStatus;
 public class HttpStatusException extends HttpException {
 
     private HttpStatus status;
+    private Object body;
 
     /**
      * @param status  The {@link HttpStatus}
@@ -38,9 +39,25 @@ public class HttpStatusException extends HttpException {
     }
 
     /**
+     * @param status The {@link HttpStatus}
+     * @param body   The arbitrary object to return
+     */
+    public HttpStatusException(HttpStatus status, Object body) {
+        this.status = status;
+        this.body = body;
+    }
+
+    /**
      * @return The {@link HttpStatus}
      */
     public HttpStatus getStatus() {
         return status;
+    }
+
+    /**
+     * @return The body for the response
+     */
+    public Object getBody() {
+        return body;
     }
 }
