@@ -17,11 +17,9 @@ import spock.lang.Specification
 
 class HttpStatusSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     void "Simple default return HttpStatus OK"() {
-        given:
-            HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
             Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                     HttpRequest.GET("/status/simple"), String
@@ -33,16 +31,9 @@ class HttpStatusSpec extends Specification {
             response.status == HttpStatus.OK
             body.isPresent()
             body.get() == 'success'
-
-        cleanup:
-            client.stop()
-            client.close()
     }
 
     void "Simple custom return HttpStatus CREATED"() {
-        given:
-            HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
-
         when:
             Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                     HttpRequest.GET("/status/simpleCreated"), String
@@ -54,16 +45,9 @@ class HttpStatusSpec extends Specification {
             response.status == HttpStatus.CREATED
             body.isPresent()
             body.get() == 'success'
-
-        cleanup:
-            client.stop()
-            client.close()
     }
 
     void "Simple custom return HttpStatus 404"() {
-        given:
-            HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
             Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                     HttpRequest.GET("/status/simple404"), String
@@ -74,10 +58,6 @@ class HttpStatusSpec extends Specification {
             def e = thrown(HttpClientResponseException)
             e.message == "Not Found"
             e.status == HttpStatus.NOT_FOUND
-
-        cleanup:
-            client.stop()
-            client.close()
     }
 
     @Controller("/status")
