@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.env.SystemPropertiesPropertySource
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
@@ -119,7 +120,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-        File classesDir = source.configuration.targetDirectory
+
+        String injectTarget = System.getProperty('micronaut.inject.target')
+        File classesDir = injectTarget ? new File(injectTarget) : source.configuration.targetDirectory
+
         DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                 classesDir
         )
