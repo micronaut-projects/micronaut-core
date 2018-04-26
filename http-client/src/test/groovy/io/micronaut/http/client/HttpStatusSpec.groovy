@@ -24,13 +24,13 @@ class HttpStatusSpec extends Specification {
 
         when:
             Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.GET("/status/simple").header("Accept-Encoding", "gzip")
+                    HttpRequest.GET("/status/simple"), String
             ))
-            Optional<String> body = flowable.map({res ->
-                res.getBody(String)}
-            ).blockingFirst()
+            HttpResponse<String> response = flowable.blockingFirst()
+            Optional<String> body = response.getBody()
 
         then:
+            response.status == HttpStatus.OK
             body.isPresent()
             body.get() == 'success'
 
@@ -48,9 +48,12 @@ class HttpStatusSpec extends Specification {
                     HttpRequest.GET("/status/simpleCreated"), String
             ))
             HttpResponse<String> response = flowable.blockingFirst()
+            Optional<String> body = response.getBody()
 
         then:
             response.status == HttpStatus.CREATED
+            body.isPresent()
+            body.get() == 'success'
 
         cleanup:
             client.stop()
@@ -77,89 +80,6 @@ class HttpStatusSpec extends Specification {
             client.close()
     }
 
-    void "Default pojo return HttpStatus OK"() {
-        given:
-            HttpClient client = HttpClient.create(embeddedServer.getURL())
-
-        when:
-            Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.GET("/get/pojo"), Book
-            ))
-
-            HttpResponse<Book> response = flowable.blockingFirst()
-            Optional<Book> body = response.getBody()
-
-        then:
-            response.contentType.isPresent()
-            response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
-            response.status == HttpStatus.OK
-            body.isPresent()
-            body.get().title == 'The Stand'
-
-        cleanup:
-            client.stop()
-            client.close()
-    }
-
-    void "Custom pojo return HttpStatus CREATED"() {
-        given:
-            HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
-
-        when:
-            Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.GET("/status/pojoCreated"), String
-            ))
-            HttpResponse<String> response = flowable.blockingFirst()
-
-        then:
-            response.status == HttpStatus.CREATED
-
-        cleanup:
-            client.stop()
-            client.close()
-    }
-
-    void "Custom pojo return HttpStatus 404"() {
-        given:
-            HttpClient client = HttpClient.create(embeddedServer.getURL())
-
-        when:
-            Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.GET("/status/pojo404"), String
-            ))
-            HttpResponse<String> response = flowable.blockingFirst()
-
-        then:
-            def e = thrown(HttpClientResponseException)
-            e.message == "Not Found"
-            e.status == HttpStatus.NOT_FOUND
-
-        cleanup:
-            client.stop()
-            client.close()
-    }
-
-    void "Custom list return HttpStatus BAD_REQUEST"() {
-        given:
-            HttpClient client = HttpClient.create(embeddedServer.getURL())
-
-        when:
-            Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                    HttpRequest.GET("/status/pojoList"), String
-            ))
-            HttpResponse<String> response = flowable.blockingFirst()
-
-        then:
-            def e = thrown(HttpClientResponseException)
-            e.message == "Bad Request"
-            e.status == HttpStatus.BAD_REQUEST
-
-        cleanup:
-            client.stop()
-            client.close()
-    }
-
-
     @Controller("/status")
     static class StatusController {
 
@@ -179,32 +99,5 @@ class HttpStatusSpec extends Specification {
         String simple404() {
             return "success"
         }
-
-        @Get("/pojo")
-        Book pojo() {
-            return new Book(title: "The Stand")
-        }
-
-        @Status(HttpStatus.CREATED)
-        @Get("/pojoCreated")
-        Book pojoCreated() {
-            return new Book(title: "The Stand")
-        }
-
-        @Status(HttpStatus.NOT_FOUND)
-        @Get("/pojo404")
-        Book pojo404() {
-            return new Book(title: "The Stand")
-        }
-
-        @Status(HttpStatus.BAD_REQUEST)
-        @Get("/pojoList")
-        List<Book> pojoList() {
-            return [ new Book(title: "The Stand") ]
-        }
-    }
-
-    static class Book {
-        String title
     }
 }
