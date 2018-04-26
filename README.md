@@ -12,7 +12,11 @@ To build the documentation run `./gradlew publishGuide` or `./gradlew pG` then o
 
 ## How to run Micronaut CLI
 
-- `$ ./gradlew cli:fatJar`
-- `$ cd cli/build/bin`
-- `$ ./mn`
+- Clone [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles)
+- Install micronaut-profiles to Maven Local `micronaut-profiles$ ./gradlew clean publishToMavenLocal`
+- `micronaut-core$ ./gradlew cli:fatJar`
+- `micronaut-core$ cd cli/build/bin`
+- `micronaut-core/cli/build/bin$ ./mn`
+ 
+  
  
