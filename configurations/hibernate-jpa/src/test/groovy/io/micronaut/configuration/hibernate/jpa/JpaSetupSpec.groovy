@@ -16,10 +16,15 @@
 package io.micronaut.configuration.hibernate.jpa
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.spring.tx.annotation.Transactional
+import org.hibernate.SessionFactory
+import org.springframework.transaction.interceptor.TransactionAspectSupport
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import javax.persistence.Entity
 import javax.persistence.EntityManager
 import javax.persistence.EntityManagerFactory
@@ -80,6 +85,38 @@ class JpaSetupSpec extends Specification {
         cleanup:
         tx.rollback()
     }
+
+    void "test spring based transaction management"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+
+
+        when:
+        List<Book> books = bookService.listBooks()
+
+        then:
+        books.size() == 0
+
+        when:
+        bookService.saveError()
+
+
+        then:
+        def e  = thrown(RuntimeException)
+
+        when:
+        books = bookService.listBooks()
+        then:
+        books.size() == 0
+
+        when:
+        bookService.saveSuccess()
+        books = bookService.listBooks()
+
+        then:
+        books.size() == 1
+
+    }
 }
 
 @Entity
@@ -91,4 +128,35 @@ class Book {
 
     @NotBlank
     String title
+}
+
+@Singleton
+class BookService {
+
+    @Inject
+    SessionFactory sessionFactory
+
+    @Transactional(readOnly = true)
+    List<Book> listBooks() {
+        sessionFactory.currentSession.createCriteria(Book).list()
+    }
+
+    @Transactional(readOnly = true)
+    List<Book> saveReadOnly() {
+        sessionFactory.currentSession.persist(new Book(title: "the stand"))
+        sessionFactory.currentSession.createCriteria(Book).list()
+    }
+
+    @Transactional()
+    List<Book> saveError() {
+        sessionFactory.currentSession.persist(new Book(title: "the stand"))
+        throw new Exception("bad things happened")
+    }
+
+    @Transactional()
+    List<Book> saveSuccess() {
+        sessionFactory.currentSession.persist(new Book(title: "the stand"))
+        sessionFactory.currentSession.createCriteria(Book).list()
+    }
+
 }
