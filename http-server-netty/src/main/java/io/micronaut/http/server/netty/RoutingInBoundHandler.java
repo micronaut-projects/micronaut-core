@@ -302,6 +302,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Matched route is not a supported media type: {}", contentType);
             }
+
+            // if route is a methodbased route, then get the declaringType and call router.route with it.
             Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
             if (statusRoute.isPresent()) {
                 route = statusRoute.get();
@@ -350,6 +352,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return;
         }
 
+        // to pass in the originalDeclaringtype see :363
         if (cause instanceof UnsatisfiedRouteException) {
             errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
         }
@@ -708,8 +711,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     } else if (result instanceof io.micronaut.http.HttpResponse) {
                         HttpStatus status = ((io.micronaut.http.HttpResponse) result).getStatus();
                         if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
+
+                            // PASS IN DECALRING TYPE HERE ALSO
                             // handle re-mapping of errors
-                            result = router.route(status)
+                            Class declaringType = ((MethodBasedRouteMatch) routeMatch).getDeclaringType();
+                            result = router.route(declaringType, status)
                                 .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                 .filter(RouteMatch::isExecutable)
                                 .map(RouteMatch::execute)
