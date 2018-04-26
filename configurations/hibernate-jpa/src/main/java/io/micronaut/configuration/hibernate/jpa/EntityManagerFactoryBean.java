@@ -23,6 +23,7 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.SessionFactoryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.cfg.AvailableSettings;
+import org.springframework.orm.hibernate5.SpringSessionContext;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -63,6 +64,7 @@ public class EntityManagerFactoryBean {
 
         Map<String,Object > additionalSettings = new LinkedHashMap<>();
         additionalSettings.put(AvailableSettings.DATASOURCE, dataSource);
+        additionalSettings.put(AvailableSettings.CURRENT_SESSION_CONTEXT_CLASS, SpringSessionContext.class.getName());
         additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME,sessionFactoryName);
         additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME_IS_JNDI,false);
         StandardServiceRegistry serviceRegistry = jpaConfiguration.buildStandardServiceRegistry(

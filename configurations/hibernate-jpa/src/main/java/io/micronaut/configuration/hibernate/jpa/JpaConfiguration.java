@@ -35,6 +35,7 @@ import java.util.Map;
  */
 @ConfigurationProperties(JpaConfiguration.PREFIX)
 public class JpaConfiguration {
+    @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = "jpa";
 
     private final BootstrapServiceRegistry bootstrapServiceRegistry;
@@ -55,6 +56,7 @@ public class JpaConfiguration {
      *
      * @return The standard service registry
      */
+    @SuppressWarnings("WeakerAccess")
     public StandardServiceRegistry buildStandardServiceRegistry(@Nullable  Map<String,Object> additionalSettings  ) {
         StandardServiceRegistryBuilder standardServiceRegistryBuilder = createStandServiceRegistryBuilder(bootstrapServiceRegistry);
 
