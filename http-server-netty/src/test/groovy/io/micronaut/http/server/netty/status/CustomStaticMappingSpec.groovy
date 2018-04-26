@@ -40,7 +40,18 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff"
+        e.response.reason() == "You sent me bad stuff - from TestController.badHandler()"
+
+    }
+
+    void "test that a bad request is handled is handled by the locally marked controller"() {
+        when:
+        rxClient.exchange('/test2/bad').blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+        e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
     }
 
@@ -54,7 +65,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff"
+        e.response.reason() == "You sent me bad stuff - from TestController.badHandler()"
 
     }
 
@@ -74,7 +85,22 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
         @Error(status = HttpStatus.BAD_REQUEST)
         HttpResponse badHandler() {
-            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff")
+            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from TestController.badHandler()")
+        }
+    }
+
+    @Controller
+    @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
+    static class Test2Controller {
+        @Get
+        HttpResponse bad() {
+            HttpResponse.badRequest()
+        }
+
+        @Error(status = HttpStatus.BAD_REQUEST)
+        HttpResponse badHandler() {
+            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test2Controller.badHandler()")
         }
     }
 }
