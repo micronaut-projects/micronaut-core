@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
@@ -22,7 +23,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
@@ -34,7 +34,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * Bindings {@link Body} arguments of type {@link Single}
+ * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Single}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -47,6 +47,11 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
 
     private PublisherBodyBinder publisherBodyBinder;
 
+    /**
+     * @param conversionService       The conversion service
+     * @param beanLocator             The bean locator
+     * @param httpServerConfiguration The Http server configuration
+     */
     public SingleBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
         super(conversionService);
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, beanLocator, httpServerConfiguration);

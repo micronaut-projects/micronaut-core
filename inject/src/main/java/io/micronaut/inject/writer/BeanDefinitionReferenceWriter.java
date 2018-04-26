@@ -78,10 +78,10 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-        Optional<File> file = outputVisitor.visitServiceDescriptor(BeanDefinitionReference.class);
-        if (file.isPresent()) {
-            ServiceDescriptorGenerator.generate(beanDefinitionReferenceClassName, file.get());
-        }
+        outputVisitor.visitServiceDescriptor(
+                BeanDefinitionReference.class,
+                beanDefinitionReferenceClassName
+        );
     }
 
     /**

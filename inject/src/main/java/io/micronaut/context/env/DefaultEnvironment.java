@@ -45,16 +45,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -200,6 +191,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             if (reading.compareAndSet(false, true)) {
+
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
             }
@@ -431,8 +423,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     // do nothing here
                     break;
             }
-
         }
+
+
+        Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
+                  System.getenv(ENVIRONMENTS_ENV))
+                .filter(Objects::nonNull)
+                .flatMap(s -> Arrays.stream(s.split(",")))
+                .map(String::trim)
+                .forEach(enviroments::add);
+
         if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
             LOG.info("Established active environments: {}", enviroments);
         }

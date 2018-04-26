@@ -33,16 +33,19 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * Prefix for placeholder in properties
      */
     public static final String PREFIX = "${";
+
     private final PropertyResolver environment;
+    private final String prefix;
 
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
         this.environment = environment;
+        this.prefix = PREFIX;
     }
 
     @Override
     public Optional<String> resolvePlaceholders(String str) {
         try {
-            int i = str.indexOf(PREFIX);
+            int i = str.indexOf(prefix);
             if (i > -1) {
                 return Optional.of(resolvePlaceholders(str, i));
             }
@@ -54,7 +57,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
-        int i = str.indexOf(PREFIX);
+        int i = str.indexOf(prefix);
         if (i > -1) {
             return resolvePlaceholders(str, i);
         }
@@ -72,7 +75,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
             resolveExpression(builder, str, expr);
 
-            i = restOfString.indexOf(PREFIX);
+            i = restOfString.indexOf(prefix);
             if (i > -1) {
                 builder.append(resolvePlaceholders(restOfString, i));
             } else {

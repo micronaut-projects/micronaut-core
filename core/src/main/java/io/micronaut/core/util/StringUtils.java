@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
 
+package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -28,7 +28,7 @@ import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 
 /**
- * Utility methods for Strings
+ * Utility methods for Strings.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,7 +41,7 @@ public class StringUtils {
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
     /**
-     * Return whether the given string is empty
+     * Return whether the given string is empty.
      *
      * @param str The string
      * @return True if is
@@ -51,7 +51,7 @@ public class StringUtils {
     }
 
     /**
-     * Return whether the given string is not empty
+     * Return whether the given string is not empty.
      *
      * @param str The string
      * @return True if is
@@ -61,7 +61,7 @@ public class StringUtils {
     }
 
     /**
-     * Return whether the given string has non whitespace characters
+     * Return whether the given string has non whitespace characters.
      *
      * @param str The string
      * @return True if is
@@ -81,11 +81,12 @@ public class StringUtils {
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
      *
      * @param objects The objects
      * @return An set of strings
      */
+    @SuppressWarnings("unused")
     public static Set<String> internSetOf(Object... objects) {
         if (objects == null || objects.length == 0) {
             return Collections.emptySet();
@@ -98,19 +99,21 @@ public class StringUtils {
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
      *
      * @param values The objects
      * @return An unmodifiable set of strings
      * @see CollectionUtils#mapOf(Object...)
      */
+    @SuppressWarnings("unused")
     public static Map<String, Object> internMapOf(Object... values) {
         if (values == null) {
             return Collections.emptyMap();
         }
         int len = values.length;
-        if (len % 2 != 0)
+        if (len % 2 != 0) {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
 
         Map<String, Object> answer = new HashMap<>(len / 2);
         int i = 0;
@@ -121,7 +124,7 @@ public class StringUtils {
     }
 
     /**
-     * Is the given string a series of digits
+     * Is the given string a series of digits.
      *
      * @param str The string
      * @return True if it is a series of digits

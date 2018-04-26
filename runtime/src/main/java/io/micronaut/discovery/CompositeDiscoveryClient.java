@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.cache.CacheConfiguration;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -28,7 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A composite implementation combining all registered {@link DiscoveryClient} instances
+ * A composite implementation combining all registered {@link DiscoveryClient} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +41,11 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     private final DiscoveryClient[] discoveryClients;
 
+    /**
+     * Construct the CompositeDiscoveryClient from all discovery clients.
+     *
+     * @param discoveryClients The service discovery clients
+     */
     protected CompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         this.discoveryClients = discoveryClients;
     }
@@ -50,10 +57,12 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
+        serviceId = NameUtils.hyphenate(serviceId);
         if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
-        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(serviceId)));
+        String finalServiceId = serviceId;
+        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(finalServiceId)));
         Maybe<List<ServiceInstance>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((instances, otherInstances) -> {
             instances.addAll(otherInstances);
             return instances;

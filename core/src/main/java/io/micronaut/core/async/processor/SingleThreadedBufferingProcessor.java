@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.processor;
 
 import io.micronaut.core.async.subscriber.SingleThreadedBufferingSubscriber;
@@ -27,7 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>A Reactive streams {@link org.reactivestreams.Processor} designed to be used within a single thread and manage back pressure state.</p>
  * <p>
  * <p>This processor only supports a single {@link Subscriber}</p>
- *
+ * @param <T> The argument type
+ * @param <R> The message type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -85,14 +87,14 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     /**
-     * Called when an message is received from the upstream {@link Subscriber}
+     * Called when an message is received from the upstream {@link Subscriber}.
      *
      * @param message The message
      */
     protected abstract void onUpstreamMessage(R message);
 
     /**
-     * Resolve the current {@link Subscriber}
+     * Resolve the current {@link Subscriber}.
      *
      * @return An {@link Optional} of the subscriber
      */
@@ -101,7 +103,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     /**
-     * Resolve the current {@link Subscriber}
+     * Resolve the current {@link Subscriber}.
      *
      * @return An {@link Optional} of the subscriber
      * @throws IllegalStateException If no {@link Subscriber} is present

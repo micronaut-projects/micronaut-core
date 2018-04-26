@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.info.source;
 
 import io.micronaut.context.annotation.Requires;
@@ -31,12 +32,11 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * <p>An {@link InfoSource} that retrieves values under the <i>info</i> key from configuration sources. </p>
+ * <p>An {@link InfoSource} that retrieves values under the <i>info</i> key from configuration sources.</p>
  *
  * @author Zachary Klein
  * @since 1.0
  */
-
 @Refreshable
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.config.enabled", notEquals = "false")
@@ -45,6 +45,9 @@ public class ConfigurationInfoSource implements InfoSource {
     private final Environment environment;
     private final Supplier<MapPropertySource> supplier;
 
+    /**
+     * @param environment The {@link Environment}
+     */
     public ConfigurationInfoSource(Environment environment) {
         this.environment = environment;
         this.supplier = SupplierUtil.memoized(this::retrieveConfigurationInfo);
@@ -54,7 +57,6 @@ public class ConfigurationInfoSource implements InfoSource {
     public Publisher<PropertySource> getSource() {
         return Flowable.just(supplier.get());
     }
-
 
     private MapPropertySource retrieveConfigurationInfo() {
         return new MapPropertySource("info", environment.getProperty("info", Map.class).orElse(new HashMap()));

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator.diskspace;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -45,7 +46,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     /**
      * @param enabled Enable the health indication endpoint
      */
-    void setEnabled(boolean enabled) {
+    protected void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
@@ -59,7 +60,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     /**
      * @param path The file path
      */
-    void setPath(File path) {
+    protected void setPath(File path) {
         this.path = path;
     }
 
@@ -73,7 +74,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     /**
      * @param threshold Set the threshold
      */
-    void setThreshold(@ReadableBytes long threshold) {
+    protected void setThreshold(@ReadableBytes long threshold) {
         this.threshold = threshold;
     }
 }

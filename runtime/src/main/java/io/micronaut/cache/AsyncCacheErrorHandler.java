@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 import io.micronaut.cache.interceptor.CacheInterceptor;
@@ -23,7 +24,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Async error handler that simply logs errors
+ * Async error handler that simply logs errors.
  *
  * @author Graeme Rocher
  * @since 1.0

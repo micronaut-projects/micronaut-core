@@ -50,6 +50,6 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |`@Requires(sdk=Sdk.JAVA, value="1.8")`
 
 |Require a property with an optional value
-|`@Requires(property='dataSource.url')`
+|`@Requires(property='data-source.url')`
 |===
 

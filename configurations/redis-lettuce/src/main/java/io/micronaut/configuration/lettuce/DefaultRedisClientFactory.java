@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisClient;
@@ -26,7 +27,7 @@ import io.micronaut.context.annotation.Requires;
 import javax.inject.Singleton;
 
 /**
- * Factory for the default {@link RedisClient}. Creates the injectable {@link Primary} bean
+ * Factory for the default {@link RedisClient}. Creates the injectable {@link Primary} bean.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -44,6 +45,7 @@ public class DefaultRedisClientFactory extends AbstractRedisClientFactory {
         return super.redisClient(config);
     }
 
+    @Override
     @Bean(preDestroy = "close")
     @Singleton
     @Primary
@@ -51,6 +53,7 @@ public class DefaultRedisClientFactory extends AbstractRedisClientFactory {
         return super.redisConnection(redisClient);
     }
 
+    @Override
     @Bean(preDestroy = "close")
     @Singleton
     public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(@Primary RedisClient redisClient) {

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt.health;
 
 import io.micronaut.context.annotation.Requires;
@@ -34,7 +35,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A Health Indicator for Neo4j
+ * A Health Indicator for Neo4j.
  *
  * @author graemerocher
  * @since 1.0
@@ -46,6 +47,10 @@ public class Neo4jHealthIndicator implements HealthIndicator {
     public static final String NAME = "neo4j";
     private final Driver boltDriver;
 
+    /**
+     * Constructor.
+     * @param boltDriver driver
+     */
     public Neo4jHealthIndicator(Driver boltDriver) {
         this.boltDriver = boltDriver;
     }

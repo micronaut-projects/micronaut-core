@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.reactivestreams.client.MongoClient;
@@ -20,11 +21,10 @@ import com.mongodb.reactivestreams.client.MongoClients;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.runtime.context.scope.Refreshable;
 
 /**
- * Factory for named {@link MongoClient} instances. Creates the injectable {@link Primary} bean
+ * Factory for named {@link MongoClient} instances. Creates the injectable {@link io.micronaut.context.annotation.Primary} bean
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +32,11 @@ import io.micronaut.runtime.context.scope.Refreshable;
 @Factory
 public class NamedMongoClientFactory {
 
+    /**
+     * Factory name to create a client.
+     * @param configuration configuration pulled in
+     * @return mongoClient
+     */
     @Bean(preDestroy = "close")
     @EachBean(NamedReactiveMongoConfiguration.class)
     @Refreshable(MongoSettings.PREFIX)

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive.condition;
 
 import com.mongodb.reactivestreams.client.MongoClient;
@@ -26,7 +27,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A custom requirement for MongoDB
+ * A custom requirement for MongoDB.
  *
  * @author graemerocher
  * @since 1.0

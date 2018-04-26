@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.parser;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
@@ -47,7 +46,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private boolean streamArray;
 
     /**
-     * Creates a new JacksonProcessor
+     * Creates a new JacksonProcessor.
      *
      * @param jsonFactory The JSON factory
      * @param streamArray Whether arrays should be streamed
@@ -62,10 +61,19 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         }
     }
 
+    /**
+     * Construct with given JSON factory.
+     *
+     * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
+     *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     */
     public JacksonProcessor(JsonFactory jsonFactory) {
         this(jsonFactory, false);
     }
 
+    /**
+     * Construct with default JSON factory.
+     */
     public JacksonProcessor() {
         this(new JsonFactory());
     }
@@ -107,20 +115,19 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
                         boolean isLast = nodeStack.isEmpty();
-                        if(isLast) {
+                        if (isLast) {
                             byteFeeder.endOfInput();
                         }
 
-                        if(isLast && streamArray && root instanceof ArrayNode) {
+                        if (isLast && streamArray && root instanceof ArrayNode) {
                             break;
-                        }
-                        else {
+                        } else {
                             currentDownstreamSubscriber()
                                     .ifPresent(subscriber ->
                                             subscriber.onNext(root)
                                     );
                         }
-                        if(isLast) {
+                        if (isLast) {
                             break;
                         }
                     }
@@ -155,18 +162,15 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 JsonNode current = nodeStack.pop();
                 if (nodeStack.isEmpty()) {
                     return current;
-                }
-                else {
-                    if(streamArray && event == JsonToken.END_OBJECT && nodeStack.size() == 1) {
+                } else {
+                    if (streamArray && event == JsonToken.END_OBJECT && nodeStack.size() == 1) {
                         JsonNode jsonNode = nodeStack.peekFirst();
-                        if(jsonNode instanceof ArrayNode) {
+                        if (jsonNode instanceof ArrayNode) {
                             return current;
-                        }
-                        else {
+                        } else {
                             return null;
                         }
-                    }
-                    else {
+                    } else {
                         return null;
                     }
                 }

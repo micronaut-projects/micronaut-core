@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.monitor;
 
 import io.micronaut.context.annotation.Requires;
@@ -36,7 +37,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * A continuous health monitor that that updates the {@link CurrentHealthStatus} in a background thread
+ * A continuous health monitor that that updates the {@link CurrentHealthStatus} in a background thread.
  *
  * @author graemerocher
  * @since 1.0
@@ -52,27 +53,37 @@ public class HealthMonitorTask {
     private final CurrentHealthStatus currentHealthStatus;
     private final HealthIndicator[] healthIndicators;
 
+    /**
+     * @param currentHealthStatus The current health status
+     * @param healthIndicators    Health indicators
+     */
     public HealthMonitorTask(CurrentHealthStatus currentHealthStatus, HealthIndicator... healthIndicators) {
         this.currentHealthStatus = currentHealthStatus;
         this.healthIndicators = healthIndicators;
     }
 
+    /**
+     * Start the continuous health monitor.
+     */
     @Scheduled(
         fixedDelay = "${micronaut.health.monitor.interval:1m}",
-        initialDelay = "${micronaut.health.monitor.initialDelay:1m}")
+        initialDelay = "${micronaut.health.monitor.initial-delay:1m}")
     void monitor() {
-
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");
         }
-        List<Publisher<HealthResult>> healthResults = Arrays.stream(healthIndicators)
+        List<Publisher<HealthResult>> healthResults = Arrays
+            .stream(healthIndicators)
             .map(HealthIndicator::getResult)
             .collect(Collectors.toList());
 
-        Flowable<HealthResult> resultFlowable = Flowable.merge(healthResults).filter(healthResult -> {
-            HealthStatus status = healthResult.getStatus();
-            return status.equals(HealthStatus.DOWN) || !status.getOperational().orElse(true);
-        });
+        Flowable<HealthResult> resultFlowable = Flowable
+            .merge(healthResults)
+            .filter(healthResult -> {
+                    HealthStatus status = healthResult.getStatus();
+                    return status.equals(HealthStatus.DOWN) || !status.getOperational().orElse(true);
+                }
+            );
 
         resultFlowable.firstElement().subscribe(new MaybeObserver<HealthResult>() {
             @Override

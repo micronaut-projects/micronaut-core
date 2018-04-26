@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache.annotation;
 
 import io.micronaut.cache.interceptor.CacheInterceptor;
@@ -46,12 +47,16 @@ import java.lang.annotation.Target;
 public @interface CacheInvalidate {
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return Cache names
      */
     @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
+     *
+     * @return Cache names
      */
     @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
     String[] cacheNames() default {};
@@ -59,6 +64,8 @@ public @interface CacheInvalidate {
 
     /**
      * Alias for {@link CacheConfig#keyGenerator}.
+     *
+     * @return The key generator class
      */
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -23,7 +24,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -37,8 +37,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -48,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Delegates to Netty's {@link FullHttpResponse}
  *
+ * @param <B> The response body
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -55,12 +54,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
 
     protected FullHttpResponse nettyResponse;
-    private final ConversionService conversionService;
     final NettyHttpHeaders headers;
+    private final ConversionService conversionService;
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
 
+    /**
+     * @param nettyResponse     The {@link FullHttpResponse}
+     * @param conversionService The conversion service
+     */
+    @SuppressWarnings("MagicNumber")
     public NettyHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
@@ -68,6 +72,10 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.conversionService = conversionService;
     }
 
+    /**
+     * @param conversionService The conversion service
+     */
+    @SuppressWarnings("MagicNumber")
     public NettyHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
@@ -146,6 +154,9 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
+    /**
+     * @return The Netty {@link FullHttpResponse}
+     */
     public FullHttpResponse getNativeResponse() {
         return nettyResponse;
     }
@@ -156,6 +167,10 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
+    /**
+     * @param body The body to replace
+     * @return The current instance
+     */
     public NettyHttpResponse replace(ByteBuf body) {
         this.nettyResponse = this.nettyResponse.replace(body);
         return this;

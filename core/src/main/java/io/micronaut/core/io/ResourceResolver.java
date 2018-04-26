@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io;
 
 import io.micronaut.core.io.file.FileSystemResourceLoader;
@@ -46,7 +47,7 @@ public class ResourceResolver {
 
     /**
      * Searches resource loaders for one that matches or is a subclass
-     * of the specified type
+     * of the specified type.
      *
      * @param resolverType The type of resolver to retrieve
      * @return An optional resource loader
@@ -59,7 +60,7 @@ public class ResourceResolver {
     }
 
     /**
-     * Searches resource loaders for one that supports the given prefix
+     * Searches resource loaders for one that supports the given prefix.
      *
      * @param prefix The prefix the loader should support. (classpath:, file:, etc)
      * @return An optional resource loader

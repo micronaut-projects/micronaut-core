@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
@@ -35,21 +36,31 @@ import java.net.URL;
 import java.util.Optional;
 
 /**
- * Writes an {@link InputStream} to the Netty context
+ * Writes an {@link InputStream} to the Netty context.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
 
+    /**
+     * @param inputStream The input stream
+     * @param name        The name
+     */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
         super(inputStream, name);
     }
 
+    /**
+     * @param url The URL
+     */
     public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
     }
 
+    /**
+     * @param delegate The streamed file
+     */
     public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
         super(delegate.getInputStream(), delegate.getName(), delegate.getLastModified(), delegate.getLength());
     }
@@ -63,9 +74,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     }
 
     @Override
-    public void write(HttpRequest<?> request,
-                      MutableHttpResponse<?> response,
-                      ChannelHandlerContext context) {
+    public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyHttpResponse) {
             FullHttpResponse nettyResponse = ((NettyHttpResponse) response).getNativeResponse();
 

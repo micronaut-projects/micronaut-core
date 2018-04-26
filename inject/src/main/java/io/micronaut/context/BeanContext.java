@@ -44,9 +44,6 @@ public interface BeanContext extends
     ApplicationEventPublisher,
     AnnotationMetadataResolver {
 
-    @Override
-    <T> BeanContext registerSingleton(Class<T> type, T singleton);
-
     /**
      * Inject an existing instance
      *
@@ -171,10 +168,28 @@ public interface BeanContext extends
     ClassLoader getClassLoader();
 
     @Override
+    <T> BeanContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier, boolean inject);
+
+    @Override
     default BeanContext registerSingleton(@Nonnull Object singleton) {
         Objects.requireNonNull(singleton, "Argument [singleton] must not be null");
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
+    }
+
+    @Override
+    default <T> BeanContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier) {
+        return registerSingleton(type, singleton, qualifier, true);
+    }
+
+    @Override
+    default <T> BeanContext registerSingleton(Class<T> type, T singleton) {
+        return registerSingleton(type, singleton, null, true);
+    }
+
+    @Override
+    default BeanContext registerSingleton(Object singleton, boolean inject) {
+        return (BeanContext) BeanDefinitionRegistry.super.registerSingleton(singleton, inject);
     }
 
     /**

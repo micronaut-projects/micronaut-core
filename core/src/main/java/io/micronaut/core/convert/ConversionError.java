@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import java.util.Optional;
 
 /**
- * An interface for reporting conversion errors
+ * An interface for reporting conversion errors.
  *
  * @author Graeme Rocher
  * @since 1.0

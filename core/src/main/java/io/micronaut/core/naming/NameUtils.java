@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.naming;
 
 import java.util.Arrays;
@@ -20,15 +21,17 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * <p>Naming convention utilities</p>
+ * <p>Naming convention utilities</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class NameUtils {
 
+    private static final int PREFIX_LENTGH = 3;
+
     /**
-     * Converts class name to property name using JavaBean decapitalization
+     * Converts class name to property name using JavaBean decapitalization.
      *
      * @param name     The class name
      * @param suffixes The suffix to remove
@@ -40,7 +43,7 @@ public class NameUtils {
     }
 
     /**
-     * Trims the given suffixes
+     * Trims the given suffixes.
      *
      * @param string   The string to trim
      * @param suffixes The suffixes
@@ -58,7 +61,7 @@ public class NameUtils {
     }
 
     /**
-     * Converts a property name to class name according to the JavaBean convention
+     * Converts a property name to class name according to the JavaBean convention.
      *
      * @param name The property name
      * @return The class name
@@ -75,7 +78,7 @@ public class NameUtils {
     }
 
     /**
-     * Converts camel case to hyphenated, lowercase form
+     * Converts camel case to hyphenated, lowercase form.
      *
      * @param name The name
      * @return The hyphenated string
@@ -85,7 +88,7 @@ public class NameUtils {
     }
 
     /**
-     * Converts camel case to hyphenated, lowercase form
+     * Converts camel case to hyphenated, lowercase form.
      *
      * @param name      The name
      * @param lowerCase Whether the result should be converted to lower case
@@ -93,11 +96,11 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         char separatorChar = '-';
-        return separateCamelCase(name, lowerCase, separatorChar);
+        return separateCamelCase(name.replace('_','-'), lowerCase, separatorChar);
     }
 
     /**
-     * Converts hyphenated, lower-case form to camel-case form
+     * Converts hyphenated, lower-case form to camel-case form.
      *
      * @param name The hyphenated string
      * @return The camel case form
@@ -114,7 +117,7 @@ public class NameUtils {
     }
 
     /**
-     * Returns the package name for a class represented as string
+     * Returns the package name for a class represented as string.
      *
      * @param className The class name
      * @return The package name
@@ -128,7 +131,7 @@ public class NameUtils {
     }
 
     /**
-     * Returns the underscore separated version of the given camel case string
+     * Returns the underscore separated version of the given camel case string.
      *
      * @param camelCase The camel case name
      * @return The underscore separated version
@@ -138,7 +141,18 @@ public class NameUtils {
     }
 
     /**
-     * Returns the simple name for a class represented as string
+     * Returns the underscore separated version of the given camel case string.
+     *
+     * @param camelCase The camel case name
+     * @return The underscore separated version
+     */
+    public static String environmentName(String camelCase) {
+        return separateCamelCase(camelCase.replace('-', '_').replace('.', '_'), false, '_')
+                        .toUpperCase(Locale.ENGLISH);
+    }
+
+    /**
+     * Returns the simple name for a class represented as string.
      *
      * @param className The class name
      * @return The simple name of the class
@@ -152,28 +166,28 @@ public class NameUtils {
     }
 
     /**
-     * Is the given method name a valid setter name
+     * Is the given method name a valid setter name.
      *
      * @param methodName The method name
      * @return True if it is a valid setter name
      */
     public static boolean isSetterName(String methodName) {
         int len = methodName.length();
-        if (len > 3 && methodName.startsWith("set")) {
-            return Character.isUpperCase(methodName.charAt(3));
+        if (len > PREFIX_LENTGH && methodName.startsWith("set")) {
+            return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
         }
         return false;
     }
 
     /**
-     * Get the equivalent property name for the given setter
+     * Get the equivalent property name for the given setter.
      *
      * @param setterName The setter
      * @return The property name
      */
     public static String getPropertyNameForSetter(String setterName) {
         if (isSetterName(setterName)) {
-            return decapitalize(setterName.substring(3));
+            return decapitalize(setterName.substring(PREFIX_LENTGH));
         }
         return setterName;
     }
@@ -183,15 +197,18 @@ public class NameUtils {
      * <ul>
      * <li>If the first or only character is Upper Case, it is made Lower Case
      * <li>UNLESS the second character is also Upper Case, when the String is
-     * returned unchanged <eul>
+     * returned unchanged <eul>.
+     * </ul>
      *
      * @param name The String to decapitalize
      * @return The decapitalized version of the String
      */
     public static String decapitalize(String name) {
 
-        if (name == null)
+        if (name == null){
             return null;
+        }
+
         // The rule for decapitalize is that:
         // If the first letter of the string is Upper Case, make it lower case
         // UNLESS the second letter of the string is also Upper Case, in which case no
@@ -205,7 +222,6 @@ public class NameUtils {
         return new String(chars);
     }
 
-
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
         if (!lowerCase) {
             StringBuilder newName = new StringBuilder();
@@ -217,10 +233,20 @@ public class NameUtils {
                     first = false;
                 } else {
                     if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
-                        newName.append(separatorChar).append(c);
-                    } else {
-                        if (c == '.') first = true;
+                        if(c != separatorChar) {
+                            newName.append(separatorChar);
+                        }
                         newName.append(c);
+                    } else {
+                        if (c == '.') {
+                            first = true;
+                        }
+                        if(c != separatorChar) {
+                            if(last == separatorChar) {
+                                newName.append(separatorChar);
+                            }
+                            newName.append(c);
+                        }
                     }
                 }
                 last = c;
@@ -232,10 +258,14 @@ public class NameUtils {
             boolean first = true;
             char last = '0';
             for (char c : chars) {
-
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
-                    newName.append(c);
+                    if(c != separatorChar) {
+                        if(last == separatorChar) {
+                            newName.append(separatorChar);
+                        }
+                        newName.append(c);
+                    }
                 } else {
                     char lowerCaseChar = Character.toLowerCase(c);
                     if (first) {
@@ -273,5 +303,28 @@ public class NameUtils {
         } else {
             return filename.substring(index + 1);
         }
+    }
+
+    /**
+     * The camel case version of the string with the first letter in lower case
+     * @param str The string
+     * @return The new string in camel case
+     */
+    public static String camelCase(String str) {
+        return camelCase(str, true);
+    }
+
+    /**
+     * The camel case version of the string with the first letter in lower case
+     * @param str The string
+     * @param lowerCaseFirstLetter Whether the first letter is in upper case or lower case
+     * @return The new string in camel case
+     */
+    public static String camelCase(String str, boolean lowerCaseFirstLetter) {
+        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        if(lowerCaseFirstLetter) {
+            return decapitalize(result);
+        }
+        return result;
     }
 }

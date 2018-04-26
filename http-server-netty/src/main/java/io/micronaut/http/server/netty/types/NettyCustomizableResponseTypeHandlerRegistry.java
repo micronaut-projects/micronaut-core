@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
 import java.util.Optional;
 
 /**
- * Represents a registry of {@link NettyCustomizableResponseTypeHandler} and finds
- * the correct handler based on the type.
+ * Represents a registry of {@link NettyCustomizableResponseTypeHandler} and finds the correct handler based on
+ * the type.
  *
  * @author James Kleeh
  * @since 1.0

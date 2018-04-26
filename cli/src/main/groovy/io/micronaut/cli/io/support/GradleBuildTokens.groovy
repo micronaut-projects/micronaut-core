@@ -65,6 +65,14 @@ class GradleBuildTokens {
         tokens
     }
 
+    Map getTokens(List<String> services) {
+        final String serviceString = services.collect { String name ->
+            "include \'$name\'"
+        }.join(System.getProperty("line.separator"))
+
+        ["services": serviceString]
+    }
+
     protected String resolveArtifactString(Dependency dep) {
         def artifact = dep.artifact
         def v = artifact.version.replace('BOM', '')

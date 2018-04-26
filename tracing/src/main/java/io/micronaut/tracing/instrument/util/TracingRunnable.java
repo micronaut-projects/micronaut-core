@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.tracing.instrument.util;
 
 import io.opentracing.Scope;
@@ -20,7 +21,7 @@ import io.opentracing.Span;
 import io.opentracing.Tracer;
 
 /**
- * Instruments a Runnable
+ * Instruments a Runnable.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,6 +32,12 @@ public class TracingRunnable implements Runnable {
     private final Tracer tracer;
     private final Span span;
 
+    /**
+     * Create enhanced {@link Runnable} with tracing.
+     *
+     * @param runnable Runnable
+     * @param tracer For span creation and propagation across arbitrary transports
+     */
     public TracingRunnable(Runnable runnable, Tracer tracer) {
         this.runnable = runnable;
         this.tracer = tracer;
@@ -54,10 +61,9 @@ public class TracingRunnable implements Runnable {
 
     private Span getSpan(Tracer tracer) {
         Scope active = tracer.scopeManager().active();
-        if(active != null) {
+        if (active != null) {
             return active.span();
-        }
-        else {
+        } else {
             return tracer.activeSpan();
         }
     }

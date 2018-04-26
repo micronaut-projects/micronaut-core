@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.naming.NameUtils;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Common application configuration
+ * Common application configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,17 +37,17 @@ import java.util.Optional;
 public class ApplicationConfiguration {
 
     /**
-     * Prefix for Micronaut application settings
+     * Prefix for Micronaut application settings.
      */
     public static final String PREFIX = "micronaut.application";
 
     /**
-     * Property name for Micronaut default charset
+     * Property name for Micronaut default charset.
      */
-    public static final String DEFAULT_CHARSET = PREFIX + ".defaultCharset";
+    public static final String DEFAULT_CHARSET = PREFIX + ".default-charset";
 
     /**
-     * Property name for Micronaut application name
+     * Property name for Micronaut application name.
      */
     public static final String APPLICATION_NAME = PREFIX + ".name";
 
@@ -54,7 +56,7 @@ public class ApplicationConfiguration {
     private InstanceConfiguration instance = new InstanceConfiguration();
 
     /**
-     * @return The default charset to use
+     * @return The default charset to use.
      */
     @SuppressWarnings("unchecked")
     public Charset getDefaultCharset() {
@@ -62,7 +64,7 @@ public class ApplicationConfiguration {
     }
 
     /**
-     * @param defaultCharset Set the default charset to use
+     * @param defaultCharset Set the default charset to use.
      */
     public void setDefaultCharset(Charset defaultCharset) {
         this.defaultCharset = defaultCharset;
@@ -82,7 +84,9 @@ public class ApplicationConfiguration {
      * @param name Set the application name
      */
     public void setName(String name) {
-        this.name = name;
+        if(name != null) {
+            this.name = NameUtils.hyphenate(name);
+        }
     }
 
     /**
@@ -102,17 +106,17 @@ public class ApplicationConfiguration {
     }
 
     /**
-     * Configuration for instance setttings
+     * Configuration for instance settings.
      */
     @ConfigurationProperties(InstanceConfiguration.PREFIX)
     public static class InstanceConfiguration {
         /**
-         * Prefix for Micronaut instance settings
+         * Prefix for Micronaut instance settings.
          */
         public static final String PREFIX = "instance";
 
         /**
-         * Property name for Micronaut instance id
+         * Property name for Micronaut instance id.
          */
         public static final String INSTANCE_ID = ApplicationConfiguration.PREFIX + '.' + PREFIX + ".id";
 

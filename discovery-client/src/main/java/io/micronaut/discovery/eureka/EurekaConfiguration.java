@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
@@ -137,40 +138,45 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         public static final String IP_ADDRESS =
             EurekaConfiguration.PREFIX + '.' +
                 RegistrationConfiguration.PREFIX + '.' +
-                "ipAddr";
+                "ip-addr";
 
         @ConfigurationBuilder
         InstanceInfo instanceInfo;
 
-        @ConfigurationBuilder(configurationPrefix = "leaseInfo")
+        @ConfigurationBuilder(configurationPrefix = "lease-info")
         LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
 
         private final boolean explicitInstanceId;
 
         public EurekaRegistrationConfiguration(
             EmbeddedServer embeddedServer,
-            @Value("${" + ApplicationConfiguration.APPLICATION_NAME + "}") String applicationName,
-            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") Optional<String> ipAddress,
-            @Value("${" + ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID + "}") Optional<String> instanceId,
-            Optional<DataCenterInfo> dataCenterInfo) {
-            this.explicitInstanceId = instanceId.isPresent();
-            if (ipAddress.isPresent()) {
+            ApplicationConfiguration applicationConfiguration,
+            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") @Nullable String  ipAddress,
+            @Nullable DataCenterInfo dataCenterInfo) {
+            String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
+            String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
+            this.explicitInstanceId = instanceId != null;
+            if (ipAddress != null) {
                 this.instanceInfo = new InstanceInfo(
                     embeddedServer.getHost(),
                     embeddedServer.getPort(),
-                    ipAddress.get(),
+                    ipAddress,
                     applicationName,
-                    instanceId.orElse(applicationName));
+                    explicitInstanceId ? instanceId : applicationName
+                );
 
             } else {
                 this.instanceInfo = new InstanceInfo(
                     embeddedServer.getHost(),
                     embeddedServer.getPort(),
                     applicationName,
-                    instanceId.orElse(applicationName));
+                    explicitInstanceId ? instanceId : applicationName
+                );
             }
 
-            dataCenterInfo.ifPresent(dci -> this.instanceInfo.setDataCenterInfo(dci));
+            if(dataCenterInfo != null) {
+                this.instanceInfo.setDataCenterInfo(dataCenterInfo);
+            }
         }
 
         /**

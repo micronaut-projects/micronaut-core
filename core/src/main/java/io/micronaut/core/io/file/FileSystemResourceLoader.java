@@ -13,19 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.file;
 
 import io.micronaut.core.io.ResourceLoader;
 
 /**
- * Abstraction to load resources from the file system
+ * Abstraction to load resources from the file system.
  */
 public interface FileSystemResourceLoader extends ResourceLoader {
 
+    /**
+     * Creation method.
+     * @return loader
+     */
     static FileSystemResourceLoader defaultLoader() {
         return new DefaultFileSystemResourceLoader();
     }
 
+    /**
+     * Does the loader support a prefix.
+     * @param path The path to a resource including a prefix
+     *             appended by a colon. Ex (classpath:, file:)
+     * @return boolean
+     */
     default boolean supportsPrefix(String path) {
         return path.startsWith("file:");
     }

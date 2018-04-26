@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.RedisClient;
@@ -25,7 +26,7 @@ import io.micronaut.context.annotation.Factory;
 import javax.inject.Singleton;
 
 /**
- * A factory bean for constructing {@link RedisClient} instances from {@link NamedRedisServersConfiguration} instances
+ * A factory bean for constructing {@link RedisClient} instances from {@link NamedRedisServersConfiguration} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +43,7 @@ public class NamedRedisClientFactory extends AbstractRedisClientFactory {
         return super.redisClient(config);
     }
 
+    @Override
     @Bean(preDestroy = "close")
     @Singleton
     @EachBean(NamedRedisServersConfiguration.class)
@@ -49,6 +51,7 @@ public class NamedRedisClientFactory extends AbstractRedisClientFactory {
         return super.redisConnection(client);
     }
 
+    @Override
     @Bean(preDestroy = "close")
     @Singleton
     @EachBean(NamedRedisServersConfiguration.class)

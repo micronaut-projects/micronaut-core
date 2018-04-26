@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.cache;
 
 import io.micronaut.cache.CacheConfiguration;
-import io.micronaut.cache.serialize.DefaultStringKeySerializer;
 import io.micronaut.configuration.lettuce.RedisSetting;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
@@ -26,7 +26,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.util.Optional;
 
 /**
- * Allows configuration of caches stored in Redis
+ * Allows configuration of caches stored in Redis.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,17 +35,21 @@ import java.util.Optional;
 public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected String server;
-
     protected Class<ObjectSerializer> keySerializer;
-
     protected Class<ObjectSerializer> valueSerializer;
 
+    /**
+     * Constructor.
+     * @param cacheName cacheName
+     * @param applicationConfiguration applicationConfiguration
+     */
     public RedisCacheConfiguration(@Parameter String cacheName, ApplicationConfiguration applicationConfiguration) {
         super(cacheName, applicationConfiguration);
     }
 
     /**
-     * @return The name of the server to use
+     * @see io.micronaut.configuration.lettuce.NamedRedisServersConfiguration
+     * @return The name of the server to use.
      */
     public Optional<String> getServer() {
         if (server != null) {
@@ -56,33 +60,14 @@ public class RedisCacheConfiguration extends CacheConfiguration {
     }
 
     /**
-     * Sets the name of a configured server to use.
-     *
-     * @param server The name of the server
-     * @see io.micronaut.configuration.lettuce.NamedRedisServersConfiguration
-     */
-    void setServer(String server) {
-        this.server = server;
-    }
-
-    /**
-     * @return The {@link ObjectSerializer} type to use for serializing values
+     * @return The {@link ObjectSerializer} type to use for serializing values.
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
     }
 
     /**
-     * The serializer to use for values
-     *
-     * @param valueSerializer The value serializer
-     */
-    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
-        this.valueSerializer = valueSerializer;
-    }
-
-    /**
-     * The {@link ObjectSerializer} to use for serializing keys. Defaults to {@link DefaultStringKeySerializer}
+     * The {@link ObjectSerializer} to use for serializing keys. Defaults to {@link io.micronaut.cache.serialize.DefaultStringKeySerializer}.
      *
      * @return The optional {@link ObjectSerializer} class
      */
@@ -90,12 +75,4 @@ public class RedisCacheConfiguration extends CacheConfiguration {
         return Optional.ofNullable(keySerializer);
     }
 
-    /**
-     * The serializer to use for keys
-     *
-     * @param keySerializer The key serializer
-     */
-    void setKeySerializer(Class<ObjectSerializer> keySerializer) {
-        this.keySerializer = keySerializer;
-    }
 }

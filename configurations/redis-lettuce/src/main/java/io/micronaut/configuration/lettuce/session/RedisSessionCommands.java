@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.session;
 
 import io.lettuce.core.Range;
@@ -25,7 +26,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Commands for storing and retrieving {@link io.micronaut.session.Session} instances
+ * Commands for storing and retrieving {@link io.micronaut.session.Session} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -43,7 +44,7 @@ public interface RedisSessionCommands extends Commands {
     CompletableFuture<Void> saveSessionData(@Param("sessionId") byte[] sessionId, @Param("value") Map<byte[], byte[]> attributes);
 
     /**
-     * Set a single attribute of a session
+     * Set a single attribute of a session.
      *
      * @param sessionId The session ID
      * @param attribute The attribute
@@ -54,7 +55,7 @@ public interface RedisSessionCommands extends Commands {
     CompletableFuture<Void> setAttribute(@Param("sessionId") byte[] sessionId, @Param("attribute") byte[] attribute, @Param("value") byte[] value);
 
     /**
-     * Removes a single attribute of a session
+     * Removes a single attribute of a session.
      *
      * @param sessionId  The session ID
      * @param attributes The attributes to delete
@@ -74,7 +75,7 @@ public interface RedisSessionCommands extends Commands {
     CompletableFuture<Map<byte[], byte[]>> findSessionData(byte[] sessionId);
 
     /**
-     * Save an expiry
+     * Save an expiry.
      *
      * @param expiryKey The expiry key
      * @param seconds   The seconds until expiration
@@ -84,7 +85,7 @@ public interface RedisSessionCommands extends Commands {
     CompletableFuture<Void> saveExpiry(@Param("expiryKey") byte[] expiryKey, @Param("seconds") byte[] seconds);
 
     /**
-     * Delete a key
+     * Delete a key.
      *
      * @param key The key to delete
      * @return the future
@@ -92,7 +93,7 @@ public interface RedisSessionCommands extends Commands {
     CompletableFuture<Void> del(byte[] key);
 
     /**
-     * Remove an item from the given sorted set
+     * Remove an item from the given sorted set.
      *
      * @param key    The key of the set
      * @param member The member to remove

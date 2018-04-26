@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 import java.util.Collections;
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * An {@link OptionalValues} that for each key features an {@link java.util.Optional} {@link List} of values
+ * An {@link OptionalValues} that for each key features an {@link java.util.Optional} {@link List} of values.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,12 +30,12 @@ import java.util.Optional;
 public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
 
     /**
-     * Constant for empty values
+     * Constant for empty values.
      */
     OptionalMultiValues EMPTY_VALUES = of(Collections.emptyMap());
 
     /**
-     * Retrieve a value if it is present
+     * Retrieve a value if it is present.
      *
      * @param name The name of the value
      * @return An {@link Optional} of the value
@@ -50,7 +51,7 @@ public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
     }
 
     /**
-     * An empty {@link OptionalValues}
+     * An empty {@link OptionalValues}.
      *
      * @param <T> The generic type
      * @return The empty values
@@ -61,7 +62,7 @@ public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
     }
 
     /**
-     * Creates a new {@link OptionalValues} for the given type and values
+     * Creates a new {@link OptionalValues} for the given type and values.
      *
      * @param values A map of values
      * @param <T>    The target generic type

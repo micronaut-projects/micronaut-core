@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.service;
 
 import java.io.File;
@@ -26,13 +27,19 @@ import java.util.Arrays;
 import java.util.Collections;
 
 /**
- * <p>Utility class for generated META-INF/services files</p>
+ * <p>Utility class for generated META-INF/services files</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ServiceDescriptorGenerator {
 
+    /**
+     * Generates a service discovery for the given class name and file
+     * @param className The class name
+     * @param descriptor The descriptor file
+     * @throws IOException An exception if an error occurs
+     */
     public static void generate(String className, File descriptor) throws IOException {
         descriptor.getParentFile().mkdirs();
         Charset charset = StandardCharsets.UTF_8;

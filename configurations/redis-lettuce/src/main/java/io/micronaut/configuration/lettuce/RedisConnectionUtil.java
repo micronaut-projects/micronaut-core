@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce;
 
 import io.lettuce.core.api.StatefulConnection;
@@ -26,7 +27,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import java.util.Optional;
 
 /**
- * Internal utility methods for configuration
+ * Internal utility methods for configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +35,7 @@ import java.util.Optional;
 @Internal
 public class RedisConnectionUtil {
     /**
-     * Utility method for establishing a redis connection
+     * Utility method for establishing a redis connection.
      *
      * @param beanLocator  The bean locator to use
      * @param serverName   The server name to use

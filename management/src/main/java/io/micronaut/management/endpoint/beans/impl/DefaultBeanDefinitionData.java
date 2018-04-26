@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -38,9 +39,13 @@ import java.util.stream.Collectors;
 @Requires(beans = BeansEndpoint.class)
 public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String, Object>> {
 
+    /**
+     * Default constructor.
+     */
     DefaultBeanDefinitionData() {
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     public Map<String, Object> getData(BeanDefinition<?> beanDefinition) {
         Map<String, Object> beanData = new LinkedHashMap<>(3);
@@ -51,14 +56,26 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
         return beanData;
     }
 
+    /**
+     * @param beanDefinition A bean definition
+     * @return A list of dependencies for the bean definition
+     */
     protected List getDependencies(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getRequiredComponents().stream().map(Class::getName).collect(Collectors.toList());
     }
 
+    /**
+     * @param beanDefinition A bean definition
+     * @return The scope for the bean
+     */
     protected String getScope(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getScope().map(Class::getSimpleName).map(String::toLowerCase).orElse(null);
     }
 
+    /**
+     * @param beanDefinition A bean definition
+     * @return The type of the bean as String
+     */
     protected String getType(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getBeanType().getName();
     }

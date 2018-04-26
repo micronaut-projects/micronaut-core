@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import org.reactivestreams.Subscriber;
@@ -24,8 +25,8 @@ import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
- * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result
- *
+ * A {@link org.reactivestreams.Publisher} that uses an {@link ExecutorService} to emit a single result.
+ * @param <T> The argument type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,11 +34,20 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
     private final ExecutorService executor;
     private final Supplier<T> supplier;
 
+    /**
+     * Constructor.
+     * @param executor executor
+     * @param supplier type of supplier
+     */
     public AsyncSingleResultPublisher(ExecutorService executor, Supplier<T> supplier) {
         this.executor = executor;
         this.supplier = supplier;
     }
 
+    /**
+     * Constructor.
+     * @param supplier type of supplier
+     */
     public AsyncSingleResultPublisher(Supplier<T> supplier) {
         this(ForkJoinPool.commonPool(), supplier);
     }
@@ -47,6 +57,10 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
         subscriber.onSubscribe(new ExecutorServiceSubscription<>(subscriber, supplier, executor));
     }
 
+    /**
+     * Subscription class.
+     * @param <S> type of subscriber
+     */
     static class ExecutorServiceSubscription<S> implements Subscription {
         private final Subscriber<? super S> subscriber;
         private final ExecutorService executor;
@@ -54,6 +68,12 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
         private Future<?> future; // to allow cancellation
         private boolean completed;
 
+        /**
+         * Constructor.
+         * @param subscriber subscriber
+         * @param supplier supplier
+         * @param executor executor
+         */
         ExecutorServiceSubscription(Subscriber<? super S> subscriber,
                                     Supplier<S> supplier,
                                     ExecutorService executor) {
@@ -62,6 +82,10 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
             this.executor = executor;
         }
 
+        /**
+         * Request execution.
+         * @param n request number
+         */
         public synchronized void request(long n) {
             if (n != 0 && !completed) {
                 completed = true;
@@ -82,9 +106,14 @@ public class AsyncSingleResultPublisher<T> extends SingleSubscriberPublisher<T> 
             }
         }
 
+        /**
+         * Cancel.
+         */
         public synchronized void cancel() {
             completed = true;
-            if (future != null) future.cancel(false);
+            if (future != null) {
+                future.cancel(false);
+            }
         }
     }
 }

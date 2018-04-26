@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
@@ -44,7 +45,7 @@ import java.io.RandomAccessFile;
 import java.util.Optional;
 
 /**
- * Writes a {@link File} to the Netty context
+ * Writes a {@link File} to the Netty context.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -52,10 +53,15 @@ import java.util.Optional;
  */
 public class NettySystemFileCustomizableResponseType extends SystemFileCustomizableResponseType implements NettyFileCustomizableResponseType {
 
+    private static final int LENGTH_8K = 8192;
+
     protected final RandomAccessFile raf;
     protected final long rafLength;
     protected Optional<SystemFileCustomizableResponseType> delegate = Optional.empty();
 
+    /**
+     * @param file The file
+     */
     public NettySystemFileCustomizableResponseType(File file) {
         super(file);
         try {
@@ -70,6 +76,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
         }
     }
 
+    /**
+     * @param delegate The system file customizable response type
+     */
     public NettySystemFileCustomizableResponseType(SystemFileCustomizableResponseType delegate) {
         this(delegate.getFile());
         this.delegate = Optional.of(delegate);
@@ -90,6 +99,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
         return delegate.map(SystemFileCustomizableResponseType::getName).orElse(super.getName());
     }
 
+    /**
+     * @param response The response to modify
+     */
     public void process(MutableHttpResponse response) {
         response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(getLength()));
         delegate.ifPresent((type) -> type.process(response));
@@ -127,7 +139,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), 8192)),
+                    flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
                         context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);

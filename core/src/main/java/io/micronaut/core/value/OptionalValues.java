@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.value;
 
 
@@ -25,7 +26,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * A simple type safe abstraction over a map of optional values
+ * A simple type safe abstraction over a map of optional values.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,12 +34,12 @@ import java.util.function.BiConsumer;
 public interface OptionalValues<V> extends Iterable<CharSequence> {
 
     /**
-     * Constant for empty values
+     * Constant for empty values.
      */
     OptionalValues EMPTY_VALUES = of(Object.class, Collections.EMPTY_MAP);
 
     /**
-     * Retrieve a value if it is present
+     * Retrieve a value if it is present.
      *
      * @param name The name of the value
      * @return An {@link Optional} of the value
@@ -78,7 +79,7 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
     }
 
     /**
-     * An empty {@link OptionalValues}
+     * An empty {@link OptionalValues}.
      *
      * @param <T> The generic type
      * @return The empty values
@@ -88,7 +89,7 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
     }
 
     /**
-     * Creates a new {@link OptionalValues} for the given type and values
+     * Creates a new {@link OptionalValues} for the given type and values.
      *
      * @param type   The target type
      * @param values A map of values

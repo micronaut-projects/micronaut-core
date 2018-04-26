@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.archaius1;
 
 import com.netflix.config.ConfigurationBasedDeploymentContext;
@@ -34,7 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link com.netflix.config.DeploymentContext} that bridges to the current {@link Environment}
+ * A {@link com.netflix.config.DeploymentContext} that bridges to the current {@link Environment}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,6 +47,10 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     private ServiceInstance instance;
     private Map<ContextKey, String> customSettings = new ConcurrentHashMap<>();
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public EnvironmentDeploymentContext(EnvironmentConfiguration environment) {
         this.environment = environment.getEnvironment();
         if (!ConfigurationManager.isConfigurationInstalled()) {
@@ -137,6 +142,8 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
                 return getDeploymentServerId();
             case datacenter:
                 return getDeploymentDatacenter();
+            default:
+                break;
         }
         return null;
     }
@@ -153,7 +160,8 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
             case stack:
                 setDeploymentStack(value);
                 break;
-        }
+            default:
+                break;        }
     }
 
     @Override

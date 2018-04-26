@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.reflect.ClassUtils;
@@ -33,7 +34,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of META-INF/services classes</p>
+ * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of META-INF/services classes</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -59,7 +60,7 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     }
 
     /**
-     * Creates a new {@link SoftServiceLoader} using the thread context loader by default
+     * Creates a new {@link SoftServiceLoader} using the thread context loader by default.
      *
      * @param service The service type
      * @param <S>     The service generic type
@@ -70,7 +71,7 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     }
 
     /**
-     * Creates a new {@link SoftServiceLoader} using the given type and class loader
+     * Creates a new {@link SoftServiceLoader} using the given type and class loader.
      *
      * @param service The service type
      * @param loader  The class loader
@@ -83,7 +84,7 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     }
 
     /**
-     * Creates a new {@link SoftServiceLoader} using the given type and class loader
+     * Creates a new {@link SoftServiceLoader} using the given type and class loader.
      *
      * @param service   The service type
      * @param loader    The class loader to use
@@ -143,7 +144,9 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
 
             @Override
             public ServiceDefinition<S> next() {
-                if (!hasNext()) throw new NoSuchElementException();
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
 
                 if (loaded.hasNext()) {
                     return loaded.next();

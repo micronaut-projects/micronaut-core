@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -49,8 +50,9 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * Abstract implementation of the {@link RouteMatch} interface
+ * Abstract implementation of the {@link RouteMatch} interface.
  *
+ * @param <R> Route Match
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -62,6 +64,12 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
     protected final List<MediaType> acceptedMediaTypes;
 
+    /**
+     * Constructor.
+     *
+     * @param abstractRoute The abstract route builder
+     * @param conversionService The conversion service
+     */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
         this.executableMethod = abstractRoute.targetMethod;
@@ -136,9 +144,9 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> variables = getVariables();
         for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
-            if (value == null || value instanceof UnresolvedArgument)
+            if (value == null || value instanceof UnresolvedArgument) {
                 return false;
-
+            }
         }
 
         Optional<Argument<?>> bodyArgument = getBodyArgument();
@@ -183,7 +191,6 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     public ReturnType<R> getReturnType() {
         return executableMethod.getReturnType();
     }
-
 
     @Override
     public R invoke(Object... arguments) {
@@ -296,12 +303,11 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
         for (Argument requiredArgument : getArguments()) {
             Object value = argumentValues.get(requiredArgument.getName());
-            if(value != null) {
+            if (value != null) {
                 String name = resolveInputName(requiredArgument);
                 if(value instanceof UnresolvedArgument) {
                     newVariables.put(name, value);
-                }
-                else {
+                } else {
                     ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
                     Optional converted = conversionService.convert(value, conversionContext);
                     Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
@@ -320,6 +326,13 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         return newFulfilled(newVariables, requiredArguments);
     }
 
+    /**
+     * @param argument The argument
+     * @param conversionContext The conversion context
+     * @param result An optional result
+     *
+     * @return The resolved value or an error
+     */
     protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
         if (!result.isPresent()) {
             Optional<ConversionError> lastError = conversionContext.getLastError();
@@ -334,5 +347,10 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         }
     }
 
+    /**
+     * @param newVariables The new variables
+     * @param requiredArguments  The required arguments
+     * @return A RouteMatch
+     */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 @Configuration
-@Requires(property = "dataSource.url")
+@Requires(property = "data-source.url")
 package io.micronaut.inject.configurations.requiresproperty;
 
 import io.micronaut.context.annotation.Configuration;

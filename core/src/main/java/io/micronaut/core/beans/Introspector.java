@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -20,7 +21,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
  * An interface that provides basic bean introspection. Designed as a simpler replacement for
- * {@link java.beans.Introspector}
+ * {@link java.beans.Introspector}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,7 +50,7 @@ public class Introspector {
     }
 
     /**
-     * Flushes the <code>BeanInfo</code> caches of the specified bean class
+     * Flushes the <code>BeanInfo</code> caches of the specified bean class.
      *
      * @param clazz the specified bean class
      */
@@ -68,7 +69,7 @@ public class Introspector {
      * object. Subsequent calls to this method will be answered with the cached
      * data.
      * </p>
-     *
+     * @param <T> type Generic
      * @param beanClass the specified bean class.
      * @return the <code>BeanInfo</code> of the bean class.
      */

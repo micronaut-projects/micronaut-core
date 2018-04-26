@@ -150,7 +150,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/recieveFlowData", requestBody)
+                HttpRequest.POST("/upload/receiveFlowData", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
@@ -169,7 +169,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("title", "bar")
                 .build()
         flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/recieveFlowData", requestBody)
+                HttpRequest.POST("/upload/receiveFlowData", requestBody)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
@@ -179,6 +179,52 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         ((String)response.getBody().get()).contains(val) // TODO: optimize this to use Jackson non-blocking and JsonNode
+    }
+
+    void "test non-blocking upload with publisher receiving multiple converted JSON"() {
+        given:
+        def data = '{"title":"Test"}'
+        def data2 = '{"title":"Test2"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("data", "data2.json", MediaType.APPLICATION_JSON_TYPE, data2.bytes)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveMultipleFlowData", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.getBody().get() == '[Data{title=\'Test\'}, Data{title=\'Test2\'}]'
+
+        when: "a large document with partial data is uploaded"
+        def val = 'xxxx' * 200
+        data = '{"title":"Big ' + val + '"}'
+        data2 = '{"title":"Big2 ' + val + '"}'
+        requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE,data.bytes)
+                .addPart("data", "data2.json", MediaType.APPLICATION_JSON_TYPE,data2.bytes)
+                .addPart("title", "bar")
+                .build()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receiveMultipleFlowData", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().contains('Data{title=\'Big xx')
+        response.body().contains('Data{title=\'Big2 xx')
     }
 
     void "test receiving multiple completed parts with the same name"() {

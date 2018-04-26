@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.context.event.ApplicationEvent;
@@ -21,7 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * <p>An {@link ApplicationEvent} for handling refreshes</p>
+ * <p>An {@link ApplicationEvent} for handling refreshes.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,7 +42,7 @@ public class RefreshEvent extends ApplicationEvent {
     }
 
     /**
-     * Constructs a refresh Event that refreshes all keys
+     * Constructs a refresh Event that refreshes all keys.
      */
     public RefreshEvent() {
         super(ALL_KEYS);

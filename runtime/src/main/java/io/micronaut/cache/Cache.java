@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}</p>
+ * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}.</p>
+ *
+ * @param <C> The native cache implementation
  *
  * @author Graeme Rocher
  * @since 1.0

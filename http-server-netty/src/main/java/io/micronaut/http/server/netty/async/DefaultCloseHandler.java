@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.async;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -29,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.channels.ClosedChannelException;
 
 /**
- * A future that executes the standard close procedure
+ * A future that executes the standard close procedure.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -39,15 +41,20 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultCloseHandler.class);
 
-
     private final ChannelHandlerContext context;
     private final HttpRequest<?> request;
     private final int statusCode;
 
+    /**
+     * @param context    The channel handler context
+     * @param request    The Http request
+     * @param statusCode The status code
+     */
     public DefaultCloseHandler(
         ChannelHandlerContext context,
         HttpRequest<?> request,
         int statusCode) {
+
         this.context = context;
         this.request = request;
         this.statusCode = statusCode;
@@ -68,7 +75,7 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
                 context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
                     .addListener(ChannelFutureListener.CLOSE);
             }
-        } else if (!request.getHeaders().isKeepAlive() || statusCode >= 300) {
+        } else if (!request.getHeaders().isKeepAlive() || statusCode >= HttpStatus.MULTIPLE_CHOICES.getCode()) {
             future.channel().close();
         }
     }

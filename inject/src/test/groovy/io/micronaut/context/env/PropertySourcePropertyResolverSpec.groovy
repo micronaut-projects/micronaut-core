@@ -26,8 +26,28 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
 
     @Unroll
-    void "test resolve environment properties"() {
+    void "test property resolution rules for key #key"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [TWITTER_OAUTH2_ACCESS_TOKEN: 'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test",
+                        ['camelCase.fooBar': 'xxx',
+                         'camelCase.URL'   : "http://localhost"],
+                        PropertySource.PropertyConvention.JAVA_PROPERTIES
+                )
+        )
 
+        expect:
+        resolver.containsProperty(key)
+        resolver.getProperty(key, Object).isPresent()
+        resolver.getProperty(key, String).get() == expected
+
+
+        where:
+        key                           | expected
+        'twitter.oauth2.access.token' | 'xxx'
+        'camel-case.foo-bar'          | 'xxx'
+        'camel-case.url'              | 'http://localhost'
     }
 
     @Unroll
@@ -46,10 +66,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         property                      | value | key                           | type   | expected
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access-token' | String | 'xxx'
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.accesstoken'  | String | 'xxx'
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access-token' | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.OAuth2AccessToken'   | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2accesstoken'   | String | 'xxx'
 
     }
 

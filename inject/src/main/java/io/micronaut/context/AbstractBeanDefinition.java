@@ -43,6 +43,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -961,7 +962,17 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     return resolveOptionalObject(value);
                 } else {
                     // can't use orElseThrow here due to compiler bug
-                    result = value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, conversionContext, prop));
+                    if(value.isPresent()) {
+                        result = value.get();
+                    }
+                    else {
+                        if(argument.getAnnotation(Nullable.class) != null) {
+                            result = null;
+                        }
+                        else {
+                            throw new DependencyInjectionException(resolutionContext, conversionContext, prop);
+                        }
+                    }
                 }
             } else {
                 throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
@@ -1453,7 +1464,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String path) {
 
         String valString = getConfigurationPropertiesPath(resolutionContext);
-        return valString + "." + path;
+        return NameUtils.hyphenate(valString + "." + path, true);
     }
 
     private String getConfigurationPropertiesPath(BeanResolutionContext resolutionContext) {

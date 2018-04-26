@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon.discovery;
 
 import com.netflix.client.config.CommonClientConfigKey;
@@ -26,6 +27,7 @@ import io.micronaut.configurations.ribbon.DiscoveryClientServerList;
 import io.micronaut.configurations.ribbon.RibbonLoadBalancer;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
@@ -34,7 +36,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import javax.inject.Singleton;
 
 /**
- * Replaces the default {@link DiscoveryClientLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances
+ * Replaces the default {@link DiscoveryClientLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances.
  *
  * @author graemerocher
  * @since 1.0
@@ -45,6 +47,12 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
     private final BeanContext beanContext;
     private final IClientConfig defaultClientConfig;
 
+    /**
+     * Constructor.
+     * @param discoveryClient discoveryClient
+     * @param beanContext beanContext
+     * @param defaultClientConfig defaultClientConfig
+     */
     public RibbonDiscoveryClientLoadBalancerFactory(DiscoveryClient discoveryClient,
                                                     BeanContext beanContext,
                                                     IClientConfig defaultClientConfig) {
@@ -56,12 +64,14 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
 
     @Override
     public LoadBalancer create(String serviceID) {
+        serviceID = NameUtils.hyphenate(serviceID);
         IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(defaultClientConfig);
         IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IRule.class));
         IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IPing.class));
         ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(ServerListFilter.class));
 
-        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> new DiscoveryClientServerList(getDiscoveryClient(), serviceID));
+        String finalServiceID = serviceID;
+        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> new DiscoveryClientServerList(getDiscoveryClient(), finalServiceID));
 
         if (niwsClientConfig.getPropertyAsBoolean(CommonClientConfigKey.InitializeNFLoadBalancer, true)) {
             return createRibbonLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);
@@ -70,6 +80,15 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
         }
     }
 
+    /**
+     * Create the load balancer based on the parameters.
+     * @param niwsClientConfig niwsClientConfig
+     * @param rule rule
+     * @param ping ping
+     * @param serverListFilter serverListFilter
+     * @param serverList serverList
+     * @return balancer
+     */
     protected RibbonLoadBalancer createRibbonLoadBalancer(IClientConfig niwsClientConfig, IRule rule, IPing ping, ServerListFilter serverListFilter, ServerList<Server> serverList) {
         return new RibbonLoadBalancer(
             niwsClientConfig,

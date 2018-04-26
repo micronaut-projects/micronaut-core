@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io;
 
 import javax.annotation.Nullable;
@@ -26,7 +27,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * <p>An interface for classes to implement that are capable of writing themselves to a {@link Writer}</p>
+ * <p>An interface for classes to implement that are capable of writing themselves to a {@link Writer}</p>.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,7 +42,7 @@ public interface Writable extends Streamable {
     void writeTo(Writer out) throws IOException;
 
     /**
-     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
+     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default.
      *
      * @param outputStream The output stream
      * @throws IOException if an error occurred while outputting data to the writer
@@ -51,7 +52,7 @@ public interface Writable extends Streamable {
     }
 
     /**
-     * Write this {@link Writable} to the given {@link File}
+     * Write this {@link Writable} to the given {@link File}.
      *
      * @param file The file
      * @throws IOException if an error occurred while outputting data to the writer
@@ -63,7 +64,7 @@ public interface Writable extends Streamable {
     }
 
     /**
-     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
+     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default.
      *
      * @param outputStream The output stream
      * @param charset      The charset to use. Defaults to {@link StandardCharsets#UTF_8}

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -31,7 +32,7 @@ import io.netty.util.AttributeKey;
 import java.util.Optional;
 
 /**
- * Implementation of {@link HttpResponseFactory} for Netty
+ * Implementation of {@link HttpResponseFactory} for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -68,54 +69,56 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
     }
 
     /**
-     * Lookup the response from the context
+     * Lookup the response from the context.
      *
      * @param request The context
-     * @return The {@link io.micronaut.http.netty.NettyHttpResponse}
+     * @return The {@link NettyHttpResponse}
      */
     @Internal
-    public static io.micronaut.http.netty.NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
+    public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
         return getOr(request, io.micronaut.http.HttpResponse.ok());
     }
 
     /**
-     * Lookup the response from the context
+     * Lookup the response from the context.
      *
-     * @param request The context
-     * @return The {@link io.micronaut.http.netty.NettyHttpResponse}
+     * @param request     The context
+     * @param alternative The alternative HttpResponse
+     * @return The {@link NettyHttpResponse}
      */
     @Internal
-    public static io.micronaut.http.netty.NettyHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
-        Attribute<io.micronaut.http.netty.NettyHttpResponse> attr = request.attr(KEY);
-        io.micronaut.http.netty.NettyHttpResponse nettyHttpResponse = attr.get();
+    public static NettyHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
+        Attribute<NettyHttpResponse> attr = request.attr(KEY);
+        NettyHttpResponse nettyHttpResponse = attr.get();
         if (nettyHttpResponse == null) {
-            nettyHttpResponse = (io.micronaut.http.netty.NettyHttpResponse) alternative;
+            nettyHttpResponse = (NettyHttpResponse) alternative;
             attr.set(nettyHttpResponse);
         }
         return nettyHttpResponse;
     }
 
     /**
-     * Lookup the response from the request
+     * Lookup the response from the request.
      *
      * @param request The request
-     * @return The {@link io.micronaut.http.netty.NettyHttpResponse}
+     * @return The {@link NettyHttpResponse}
      */
     @Internal
-    public static Optional<io.micronaut.http.netty.NettyHttpResponse> get(NettyHttpRequest<?> request) {
-        io.micronaut.http.netty.NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
+    public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
+        NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
         return Optional.ofNullable(nettyHttpResponse);
     }
 
     /**
-     * Lookup the response from the request
+     * Lookup the response from the request.
      *
-     * @param request The request
-     * @return The {@link io.micronaut.http.netty.NettyHttpResponse}
+     * @param request  The request
+     * @param response The Http Response
+     * @return The {@link NettyHttpResponse}
      */
     @Internal
-    public static Optional<io.micronaut.http.netty.NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
-        request.attr(KEY).set((io.micronaut.http.netty.NettyHttpResponse) response);
-        return Optional.ofNullable((io.micronaut.http.netty.NettyHttpResponse) response);
+    public static Optional<NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
+        request.attr(KEY).set((NettyHttpResponse) response);
+        return Optional.ofNullable((NettyHttpResponse) response);
     }
 }

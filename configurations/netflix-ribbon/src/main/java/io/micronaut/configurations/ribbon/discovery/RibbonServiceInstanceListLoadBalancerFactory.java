@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon.discovery;
 
 import com.netflix.client.config.CommonClientConfigKey;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Replaces the default {@link ServiceInstanceListLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances
+ * Replaces the default {@link ServiceInstanceListLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances.
  *
  * @author graemerocher
  * @since 1.0
@@ -49,6 +50,11 @@ public class RibbonServiceInstanceListLoadBalancerFactory extends ServiceInstanc
     private final BeanContext beanContext;
     private final IClientConfig defaultClientConfig;
 
+    /**
+     * Constructor.
+     * @param beanContext beanContext
+     * @param defaultClientConfig defaultClientConfig
+     */
     public RibbonServiceInstanceListLoadBalancerFactory(BeanContext beanContext, IClientConfig defaultClientConfig) {
         this.beanContext = beanContext;
         this.defaultClientConfig = defaultClientConfig;
@@ -83,6 +89,10 @@ public class RibbonServiceInstanceListLoadBalancerFactory extends ServiceInstanc
                 return instances.stream().map(RibbonServer::new).collect(Collectors.toList());
             }
 
+            /**
+             * Get an updated list of servers.
+             * @return list of servers.
+             */
             @Override
             public List<Server> getUpdatedListOfServers() {
                 return getInitialListOfServers();
@@ -90,6 +100,15 @@ public class RibbonServiceInstanceListLoadBalancerFactory extends ServiceInstanc
         };
     }
 
+    /**
+     * Create the load balancer based on the parameters.
+     * @param niwsClientConfig niwsClientConfig
+     * @param rule rule
+     * @param ping ping
+     * @param serverListFilter serverListFilter
+     * @param serverList serverList
+     * @return balancer
+     */
     protected RibbonLoadBalancer createRibbonLoadBalancer(IClientConfig niwsClientConfig, IRule rule, IPing ping, ServerListFilter serverListFilter, ServerList<Server> serverList) {
         return new RibbonLoadBalancer(
             niwsClientConfig,

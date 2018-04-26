@@ -13,22 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.exceptions;
 
 import io.micronaut.context.exceptions.BeanContextException;
 
 /**
- * <p>An exception that occurs when building routes</p>
+ * <p>An exception that occurs when building routes.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class RoutingException extends BeanContextException {
 
+    /**
+     * @param message The error message
+     * @param cause The throwable
+     */
     public RoutingException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The error message
+     */
     public RoutingException(String message) {
         super(message);
     }
