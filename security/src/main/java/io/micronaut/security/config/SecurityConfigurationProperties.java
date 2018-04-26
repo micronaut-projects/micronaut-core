@@ -17,7 +17,7 @@
 package io.micronaut.security.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.util.Toggleable;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,12 +29,15 @@ import java.util.List;
  * @since 1.0
  */
 @ConfigurationProperties(SecurityConfigurationProperties.PREFIX)
-public class SecurityConfigurationProperties implements Toggleable {
+public class SecurityConfigurationProperties implements SecurityConfiguration {
 
     public static final String PREFIX = "micronaut.security";
     public static final String ANYWHERE = "0.0.0.0";
 
+    private static final String DEFAULT_ROLES_NAME = "roles";
+
     protected boolean enabled = false;
+    protected String rolesName = DEFAULT_ROLES_NAME;
     protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
     protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
     protected List<String> ipPatterns = Collections.singletonList(ANYWHERE);
@@ -70,5 +73,14 @@ public class SecurityConfigurationProperties implements Toggleable {
      */
     public List<String> getIpPatterns() {
         return ipPatterns;
+    }
+
+    /**
+     * @see SecurityConfiguration#getRolesName() ().
+     * If not specified, defaults to {@link #DEFAULT_ROLES_NAME}.
+     */
+    @Override
+    public String getRolesName() {
+        return rolesName;
     }
 }

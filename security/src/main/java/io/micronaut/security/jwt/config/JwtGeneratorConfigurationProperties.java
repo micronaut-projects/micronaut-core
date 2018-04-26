@@ -29,11 +29,9 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     public static final String PREFIX = JwtConfigurationProperties.PREFIX + ".generator";
 
     private static final Integer DEFAULT_EXPIRATION = 3600;
-    private static final String DEFAULT_ROLES_CLAIM_NAME = "roles";
 
     protected Integer refreshTokenExpiration = null;
     protected Integer accessTokenExpiration = DEFAULT_EXPIRATION;
-    protected String rolesClaimName = DEFAULT_ROLES_CLAIM_NAME;
 
     @Override
     public Integer getRefreshTokenExpiration() {
@@ -46,14 +44,5 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     @Override
     public Integer getAccessTokenExpiration() {
         return accessTokenExpiration;
-    }
-
-    /**
-     * @see JwtGeneratorConfiguration#getRolesClaimName() ().
-     * If not specified, defaults to {@link #DEFAULT_ROLES_CLAIM_NAME}.
-     */
-    @Override
-    public String getRolesClaimName() {
-        return rolesClaimName;
     }
 }

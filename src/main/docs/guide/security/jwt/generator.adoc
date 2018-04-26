@@ -6,8 +6,6 @@
 
 | `micronaut.security.jwt.generator.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds. By default, they don't expire.
 
-| `micronaut.security.jwt.generator.rolesClaimName` | `roles` | Default claim name
-
 |===
 
 

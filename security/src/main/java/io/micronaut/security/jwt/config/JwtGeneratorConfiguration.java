@@ -34,11 +34,4 @@ public interface JwtGeneratorConfiguration {
      * @return The time, or null if not set to expire
      */
     Integer getRefreshTokenExpiration();
-
-    /**
-     * The name in the claims object that stores the granted roles.
-     *
-     * @return The roles claim name, e.g. roles.
-     */
-    String getRolesClaimName();
 }

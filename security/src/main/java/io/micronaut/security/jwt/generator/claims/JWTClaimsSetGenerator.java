@@ -18,7 +18,7 @@ package io.micronaut.security.jwt.generator.claims;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.security.authentication.UserDetails;
-import io.micronaut.security.jwt.config.JwtGeneratorConfiguration;
+import io.micronaut.security.config.SecurityConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
@@ -38,14 +38,14 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JWTClaimsSetGenerator.class);
 
-    private final JwtGeneratorConfiguration jwtGeneratorConfiguration;
+    private final SecurityConfiguration securityConfiguration;
 
     /**
      *
-     * @param jwtGeneratorConfiguration Token Configuration
+     * @param securityConfiguration Security Configuration
      */
-    public JWTClaimsSetGenerator(JwtGeneratorConfiguration jwtGeneratorConfiguration) {
-        this.jwtGeneratorConfiguration = jwtGeneratorConfiguration;
+    public JWTClaimsSetGenerator(SecurityConfiguration securityConfiguration) {
+        this.securityConfiguration = securityConfiguration;
     }
 
     /**
@@ -70,7 +70,7 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
             builder.expirationTime(Date.from(Instant.now().plus(expiration, ChronoUnit.MILLIS)));
         }
 
-        builder.claim(jwtGeneratorConfiguration.getRolesClaimName(), userDetails.getRoles());
+        builder.claim(securityConfiguration.getRolesName(), userDetails.getRoles());
 
         LOG.debug("Generated claim set: {}", builder.build().toJSONObject().toString());
 

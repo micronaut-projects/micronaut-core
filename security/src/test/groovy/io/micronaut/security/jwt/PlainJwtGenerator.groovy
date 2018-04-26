@@ -4,6 +4,9 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import io.micronaut.security.authentication.UserDetails
+import io.micronaut.security.config.InterceptUrlMapPattern
+import io.micronaut.security.config.SecurityConfigType
+import io.micronaut.security.config.SecurityConfiguration
 import io.micronaut.security.jwt.config.CryptoAlgorithm
 import io.micronaut.security.jwt.config.JwtGeneratorConfiguration
 import io.micronaut.security.jwt.encryption.JwtGeneratorEncryptionConfiguration
@@ -15,8 +18,30 @@ trait PlainJwtGenerator {
     String plainJwt(String user, List<String> roles, Integer expiration = 3600) {
         new JwtTokenGenerator(new MockJwtGeneratorSignatureConfiguration(),
                 new MockJwtGeneratorEncryptionConfiguration(),
-                new JWTClaimsSetGenerator(new MockJwtGeneratorConfiguration())
+                new JWTClaimsSetGenerator(new MockSecurityConfiguration())
         ).generateToken(new UserDetails(user, roles), 3600)
+    }
+}
+class MockSecurityConfiguration implements SecurityConfiguration {
+
+    @Override
+    String getRolesName() {
+        return 'roles'
+    }
+
+    @Override
+    List<String> getIpPatterns() {
+        return null
+    }
+
+    @Override
+    List<InterceptUrlMapPattern> getInterceptUrlMap() {
+        return null
+    }
+
+    @Override
+    SecurityConfigType getSecurityConfigType() {
+        return null
     }
 }
 class MockJwtGeneratorSignatureConfiguration implements JwtGeneratorSignatureConfiguration {
@@ -87,10 +112,5 @@ class MockJwtGeneratorConfiguration implements JwtGeneratorConfiguration {
     @Override
     Integer getRefreshTokenExpiration() {
         return null
-    }
-
-    @Override
-    String getRolesClaimName() {
-        return 'roles'
     }
 }

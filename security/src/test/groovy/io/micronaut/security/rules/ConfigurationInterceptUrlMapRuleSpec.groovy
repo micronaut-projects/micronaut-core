@@ -21,7 +21,7 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
             getUri() >> new URI('/books')
             getMethod() >> HttpMethod.GET
         }
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(JwtGeneratorConfiguration), securityConfiguration)
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(securityConfiguration)
 
         expect:
         provider.check(request, null, null) == securityRuleResult
@@ -36,7 +36,7 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
     @Unroll("comparing required: #requiredRoles and granted should return #description")
     def 'verify compare role behaviour'(List<String> requiredRoles, List<String> grantedRoles, SecurityRuleResult expected, String description) {
         given:
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(JwtGeneratorConfiguration), Mock(SecurityConfigurationProperties))
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(SecurityConfigurationProperties))
 
         expect:
         expected == provider.compareRoles(requiredRoles, grantedRoles)
