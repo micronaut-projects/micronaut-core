@@ -1,6 +1,6 @@
 import java.util.regex.Pattern
 
-Pattern pattern = Pattern.compile("([\\w\\-.]+):([\\w\\-]+):([\\w\\.]+)")
+Pattern pattern = Pattern.compile("([\\w\\-.]+):([\\w\\-]+):([\\w\\-.]+)")
 
 List<String> excludedDependencies = [
     'caffeine', 'yaml', 'lombok', 'cglib', 'asm', 'gormCore', 'gormDatastore', 'gormHibernate5', 'grailsDocs',
