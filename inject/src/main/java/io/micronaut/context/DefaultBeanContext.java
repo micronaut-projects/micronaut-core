@@ -963,7 +963,10 @@ public class DefaultBeanContext implements BeanContext {
                     // try narrow to exact type
                     candidates = candidates
                         .stream()
-                        .filter(candidate -> candidate.getBeanType() == instance.getClass())
+                        .filter(candidate ->
+                                !(candidate instanceof NoInjectionBeanDefinition) &&
+                                candidate.getBeanType() == instance.getClass()
+                        )
                         .collect(Collectors.toList());
                     return candidates;
                 }
