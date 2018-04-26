@@ -43,7 +43,7 @@ public class AuthenticationUserDetailsAdapter implements Authentication {
     }
 
     @Override
-    public String getId() {
+    public String getName() {
         return userDetails.getUsername();
     }
 }

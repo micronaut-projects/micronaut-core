@@ -28,10 +28,12 @@ import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.rules.SecuredAnnotationRule;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;
+import io.micronaut.session.http.HttpSessionFilter;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -50,6 +52,10 @@ import java.util.stream.Collectors;
 @Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled")
 @Filter("/**")
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
+    /**
+     * The order of the rule.
+     */
+    public static final Integer ORDER = HttpSessionFilter.ORDER + 100;
 
     /**
      * The attribute used to store the authentication object in the request.
@@ -58,21 +64,16 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
 
-    protected final Collection<TokenReader> tokenReaders;
-    protected final Collection<TokenValidator> tokenValidators;
     private final Collection<SecurityRule> securityRules;
+    private final Collection<AuthenticationFetcher> authenticationFetchers;
 
     /**
-     * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
-     * @param tokenReaders The list {@link TokenReader} which attempt to read the request
      * @param securityRules The list of rules that will allow or reject the request
      */
-    public SecurityFilter(Collection<TokenValidator> tokenValidators,
-                          Collection<TokenReader> tokenReaders,
-                          Collection<SecurityRule> securityRules) {
-        this.tokenValidators = tokenValidators;
-        this.tokenReaders = tokenReaders;
+    public SecurityFilter(Collection<SecurityRule> securityRules,
+                          Collection<AuthenticationFetcher> authenticationFetchers) {
         this.securityRules = securityRules;
+        this.authenticationFetchers = authenticationFetchers;
     }
 
     private Publisher<MutableHttpResponse<?>> rejected(boolean forbidden) {
@@ -96,37 +97,27 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         String method = request.getMethod().toString();
         String path = request.getPath();
 
-        Optional<String> token = Optional.empty();
-        for (TokenReader tokenReader : tokenReaders) {
-            token = tokenReader.findToken(request);
-            if (token.isPresent()) {
-                break;
-            }
-        }
         Optional<Authentication> authentication = Optional.empty();
-        for (TokenValidator tokenValidator : tokenValidators) {
-            authentication = token.flatMap(tokenValidator::validateToken);
+        for (AuthenticationFetcher authenticationFetcher : authenticationFetchers) {
+            authentication = authenticationFetcher.fetchAuthentication(request);
             if (authentication.isPresent()) {
                 break;
             }
         }
+
         request.setAttribute(AUTHENTICATION, authentication.orElse(null));
         Optional<Map<String, Object>> attributes = authentication.map(Authentication::getAttributes);
         Optional<RouteMatch> routeMatch = getRouteMatch(request);
 
         if (LOG.isDebugEnabled()) {
-            if (token.isPresent()) {
-                LOG.debug("Token {} found in request {} {}", token.get(), method, path);
-                if (attributes.isPresent()) {
-                        LOG.debug("Attributes: {}", attributes.get().entrySet()
-                                .stream()
-                                .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                                .collect(Collectors.joining(", ")));
-                } else {
-                    LOG.debug("Unauthenticated request {} {}. Failure to fetch claims because token validation failed.", method, path);
-                }
-            } else {
-                LOG.debug("Unauthenticated request {}, {}, no token found.", method, path);
+            if (attributes.isPresent()) {
+                LOG.debug("Attributes: {}", attributes.get().entrySet()
+                        .stream()
+                        .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                        .collect(Collectors.joining(", ")));
+            }
+            if (authentication.isPresent()) {
+                LOG.debug("Failure to authenticate request. {} {}.", method, path);
             }
         }
 
@@ -148,5 +139,10 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
         //no rule found for the given request, reject
         return rejected(attributes.isPresent());
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }

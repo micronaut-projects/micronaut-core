@@ -29,7 +29,7 @@ class IpAuthorizationApprovedSpec extends Specification implements Authorization
         HttpResponse<String> response = get("/nonSensitive")
 
         then:
-        response.body() == "World"
+        response.body() == "Not logged in"
     }
 
     void "even if you are in the correct ip range, accessing the secured controller without authentication should return unauthorized"() {

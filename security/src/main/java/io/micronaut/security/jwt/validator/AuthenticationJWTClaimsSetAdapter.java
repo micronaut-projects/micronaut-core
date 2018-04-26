@@ -40,7 +40,7 @@ public class AuthenticationJWTClaimsSetAdapter implements Authentication {
     }
 
     @Override
-    public String getId() {
+    public String getName() {
         return claimSet.getSubject();
     }
 }

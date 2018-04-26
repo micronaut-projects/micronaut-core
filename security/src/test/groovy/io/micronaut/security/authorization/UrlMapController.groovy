@@ -16,11 +16,11 @@ class UrlMapController {
 
     @Get("/authenticated")
     String authenticated(Authentication authentication) {
-        "${authentication.id} is authenticated"
+        "${authentication.name} is authenticated"
     }
 
     @Get("/principal")
     String authenticated(Principal principal) {
-        "${principal.getName()} is authenticated"
+        "${principal.name} is authenticated"
     }
 }

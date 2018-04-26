@@ -17,14 +17,18 @@
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.*;
+import io.micronaut.security.event.LoginFailedEvent;
+import io.micronaut.security.event.LoginSuccesfulEvent;
 import io.micronaut.security.rules.SecurityRule;
-import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
-import io.micronaut.security.jwt.config.JwtConfiguration;
 
 import java.util.Optional;
 
@@ -38,22 +42,21 @@ import java.util.Optional;
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LoginController implements LoginControllerApi {
 
-    public static final String LOGIN_PATH = "/login";
-
-    protected final AccessRefreshTokenGenerator accessRefreshTokenGenerator;
-    protected final JwtConfiguration jwtConfiguration;
     protected final Authenticator authenticator;
+    protected final LoginHandler loginHandler;
+    protected final ApplicationEventPublisher eventPublisher;
 
     /**
      *
-     * @param accessRefreshTokenGenerator AccessRefresh Token generator
-     * @param jwtConfiguration Token configuration
      * @param authenticator {@link Authenticator} collaborator
+     * @param eventPublisher The application event publisher
      */
-    public LoginController(AccessRefreshTokenGenerator accessRefreshTokenGenerator, JwtConfiguration jwtConfiguration, Authenticator authenticator) {
-        this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
-        this.jwtConfiguration = jwtConfiguration;
+    public LoginController(Authenticator authenticator,
+                           LoginHandler loginHandler,
+                           ApplicationEventPublisher eventPublisher) {
         this.authenticator = authenticator;
+        this.loginHandler = loginHandler;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -61,11 +64,21 @@ public class LoginController implements LoginControllerApi {
      * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
+    @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Override
-    public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials) {
+    public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
         Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
-        if (response.map(AuthenticationResponse::isAuthenticated).orElse(false)) {
-            return accessRefreshTokenGenerator.generate((UserDetails) response.get());
+        if (response.isPresent()) {
+            AuthenticationResponse authResponse = response.get();
+            if (authResponse.isAuthenticated()) {
+                UserDetails userDetails = (UserDetails) authResponse;
+                eventPublisher.publishEvent(new LoginSuccesfulEvent(userDetails));
+                return loginHandler.loginSuccess(userDetails, request);
+            } else {
+                AuthenticationFailed authenticationFailed = (AuthenticationFailed) authResponse;
+                eventPublisher.publishEvent(new LoginFailedEvent(authenticationFailed));
+                return loginHandler.loginFailed(authenticationFailed);
+            }
         }
         throw new AuthenticationException(response.flatMap(AuthenticationResponse::getMessage).orElse(null));
     }

@@ -32,6 +32,7 @@ public class SecurityEndpointsConfigurationProperties implements SecurityEndpoin
 
     protected boolean login = false;
     protected boolean refresh = false;
+    protected boolean logout = false;
 
     /**
      * login getter.
@@ -49,6 +50,15 @@ public class SecurityEndpointsConfigurationProperties implements SecurityEndpoin
     @Override
     public boolean isRefresh() {
         return refresh;
+    }
+
+    /**
+     * logout getter.
+     * @return boolean flag to indicate if {@link LogoutController} should be enabled.
+     */
+    @Override
+    public boolean isLogout() {
+        return logout;
     }
 
 }

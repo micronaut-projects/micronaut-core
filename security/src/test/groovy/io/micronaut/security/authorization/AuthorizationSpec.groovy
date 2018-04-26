@@ -8,6 +8,8 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.PrincipalArgumentBinder
+import io.micronaut.security.authentication.UsernamePasswordCredentials
+import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -69,6 +71,16 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     void "test accessing the url map controller without authentication"() {
         when:
         get("/urlMap/authenticated")
+
+        then:
+        HttpClientResponseException e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    void "attempt to login with bad credentials"() {
+        when:
+        def creds = new UsernamePasswordCredentials("notFound", "password")
+        client.toBlocking().exchange(HttpRequest.POST('/login', creds), BearerAccessRefreshToken)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -190,8 +202,11 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing a non sensitive endpoint with authentication"() {
-        given:
+        when:
         String token = loginWith("valid")
+
+        then:
+        token
 
         when:
         HttpResponse<String> response = get("/nonSensitive", token)

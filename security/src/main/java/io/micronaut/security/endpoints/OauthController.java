@@ -19,10 +19,13 @@ package io.micronaut.security.endpoints;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.Authentication;
+import io.micronaut.security.jwt.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.jwt.validator.JwtTokenValidator;
@@ -57,7 +60,6 @@ public class OauthController implements OauthControllerApi {
      * @param accessRefreshTokenGenerator An instance of {@link AccessRefreshTokenGenerator}
      */
     public OauthController(JwtTokenValidator tokenValidator,
-                           AccessRefreshTokenGenerator accessRefreshTokenGenerator) {
         this.tokenValidator = tokenValidator;
         this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
     }
@@ -68,17 +70,28 @@ public class OauthController implements OauthControllerApi {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Override
+    @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post(OauthController.ACCESS_TOKEN_PATH)
     public HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest) {
         if (!validateTokenRefreshRequest(tokenRefreshRequest)) {
             return HttpResponse.status(HttpStatus.BAD_REQUEST);
         }
-        LOG.info("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
+
+        }
 
         Optional<Map<String, Object>> claims = tokenValidator.validateToken(tokenRefreshRequest.getRefreshToken()).map(Authentication::getAttributes);
 
         if (claims.isPresent()) {
-            return accessRefreshTokenGenerator.generate(tokenRefreshRequest.getRefreshToken(), claims.get());
+
+            Optional<AccessRefreshToken> accessRefreshToken = accessRefreshTokenGenerator.generate(tokenRefreshRequest.getRefreshToken(), claims.get());
+            if (accessRefreshToken.isPresent()) {
+                return HttpResponse.ok(accessRefreshToken.get());
+            }
+            return HttpResponse.serverError();
+
         } else {
             return HttpResponse.status(HttpStatus.FORBIDDEN);
         }

@@ -25,7 +25,7 @@ class ExampleController {
 
     @Get("/authenticated") // <1>
     String authenticated(Authentication authentication) {
-        "${authentication.id} is authenticated"
+        "${authentication.name} is authenticated"
     }
 }
 //end::exampleControllerPlusImports[]

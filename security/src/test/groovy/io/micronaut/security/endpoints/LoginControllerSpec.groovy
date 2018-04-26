@@ -11,7 +11,6 @@ import io.micronaut.security.authentication.AuthenticationException
 import io.micronaut.security.authentication.Authenticator
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.token.generator.AccessRefreshTokenGenerator
 import io.micronaut.security.jwt.config.JwtConfiguration
 import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup

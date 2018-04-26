@@ -31,7 +31,7 @@ class AuthorizationWithoutInterceptUrlMapSpec extends Specification implements A
         HttpResponse<String> response = get("/nonSensitive")
 
         then:
-        response.body() == "World"
+        response.body() == "Not logged in"
     }
 
     void "test accessing a sensitive endpoint without authentication"() {

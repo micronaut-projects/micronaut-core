@@ -18,23 +18,17 @@ package io.micronaut.security.endpoints;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.authentication.AuthenticationFailed;
+import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.authentication.UserDetails;
 
 /**
- *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface LoginControllerApi {
+public interface LoginHandler {
 
-    /**
-     * Attempts to authenticate the with the supplied credentials.
-     *
-     * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
-     * @return An Http response
-     */
-    @Post("/login")
-    HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request);
+    HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request);
+
+    HttpResponse loginFailed(AuthenticationFailed authenticationFailed);
 }

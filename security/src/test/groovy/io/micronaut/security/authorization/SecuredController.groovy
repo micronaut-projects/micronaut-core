@@ -18,6 +18,6 @@ class SecuredController {
 
     @Get("/authenticated")
     String authenticated(Authentication authentication) {
-        "${authentication.id} is authenticated"
+        "${authentication.getName()} is authenticated"
     }
 }

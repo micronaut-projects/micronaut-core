@@ -33,4 +33,9 @@ public interface SecurityEndpointsConfiguration {
      * @return true if you want to enable the {@link OauthController}
      */
     boolean isRefresh();
+
+    /**
+     * @return true if you want to enable the {@link LogoutController}
+     */
+    boolean isLogout();
 }
