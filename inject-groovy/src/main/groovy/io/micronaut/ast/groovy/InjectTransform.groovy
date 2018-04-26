@@ -16,7 +16,6 @@
 package io.micronaut.ast.groovy
 
 import io.micronaut.context.annotation.Property
-import io.micronaut.context.env.SystemPropertiesPropertySource
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
