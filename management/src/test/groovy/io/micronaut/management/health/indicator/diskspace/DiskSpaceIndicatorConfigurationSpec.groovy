@@ -16,18 +16,13 @@
 package io.micronaut.management.health.indicator.diskspace
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 
 class DiskSpaceIndicatorConfigurationSpec extends Specification {
 
     void "test threshold configuration"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(['endpoints.health.disk-space.threshold': '100GB']))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.disk-space.threshold': '100GB'])
 
         expect:
         context.getBean(DiskSpaceIndicatorConfiguration).threshold == 1024L * 1024L * 1024L * 100L
@@ -38,9 +33,7 @@ class DiskSpaceIndicatorConfigurationSpec extends Specification {
 
     void "test path configuration"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(['endpoints.health.disk-space.path': '/foo']))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.disk-space.path': '/foo'])
 
         expect:
         context.getBean(DiskSpaceIndicatorConfiguration).path.absolutePath == "/foo"

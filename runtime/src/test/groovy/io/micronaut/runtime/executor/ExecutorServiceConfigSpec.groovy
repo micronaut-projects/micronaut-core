@@ -38,14 +38,11 @@ class ExecutorServiceConfigSpec extends Specification {
     @Unroll
     void "test configure custom executor with invalidate cache: #invalidateCache"() {
         given:
-        ApplicationContext ctx = ApplicationContext.build("test")
-                          .environment {
-            it.addPropertySource(PropertySource.of(
-                    'micronaut.server.executors.one.type':'FIXED',
-                    'micronaut.server.executors.one.nThreads':'5',
-                    'micronaut.server.executors.two.type':'work_stealing',
-            ))
-        }.start()
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.server.executors.one.type':'FIXED',
+                'micronaut.server.executors.one.nThreads':'5',
+                'micronaut.server.executors.two.type':'work_stealing'
+        )
 
         when:
         def configs = ctx.getBeansOfType(ExecutorConfiguration)
@@ -102,14 +99,11 @@ class ExecutorServiceConfigSpec extends Specification {
     @Unroll
     void "test configure custom executor - distinct initialization order with invalidate cache: #invalidateCache"() {
         given:
-        ApplicationContext ctx = ApplicationContext.build(environment)
-                .environment {
-            it.addPropertySource(PropertySource.of(
-                    'micronaut.server.executors.one.type':'FIXED',
-                    'micronaut.server.executors.one.nThreads':'5',
-                    'micronaut.server.executors.two.type':'work_stealing',
-            ))
-        }.start()
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.server.executors.one.type':'FIXED',
+                'micronaut.server.executors.one.nThreads':'5',
+                'micronaut.server.executors.two.type':'work_stealing'
+        )
 
 
 
@@ -148,14 +142,11 @@ class ExecutorServiceConfigSpec extends Specification {
     @Unroll
     void "test configure existing IO executor - distinct initialization order with invalidate cache: #invalidateCache"() {
         given:
-        ApplicationContext ctx = ApplicationContext.build(environment)
-                .environment {
-            it.addPropertySource(PropertySource.of(
-                    'micronaut.server.executors.io.type':'FIXED',
-                    'micronaut.server.executors.io.nThreads':'5',
-                    'micronaut.server.executors.two.type':'work_stealing',
-            ))
-        }.start()
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.server.executors.io.type':'FIXED',
+                'micronaut.server.executors.io.nThreads':'5',
+                'micronaut.server.executors.two.type':'work_stealing'
+        )
 
 
 

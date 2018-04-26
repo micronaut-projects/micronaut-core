@@ -58,7 +58,10 @@ public class MongoDatastoreFactory {
             .filter(MongoEntity.class::isAssignableFrom)
             .toArray(Class[]::new);
 
-        PropertyResolverAdapter propertyResolver = new PropertyResolverAdapter(applicationContext, applicationContext);
+        PropertyResolverAdapter propertyResolver = new PropertyResolverAdapter(
+                applicationContext,
+                applicationContext
+        );
         MongoDatastore datastore = new MongoDatastore(mongoClient, propertyResolver,
             new ConfigurableEventPublisherAdapter(applicationContext),
             entities);

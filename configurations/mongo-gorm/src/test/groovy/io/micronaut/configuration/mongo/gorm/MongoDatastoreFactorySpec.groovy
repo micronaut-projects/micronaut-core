@@ -35,7 +35,9 @@ import javax.validation.constraints.NotBlank
  */
 @IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoDatastoreFactorySpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run('mongodb.uri': MongoSettings.DEFAULT_URI)
+    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.build('mongodb.uri': MongoSettings.DEFAULT_URI)
+                                                                                   .mainClass(MongoDatastoreFactorySpec)
+                                                                                   .start()
 
     @Rollback
     void "test configure GORM for MongoDB"() {
@@ -61,6 +63,7 @@ class MongoDatastoreFactorySpec extends Specification {
 
     void "test MongoClient is available"() {
         expect:
+        applicationContext.containsBean(MongoClient)
         applicationContext.getBean(MongoClient)
         applicationContext.getBean(MongoDatastore)
     }

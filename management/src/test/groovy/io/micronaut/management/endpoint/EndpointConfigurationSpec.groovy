@@ -24,11 +24,7 @@ class EndpointConfigurationSpec extends Specification {
 
     void "test sensitive inheritance"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(
-                ['endpoints.foo.enabled': true, 'endpoints.all.sensitive': true]
-        ))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.foo.enabled': true, 'endpoints.all.sensitive': true])
 
         when:
         EndpointConfiguration foo = context.getBean(EndpointConfiguration, Qualifiers.byName("foo"))
@@ -43,11 +39,7 @@ class EndpointConfigurationSpec extends Specification {
 
     void "test enabled inheritance"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(
-                ['endpoints.foo.sensitive': true, 'endpoints.all.enabled': false]
-        ))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.foo.sensitive': true, 'endpoints.all.enabled': false])
 
         when:
         EndpointConfiguration foo = context.getBean(EndpointConfiguration, Qualifiers.byName("foo"))
@@ -62,11 +54,7 @@ class EndpointConfigurationSpec extends Specification {
 
     void "test sensitive is not present"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(
-                ['endpoints.foo.enabled': true]
-        ))
-        context.start()
+        ApplicationContext context = ApplicationContext.run( ['endpoints.foo.enabled': true])
 
         when:
         EndpointConfiguration foo = context.getBean(EndpointConfiguration, Qualifiers.byName("foo"))
@@ -80,11 +68,7 @@ class EndpointConfigurationSpec extends Specification {
 
     void "test enabled is not present"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(PropertySource.of(
-                ['endpoints.foo.sensitive': true]
-        ))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.foo.sensitive': true])
 
         when:
         EndpointConfiguration foo = context.getBean(EndpointConfiguration, Qualifiers.byName("foo"))

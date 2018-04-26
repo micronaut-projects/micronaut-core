@@ -43,7 +43,7 @@ class MyBean {
 }
 ''')
 
-        ApplicationContext applicationContext = ApplicationContext.build()
+        ApplicationContext applicationContext = ApplicationContext.build().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
         applicationContext.environment.start()
 
@@ -51,7 +51,7 @@ class MyBean {
         beanDefinition.isEnabled(applicationContext)
 
         when:
-        applicationContext = ApplicationContext.build()
+        applicationContext = ApplicationContext.build().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
         applicationContext.environment.start()
 
@@ -59,7 +59,7 @@ class MyBean {
         !beanDefinition.isEnabled(applicationContext)
 
         when:
-        applicationContext = ApplicationContext.build()
+        applicationContext = ApplicationContext.build().build()
         applicationContext.environment.start()
 
         then:
@@ -116,11 +116,9 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"test")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"test"))
-            it.start()
-        })
+        context.environment.start()
 
         context.registerSingleton(String.class, "foo")
 
@@ -237,7 +235,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo")
+        def context = ApplicationContext.build("foo").build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -256,7 +254,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build()
+        def context = ApplicationContext.build().build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -275,7 +273,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo")
+        def context = ApplicationContext.build("foo").build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -294,7 +292,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build()
+        def context = ApplicationContext.build().build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -314,11 +312,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':true)
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':true))
-            it.start()
-        })
+
+        context.environment.start()
 
 
         then:
@@ -342,9 +339,9 @@ class MyBean {
 
         def context = ApplicationContext
                 .build()
-                .environment( {
-            it.start()
-        })
+                .build()
+
+        context.environment.start()
 
 
         then:
@@ -367,12 +364,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"test")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"test"))
-            it.start()
-        })
 
+        context.environment.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -393,9 +388,9 @@ class MyBean {
 
         def context = ApplicationContext
                 .build()
-                .environment( {
-            it.start()
-        })
+                .build()
+
+        context.environment.start()
 
 
         then:
@@ -416,11 +411,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"blah")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"blah"))
-            it.start()
-        })
+
+        context.environment.start()
 
 
         then:

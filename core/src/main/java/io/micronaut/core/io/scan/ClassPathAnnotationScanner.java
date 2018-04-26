@@ -95,7 +95,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
             String packagePath = pkg.replace('.', '/').concat("/");
             List<Class> classes = new ArrayList<>();
             Enumeration<URL> resources = classLoader.getResources(packagePath);
-            if(LOG.isDebugEnabled()) {
+            if(!resources.hasMoreElements() && LOG.isDebugEnabled()) {
                 LOG.debug("No resources found under package path: {}", packagePath);
             }
             while (resources.hasMoreElements()) {

@@ -1,5 +1,6 @@
+
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@io.micronaut.context.annotation.Configuration
-@Requirements([
-    @Requires(classes = [HibernateDatastore, javax.persistence.Entity]),
-    @Requires(entities = [Entity, javax.persistence.Entity])
-])
-package io.micronaut.configuration.hibernate.gorm
+/**
+ * Configuration for GORM for Hibernate
+ *
+ * @author graemerocher
+ * @since 1.0
+ */
+@Configuration
+@Requires(classes = HibernateDatastore.class)
+@Requires(classes = SessionFactory.class)
+@Requires(entities = Entity.class)
+package io.micronaut.configuration.hibernate.gorm;
 
-import grails.gorm.annotation.Entity
-import org.grails.orm.hibernate.HibernateDatastore
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
+import grails.gorm.annotation.Entity;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import org.grails.orm.hibernate.HibernateDatastore;
+import org.hibernate.SessionFactory;

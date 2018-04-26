@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 /**
+ * This configuration contains setup class for GORM for Neo4j
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@RequiresMongo
+@Requires(classes = Driver.class)
 @Requires(entities = Entity.class)
-package io.micronaut.configuration.mongo.gorm;
+package io.micronaut.configuration.neo4j.gorm;
 
 import grails.gorm.annotation.Entity;
-import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
-import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import org.neo4j.driver.v1.Driver;
