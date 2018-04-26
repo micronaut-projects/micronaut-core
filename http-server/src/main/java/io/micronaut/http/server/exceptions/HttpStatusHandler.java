@@ -39,11 +39,18 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
 
     @Override
     public HttpResponse handle(HttpRequest request, HttpStatusException exception) {
-        VndError error = new VndError(exception.getMessage());
-        error.link(Link.SELF, Link.of(request.getUri()));
+        if (exception.getBody() == null) {
+            VndError error = new VndError(exception.getMessage());
+            error.link(Link.SELF, Link.of(request.getUri()));
 
-        return HttpResponse
-            .status(exception.getStatus())
-            .body(error);
+            return HttpResponse
+                .status(exception.getStatus())
+                .body(error);
+
+        } else {
+            return HttpResponse
+                .status(exception.getStatus())
+                .body(exception.getBody());
+        }
     }
 }

@@ -52,6 +52,22 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         json._links.self.href == '/errors'
     }
 
+    void 'test returning an arbitrary POGO'() {
+        when:
+        def response = rxClient
+            .exchange((HttpRequest.GET('/errors/book')), String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.ACCEPTED.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+
+        when:
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
+
+        then:
+        json.title == 'The title'
+    }
+
     @Controller('/errors')
     @Singleton
     static class BookController {
@@ -60,5 +76,14 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         String serverError() {
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, 'The error message')
         }
+
+        @Get('/book')
+        String book() {
+            throw new HttpStatusException(HttpStatus.ACCEPTED, new Book(title: 'The title'))
+        }
+    }
+
+    static class Book {
+        String title
     }
 }
