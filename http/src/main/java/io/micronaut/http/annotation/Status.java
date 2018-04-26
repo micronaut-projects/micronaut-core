@@ -25,7 +25,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Indicates that the role of a class is a controller within an application.</p>
+ * <p>Sets alternative HttpStatus response code when applied to a method and HttpStatus code is specified</p>
  * <p>
  *
  * @author Ben Rhine
