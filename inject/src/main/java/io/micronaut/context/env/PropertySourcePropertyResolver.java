@@ -238,7 +238,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     private String normalizeName(String name) {
-        return name.toLowerCase(Locale.ENGLISH).replace('-', '.');
+        return name.replace('-', '.');
     }
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
@@ -346,10 +346,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
                 // environment variables are converted to lower case and dot separated
-                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH).replace('_', '.'));
+                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
+                                  .replace('_', '.'));
             default:
-                return Collections.singletonList(
-                        NameUtils.hyphenate(property, true)
+                return Arrays.asList(
+                        property, NameUtils.hyphenate(property, true)
                 );
         }
     }
