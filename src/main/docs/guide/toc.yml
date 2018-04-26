@@ -88,6 +88,7 @@ management:
 security:
   title: Security
   basicAuth: Basic Auth
+  session: Session Authentication
   securityRule:
     title: Security Rules
     ipPattern: IP Pattern Rule

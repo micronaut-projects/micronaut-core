@@ -9,6 +9,8 @@ dependencies {
     compile project(":runtime")
     compile project(":management")
     compile project(":http")
+    compile project(":session")
+
     compile "org.bouncycastle:bcprov-jdk15on:$bouncyCastleVersion"
     compile "org.bouncycastle:bcpkix-jdk15on:$bouncyCastleVersion"
     compile "com.nimbusds:nimbus-jose-jwt:$nimbusJoseJwtVersion"

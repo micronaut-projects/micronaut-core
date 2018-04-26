@@ -27,7 +27,6 @@ import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.jwt.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.rules.SecurityRule;
-import io.micronaut.security.token.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.jwt.validator.JwtTokenValidator;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.micronaut.security.token.render.AccessRefreshToken;
@@ -60,6 +59,7 @@ public class OauthController implements OauthControllerApi {
      * @param accessRefreshTokenGenerator An instance of {@link AccessRefreshTokenGenerator}
      */
     public OauthController(JwtTokenValidator tokenValidator,
+                           AccessRefreshTokenGenerator accessRefreshTokenGenerator) {
         this.tokenValidator = tokenValidator;
         this.accessRefreshTokenGenerator = accessRefreshTokenGenerator;
     }

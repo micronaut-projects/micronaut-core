@@ -42,6 +42,11 @@ import java.util.Optional;
 public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
 
     /**
+     * The order of the filter.
+     */
+    public static final Integer ORDER = 0;
+
+    /**
      * Constant for Micronaut SESSION attribute.
      */
     public static final CharSequence SESSION_ATTRIBUTE = "micronaut.SESSION";
@@ -127,5 +132,10 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
             this.session = session;
             this.response = response;
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
     }
 }
