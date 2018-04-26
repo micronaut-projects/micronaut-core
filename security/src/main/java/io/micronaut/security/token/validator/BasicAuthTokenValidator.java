@@ -19,6 +19,7 @@ package io.micronaut.security.token.validator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.Authenticator;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
@@ -28,8 +29,6 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -66,7 +65,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
             Optional<AuthenticationResponse> response = authenticator.authenticate(creds.get());
             if (response.map(AuthenticationResponse::isAuthenticated).orElse(false)) {
                 UserDetails userDetails = (UserDetails) response.get();
-                return Optional.of(authenticationOfUserDetails(userDetails));
+                return Optional.of(new AuthenticationUserDetailsAdapter(userDetails));
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Could not authenticate {}", creds.get().getUsername());
@@ -80,23 +79,6 @@ public class BasicAuthTokenValidator implements TokenValidator {
     @Override
     public int getOrder() {
         return ORDER;
-    }
-
-    private Authentication authenticationOfUserDetails(UserDetails userDetails) {
-        return new Authentication() {
-            @Override
-            public String getId() {
-                return userDetails.getUsername();
-            }
-
-            @Override
-            public Map<String, Object> getAttributes() {
-                Map<String, Object> attributes = new HashMap<>();
-                attributes.put("roles", userDetails.getRoles());
-                attributes.put("username", userDetails.getUsername());
-                return attributes;
-            }
-        };
     }
 
     private Optional<UsernamePasswordCredentials> credsFromEncodedToken(String encodedToken) {

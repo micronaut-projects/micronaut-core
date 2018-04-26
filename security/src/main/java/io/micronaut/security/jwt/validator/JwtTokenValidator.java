@@ -44,7 +44,6 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -213,16 +212,6 @@ public class JwtTokenValidator implements TokenValidator {
             return Optional.empty();
         }
 
-        return Optional.of(new Authentication() {
-            @Override
-            public String getId() {
-                return subject;
-            }
-
-            @Override
-            public Map<String, Object> getAttributes() {
-                return claimSet.getClaims();
-            }
-        });
+        return Optional.of(new AuthenticationJWTClaimsSetAdapter(claimSet));
     }
 }
