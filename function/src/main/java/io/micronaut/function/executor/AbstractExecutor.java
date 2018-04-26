@@ -67,7 +67,7 @@ class AbstractExecutor<C> {
      * @return Build the {@link ApplicationContext} to use
      */
     protected ApplicationContext buildApplicationContext(@Nullable C context) {
-        return ApplicationContext.build();
+        return ApplicationContext.build().build();
     }
 
     /**

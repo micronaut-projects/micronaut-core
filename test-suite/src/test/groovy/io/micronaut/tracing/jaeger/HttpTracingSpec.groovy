@@ -223,13 +223,12 @@ class HttpTracingSpec extends Specification {
 
 
     ApplicationContext buildContext() {
-        ApplicationContext context = ApplicationContext.build()
-        context.environment.addPropertySource(PropertySource.of(
-                'tracing.jaeger.enabled':true,
-                'tracing.jaeger.sampler.probability':1))
         def reporter = new InMemoryReporter()
-        context.registerSingleton(reporter)
-        context.start()
+        ApplicationContext.build(
+            'tracing.jaeger.enabled':true,
+            'tracing.jaeger.sampler.probability':1
+        ).singletons(reporter)
+         .start()
     }
 
     @Controller('/traced')

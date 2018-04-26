@@ -17,11 +17,11 @@
 package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
+import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.cli.CommandLine;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -29,14 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -45,18 +38,12 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Micronaut {
+public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
 
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
 
-    private Collection<Class> classes = new ArrayList<>();
-    private Collection<Package> packages = new ArrayList<>();
-    private Collection<String> configurationIncludes = new HashSet<>();
-    private Collection<String> configurationExcludes = new HashSet<>();
     private String[] args = new String[0];
-    private Set<String> environments = new HashSet<>();
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
-    private Collection<Map<String, Object>> propertyMaps = new ArrayList<>();
 
     /**
      * The default constructor.
@@ -65,36 +52,13 @@ public class Micronaut {
     }
 
     /**
-     * @param applicationClass The application class
      * @return Run this {@link Micronaut}
      */
-    public ApplicationContext start(Class applicationClass) {
+    @Override
+    public ApplicationContext start() {
         CommandLine commandLine = CommandLine.parse(args);
-
-        String[] envArray = this.environments.toArray(new String[this.environments.size()]);
-        ApplicationContext applicationContext;
-        if (applicationClass != null) {
-            applicationContext = ApplicationContext.build(applicationClass, envArray);
-        } else {
-            applicationContext = ApplicationContext.build(ApplicationContext.class.getClassLoader(), envArray);
-        }
-        applicationContext.registerSingleton(commandLine);
-
-        // Add packages to scan
-        Environment environment = applicationContext.getEnvironment();
-        for (Class cls : classes) {
-            environment.addPackage(cls.getPackage());
-        }
-
-        for (Package aPackage : packages) {
-            environment.addPackage(aPackage);
-        }
-        // Add the system properties passed via the command line
-        environment.addPropertySource(new CommandLinePropertySource(commandLine));
-
-        for (Map<String, Object> propertyMap : propertyMaps) {
-            environment.addPropertySource(PropertySource.of(Environment.DEFAULT_NAME, propertyMap));
-        }
+        propertySources(new CommandLinePropertySource(commandLine));
+        ApplicationContext applicationContext = super.build();
 
         try {
             long start = System.currentTimeMillis();
@@ -127,6 +91,16 @@ public class Micronaut {
         }
     }
 
+    @Override
+    public Micronaut include(@Nullable String... configurations) {
+        return (Micronaut) super.include(configurations);
+    }
+
+    @Override
+    public Micronaut exclude(@Nullable String... configurations) {
+        return (Micronaut) super.exclude(configurations);
+    }
+
     /**
      * Add classes to be included in the initialization of the application.
      *
@@ -135,22 +109,36 @@ public class Micronaut {
      */
     public Micronaut classes(@Nullable Class... classes) {
         if (classes != null) {
-            this.classes.addAll(Arrays.asList(classes));
+            for (Class aClass : classes) {
+                packages(aClass.getPackage().getName());
+            }
         }
         return this;
     }
 
-    /**
-     * Add additional properties to the {@link PropertySource} list.
-     *
-     * @param properties The properties
-     * @return The properties
-     */
+    @Override
     public Micronaut properties(@Nullable Map<String, Object> properties) {
-        if (properties != null) {
-            this.propertyMaps.add(properties);
-        }
-        return this;
+        return (Micronaut) super.properties(properties);
+    }
+
+    @Override
+    public Micronaut singletons(Object... beans) {
+        return (Micronaut) super.singletons(beans);
+    }
+
+    @Override
+    public Micronaut propertySources(@Nullable PropertySource... propertySources) {
+        return (Micronaut) super.propertySources(propertySources);
+    }
+
+    @Override
+    public Micronaut mainClass(Class mainClass) {
+        return (Micronaut) super.mainClass(mainClass);
+    }
+
+    @Override
+    public Micronaut classLoader(ClassLoader classLoader) {
+        return (Micronaut) super.classLoader(classLoader);
     }
 
     /**
@@ -166,74 +154,14 @@ public class Micronaut {
         return this;
     }
 
-    /**
-     * Set the environment.
-     *
-     * @param environments The environment
-     * @return This application
-     */
-    public Micronaut env(@Nullable String... environments) {
-        if (ArrayUtils.isNotEmpty(environments)) {
-            this.environments = CollectionUtils.setOf(environments);
-        }
-        return this;
+    @Override
+    public Micronaut environments(@Nullable String... environments) {
+        return (Micronaut) super.environments(environments);
     }
 
-    /**
-     * Add packages to scan.
-     *
-     * @param packages The packages
-     * @return This application
-     */
-    public Micronaut packages(@Nullable Package... packages) {
-        if (packages != null) {
-            this.packages.addAll(Arrays.asList(packages));
-        }
-        return this;
-    }
-
-    /**
-     * Add packages to scan.
-     *
-     * @param packages The packages
-     * @return This application
-     */
-    public Micronaut packages(String... packages) {
-        if (packages != null) {
-            for (String aPackage : packages) {
-                Package thePackage = Package.getPackage(aPackage);
-                if (thePackage != null) {
-                    this.packages.add(thePackage);
-                }
-            }
-        }
-        return this;
-    }
-
-    /**
-     * Allow customizing the configurations that will be loaded.
-     *
-     * @param configurations The configurations to include
-     * @return This application
-     */
-    public Micronaut include(@Nullable String... configurations) {
-        if (configurations != null) {
-            this.configurationIncludes.addAll(Arrays.asList(configurations));
-        }
-        return this;
-    }
-
-    /**
-     * Allow customizing the configurations that will be loaded.
-     *
-     * @param configurations The configurations to exclude
-     * @return This application
-     */
-    public Micronaut exclude(@Nullable String... configurations) {
-        if (configurations != null) {
-            this.configurationExcludes.addAll(Arrays.asList(configurations));
-        }
-        return this;
+    @Override
+    public Micronaut packages(@Nullable String... packages) {
+        return (Micronaut) super.packages(packages);
     }
 
     /**
@@ -291,7 +219,7 @@ public class Micronaut {
         return new Micronaut()
             .classes(classes)
             .args(args)
-            .start(ArrayUtils.isNotEmpty(classes) ? classes[0] : Micronaut.class);
+            .start();
     }
 
     /**
