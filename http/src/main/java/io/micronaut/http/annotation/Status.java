@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import io.micronaut.http.HttpStatus;
@@ -25,8 +26,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Sets alternative HttpStatus response code when applied to a method and HttpStatus code is specified</p>
- * <p>
+ * <p>Sets alternative HttpStatus response code when applied to a method and HttpStatus code is specified.</p>
  *
  * @author Ben Rhine
  * @since 1.0
