@@ -31,31 +31,33 @@ import java.security.Principal;
 import java.util.Optional;
 
 /**
- * Responsible for binding Principal to a route argument.
- *
+ * Responsible for binding Optional<Principal> to a route argument.
  * @author Sergio del Amo
  * @since 1.0
  */
 @Singleton
 @Requires(classes = SecurityFilter.class)
-public class PrincipalArgumentBinder implements TypedRequestArgumentBinder<Principal> {
+public class OptionalPrincipalArgumentBinder implements TypedRequestArgumentBinder<Optional<Principal>> {
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Argument<Principal> argumentType() {
-        return Argument.of(Principal.class);
+    public Argument<Optional<Principal>> argumentType() {
+        Argument argument = Argument.of(Optional.class, Principal.class);
+        return argument;
     }
 
     @Override
-    public BindingResult<Principal> bind(ArgumentConversionContext<Principal> context, HttpRequest<?> source) {
-        if (source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(SecurityFilter.class))) {
-            MutableConvertibleValues<Object> attrs = source.getAttributes();
-            Optional<Authentication> existing = attrs.get(SecurityFilter.AUTHENTICATION, Authentication.class);
-            if (existing.isPresent()) {
-                return () -> Optional.of((Principal) () -> existing.get().getId());
-            }
+    public ArgumentBinder.BindingResult<Optional<Principal>> bind(ArgumentConversionContext<Optional<Principal>> context, HttpRequest<?> source) {
+        MutableConvertibleValues<Object> attrs = source.getAttributes();
+        if (!attrs.contains(OncePerRequestHttpServerFilter.getKey(SecurityFilter.class))) {
+            // the filter hasn't been executed but the argument is not satisfied
+            return ArgumentBinder.BindingResult.UNSATISFIED;
+        }
+        Optional<Authentication> existing = attrs.get(SecurityFilter.AUTHENTICATION, Authentication.class);
+        if (existing.isPresent()) {
+            return () -> Optional.of(Optional.of((Principal) () -> existing.get().getId()));
+        } else {
             return ArgumentBinder.BindingResult.EMPTY;
         }
-
-        return BindingResult.UNSATISFIED;
-   }
+    }
 }

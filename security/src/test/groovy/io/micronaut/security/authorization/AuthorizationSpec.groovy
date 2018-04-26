@@ -8,10 +8,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.PrincipalArgumentBinder
-import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -52,7 +49,6 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         response.body() == 'You are anonymous'
     }
 
-    @PendingFeature
     void "java.security.Principal Argument Binders binds even if Optional<Principal>"() {
         expect:
         embeddedServer.applicationContext.getBean(PrincipalArgumentBinder.class)
