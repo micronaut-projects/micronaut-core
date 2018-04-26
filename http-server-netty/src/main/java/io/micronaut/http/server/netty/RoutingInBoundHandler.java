@@ -19,7 +19,6 @@ package io.micronaut.http.server.netty;
 import com.typesafe.netty.HandlerPublisher;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -101,7 +100,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
@@ -729,9 +727,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     } else {
                         HttpStatus status = HttpStatus.OK;
 
-                        if(routeMatch instanceof MethodBasedRouteMatch) {
+                        if (routeMatch instanceof MethodBasedRouteMatch) {
                             final MethodBasedRouteMatch rm = (MethodBasedRouteMatch) routeMatch;
-                            if(rm.hasAnnotation(Status.class)) {
+                            if (rm.hasAnnotation(Status.class)) {
                                 status = rm.getAnnotation(Status.class).value();
                             }
                         }

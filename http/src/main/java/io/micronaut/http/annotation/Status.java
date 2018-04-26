@@ -36,5 +36,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD})
 public @interface Status {
 
+    /**
+     * @return The HttpStatus specified when declared on the method
+     */
     HttpStatus value();
 }
