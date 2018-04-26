@@ -19,6 +19,7 @@ package io.micronaut.http.server.netty;
 import com.typesafe.netty.HandlerPublisher;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -31,6 +32,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpFilter;
@@ -99,6 +101,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
@@ -726,6 +729,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         response = io.micronaut.http.HttpResponse.status((HttpStatus) result);
                     } else {
                         response = io.micronaut.http.HttpResponse.ok(result);
+
+                        if(routeMatch instanceof MethodBasedRouteMatch) {
+                            final MethodBasedRouteMatch rm = (MethodBasedRouteMatch) routeMatch;
+                            if(rm.hasAnnotation(Status.class)) {
+                                response = io.micronaut.http.HttpResponse.status(rm.getAnnotation(Status.class).value());
+                            }
+                        }
                     }
 
                     emitter.onNext(response);
