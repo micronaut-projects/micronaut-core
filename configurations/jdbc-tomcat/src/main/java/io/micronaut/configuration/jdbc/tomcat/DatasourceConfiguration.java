@@ -18,7 +18,7 @@ package io.micronaut.configuration.jdbc.tomcat;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.convert.format.KeyFormat;
+import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
@@ -67,7 +67,7 @@ public class DatasourceConfiguration extends PoolProperties implements BasicJdbc
     }
 
     @Override
-    public void setDbProperties(@KeyFormat(StringConvention.UNDER_SCORE_SEPARATED) Properties dbProperties) {
+    public void setDbProperties(@MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED) Properties dbProperties) {
         super.setDbProperties(dbProperties);
     }
 

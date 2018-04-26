@@ -17,7 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.format.KeyFormat;
+import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.CollectionUtils;
@@ -28,7 +28,6 @@ import io.micronaut.core.value.PropertyResolver;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances</p>
@@ -253,8 +252,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Properties resolveSubProperties(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
-        KeyFormat keyFormat = conversionContext.getAnnotation(KeyFormat.class);
-        StringConvention keyConvention = keyFormat != null ? keyFormat.value() : StringConvention.RAW;
+        MapFormat mapFormat = conversionContext.getAnnotation(MapFormat.class);
+        StringConvention keyConvention = mapFormat != null ? mapFormat.keyFormat() : StringConvention.RAW;
         String prefix = name + '.';
         entries.entrySet().stream()
                 .filter(map -> map.getKey().startsWith(prefix))
@@ -273,27 +272,35 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Map<String, Object> subMap = new LinkedHashMap<>();
-        KeyFormat keyFormat = conversionContext.getAnnotation(KeyFormat.class);
-        StringConvention keyConvention = keyFormat != null ? keyFormat.value() : StringConvention.RAW;
+        MapFormat mapFormat = conversionContext.getAnnotation(MapFormat.class);
+        StringConvention keyConvention = mapFormat != null ? mapFormat.keyFormat() : StringConvention.RAW;
         String prefix = name + '.';
         for (Map.Entry<String, Object> map : entries.entrySet()) {
             if (map.getKey().startsWith(prefix)) {
                 String subMapKey = map.getKey().substring(prefix.length());
-                int index = subMapKey.indexOf('.');
                 Object value = resolvePlaceHoldersIfNecessary(map.getValue());
-                if (index == -1) {
+                MapFormat.MapTransformation transformation = mapFormat != null ? mapFormat.transformation() : MapFormat.MapTransformation.NESTED;
+                if(transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
                     subMap.put(subMapKey, value);
-                } else {
-                    String mapKey = subMapKey.substring(0, index);
-                    mapKey = keyConvention.format(mapKey);
-                    if (!subMap.containsKey(mapKey)) {
-                        subMap.put(mapKey, new LinkedHashMap<>());
+                }
+                else {
+                    int index = subMapKey.indexOf('.');
+                    if (index == -1) {
+                        subMapKey = keyConvention.format(subMapKey);
+                        subMap.put(subMapKey, value);
+                    } else {
+
+                        String mapKey = subMapKey.substring(0, index);
+                        mapKey = keyConvention.format(mapKey);
+                        if (!subMap.containsKey(mapKey)) {
+                            subMap.put(mapKey, new LinkedHashMap<>());
+                        }
+                        Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
+                        String nestedKey = subMapKey.substring(index + 1);
+                        keyConvention.format(nestedKey);
+                        nestedMap.put(nestedKey, value);
                     }
-                    Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
-                    String nestedKey = subMapKey.substring(index + 1);
-                    keyConvention.format(nestedKey);
-                    nestedMap.put(nestedKey, value);
                 }
             }
         }

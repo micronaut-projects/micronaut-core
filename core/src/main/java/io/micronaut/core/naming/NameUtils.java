@@ -137,7 +137,7 @@ public class NameUtils {
      * @return The underscore separated version
      */
     public static String underscoreSeparate(String camelCase) {
-        return separateCamelCase(camelCase, false, '_');
+        return separateCamelCase(camelCase.replace('-', '_'), false, '_');
     }
 
     /**
