@@ -1,33 +1,46 @@
 Micronaut security capabilities use signed JWT’s as specified by the
 https://tools.ietf.org/html/rfc7515[JSON Web Signature] specification.
 
-More specifically, the algorithm used is `HMAC SHA-256` with a specified shared secret.
 The relevant configuration properties are:
 
 |===
 
 | Configuration Property | Default Value | Description
 
-| `micronaut.security.jwt.generator.signature.enabled` | true | false or true
+| `micronaut.security.token.jwt.generator.signature.enabled` | true | false or true
 
-| `micronaut.security.jwt.generator.signature.jwsAlgorithm` | `HS256` | Any value of `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`
+| `micronaut.security.token.jwt.generator.signature.type` | SECRET | SECRET, RSA OR EC
 
-| `micronaut.security.jwt.generator.signature.secret` | `null` (this is required property) | The secret length must be at least 256 bits
+| `micronaut.security.token.jwt.generator.signature.jwsAlgorithm` | `HS256` | Any value of `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`
+
+| `micronaut.security.token.jwt.generator.signature.pemPath` | `null` | Full path to PEM file e.g. '/home/john/rsa-2048bit-key-pair.pem'
+
+| `micronaut.security.token.jwt.generator.signature.secret` | `null` | Required if you are using SECRET type signing. The secret length must be at least 256 bits
 
 | ==
 
 
-=== Example configuration:
+=== Example configuration
 
-[source, yaml]
-.JWT signature example configuration
+Typically you will want, at least, to sign your JWT tokens. A common configuration will be:
+
+[source,yaml]
 ----
 micronaut:
   security:
-    jwt:
+    enabled: true
+    token:
       enabled: true
-      generator:
-        signature:
-          enabled: true
-          secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+      jwt:
+        enabled: true
+        generator:
+          signature:
+            enabled: true
+            type: SECRET <1>
+            secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa <2>
+            jwsAlgorithm: HS256 <2>
 ----
+
+<1> You can choose between three different kind of signature type SECRET, RSA or EC.
+<2> **Change this for your own secret and keep it safe**.
+<3> Json Web Token Signature name. In this example, HMAC using SHA-256 hash algorithm.

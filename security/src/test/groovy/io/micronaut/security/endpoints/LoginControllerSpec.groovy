@@ -26,9 +26,9 @@ class LoginControllerSpec extends Specification {
                     'spec.name': 'endpoints',
                     'micronaut.security.enabled': true,
                     'micronaut.security.endpoints.login': true,
-                    'micronaut.security.jwt.enabled': true,
-                    'micronaut.security.jwt.generator.signature.enabled': true,
-                    'micronaut.security.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                    'micronaut.security.token.jwt.enabled': true,
+                    'micronaut.security.token.jwt.generator.signature.enabled': true,
+                    'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
 
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()

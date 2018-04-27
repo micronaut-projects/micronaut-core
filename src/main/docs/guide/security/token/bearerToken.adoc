@@ -1,6 +1,6 @@
 Micronaut supports https://tools.ietf.org/html/rfc6750[RFC 6750 Bearer Token] specification out-of-the-box.
 
-It is enabled by default.
+It is enabled by default but requires Token Authentication to be enabled.
 
 |===
 

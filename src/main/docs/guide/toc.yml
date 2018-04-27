@@ -92,6 +92,7 @@ security:
     title: Token Authentication
     bearerToken: Bearer Token Reader
     cookieToken: Cookie Token Reader
+    basicAuthTokenReader: Basic Auth Token Reader
     basicAuth: Basic Auth
     jwt:
       title: JSON Web Token

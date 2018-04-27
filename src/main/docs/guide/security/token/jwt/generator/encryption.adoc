@@ -18,13 +18,13 @@ Then, configure the keys properly, along with the rest of the configuration:
 
 | Configuration Property | Default Value | Possible Values
 
-| `micronaut.security.jwt.generator.encryption.enabled` | false | false or true
+| `micronaut.security.token.jwt.generator.encryption.enabled` | false | false or true
 
-| `micronaut.security.jwt.generator.encryption.jweAlgorithm` | RSA-OAEP | Any value in: RSA1_5, RSA-OAEP, RSA-OAEP-256, A128KW, A192KW, A256KW, dir, ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW, A128GCMKW, A192GCMKW, A256GCMKW, PBES2-HS256+A128KW, PBES2-HS384+A192KW, PBES2-HS512+A256KW
+| `micronaut.security.token.jwt.generator.encryption.jweAlgorithm` | RSA-OAEP | Any value in: RSA1_5, RSA-OAEP, RSA-OAEP-256, A128KW, A192KW, A256KW, dir, ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW, A128GCMKW, A192GCMKW, A256GCMKW, PBES2-HS256+A128KW, PBES2-HS384+A192KW, PBES2-HS512+A256KW
 
-| `micronaut.security.jwt.generator.encryption.encryptionMethod` | A128GCM | Any value in: A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, A128CBC+HS256, A256CBC+HS512, A128GCM, A192GCM, A256GCM
+| `micronaut.security.token.jwt.generator.encryption.encryptionMethod` | A128GCM | Any value in: A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, A128CBC+HS256, A256CBC+HS512, A128GCM, A192GCM, A256GCM
 
-| `micronaut.security.jwt.generator.encryption.pemPath` | null | Full path to the PEM file
+| `micronaut.security.token.jwt.generator.encryption.pemPath` | null | Full path to the PEM file
 
 |===
 

@@ -1,5 +1,5 @@
 Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
-JSON Web Token (JWT) is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
+JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
 
 |===
 
@@ -49,4 +49,4 @@ A base64-encoded JSON like:
 ----
 
 ==== Signature
-Depends on the algorithm specified on the header, it can be a digital signature of the base64-encoded header and claims, or an encryption of them using RSA.
+Depends on the algorithm specified on the header, it can be a digital signature of the base64-encoded header and claims, or an encryption of them.
