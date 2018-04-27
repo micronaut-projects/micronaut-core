@@ -29,6 +29,8 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     protected String loginSuccessTargetUrl = "/";
     protected String loginFailureTargetUrl = "/";
     protected String logoutTargetUrl = "/";
+    protected String unauthorizedTargetUrl;
+    protected String forbiddenTargetUrl;
     protected boolean enabled = false;
 
     @Override
@@ -49,5 +51,24 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     @Override
     public String getLoginFailureTargetUrl() {
         return this.loginFailureTargetUrl;
+    }
+
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to after trying to access a secured route.
+     */
+    @Override
+    public String getUnauthorizedTargetUrl()  {
+        return unauthorizedTargetUrl;
+    }
+
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to.
+     * He is sent to that destination after trying to access a secured route for which the does not have sufficient roles.
+     */
+    @Override
+    public String getForbiddenTargetUrl()  {
+        return forbiddenTargetUrl;
     }
 }

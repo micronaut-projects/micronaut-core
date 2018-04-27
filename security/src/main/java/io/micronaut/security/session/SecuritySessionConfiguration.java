@@ -41,4 +41,17 @@ public interface SecuritySessionConfiguration extends Toggleable {
      * @return A String to be parsed into a URI which represents where the user is redirected to after a failed login.
      */
     String getLoginFailureTargetUrl();
+
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to after trying to access a secured route.
+     */
+    String getUnauthorizedTargetUrl();
+
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to.
+     * He is sent to that destination after trying to access a secured route for which the does not have sufficient roles.
+     */
+    String getForbiddenTargetUrl();
 }

@@ -16,18 +16,14 @@
 
 package io.micronaut.security.filters;
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.security.authentication.Authentication;
-import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.handlers.RejectionHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.session.http.HttpSessionFilter;
@@ -35,6 +31,7 @@ import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +43,6 @@ import java.util.stream.Collectors;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled")
 @Filter("/**")
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
@@ -62,21 +58,21 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
 
-    private final Collection<SecurityRule> securityRules;
-    private final Collection<AuthenticationFetcher> authenticationFetchers;
+    protected final Collection<SecurityRule> securityRules;
+    protected final Collection<AuthenticationFetcher> authenticationFetchers;
+    protected final RejectionHandler rejectionHandler;
 
     /**
      * @param securityRules The list of rules that will allow or reject the request
      * @param authenticationFetchers List of {@link AuthenticationFetcher} beans in the context.
+     * @param rejectionHandler Bean which handles routes which need to be rejected
      */
     public SecurityFilter(Collection<SecurityRule> securityRules,
-                          Collection<AuthenticationFetcher> authenticationFetchers) {
+                          Collection<AuthenticationFetcher> authenticationFetchers,
+                          RejectionHandler rejectionHandler) {
         this.securityRules = securityRules;
         this.authenticationFetchers = authenticationFetchers;
-    }
-
-    private Publisher<MutableHttpResponse<?>> rejected(boolean forbidden) {
-        return Publishers.just(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
+        this.rejectionHandler = rejectionHandler;
     }
 
     private Optional<RouteMatch> getRouteMatch(HttpRequest<?> request) {
@@ -126,7 +122,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
-                return rejected(attributes.isPresent());
+                return rejectionHandler.reject(request, attributes.isPresent());
             }
             if (result == SecurityRuleResult.ALLOWED) {
                 if (LOG.isDebugEnabled()) {
@@ -137,7 +133,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         }
 
         //no rule found for the given request, reject
-        return rejected(attributes.isPresent());
+        return rejectionHandler.reject(request, attributes.isPresent());
     }
 
     @Override

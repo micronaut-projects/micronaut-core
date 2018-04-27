@@ -14,12 +14,13 @@ class IpAuthorizationApprovedSpec extends Specification implements Authorization
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.authentication': true,
-            "micronaut.security.enabled": true,
-            "micronaut.security.endpoints.login": true,
-            "micronaut.security.jwt.enabled": true,
-            "micronaut.security.jwt.generator.signature.enabled": true,
-            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
-            "micronaut.security.ipPatterns": ['10.10.0.48', '127.0.0.*']
+            'micronaut.security.enabled': true,
+            'micronaut.security.endpoints.login': true,
+            'micronaut.security.token.enabled': true,
+            'micronaut.security.token.jwt.enabled': true,
+            'micronaut.security.token.jwt.generator.signature.enabled': true,
+            'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            'micronaut.security.ipPatterns': ['10.10.0.48', '127.0.0.*']
     ], "test")
 
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())

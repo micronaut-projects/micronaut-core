@@ -2,18 +2,19 @@ package io.micronaut.security.token.generator
 
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.config.SecurityConfiguration
-import io.micronaut.security.jwt.generator.claims.JWTClaimsSetGenerator
-import io.micronaut.security.jwt.generator.claims.JwtClaims
+import io.micronaut.security.token.config.TokenConfiguration
+import io.micronaut.security.token.jwt.generator.claims.JWTClaimsSetGenerator
+import io.micronaut.security.token.jwt.generator.claims.JwtClaims
 import spock.lang.Specification
 
 class JWTClaimsSetGeneratorSpec extends Specification {
 
     def "generateClaims includes sub and exp claims"() {
         given:
-        def securityConfiguration = Stub(SecurityConfiguration) {
+        def tokenConfiguration = Stub(TokenConfiguration) {
             getRolesName() >> 'roles'
         }
-        JWTClaimsSetGenerator generator = new JWTClaimsSetGenerator(securityConfiguration)
+        JWTClaimsSetGenerator generator = new JWTClaimsSetGenerator(tokenConfiguration)
 
         when:
         Map<String, Object> claims = generator.generateClaims(new UserDetails('admin', ['ROLE_USER', 'ROLE_ADMIN']), 3600)

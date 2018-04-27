@@ -34,10 +34,7 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     public static final String PREFIX = "micronaut.security";
     public static final String ANYWHERE = "0.0.0.0";
 
-    private static final String DEFAULT_ROLES_NAME = "roles";
-
     protected boolean enabled = false;
-    protected String rolesName = DEFAULT_ROLES_NAME;
     protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
     protected List<String> ipPatterns = Collections.singletonList(ANYWHERE);
 
@@ -49,7 +46,6 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     public boolean isEnabled() {
         return this.enabled;
     }
-
 
     /**
      * interceptUrlMap getter.
@@ -65,14 +61,5 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
      */
     public List<String> getIpPatterns() {
         return ipPatterns;
-    }
-
-    /**
-     * @see SecurityConfiguration#getRolesName() ().
-     * If not specified, defaults to {@link #DEFAULT_ROLES_NAME}.
-     */
-    @Override
-    public String getRolesName() {
-        return rolesName;
     }
 }

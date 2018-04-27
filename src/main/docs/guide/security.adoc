@@ -8,11 +8,3 @@ micronaut:
 ----
 
 Once you enable security, Micronaut returns HTTP Status Unauthorized ( 401 ) for any endpoint invocation.
-
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.rolesName` | `roles` | Default claim name
-
-|===

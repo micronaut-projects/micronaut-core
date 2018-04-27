@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.config;
 
 import io.micronaut.core.util.Toggleable;
@@ -26,13 +27,6 @@ import java.util.List;
  * @since 1.0
  */
 public interface SecurityConfiguration extends Toggleable {
-
-    /**
-     * The name in the claims object that stores the granted roles.
-     *
-     * @return The roles claim name, e.g. roles.
-     */
-    String getRolesName();
 
     /**
      * ipPatterns getter.

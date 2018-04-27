@@ -18,7 +18,6 @@ package io.micronaut.security.token.reader;
 
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.security.config.SecurityConfigurationProperties;
 
 import java.util.Optional;
 
@@ -29,8 +28,6 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface TokenReader extends Ordered {
-
-    String PREFIX = SecurityConfigurationProperties.PREFIX + ".token";
 
     /**
      * Attempts to retrieve a token in a request.

@@ -16,7 +16,7 @@
 
 package io.micronaut.security.rules;
 
-import io.micronaut.security.config.SecurityConfiguration;
+import io.micronaut.security.token.config.TokenConfiguration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,14 +32,14 @@ import java.util.Map;
  */
 public abstract class AbstractSecurityRule implements SecurityRule {
 
-    private final SecurityConfiguration securityConfiguration;
+    private final TokenConfiguration tokenConfiguration;
 
     /**
      *
-     * @param securityConfiguration General Token Configuration
+     * @param tokenConfiguration General Token Configuration
      */
-    AbstractSecurityRule(SecurityConfiguration securityConfiguration) {
-        this.securityConfiguration = securityConfiguration;
+    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
+        this.tokenConfiguration = tokenConfiguration;
     }
 
     /**
@@ -55,7 +55,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
         if (claims == null) {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
-            Object rolesObject = claims.get(securityConfiguration.getRolesName());
+            Object rolesObject = claims.get(tokenConfiguration.getRolesName());
             if (rolesObject instanceof Iterable) {
                 for (Object o : ((Iterable) rolesObject)) {
                     roles.add(o.toString());

@@ -18,12 +18,14 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.Secured;
-import io.micronaut.security.config.SecurityConfiguration;
+import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Security rule implementation for the {@link Secured} annotation.
@@ -41,10 +43,10 @@ public class SecuredAnnotationRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param securityConfiguration Security Configuration used by parent class.
+     * @param tokenConfiguration Token Configuration.
      */
-    SecuredAnnotationRule(SecurityConfiguration securityConfiguration) {
-        super(securityConfiguration);
+    SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
+        super(tokenConfiguration);
     }
 
     /**

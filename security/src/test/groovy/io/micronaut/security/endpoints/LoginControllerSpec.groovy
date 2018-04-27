@@ -11,7 +11,7 @@ import io.micronaut.security.authentication.AuthenticationException
 import io.micronaut.security.authentication.Authenticator
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.jwt.config.JwtConfiguration
+import io.micronaut.security.token.jwt.config.JwtConfiguration
 import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
@@ -23,12 +23,12 @@ class LoginControllerSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             [
-                    "spec.name": "endpoints",
-                    "micronaut.security.enabled": true,
-                    "micronaut.security.endpoints.login": true,
-                    "micronaut.security.jwt.enabled": true,
-                    "micronaut.security.jwt.generator.signature.enabled": true,
-                    "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                    'spec.name': 'endpoints',
+                    'micronaut.security.enabled': true,
+                    'micronaut.security.endpoints.login': true,
+                    'micronaut.security.jwt.enabled': true,
+                    'micronaut.security.jwt.generator.signature.enabled': true,
+                    'micronaut.security.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
 
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()

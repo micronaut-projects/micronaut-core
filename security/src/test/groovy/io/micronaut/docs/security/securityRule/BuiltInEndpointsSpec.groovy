@@ -43,11 +43,11 @@ endpoints:
     Map<String, Object> config = [
             'micronaut.security.endpoints.login': true,
             'spec.authentication': true,
-            "micronaut.security.enabled": true,
-            "micronaut.security.token.bearer.enabled": true,
-            "micronaut.security.jwt.enabled": true,
-            "micronaut.security.jwt.generator.signature.enabled": true,
-            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            'micronaut.security.enabled': true,
+            'micronaut.security.token.enabled': true,
+            'micronaut.security.token.jwt.enabled': true,
+            'micronaut.security.token.jwt.generator.signature.enabled': true,
+            'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ] << flatten(endpointsMap)
 
     @Shared

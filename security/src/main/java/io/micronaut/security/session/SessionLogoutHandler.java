@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.security.endpoints.LogoutHandler;
+import io.micronaut.security.handlers.LogoutHandler;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.session.Session;
 import io.micronaut.session.http.HttpSessionFilter;

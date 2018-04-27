@@ -19,6 +19,7 @@ package io.micronaut.security.rules;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
@@ -44,10 +45,12 @@ public class IpPatternsRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param securityConfiguration The security Configuration
+     * @param tokenConfiguration Token Configuration
+     * @param securityConfiguration Security Configuration
      */
-    public IpPatternsRule(SecurityConfiguration securityConfiguration) {
-        super(securityConfiguration);
+    public IpPatternsRule(TokenConfiguration tokenConfiguration,
+                          SecurityConfiguration securityConfiguration) {
+        super(tokenConfiguration);
         this.patternList = securityConfiguration.getIpPatterns()
                         .stream()
                         .map(Pattern::compile)

@@ -24,10 +24,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.*;
 import io.micronaut.security.event.LoginFailedEvent;
 import io.micronaut.security.event.LoginSuccesfulEvent;
+import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 
 import java.util.Optional;
@@ -67,6 +69,7 @@ public class LoginController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
+    @Post
     public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
         Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
         if (response.isPresent()) {

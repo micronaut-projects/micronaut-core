@@ -19,17 +19,22 @@ class BasicAuthSpec extends Specification implements YamlAsciidocTagCleaner, Aut
 micronaut:
   security:
     enabled: true
-    basicAuth:
+    token:
       enabled: true
+        basicAuth:
+          enabled: true
 '''//end::yamlconfig[]
 
     @Shared
     Map<String, Object> confMap = [
-            "micronaut": [
-                    "security": [
-                            "enabled"    : true,
-                            "basicAuth" : [
-                                    enabled: true,
+            'micronaut': [
+                    'security': [
+                            'enabled'    : true,
+                            'token': [
+                                    'enabled': true,
+                                    'basicAuth' : [
+                                            enabled: true,
+                                    ],
                             ],
                     ]
             ]

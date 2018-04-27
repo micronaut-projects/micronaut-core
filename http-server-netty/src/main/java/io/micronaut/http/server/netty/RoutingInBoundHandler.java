@@ -222,7 +222,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         List<UriRouteMatch<Object>> uriRoutes = router
             .find(httpMethod, requestPath)
-            .filter((match) -> match.test(request))
+            .filter((match) -> {
+                return match.test(request);
+            })
             .collect(StreamUtils.minAll(
                 Comparator.comparingInt((match) -> match.getVariables().size()),
                 Collectors.toList()));

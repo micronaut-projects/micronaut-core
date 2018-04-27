@@ -11,10 +11,10 @@ class SecurityConfigurationPropertiesSpec extends Specification {
     void "test configuring security with missing access key"() {
         given:
         def ctx = ApplicationContext.run([
-                "micronaut.security.enabled": true,
-                "micronaut.security.interceptUrlMap": [
+                'micronaut.security.enabled': true,
+                'micronaut.security.interceptUrlMap': [
                         [pattern: '/health']
-        ]], "test")
+        ]], 'test')
 
         when:
         ctx.getBean(SecurityConfigurationProperties)

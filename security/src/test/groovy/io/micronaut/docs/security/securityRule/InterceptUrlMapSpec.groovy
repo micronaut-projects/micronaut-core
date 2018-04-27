@@ -36,10 +36,10 @@ micronaut:
 '''//end::yamlconfig[]
 
     @Shared
-    Map<String, Object> ipPatternsMap = ["micronaut": [
-            "security": [
-                    "enabled"    : true,
-                    "interceptUrlMap" : [
+    Map<String, Object> ipPatternsMap = ['micronaut': [
+            'security': [
+                    'enabled'    : true,
+                    'interceptUrlMap' : [
                             [
                                     pattern: '/images/*',
                                     httpMethod: 'GET',
@@ -63,9 +63,9 @@ micronaut:
     Map<String, Object> config = [
             'endpoints.health.enabled'                 : true,
             'endpoints.health.sensitive'               : false,
-            "micronaut.security.jwt.enabled"           : true,
-            "micronaut.security.jwt.generator.signature.enabled": true,
-            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            'micronaut.security.jwt.enabled'           : true,
+            'micronaut.security.jwt.generator.signature.enabled': true,
+            'micronaut.security.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ] << ipPatternsMap
 
     @Shared

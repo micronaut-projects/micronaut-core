@@ -24,10 +24,10 @@ micronaut:
 
 
     @Shared
-    Map<String, Object> ipPatternsMap = ["micronaut": [
-            "security": [
-                    "enabled"    : true,
-                    "ipPatterns" : ['127.0.0.1', '192.168.1.*']
+    Map<String, Object> ipPatternsMap = ['micronaut': [
+            'security': [
+                    'enabled'    : true,
+                    'ipPatterns' : ['127.0.0.1', '192.168.1.*']
             ]
         ]
     ]
@@ -36,9 +36,10 @@ micronaut:
     Map<String, Object> config = [
             'endpoints.health.enabled'                 : true,
             'endpoints.health.sensitive'               : false,
-            "micronaut.security.jwt.enabled"           : true,
-            "micronaut.security.jwt.generator.signature.enabled": true,
-            "micronaut.security.jwt.generator.signature.secret": 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+            'micronaut.security.token.enabled'           : true,
+            'micronaut.security.token.jwt.enabled'           : true,
+            'micronaut.security.token.jwt.generator.signature.enabled': true,
+            'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ] << flatten(ipPatternsMap)
 
     @Shared

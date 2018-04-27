@@ -4,8 +4,9 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.security.config.InterceptUrlMapPattern
 import io.micronaut.security.config.SecurityConfigurationProperties
-import io.micronaut.security.jwt.config.JwtConfiguration
-import io.micronaut.security.jwt.config.JwtGeneratorConfiguration
+import io.micronaut.security.token.config.TokenConfiguration
+import io.micronaut.security.token.jwt.config.JwtConfiguration
+import io.micronaut.security.token.jwt.config.JwtGeneratorConfiguration
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -21,7 +22,7 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
             getUri() >> new URI('/books')
             getMethod() >> HttpMethod.GET
         }
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(securityConfiguration)
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(TokenConfiguration), securityConfiguration)
 
         expect:
         provider.check(request, null, null) == securityRuleResult
@@ -36,7 +37,7 @@ class ConfigurationInterceptUrlMapRuleSpec extends Specification {
     @Unroll("comparing required: #requiredRoles and granted should return #description")
     def 'verify compare role behaviour'(List<String> requiredRoles, List<String> grantedRoles, SecurityRuleResult expected, String description) {
         given:
-        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(SecurityConfigurationProperties))
+        ConfigurationInterceptUrlMapRule provider = new ConfigurationInterceptUrlMapRule(Mock(TokenConfiguration), Mock(SecurityConfigurationProperties))
 
         expect:
         expected == provider.compareRoles(requiredRoles, grantedRoles)

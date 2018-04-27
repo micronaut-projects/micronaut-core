@@ -22,7 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationFailed;
 import io.micronaut.security.authentication.UserDetails;
-import io.micronaut.security.endpoints.LoginHandler;
+import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;

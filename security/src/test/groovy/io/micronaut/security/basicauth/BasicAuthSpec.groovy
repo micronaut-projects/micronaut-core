@@ -18,9 +18,9 @@ class BasicAuthSpec extends Specification implements AuthorizationUtils {
             'spec.name': 'basicauth',
             'endpoints.health.enabled': true,
             'endpoints.health.sensitive': true,
-            "micronaut.security.enabled": true,
-            "micronaut.security.basicAuth.enabled": true,
-    ], "test")
+            'micronaut.security.enabled': true,
+            'micronaut.security.basicAuth.enabled': true,
+    ], 'test')
 
     @Shared @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())

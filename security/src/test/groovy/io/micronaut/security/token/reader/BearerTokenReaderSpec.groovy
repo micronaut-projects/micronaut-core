@@ -2,6 +2,8 @@ package io.micronaut.security.token.reader
 
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
+import io.micronaut.security.token.reader.bearer.BearerTokenReader
+import io.micronaut.security.token.reader.bearer.BearerTokenReaderConfiguration
 import spock.lang.Shared
 import spock.lang.Specification
 
