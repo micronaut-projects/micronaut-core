@@ -16,9 +16,20 @@
 package io.micronaut.configuration.hibernate.jpa
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanContextException
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.util.CollectionUtils
+import io.micronaut.http.exceptions.ConnectionClosedException
+import io.micronaut.http.exceptions.HttpException
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ExecutableMethod
+import io.micronaut.spring.tx.annotation.BindableRuleBasedTransactionAttribute
+import io.micronaut.spring.tx.annotation.TransactionInterceptor
 import io.micronaut.spring.tx.annotation.Transactional
 import org.hibernate.SessionFactory
-import org.springframework.transaction.interceptor.TransactionAspectSupport
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Propagation
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -43,6 +54,31 @@ class JpaSetupSpec extends Specification {
             'datasources.default.name':'mydb',
             'jpa.properties.hibernate.hbm2ddl.auto':'create-drop'
     )
+
+    void "test configure @Transactional attribute"() {
+        given:
+        BeanDefinition<BookService> beanDefinition = applicationContext.getBeanDefinition(BookService)
+        TransactionInterceptor interceptor = applicationContext.getBean(TransactionInterceptor)
+        ExecutableMethod method = beanDefinition.findMethod("testMethod").get()
+
+        when:
+        BindableRuleBasedTransactionAttribute attribute = interceptor.resolveTransactionAttribute(
+                method.getTargetMethod(),
+                method.getAnnotationMetadata(),
+                "test"
+        )
+
+        then:
+        attribute != null
+        attribute.readOnly
+        attribute.timeout == 1000
+        attribute.propagationBehavior == TransactionDefinition.PROPAGATION_MANDATORY
+        attribute.isolationLevel == TransactionDefinition.ISOLATION_REPEATABLE_READ
+        attribute.rollbackFor == CollectionUtils.setOf(BeanContextException)
+        attribute.noRollbackFor == CollectionUtils.setOf(HttpException)
+        !attribute.rollbackOn(new ConnectionClosedException(""))
+        attribute.rollbackOn(new BeanContextException(""))
+    }
 
     void "test setup entity manager with validation"() {
         when:
@@ -135,6 +171,19 @@ class BookService {
 
     @Inject
     SessionFactory sessionFactory
+
+    @Transactional(
+            readOnly = true,
+            propagation = Propagation.MANDATORY,
+            isolation = Isolation.REPEATABLE_READ,
+            transactionManager = "foo",
+            timeout = 1000,
+            rollbackFor = BeanContextException,
+            noRollbackFor = HttpException
+    )
+    void testMethod() {
+
+    }
 
     @Transactional(readOnly = true)
     List<Book> listBooks() {

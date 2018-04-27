@@ -19,18 +19,20 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionSystemException;
-import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.interceptor.TransactionAttribute;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.inject.Singleton;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -62,15 +64,11 @@ public class TransactionInterceptor implements MethodInterceptor<Object,Object> 
             PlatformTransactionManager transactionManager = resolveTransactionManager(transactionManagerName);
 
             String finalTransactionManagerName = transactionManagerName;
-            TransactionAttribute transactionDefinition = transactionDefinitionMap.computeIfAbsent(context.getTargetMethod(), method -> {
-                Map<String, Object> attributeMap = context.getValues(Transactional.class).asMap();
-                DefaultTransactionAttribute defaultTransactionAttribute = ConversionService.SHARED.convert(attributeMap, DefaultTransactionAttribute.class)
-                        .orElseThrow(() -> new TransactionSystemException("Unable to create TransactionAttribute for map: " + attributeMap));
-                if(finalTransactionManagerName != null) {
-                    defaultTransactionAttribute.setQualifier(finalTransactionManagerName);
-                }
-                return defaultTransactionAttribute;
-            });
+            TransactionAttribute transactionDefinition = resolveTransactionAttribute(
+                    context.getTargetMethod(),
+                    context,
+                    finalTransactionManagerName
+            );
 
 
             TransactionTemplate template = new TransactionTemplate(
@@ -83,6 +81,24 @@ public class TransactionInterceptor implements MethodInterceptor<Object,Object> 
         else {
             return context.proceed();
         }
+    }
+
+    protected TransactionAttribute resolveTransactionAttribute(
+            Method targetMethod,
+            AnnotationMetadata annotationMetadata,
+            String transactionManagerName) {
+        return transactionDefinitionMap.computeIfAbsent(targetMethod, method -> {
+            Transactional annotation = annotationMetadata.getAnnotation(Transactional.class);
+            BindableRuleBasedTransactionAttribute attribute = new BindableRuleBasedTransactionAttribute();
+            attribute.setReadOnly(annotation.readOnly());
+            attribute.setTimeout(annotation.timeout());
+            attribute.setRollbackFor(annotation.rollbackFor());
+            attribute.setNoRollbackFor(annotation.noRollbackFor());
+            attribute.setPropagationBehavior(annotation.propagation().value());
+            attribute.setIsolationLevel(annotation.isolation().value());
+            attribute.setQualifier(transactionManagerName);
+            return attribute;
+        });
     }
 
     private PlatformTransactionManager resolveTransactionManager(String transactionManagerName) {
