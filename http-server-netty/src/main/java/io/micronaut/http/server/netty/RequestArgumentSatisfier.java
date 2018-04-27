@@ -74,65 +74,72 @@ class RequestArgumentSatisfier {
             argumentValues = new LinkedHashMap<>();
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
-                Optional<ArgumentBinder> registeredBinder =
-                    binderRegistry.findArgumentBinder(argument, request);
-                if (registeredBinder.isPresent()) {
-                    ArgumentBinder argumentBinder = registeredBinder.get();
-                    String argumentName = argument.getName();
-                    ArgumentConversionContext conversionContext = ConversionContext.of(
-                        argument,
-                        request.getLocale().orElse(null),
-                        request.getCharacterEncoding()
-                    );
-
-                    if (argumentBinder instanceof BodyArgumentBinder) {
-                        if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
-                            ArgumentBinder.BindingResult bindingResult = argumentBinder
-                                .bind(conversionContext, request);
-
-                            if (bindingResult.isPresentAndSatisfied()) {
-                                argumentValues.put(argumentName, bindingResult.get());
-                            }
-
-                        } else {
-                            argumentValues.put(argumentName, (UnresolvedArgument) () ->
-                                argumentBinder.bind(conversionContext, request)
-                            );
-                            ((NettyHttpRequest) request).setBodyRequired(true);
-                        }
-                    } else {
-
-                        ArgumentBinder.BindingResult bindingResult = argumentBinder
-                            .bind(conversionContext, request);
-                        if (argument.getType() == Optional.class) {
-                            if (bindingResult.isSatisfied() || satisfyOptionals) {
-                                Optional value = bindingResult.getValue();
-                                if (value.isPresent()) {
-                                    argumentValues.put(argumentName, value.get());
-                                } else {
-                                    argumentValues.put(argumentName, value);
-                                }
-                            }
-                        } else if (bindingResult.isPresentAndSatisfied()) {
-                            argumentValues.put(argumentName, bindingResult.get());
-                        } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
-                            argumentValues.put(argumentName, (UnresolvedArgument) () -> {
-                                ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
-                                Optional<ConversionError> lastError = conversionContext.getLastError();
-                                if (lastError.isPresent()) {
-                                    return (ArgumentBinder.BindingResult) () -> lastError;
-                                }
-                                return result;
-                            });
-                        } else if (argument.getDeclaredAnnotation(Nullable.class) != null) {
-                            argumentValues.put(argumentName, (UnresolvedArgument) () -> ArgumentBinder.BindingResult.EMPTY);
-                        }
-                    }
-                }
+                getValueForArgument(argument, request, satisfyOptionals).ifPresent((value) ->
+                    argumentValues.put(argument.getName(), value));
             }
         }
 
         route = route.fulfill(argumentValues);
         return route;
+    }
+
+    protected Optional<Object> getValueForArgument(Argument argument, HttpRequest<?> request, boolean satisfyOptionals) {
+        Object value = null;
+        Optional<ArgumentBinder> registeredBinder =
+                binderRegistry.findArgumentBinder(argument, request);
+        if (registeredBinder.isPresent()) {
+            ArgumentBinder argumentBinder = registeredBinder.get();
+            ArgumentConversionContext conversionContext = ConversionContext.of(
+                    argument,
+                    request.getLocale().orElse(null),
+                    request.getCharacterEncoding()
+            );
+
+            if (argumentBinder instanceof BodyArgumentBinder) {
+                if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
+                    ArgumentBinder.BindingResult bindingResult = argumentBinder
+                            .bind(conversionContext, request);
+
+                    if (bindingResult.isPresentAndSatisfied()) {
+                        value = bindingResult.get();
+                    }
+
+                } else {
+                    ((NettyHttpRequest) request).setBodyRequired(true);
+
+                    value = (UnresolvedArgument) () -> argumentBinder.bind(conversionContext, request);
+                }
+            } else {
+
+                ArgumentBinder.BindingResult bindingResult = argumentBinder
+                        .bind(conversionContext, request);
+                if (argument.getType() == Optional.class) {
+                    if (bindingResult.isSatisfied() || satisfyOptionals) {
+                        Optional optionalValue = bindingResult.getValue();
+                        if (optionalValue.isPresent()) {
+                            value = optionalValue.get();
+                        } else {
+                            value = optionalValue;
+                        }
+                    }
+                } else if (bindingResult.isPresentAndSatisfied()) {
+                   value = bindingResult.get();
+                } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
+                    value = (UnresolvedArgument) () -> {
+                        ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
+                        Optional<ConversionError> lastError = conversionContext.getLastError();
+                        if (lastError.isPresent()) {
+                            return (ArgumentBinder.BindingResult) () -> lastError;
+                        }
+                        return result;
+                    };
+                } else if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                    value = (UnresolvedArgument) () -> {
+                        return (ArgumentBinder.BindingResult) () -> getValueForArgument(argument, request, satisfyOptionals);
+                    };
+                }
+            }
+        }
+        return Optional.ofNullable(value);
     }
 }
