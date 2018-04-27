@@ -43,11 +43,11 @@ import java.util.stream.Stream
 @Factory
 @CompileStatic
 @Slf4j
-class HibernateFactory {
+class HibernateDatastoreFactory {
 
     final ApplicationContext applicationContext
 
-    HibernateFactory(ApplicationContext applicationContext) {
+    HibernateDatastoreFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext
     }
 
