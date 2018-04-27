@@ -18,6 +18,7 @@ package io.micronaut.configuration.hibernate.jpa
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import org.hibernate.SessionFactory
+import org.springframework.orm.hibernate5.HibernateTransactionManager
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -39,10 +40,15 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
     void "test multiple data sources setup"() {
         given:
         SessionFactory defaultSessionFactory = applicationContext.getBean(SessionFactory)
+        HibernateTransactionManager defaultTxManager = applicationContext.getBean(HibernateTransactionManager)
+
         SessionFactory otherSessionFactory = applicationContext.getBean(SessionFactory, Qualifiers.byName("other"))
+        HibernateTransactionManager otherTxManager = applicationContext.getBean(HibernateTransactionManager, Qualifiers.byName("other"))
 
         expect:
         defaultSessionFactory != otherSessionFactory
+        defaultTxManager.sessionFactory == defaultSessionFactory
+        otherTxManager.sessionFactory == otherSessionFactory
         defaultSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "MYDB"
         otherSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "OTHERDB"
     }
