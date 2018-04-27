@@ -45,11 +45,4 @@ public interface SecurityConfiguration extends Toggleable {
      * @return a list of {@link InterceptUrlMapPattern}
      */
     List<InterceptUrlMapPattern> getInterceptUrlMap();
-
-
-    /**
-     * securityConfigType getter.
-     * @return an enum containing the type of security configuration
-     */
-    SecurityConfigType getSecurityConfigType();
 }

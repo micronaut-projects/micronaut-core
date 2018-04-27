@@ -38,7 +38,6 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
 
     protected boolean enabled = false;
     protected String rolesName = DEFAULT_ROLES_NAME;
-    protected SecurityConfigType securityConfigType = SecurityConfigType.INTERCEPT_URL_MAP;
     protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
     protected List<String> ipPatterns = Collections.singletonList(ANYWHERE);
 
@@ -51,13 +50,6 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
         return this.enabled;
     }
 
-    /**
-     * securityConfigType getter.
-     * @return an enum containing the type of security configuration
-     */
-    public SecurityConfigType getSecurityConfigType() {
-        return this.securityConfigType;
-    }
 
     /**
      * interceptUrlMap getter.
