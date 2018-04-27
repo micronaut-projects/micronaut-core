@@ -40,7 +40,7 @@ import java.util.Optional;
 @Controller("/")
 @Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".login")
 @Secured(SecurityRule.IS_ANONYMOUS)
-public class LoginController implements LoginControllerApi {
+public class LoginController {
 
     protected final Authenticator authenticator;
     protected final LoginHandler loginHandler;
@@ -49,6 +49,7 @@ public class LoginController implements LoginControllerApi {
     /**
      *
      * @param authenticator {@link Authenticator} collaborator
+     * @param loginHandler A collaborator which helps to build HTTP response depending on success or failure.
      * @param eventPublisher The application event publisher
      */
     public LoginController(Authenticator authenticator,
@@ -62,10 +63,10 @@ public class LoginController implements LoginControllerApi {
     /**
      *
      * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
+     * @param request The {@link HttpRequest} being executed
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Override
     public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
         Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
         if (response.isPresent()) {

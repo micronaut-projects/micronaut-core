@@ -30,6 +30,11 @@ import io.micronaut.security.token.render.AccessRefreshToken;
 import javax.inject.Singleton;
 import java.util.Optional;
 
+/**
+ * Implementation of {@link LoginHandler} for Token Based Authentication.
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 @Requires(property = JwtConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class AccessRefreshTokenLoginHandler implements LoginHandler {

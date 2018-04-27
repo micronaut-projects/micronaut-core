@@ -19,6 +19,8 @@ package io.micronaut.security.session;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
+import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
+import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.filters.AuthenticationFetcher;
 import io.micronaut.security.token.TokenAuthenticationFetcher;
 import io.micronaut.session.Session;
@@ -29,9 +31,13 @@ import java.util.Optional;
 import static io.micronaut.security.filters.SecurityFilter.AUTHENTICATION;
 import static io.micronaut.session.http.HttpSessionFilter.SESSION_ATTRIBUTE;
 
+/**
+ * {@link AuthenticationFetcher} for Session Authentication.
+ */
 @Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class SessionAuthenticationFetcher implements AuthenticationFetcher {
+
     /**
      * The order of the fetcher.
      */
@@ -46,7 +52,9 @@ public class SessionAuthenticationFetcher implements AuthenticationFetcher {
             if (optObj.isPresent()) {
                 Object obj = optObj.get();
                 if (obj instanceof Authentication) {
-                    return Optional.of((Authentication)obj);
+                    return Optional.of((Authentication) obj);
+                } else if (obj instanceof UserDetails) {
+                    return Optional.of(new AuthenticationUserDetailsAdapter((UserDetails) obj));
                 }
             }
         }

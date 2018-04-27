@@ -36,9 +36,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-
 /**
- * Generates http responses with access and refresh token
+ * Generates http responses with access and refresh token.
  *
  * @author Sergio del Amo
  * @since 1.0

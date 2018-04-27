@@ -28,11 +28,8 @@ import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.config.SecurityConfigurationProperties;
-import io.micronaut.security.rules.SecuredAnnotationRule;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
-import io.micronaut.security.token.reader.TokenReader;
-import io.micronaut.security.token.validator.TokenValidator;
 import io.micronaut.session.http.HttpSessionFilter;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
@@ -52,6 +49,7 @@ import java.util.stream.Collectors;
 @Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled")
 @Filter("/**")
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
+
     /**
      * The order of the rule.
      */
@@ -69,6 +67,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     /**
      * @param securityRules The list of rules that will allow or reject the request
+     * @param authenticationFetchers List of {@link AuthenticationFetcher} beans in the context.
      */
     public SecurityFilter(Collection<SecurityRule> securityRules,
                           Collection<AuthenticationFetcher> authenticationFetchers) {

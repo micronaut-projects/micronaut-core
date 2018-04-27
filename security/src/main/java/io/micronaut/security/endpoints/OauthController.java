@@ -44,7 +44,7 @@ import java.util.Optional;
 @Controller(OauthController.CONTROLLER_PATH)
 @Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".refresh")
 @Secured(SecurityRule.IS_ANONYMOUS)
-public class OauthController implements OauthControllerApi {
+public class OauthController {
 
     public static final String CONTROLLER_PATH = "/oauth";
     public static final String ACCESS_TOKEN_PATH = "/access_token";
@@ -69,7 +69,6 @@ public class OauthController implements OauthControllerApi {
      * @param tokenRefreshRequest An instance of {@link TokenRefreshRequest} present in the request
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
-    @Override
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post(OauthController.ACCESS_TOKEN_PATH)
     public HttpResponse<AccessRefreshToken> token(TokenRefreshRequest tokenRefreshRequest) {

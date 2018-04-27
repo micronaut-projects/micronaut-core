@@ -20,21 +20,12 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
-import io.micronaut.security.authentication.AuthenticationException;
-import io.micronaut.security.authentication.AuthenticationResponse;
-import io.micronaut.security.authentication.Authenticator;
-import io.micronaut.security.authentication.UserDetails;
-import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.rules.SecurityRule;
-
 import javax.annotation.Nullable;
-import java.util.Collection;
-import java.util.Optional;
 
 /**
  *
@@ -44,27 +35,25 @@ import java.util.Optional;
 @Controller("/")
 @Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".logout")
 @Secured(SecurityRule.IS_AUTHENTICATED)
-public class LogoutController implements LogoutControllerApi {
+public class LogoutController {
 
     protected final LogoutHandler logoutHandler;
 
     /**
-     *
-     * @param logoutHandler List of {@link LogoutHandler}
+     * @param logoutHandler A collaborator which helps to build HTTP response if user logout.
      */
     public LogoutController(@Nullable LogoutHandler logoutHandler) {
         this.logoutHandler = logoutHandler;
     }
 
     /**
-     *
+     * @param request The {@link HttpRequest} being executed
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Override
     @Post
     public HttpResponse logout(HttpRequest<?> request) {
-         if ( logoutHandler != null ) {
+         if (logoutHandler != null) {
              return logoutHandler.logout(request);
          }
          return HttpResponse.notFound();

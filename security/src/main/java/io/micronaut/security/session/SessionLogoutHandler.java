@@ -16,6 +16,7 @@
 
 package io.micronaut.security.session;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -29,6 +30,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
 
+/**
+ * {@link LogoutHandler} implementation for Session Authentication.
+ */
+@Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class SessionLogoutHandler implements LogoutHandler {
     protected final SecuritySessionConfiguration securitySessionConfiguration;

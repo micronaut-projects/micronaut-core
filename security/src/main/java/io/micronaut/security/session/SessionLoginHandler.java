@@ -21,7 +21,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationFailed;
-import io.micronaut.security.authentication.AuthenticationResponse;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.endpoints.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
@@ -34,6 +33,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
 
+/**
+ * {@link LoginHandler} implementation for Session Authentication.
+ */
 @Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class SessionLoginHandler implements LoginHandler {
@@ -43,7 +45,7 @@ public class SessionLoginHandler implements LoginHandler {
 
     /**
      * Constructor.
-     *
+     * @param securitySessionConfiguration Security Session Configuration
      * @param sessionStore The session store
      */
     public SessionLoginHandler(SecuritySessionConfiguration securitySessionConfiguration,

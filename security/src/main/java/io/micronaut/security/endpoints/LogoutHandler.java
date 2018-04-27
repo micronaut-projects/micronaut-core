@@ -25,5 +25,11 @@ import io.micronaut.http.HttpResponse;
  * @since 1.0
  */
 public interface LogoutHandler {
+
+    /**
+     *
+     * @param request The {@link HttpRequest} being executed
+     * @return An HttpResponse built after the user logs out
+     */
     HttpResponse logout(HttpRequest<?> request);
 }

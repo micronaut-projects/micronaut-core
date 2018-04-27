@@ -19,6 +19,9 @@ package io.micronaut.security.session;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
+/**
+ * Security Session Configuration Properties.
+ */
 @ConfigurationProperties(SecuritySessionConfigurationProperties.PREFIX)
 public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".session";

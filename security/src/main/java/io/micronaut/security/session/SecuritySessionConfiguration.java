@@ -18,10 +18,27 @@ package io.micronaut.security.session;
 
 import io.micronaut.core.util.Toggleable;
 
+/**
+ * @author Sergio del Amo
+ * @since 1.0
+ */
 public interface SecuritySessionConfiguration extends Toggleable {
+
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to after a successful login.
+     */
     String getLoginSuccessTargetUrl();
 
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to after logout.
+     */
     String getLogoutTargetUrl();
 
+    /**
+     *
+     * @return A String to be parsed into a URI which represents where the user is redirected to after a failed login.
+     */
     String getLoginFailureTargetUrl();
 }
