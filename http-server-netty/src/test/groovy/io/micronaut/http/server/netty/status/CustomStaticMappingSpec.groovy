@@ -35,12 +35,12 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by the locally marked controller"() {
         when:
-        rxClient.exchange('/test/bad').blockingFirst()
+        rxClient.exchange('/test1/bad').blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff - from TestController.badHandler()"
+        e.response.reason() == "You sent me bad stuff - from Test1Controller.badHandler()"
 
         when:
         rxClient.exchange('/test2/bad').blockingFirst()
@@ -55,7 +55,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
     void "test that a bad request response for invalid request data can be redirected by the router to the local method"() {
         when:
         rxClient.exchange(
-                HttpRequest.POST('/test/simple', [name:"Fred"])
+                HttpRequest.POST('/test1/simple', [name:"Fred"])
                            .contentType(MediaType.FORM)
         ).blockingFirst()
 
@@ -80,7 +80,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
     @Controller
     @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
-    static class TestController {
+    static class Test1Controller {
         @Get
         HttpResponse bad() {
             HttpResponse.badRequest()
@@ -93,7 +93,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
         @Error(status = HttpStatus.BAD_REQUEST)
         HttpResponse badHandler() {
-            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from TestController.badHandler()")
+            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test1Controller.badHandler()")
         }
     }
 
