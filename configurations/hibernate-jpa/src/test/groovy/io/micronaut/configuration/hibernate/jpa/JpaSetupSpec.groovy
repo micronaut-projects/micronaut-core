@@ -72,6 +72,7 @@ class JpaSetupSpec extends Specification {
         attribute != null
         attribute.readOnly
         attribute.timeout == 1000
+        attribute.qualifier == 'test'
         attribute.propagationBehavior == TransactionDefinition.PROPAGATION_MANDATORY
         attribute.isolationLevel == TransactionDefinition.ISOLATION_REPEATABLE_READ
         attribute.rollbackFor == CollectionUtils.setOf(BeanContextException)
