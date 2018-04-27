@@ -30,8 +30,7 @@ import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
 import java.lang.annotation.Annotation;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -44,6 +43,8 @@ import java.util.regex.Pattern;
 abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, Completable {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
+    private static final List<String> NON_PATH_TYPES = Arrays.asList("java.security.Principal");
+
 
     private Map<Class, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
@@ -136,6 +137,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * @return Whether the argument is a path parameter
      */
     protected boolean isPathParameter(Argument argument) {
+        if (NON_PATH_TYPES.contains(argument.getType().getName())) {
+            return false;
+        }
         return argument.getAnnotations().length == 0 || argument.getAnnotation(QueryValue.class) != null;
     }
 }
