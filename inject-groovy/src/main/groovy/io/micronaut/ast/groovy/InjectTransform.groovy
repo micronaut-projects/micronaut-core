@@ -155,6 +155,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        for(loadedVisitor in loadedVisitors.values()) {
+            loadedVisitor.visitor.start(visitorContext)
+        }
+
         for (ClassNode classNode in classes) {
             if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
@@ -246,10 +250,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             try {
                 outputVisitor.finish()
+
             } catch (Throwable e) {
                 AstMessageUtils.error(source, moduleNode, "Error generating META-INF/services files: $e.message")
                 if (e.message == null) {
                     e.printStackTrace(System.err)
+                }
+            }
+
+            for(loadedVisitor in loadedVisitors.values()) {
+                try {
+                    loadedVisitor.visitor.finish(visitorContext)
+                } catch (Throwable e) {
+                    AstMessageUtils.error(
+                            source,
+                            moduleNode,
+                            "Error finalizing type visitor [$loadedVisitor.visitor]: $e.message")
                 }
             }
         }

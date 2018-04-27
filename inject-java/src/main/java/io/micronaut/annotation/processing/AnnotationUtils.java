@@ -113,16 +113,6 @@ public class AnnotationUtils {
     }
 
     /**
-     * Resolve the {@link Qualifier} to use for the given element
-     *
-     * @param element The element
-     * @return The Qualifier or null
-     */
-    String resolveQualifier(Element element) {
-        return getAnnotationMetadata(element).getAnnotationNameByStereotype(Qualifier.class).orElse(null);
-    }
-
-    /**
      * Check whether the method is annotated
      *
      * @param method The method

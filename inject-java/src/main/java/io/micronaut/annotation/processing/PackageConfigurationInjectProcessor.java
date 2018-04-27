@@ -48,12 +48,12 @@ import java.util.Set;
 public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
+    public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
     }
 
     @Override
-    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if(annotations.isEmpty()) {
             return false;
         }

@@ -35,6 +35,7 @@ import java.util.function.Function;
 /**
  * Implementation of {@link ConfigurationMetadataBuilder} for Java
  *
+ * @see ConfigurationMetadataBuilder
  * @author Graeme Rocher
  * @since 1.0
  */

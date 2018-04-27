@@ -64,6 +64,16 @@ import java.util.stream.Stream;
 import static javax.lang.model.element.ElementKind.*;
 import static javax.lang.model.type.TypeKind.ARRAY;
 
+/**
+ * <p>The core annotation processed used to generate bean definitions and power AOP for Micronaut</p>
+ *
+ * <p>Each dependency injection candidate is visited and {@link BeanDefinitionWriter} is used to produce byte code via ASM.
+ * Each bean results in a instanceof {@link io.micronaut.inject.BeanDefinition}</p>
+ *
+ * @author Graeme Rocher
+ * @author Dean Wette
+ * @since 1.0
+ */
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
@@ -87,14 +97,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private Set<String> processed = new HashSet<>();
 
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
+    public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils);
         this.beanDefinitionWriters = new LinkedHashMap<>();
     }
 
     @Override
-    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (annotations.isEmpty()) {
             return false;
         }
@@ -108,6 +118,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
+
+
         annotations = annotations
                 .stream()
                 .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
@@ -115,6 +127,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
+            for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
+                try {
+                    loadedVisitor.getVisitor().start(visitorContext);
+                } catch (Throwable e) {
+                    error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage() );
+                }
+            }
             // accumulate all the class elements for all annotated elements
             annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
                     .stream()
@@ -185,6 +204,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     } catch (ServiceConfigurationError e) {
                         warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+                    }
+                }
+
+                for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
+                    try {
+                        loadedVisitor.getVisitor().finish(visitorContext);
+                    } catch (Throwable e) {
+                        error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage() );
                     }
                 }
                 return true;
@@ -531,7 +558,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             writer.visitSetterValue(
                     modelUtils.resolveTypeReference(declaringClass),
                     annotationMetadata,
-                    modelUtils.requiresReflection(method),
+                    modelUtils.isPrivate(method),
                     fieldType,
                     setterName,
                     genericTypes,
@@ -1242,12 +1269,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private ExecutableElementParamInfo populateParameterData(ExecutableElement element) {
-            ExecutableElementParamInfo params = new ExecutableElementParamInfo();
+            AnnotationMetadata elementMetadata = annotationUtils.getAnnotationMetadata(element);
+            ExecutableElementParamInfo params = new ExecutableElementParamInfo(
+                    modelUtils.isPrivate(element),
+                    elementMetadata
+            );
             if (element == null) {
                 return params;
             }
-            params.metadata = annotationUtils.getAnnotationMetadata(element);
-            params.requiresReflection = modelUtils.isPrivate(element);
             element.getParameters().forEach(paramElement -> {
 
                 String argName = paramElement.getSimpleName().toString();
