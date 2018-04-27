@@ -19,6 +19,7 @@ package io.micronaut.configuration.hibernate.gorm
 import grails.gorm.annotation.Entity
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.micronaut.configuration.gorm.configuration.GormPropertyResolverAdapter
 import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
@@ -58,7 +59,7 @@ class HibernateDatastoreFactory {
         Stream<Class> entities = applicationContext.environment.scan(Entity)
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(
-            new PropertyResolverAdapter(applicationContext, applicationContext),
+            new GormPropertyResolverAdapter(applicationContext, applicationContext),
             new ConfigurableEventPublisherAdapter(applicationContext),
             classes
         )
