@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Requires;
 import org.hibernate.SessionFactory;
 import org.springframework.orm.hibernate5.HibernateTransactionManager;
 
+import javax.inject.Singleton;
 import javax.sql.DataSource;
 
 /**
@@ -31,12 +32,13 @@ import javax.sql.DataSource;
  * @since 1.0
  */
 @Factory
-@EachBean(DataSource.class)
 @Requires(classes = HibernateTransactionManager.class)
 public class HibernateTransactionManagerFactory {
 
     @Bean
     @Requires(classes = HibernateTransactionManager.class)
+    @Singleton
+    @EachBean(SessionFactory.class)
     HibernateTransactionManager hibernateTransactionManager(SessionFactory sessionFactory, DataSource dataSource) {
         HibernateTransactionManager hibernateTransactionManager = new HibernateTransactionManager(sessionFactory);
         hibernateTransactionManager.setDataSource(dataSource);

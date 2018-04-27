@@ -27,6 +27,7 @@ import java.lang.annotation.Target;
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.Blocking;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.annotation.Isolation;
@@ -66,6 +67,7 @@ import org.springframework.transaction.annotation.Propagation;
 @Documented
 @Around
 @Type(TransactionInterceptor.class)
+@Blocking
 public @interface Transactional {
 
     /**

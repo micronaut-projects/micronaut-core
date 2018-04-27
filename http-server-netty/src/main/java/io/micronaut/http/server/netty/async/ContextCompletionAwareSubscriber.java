@@ -17,8 +17,8 @@
 package io.micronaut.http.server.netty.async;
 
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.netty.channel.ChannelHandlerContext;
-import com.typesafe.netty.HandlerPublisher;
 import io.netty.channel.ChannelPipeline;
 import org.reactivestreams.Subscription;
 

@@ -16,7 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
-import com.typesafe.netty.http.StreamedHttpMessage;
+import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;

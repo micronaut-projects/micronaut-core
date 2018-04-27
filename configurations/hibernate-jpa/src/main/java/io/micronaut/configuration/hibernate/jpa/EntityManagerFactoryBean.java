@@ -15,8 +15,12 @@
  */
 package io.micronaut.configuration.hibernate.jpa;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import org.hibernate.Interceptor;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
@@ -27,6 +31,8 @@ import org.springframework.orm.hibernate5.SpringSessionContext;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.persistence.Entity;
 import javax.sql.DataSource;
 import javax.validation.ValidatorFactory;
@@ -40,58 +46,117 @@ import java.util.Map;
  * @since 1.0
  */
 @Factory
-@EachBean(DataSource.class)
 public class EntityManagerFactoryBean {
 
 
     private final JpaConfiguration jpaConfiguration;
     private final Environment environment;
-    private final String sessionFactoryName;
+    private final BeanLocator beanLocator;
+    private Interceptor hibernateInterceptor;
 
-    public EntityManagerFactoryBean(@Parameter String name,JpaConfiguration jpaConfiguration, Environment environment) {
+    public EntityManagerFactoryBean(
+            JpaConfiguration jpaConfiguration,
+            Environment environment,
+            BeanLocator beanLocator) {
         this.jpaConfiguration = jpaConfiguration;
         this.environment = environment;
-        this.sessionFactoryName = name;
+        this.beanLocator = beanLocator;
     }
 
+    /**
+     * Sets the {@link Interceptor} to use
+     * @param hibernateInterceptor The hibernate interceptor
+     */
+    @Inject
+    public void setHibernateInterceptor(@Nullable Interceptor hibernateInterceptor) {
+        this.hibernateInterceptor = hibernateInterceptor;
+    }
 
-    @Context
-    @Requires(entities = Entity.class)
-    @Bean(preDestroy = "close")
-    protected SessionFactory entityManager(
-            DataSource dataSource,
-            @Nullable ValidatorFactory validatorFactory) {
-
+    /**
+     * Builds the {@link StandardServiceRegistry} bean for the given {@link DataSource}
+     * @param dataSource The data source
+     * @return The {@link StandardServiceRegistry}
+     */
+    @Singleton
+    @EachBean(DataSource.class)
+    protected StandardServiceRegistry hibernateStandardServiceRegistry(
+            @Parameter String dataSourceName,
+            DataSource dataSource) {
         Map<String,Object > additionalSettings = new LinkedHashMap<>();
         additionalSettings.put(AvailableSettings.DATASOURCE, dataSource);
         additionalSettings.put(AvailableSettings.CURRENT_SESSION_CONTEXT_CLASS, SpringSessionContext.class.getName());
-        additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME,sessionFactoryName);
+        additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME,dataSourceName);
         additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME_IS_JNDI,false);
-        StandardServiceRegistry serviceRegistry = jpaConfiguration.buildStandardServiceRegistry(
+        JpaConfiguration jpaConfiguration = beanLocator.findBean(JpaConfiguration.class, Qualifiers.byName(dataSourceName))
+                                                       .orElse(this.jpaConfiguration);
+        return jpaConfiguration.buildStandardServiceRegistry(
                 additionalSettings
         );
-        MetadataSources metadataSources = createMetadataSources(serviceRegistry);
-        environment.scan(Entity.class).forEach(metadataSources::addAnnotatedClass);
+    }
+
+    /**
+     * Builds the {@link MetadataSources} for the given {@link StandardServiceRegistry}
+     * @param standardServiceRegistry The standard service registry
+     * @return The {@link MetadataSources}
+     */
+    @Singleton
+    @EachBean(StandardServiceRegistry.class)
+    @Requires(entities = Entity.class)
+    protected MetadataSources hibernateMetadataSources(
+            @Parameter String dataSourceName,
+            StandardServiceRegistry standardServiceRegistry) {
+        MetadataSources metadataSources = createMetadataSources(standardServiceRegistry);
+        JpaConfiguration jpaConfiguration = beanLocator.findBean(JpaConfiguration.class, Qualifiers.byName(dataSourceName))
+                .orElse(this.jpaConfiguration);
+
+        String[] packagesToScan = jpaConfiguration.getPackagesToScan();
+        if(ArrayUtils.isNotEmpty(packagesToScan)) {
+            environment.scan(Entity.class, packagesToScan).forEach(metadataSources::addAnnotatedClass);
+        }
+        else {
+            environment.scan(Entity.class).forEach(metadataSources::addAnnotatedClass);
+        }
+        return metadataSources;
+    }
+
+
+    /**
+     * Builds the {@link SessionFactoryBuilder} to use
+     *
+     * @param metadataSources The {@link MetadataSources}
+     * @param validatorFactory The {@link ValidatorFactory}
+     * @return The {@link SessionFactoryBuilder}
+     */
+    @Singleton
+    @EachBean(MetadataSources.class)
+    @Requires(beans = MetadataSources.class)
+    protected SessionFactoryBuilder hibernateSessionFactoryBuilder(
+            MetadataSources metadataSources,
+            @Nullable ValidatorFactory validatorFactory) {
         Metadata metadata = metadataSources.buildMetadata();
         SessionFactoryBuilder sessionFactoryBuilder = metadata.getSessionFactoryBuilder();
         if(validatorFactory != null) {
             sessionFactoryBuilder.applyValidatorFactory(validatorFactory);
         }
-        customizeSessionFactory(sessionFactoryBuilder);
 
-        return sessionFactoryBuilder.build();
+        if(hibernateInterceptor != null) {
+            sessionFactoryBuilder.applyInterceptor(hibernateInterceptor);
+        }
+        return sessionFactoryBuilder;
     }
 
     /**
-     * Sub classes can override to customise the session factory
-     *
-     * @param sessionFactoryBuilder The builder
+     * Builds the actual {@link SessionFactory} from the builder
+     * @param sessionFactoryBuilder The {@link SessionFactoryBuilder}
+     * @return The {@link SessionFactory}
      */
-    @SuppressWarnings("WeakerAccess")
-    protected void customizeSessionFactory(@Nonnull SessionFactoryBuilder sessionFactoryBuilder) {
-        //no-op
+    @Context
+    @Requires(beans = SessionFactoryBuilder.class)
+    @Bean(preDestroy = "close")
+    @EachBean(SessionFactoryBuilder.class)
+    protected SessionFactory hibernateSessionFactory( SessionFactoryBuilder sessionFactoryBuilder ) {
+        return sessionFactoryBuilder.build();
     }
-
 
     /**
      * Creates the {@link MetadataSources} for the given registry

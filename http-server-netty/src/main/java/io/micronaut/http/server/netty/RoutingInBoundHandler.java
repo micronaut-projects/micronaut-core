@@ -16,8 +16,8 @@
 
 package io.micronaut.http.server.netty;
 
-import com.typesafe.netty.HandlerPublisher;
-import com.typesafe.netty.http.StreamedHttpRequest;
+import io.micronaut.http.netty.reactive.HandlerPublisher;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -844,7 +844,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
             if (isChunked) {
-                // if the transfer encoding is chunked then create a com.typesafe.netty.http.StreamedHttpResponse
+                // if the transfer encoding is chunked then create a io.micronaut.http.netty.stream.StreamedHttpResponse
                 // that will send the encoded data chunk by chunk
 
                 // adapt the publisher to produce HTTP content

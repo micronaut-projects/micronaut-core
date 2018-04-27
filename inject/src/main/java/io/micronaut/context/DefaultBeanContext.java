@@ -821,8 +821,19 @@ public class DefaultBeanContext implements BeanContext {
             try {
 
                 BeanDefinition beanDefinition = contextScopeBean.load(this);
-                if (beanDefinition.isEnabled(this)) {
-                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
+                if(beanDefinition.isIterable()) {
+                    Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
+                    for (BeanDefinition beanCandidate : beanCandidates) {
+                        if(beanCandidate.isEnabled(this)) {
+                            createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanCandidate, beanCandidate.getBeanType(), null);
+                        }
+                    }
+
+                }
+                else {
+                    if (beanDefinition.isEnabled(this)) {
+                        createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
+                    }
                 }
             } catch (Throwable e) {
                 throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);

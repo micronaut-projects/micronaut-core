@@ -19,6 +19,8 @@ package io.micronaut.configuration.hibernate.gorm
 import grails.gorm.annotation.Entity
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.micronaut.configuration.gorm.configuration.GormPropertyResolverAdapter
+import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
@@ -42,11 +44,11 @@ import java.util.stream.Stream
 @Factory
 @CompileStatic
 @Slf4j
-class HibernateFactory {
+class HibernateDatastoreFactory {
 
     final ApplicationContext applicationContext
 
-    HibernateFactory(ApplicationContext applicationContext) {
+    HibernateDatastoreFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext
     }
 
@@ -57,11 +59,12 @@ class HibernateFactory {
         Stream<Class> entities = applicationContext.environment.scan(Entity)
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(
-            new PropertyResolverAdapter(applicationContext, applicationContext),
+            new GormPropertyResolverAdapter(applicationContext, applicationContext),
+            new ConfigurableEventPublisherAdapter(applicationContext),
             classes
         )
         for (o in datastore.getServices()) {
-            applicationContext.registerSingleton(o)
+            applicationContext.registerSingleton(o, false)
         }
         for (o in datastore.getServices()) {
             applicationContext.inject(o)

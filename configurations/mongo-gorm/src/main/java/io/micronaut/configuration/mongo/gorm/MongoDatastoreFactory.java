@@ -19,6 +19,7 @@ package io.micronaut.configuration.mongo.gorm;
 import com.mongodb.MongoClient;
 import grails.gorm.annotation.Entity;
 import grails.mongodb.MongoEntity;
+import io.micronaut.configuration.gorm.configuration.GormPropertyResolverAdapter;
 import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
@@ -58,7 +59,7 @@ public class MongoDatastoreFactory {
             .filter(MongoEntity.class::isAssignableFrom)
             .toArray(Class[]::new);
 
-        PropertyResolverAdapter propertyResolver = new PropertyResolverAdapter(
+        PropertyResolverAdapter propertyResolver = new GormPropertyResolverAdapter(
                 applicationContext,
                 applicationContext
         );

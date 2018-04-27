@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import com.typesafe.netty.http.StreamedHttpRequest;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -36,7 +35,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
-import com.typesafe.netty.http.DefaultStreamedHttpRequest;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
