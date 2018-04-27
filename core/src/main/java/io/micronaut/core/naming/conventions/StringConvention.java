@@ -17,6 +17,8 @@ package io.micronaut.core.naming.conventions;
 
 import io.micronaut.core.naming.NameUtils;
 
+import java.util.Locale;
+
 /**
  * An enum representing different conventions for
  *
@@ -43,9 +45,18 @@ public enum StringConvention {
     HYPHENATED,
 
     /**
+     * Raw unconverted string
+     */
+    RAW,
+    /**
      * Hyphenated, in upper case.  Example FOO_BAR
      */
-    UNDER_SCORE_SEPARATED;
+    UNDER_SCORE_SEPARATED,
+    /**
+     * Hyphenated, in lower case.  Example foo_bar
+     */
+    UNDER_SCORE_SEPARATED_LOWER_CASE;
+
 
     /**
      * Format the string with this format
@@ -63,11 +74,16 @@ public enum StringConvention {
                 return NameUtils.camelCase(str);
             case HYPHENATED:
                 return NameUtils.hyphenate(str);
+            case UNDER_SCORE_SEPARATED_LOWER_CASE:
+                return NameUtils.underscoreSeparate(str.toLowerCase(Locale.ENGLISH));
             case UNDER_SCORE_SEPARATED:
                 return NameUtils.environmentName(str);
             case CAMEL_CASE_CAPITALIZED:
-            default:
                 return NameUtils.camelCase(str, false);
+            case RAW:
+            default:
+                return str;
+
         }
     }
 }

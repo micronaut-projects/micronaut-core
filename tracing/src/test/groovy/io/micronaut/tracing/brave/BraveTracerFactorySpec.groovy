@@ -79,16 +79,14 @@ class BraveTracerFactorySpec extends Specification {
     }
 
     void "test brace tracer report spans"() {
-        given:
 
-        ApplicationContext context = ApplicationContext.build()
-        context.environment.addPropertySource(PropertySource.of(
-                'tracing.zipkin.enabled':true,
-                'tracing.zipkin.sampler.probability':1)
-        )
+        given:
         def reporter = new TestReporter()
-        context.registerSingleton(reporter)
-        context.start()
+        ApplicationContext context = ApplicationContext.build(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1
+        ).singletons(reporter)
+         .start()
 
         when:
         Tracer tracer = context.getBean(Tracer)

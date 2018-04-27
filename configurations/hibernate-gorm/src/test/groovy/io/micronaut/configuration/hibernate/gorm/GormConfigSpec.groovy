@@ -41,13 +41,33 @@ import javax.sql.DataSource
  */
 class GormConfigSpec extends Specification {
 
+    void "test beans for custom data source"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.build(
+                [(Settings.SETTING_DB_CREATE):'create-drop',
+                 'dataSource.url':'jdbc:h2:mem:someOtherDb',
+                 'dataSource.properties.initialSize':25]
+                )
+                .mainClass(GormConfigSpec)
+                .start()
+
+
+        DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource.targetDataSource
+
+        expect:
+        dataSource.poolProperties.url == 'jdbc:h2:mem:someOtherDb'
+        dataSource.poolProperties.initialSize == 25
+
+        cleanup:
+        applicationContext.close()
+    }
+
+
     void "test gorm config configures gorm"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment
-                .addPackage(getClass().getPackage())
-                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop']))
-        applicationContext.start()
+        ApplicationContext applicationContext = ApplicationContext.build([(Settings.SETTING_DB_CREATE):'create-drop'])
+                                                                  .mainClass(GormConfigSpec)
+                                                                  .start()
 
         when:
         TransactionService transactionService = applicationContext.getBean(TransactionService)

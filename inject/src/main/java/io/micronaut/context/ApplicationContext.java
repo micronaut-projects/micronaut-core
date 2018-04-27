@@ -140,8 +140,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static ApplicationContext run(PropertySource properties, String... environments) {
         return build(environments)
-            .environment(env -> env.addPropertySource(properties))
-            .start();
+                    .propertySources(properties)
+                    .start();
     }
 
     /**
@@ -180,18 +180,18 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The running {@link BeanContext}
      */
     static <T> T run(Class<T> type, PropertySource propertySource, String... environments) {
-        T bean = build(type.getClassLoader(), environments)
-            .environment(env -> env
-                .addPropertySource(propertySource)
-                .addPackage(type.getPackage()))
-            .start()
-            .getBean(type);
+        T bean = build( environments)
+                    .mainClass(type)
+                    .propertySources(propertySource)
+                    .start()
+                    .getBean(type);
         if (bean instanceof LifeCycle) {
             LifeCycle lifeCycle = (LifeCycle) bean;
             if (!lifeCycle.isRunning()) {
                 lifeCycle.start();
             }
         }
+
         return bean;
     }
 
@@ -201,18 +201,29 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environments to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build(String... environments) {
-        if (environments == null) environments = StringUtils.EMPTY_STRING_ARRAY;
-        return new DefaultApplicationContext(environments);
+    static ApplicationContextBuilder build(String... environments) {
+        return new DefaultApplicationContextBuilder()
+                    .environments(environments);
     }
 
     /**
      * Build a {@link ApplicationContext}
      *
+     * @param environments The environments to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build() {
-        return new DefaultApplicationContext();
+    static ApplicationContextBuilder build(Map<String,Object> properties, String... environments) {
+        return new DefaultApplicationContextBuilder()
+                .properties(properties)
+                .environments(environments);
+    }
+    /**
+     * Build a {@link ApplicationContext}
+     *
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static ApplicationContextBuilder build() {
+        return new DefaultApplicationContextBuilder();
     }
 
     /**
@@ -233,8 +244,9 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build(ClassLoader classLoader, String... environments) {
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), environments);
+    static ApplicationContextBuilder build(ClassLoader classLoader, String... environments) {
+        return build(environments)
+                    .classLoader(classLoader);
     }
 
     /**
@@ -244,9 +256,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build(Class mainClass, String... environments) {
-        DefaultApplicationContext applicationContext = new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(mainClass.getClassLoader()), environments);
-        applicationContext.getEnvironment().addPackage(mainClass.getPackage());
-        return applicationContext;
+    static ApplicationContextBuilder build(Class mainClass, String... environments) {
+        return build(environments)
+                .mainClass(mainClass);
     }
 }

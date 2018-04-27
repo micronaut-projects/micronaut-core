@@ -19,10 +19,10 @@
  */
 @Configuration
 @RequiresMongo
-@Requires(beans = MongoClient.class)
+@Requires(entities = Entity.class)
 package io.micronaut.configuration.mongo.gorm;
 
-import com.mongodb.MongoClient;
+import grails.gorm.annotation.Entity;
 import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

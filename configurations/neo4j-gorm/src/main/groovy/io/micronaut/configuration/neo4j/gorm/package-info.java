@@ -13,25 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.convert.format;
-import io.micronaut.core.naming.conventions.StringConvention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
 /**
- * Allows configuring the format of Map keys when injecting map configuration
+ * This configuration contains setup class for GORM for Neo4j
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-public @interface KeyFormat {
-    /**
-     * @return The string conversion to use
-     */
-    StringConvention value();
-}
+@Requires(classes = Driver.class)
+@Requires(entities = Entity.class)
+package io.micronaut.configuration.neo4j.gorm;
+
+import grails.gorm.annotation.Entity;
+import io.micronaut.context.annotation.Requires;
+import org.neo4j.driver.v1.Driver;
