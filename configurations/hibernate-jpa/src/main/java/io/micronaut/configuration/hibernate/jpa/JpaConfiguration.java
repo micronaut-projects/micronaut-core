@@ -18,6 +18,7 @@ package io.micronaut.configuration.hibernate.jpa;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.util.ArrayUtils;
 import org.hibernate.boot.registry.BootstrapServiceRegistry;
 import org.hibernate.boot.registry.BootstrapServiceRegistryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -40,7 +41,8 @@ public class JpaConfiguration {
 
     private final BootstrapServiceRegistry bootstrapServiceRegistry;
 
-    protected Map<String,Object> jpaProperties;
+    private Map<String,Object> jpaProperties;
+    private String[] packagesToScan;
 
     public JpaConfiguration(ApplicationContext applicationContext,
                             @Nullable Integrator integrator) {
@@ -57,7 +59,7 @@ public class JpaConfiguration {
      * @return The standard service registry
      */
     @SuppressWarnings("WeakerAccess")
-    public StandardServiceRegistry buildStandardServiceRegistry(@Nullable  Map<String,Object> additionalSettings  ) {
+    public StandardServiceRegistry buildStandardServiceRegistry(@Nullable Map<String,Object> additionalSettings  ) {
         StandardServiceRegistryBuilder standardServiceRegistryBuilder = createStandServiceRegistryBuilder(bootstrapServiceRegistry);
 
         if(jpaProperties != null) {
@@ -67,6 +69,23 @@ public class JpaConfiguration {
             standardServiceRegistryBuilder.applySettings(additionalSettings);
         }
         return standardServiceRegistryBuilder.build();
+    }
+
+    /**
+     * Sets the packages to scan
+     * @param packagesToScan The packages to scan
+     */
+    public void setPackagesToScan(String... packagesToScan) {
+        if(ArrayUtils.isNotEmpty(packagesToScan)) {
+            this.packagesToScan = packagesToScan;
+        }
+    }
+
+    /**
+     * @return The packages to scan
+     */
+    public String[] getPackagesToScan() {
+        return packagesToScan;
     }
 
     /**

@@ -124,6 +124,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public Stream<Class> scan(Class<? extends Annotation> annotation, String... packages) {
+        return annotationScanner.scan(annotation, packages);
+    }
+
+    @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
