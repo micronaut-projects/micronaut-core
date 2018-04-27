@@ -31,7 +31,7 @@ include "cli"
 include "bom"
 
 // configurations
-include "configurations:gorm"
+include "configurations:gorm-common"
 include "configurations:hibernate-validator"
 include "configurations:hibernate-gorm"
 include "configurations:hibernate-jpa"

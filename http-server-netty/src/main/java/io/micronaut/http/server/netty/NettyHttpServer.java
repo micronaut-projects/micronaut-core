@@ -16,7 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
-import com.typesafe.netty.http.HttpStreamsServerHandler;
+import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;

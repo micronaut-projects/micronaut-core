@@ -5,6 +5,7 @@ dependencies {
     compile project(":runtime-groovy")
     compile project(":inject")
     compile project(":spring")
+    compile project(":configurations:gorm-common")
     testCompile project(":inject-groovy")
     compile dependencyVersions.gormHibernate5
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
