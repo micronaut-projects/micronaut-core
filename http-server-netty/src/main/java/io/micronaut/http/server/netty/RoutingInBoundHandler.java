@@ -54,6 +54,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -303,6 +304,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 LOG.debug("Matched route is not a supported media type: {}", contentType);
             }
 
+            // we matched a route and it says we consume JSON and we sent in XML
             // if route is a methodbased route, then get the declaringType and call router.route with it.
             Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
             if (statusRoute.isPresent()) {
@@ -352,20 +354,33 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return;
         }
 
-        // to pass in the originalDeclaringtype see :363
-        if (cause instanceof UnsatisfiedRouteException) {
-            errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
+        // find the origination of of the route
+        RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
+        Class declaringType = null;
+        if (originalRoute instanceof MethodExecutionHandle) {
+            declaringType = ((MethodExecutionHandle) originalRoute).getDeclaringType();
         }
-        if (errorRoute == null) {
-            RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
-            Optional<RouteMatch<Object>> errorRouteMatch;
-            if (originalRoute instanceof MethodBasedRouteMatch) {
-                Class declaringType = ((MethodBasedRouteMatch) originalRoute).getDeclaringType();
-                errorRouteMatch = declaringType != null ? router.route(declaringType, cause) : Optional.empty();
-            } else {
-                errorRouteMatch = Optional.empty();
+
+        // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
+        if (cause instanceof UnsatisfiedRouteException) {
+            if (declaringType != null) {
+                // handle error with a method that is non global with bad request
+                errorRoute = router.route(declaringType, HttpStatus.BAD_REQUEST).orElse(null);
             }
-            errorRoute = errorRouteMatch.orElseGet(() -> router.route(cause).orElse(null));
+            if (errorRoute == null) {
+                // handle error with a method that is global with bad request
+                errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
+            }
+        }
+
+        // any another other exception may arise. handle these with non global exception marked method or a global exception marked method.
+        if (errorRoute == null) {
+            if (declaringType != null) {
+                errorRoute = router.route(declaringType, cause).orElse(null);
+            }
+            if (errorRoute == null) {
+                errorRoute = router.route(cause).orElse(null);
+            }
         }
 
         if (errorRoute != null) {
@@ -693,6 +708,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Class<?> javaReturnType = routeMatch.getReturnType().getType();
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
+                            // This happens ex: when the route has a return type of String and it returns null
+                            // in the CustomeStaticMapping Test, try changing the simple() call to return null
                             result = router.route(HttpStatus.NOT_FOUND)
                                 .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                 .filter(RouteMatch::isExecutable)

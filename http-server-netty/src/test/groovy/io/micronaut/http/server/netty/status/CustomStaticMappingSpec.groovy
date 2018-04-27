@@ -33,7 +33,7 @@ import io.micronaut.http.annotation.Post
  */
 class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
-    void "test that a bad request response can be redirected by the router"() {
+    void "test that a bad request is handled is handled by the locally marked controller"() {
         when:
         rxClient.exchange('/test/bad').blockingFirst()
 
@@ -42,20 +42,17 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from TestController.badHandler()"
 
-    }
-
-    void "test that a bad request is handled is handled by the locally marked controller"() {
         when:
         rxClient.exchange('/test2/bad').blockingFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
     }
 
-    void "test that a bad request response for invalid request data can be redirected by the router"() {
+    void "test that a bad request response for invalid request data can be redirected by the router to the local method"() {
         when:
         rxClient.exchange(
                 HttpRequest.POST('/test/simple', [name:"Fred"])
@@ -65,7 +62,18 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff - from TestController.badHandler()"
+        e.response.reason() == "You sent me bad stuff - from Test1Controller.badHandler()"
+
+        when:
+        rxClient.exchange(
+                HttpRequest.POST('/test2/simple', [name:"Fred"])
+                        .contentType(MediaType.FORM)
+        ).blockingFirst()
+
+        then:
+        e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+        e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
     }
 
@@ -96,6 +104,11 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         @Get
         HttpResponse bad() {
             HttpResponse.badRequest()
+        }
+
+        @Post
+        String simple(String name, Integer age) {
+            "name: $name, age: $age"
         }
 
         @Error(status = HttpStatus.BAD_REQUEST)
