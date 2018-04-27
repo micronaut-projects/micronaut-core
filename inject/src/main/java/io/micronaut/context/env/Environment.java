@@ -27,6 +27,7 @@ import io.micronaut.inject.BeanConfiguration;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -207,6 +208,19 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     default Stream<Class> scan(Class<? extends Annotation> annotation) {
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(getClassLoader());
         return scanner.scan(annotation, getPackages());
+    }
+
+    /**
+     * Scan the current environment for classes annotated with the given annotation. Use with care, repeated
+     * invocations should be avoided for performance reasons.
+     *
+     * @param annotation The annotation to scan
+     * @param packages The packages to scan
+     * @return The classes
+     */
+    default Stream<Class> scan(Class<? extends Annotation> annotation, String...packages) {
+        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(getClassLoader());
+        return scanner.scan(annotation, Arrays.asList(packages));
     }
 
     /**
