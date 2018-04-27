@@ -1,0 +1,40 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "io.spring.gradle:dependency-management-plugin:1.0.5.RELEASE"
+    }
+}
+
+version "0.1"
+group "demo"
+
+apply plugin:"io.spring.dependency-management"
+apply plugin:"application"
+apply plugin:"java"
+
+mainClassName = "demo.Application"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven { url "https://repo.micronaut.io/artifactory" }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'io.micronaut:bom:1.0.0-SNAPSHOT'
+    }
+}
+
+dependencies {
+    compile "io.micronaut:http-server-netty"
+    compile "io.micronaut:inject"
+    compileOnly "io.micronaut:inject-java"
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+
+    compile "io.micronaut:session:1.0.0-SNAPSHOT"
+    compile "io.micronaut:security:1.0.0-SNAPSHOT"
+    runtime 'org.yaml:snakeyaml:1.19'
+}

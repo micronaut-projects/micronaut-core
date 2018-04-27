@@ -1,0 +1,12 @@
+micronaut:
+  server:
+    port: 8080
+  security:
+    enabled: true
+    endpoints:
+      login: true
+      logout: true
+    session:
+      enabled: true
+      loginSuccessTargetUrl: '/'
+      loginFailureTargetUrl: '/login/authFailed'
