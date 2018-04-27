@@ -16,7 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
-import com.typesafe.netty.http.StreamedHttpResponse;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
 import org.reactivestreams.Publisher;

@@ -16,7 +16,7 @@
 
 package io.micronaut.http.server.netty.binders;
 
-import com.typesafe.netty.http.StreamedHttpRequest;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;

@@ -1,12 +1,6 @@
 dependencies {
     compile project(":http")
     compileOnly project(":inject-java")
-    compile 'com.typesafe.netty:netty-reactive-streams-http:2.0.0', {
-        exclude group:'com.typesafe.netty', module:'netty-reactive-streams'
-    }
-    compile 'com.typesafe.netty:netty-reactive-streams:2.0.0', {
-        exclude group:'io.netty', module:'netty-handler'
-    }
     compile "io.netty:netty-codec-http:$nettyVersion"
     compile "io.netty:netty-handler:$nettyVersion"
 }
