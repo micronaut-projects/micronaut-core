@@ -556,7 +556,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link HttpStatus} code.
      */
-    class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute>  {
+    class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute> {
 
         private final HttpStatus status;
         private final Class originatingClass;
@@ -662,29 +662,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public String toString() {
-            StringBuilder builder = new StringBuilder();
-            return builder.append(' ')
-                    .append(status.getCode())
-                    .append(" -> ")
-                    .append(targetMethod.getDeclaringType().getSimpleName())
-                    .append('#')
-                    .append(targetMethod)
-                    .toString();
-        }
-
-        @Override
         public int compareTo(StatusRoute o) {
             if (o == this) {
                 return 0;
             }
-            HttpStatus thatHttpStatus = o.status();
-            HttpStatus thisHttpStatus = this.status;
+            Class<?> thatType = o.originatingType();
+            Class<?> thisType= this.originatingType();
 
-            if (thatHttpStatus == thisHttpStatus) {
+            if (thisType == thatType) {
                 return 0;
-            } else
+            } else {
                 return -1;
+            }
         }
     }
 
