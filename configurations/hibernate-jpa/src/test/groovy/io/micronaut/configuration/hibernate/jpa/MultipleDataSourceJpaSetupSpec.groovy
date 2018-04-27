@@ -34,7 +34,8 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'datasources.default.name':'mydb',
             'datasources.other.name':'otherdb',
-            'jpa.properties.hibernate.hbm2ddl.auto':'create-drop'
+            'jpa.other.packages-to-scan':'io.micronaut.configuration.hibernate.jpa.other',
+            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop'
     )
 
     void "test multiple data sources setup"() {
@@ -47,6 +48,8 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
 
         expect:
         defaultSessionFactory != otherSessionFactory
+        defaultSessionFactory.getMetamodel().entity(Book)
+        otherSessionFactory.getMetamodel().entities.isEmpty()
         defaultTxManager.sessionFactory == defaultSessionFactory
         otherTxManager.sessionFactory == otherSessionFactory
         defaultSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "MYDB"
