@@ -1,7 +1,7 @@
 dependencies {
     compile project(":configurations:mongo-reactive")
     compile project(":configurations:hibernate-validator")
-    compile project(":configurations:gorm")
+    compile project(":configurations:gorm-common")
 
     compile "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly project(":inject-groovy")

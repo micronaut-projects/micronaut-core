@@ -1,6 +1,6 @@
 dependencies {
     compile project(":configurations:neo4j-bolt")
-    compile project(":configurations:gorm")
+    compile project(":configurations:gorm-common")
     compile project(":configurations:hibernate-validator")
 
     compile "org.codehaus.groovy:groovy:$groovyVersion"
