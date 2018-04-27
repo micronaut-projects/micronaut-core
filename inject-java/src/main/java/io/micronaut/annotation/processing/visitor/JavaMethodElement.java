@@ -27,7 +27,7 @@ import javax.lang.model.element.ExecutableElement;
  * @author James Kleeh
  * @since 1.0
  */
-public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
+class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
 

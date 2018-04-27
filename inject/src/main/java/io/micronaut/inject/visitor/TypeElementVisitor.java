@@ -32,7 +32,9 @@ public interface TypeElementVisitor<C, E> {
      * @param element The element
      * @param context The visitor context
      */
-    void visitClass(ClassElement element, VisitorContext context);
+    default void visitClass(ClassElement element, VisitorContext context) {
+        // no-op
+    }
 
     /**
      * Executed when a method is encountered that matches the <E> generic
@@ -40,7 +42,9 @@ public interface TypeElementVisitor<C, E> {
      * @param element The element
      * @param context The visitor context
      */
-    void visitMethod(MethodElement element, VisitorContext context);
+    default void visitMethod(MethodElement element, VisitorContext context) {
+        // no-op
+    }
 
     /**
      * Executed when a field is encountered that matches the <E> generic
@@ -48,5 +52,24 @@ public interface TypeElementVisitor<C, E> {
      * @param element The element
      * @param context The visitor context
      */
-    void visitField(FieldElement element, VisitorContext context);
+    default void visitField(FieldElement element, VisitorContext context) {
+        // no-op
+    }
+
+    /**
+     * Called once when visitor processing starts
+     *
+     * @param visitorContext The visitor context
+     */
+    default void start(VisitorContext visitorContext) {
+        // no-op
+    }
+
+    /**
+     * Called once when visitor processing finishes
+     * @param visitorContext The visitor context
+     */
+    default void finish(VisitorContext visitorContext) {
+        // no-op
+    }
 }

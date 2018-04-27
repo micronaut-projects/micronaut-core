@@ -59,6 +59,10 @@ class LoadedVisitor {
         elementAnnotation = generics[1].type.name
     }
 
+    TypeElementVisitor getVisitor() {
+        return visitor
+    }
+
     boolean equals(o) {
         if (this.is(o)) return true
         if (getClass() != o.class) return false

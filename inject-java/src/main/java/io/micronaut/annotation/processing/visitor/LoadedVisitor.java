@@ -63,6 +63,13 @@ public class LoadedVisitor {
     }
 
     /**
+     * @return The visitor
+     */
+    public TypeElementVisitor getVisitor() {
+        return visitor;
+    }
+
+    /**
      * @param typeElement The class element
      * @return True if the class element should be visited
      */

@@ -27,7 +27,7 @@ import javax.lang.model.element.VariableElement;
  * @author James Kleeh
  * @since 1.0
  */
-public class JavaFieldElement extends AbstractJavaElement implements FieldElement {
+class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final VariableElement variableElement;
 

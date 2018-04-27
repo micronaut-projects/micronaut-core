@@ -29,40 +29,75 @@ import java.util.Map;
 @Internal
 class ExecutableElementParamInfo {
 
-    boolean requiresReflection = false;
-    AnnotationMetadata metadata = AnnotationMetadata.EMPTY_METADATA;
+    private boolean requiresReflection;
+    private AnnotationMetadata metadata;
     private Map<String, Object> parameters = new LinkedHashMap<>();
     private Map<String, AnnotationMetadata> annotationMetadata = new LinkedHashMap<>();
     private Map<String, Map<String, Object>> genericTypes = new LinkedHashMap<>();
 
+    ExecutableElementParamInfo(boolean requiresReflection, AnnotationMetadata metadata) {
+        this.requiresReflection = requiresReflection;
+        this.metadata = metadata != null ? metadata : AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    /**
+     * Adds a parameter to the info
+     * @param paramName The parameter name
+     * @param type The type reference
+     */
     void addParameter(String paramName, Object type) {
         parameters.put(paramName, type);
     }
 
+    /**
+     * Adds annotation metadata for the given parameter
+     * @param paramName The parameter name
+     * @param metadata The metadata
+     */
     void addAnnotationMetadata(String paramName, AnnotationMetadata metadata) {
         annotationMetadata.put(paramName, metadata);
     }
 
+    /**
+     * Adds generics info for the given parameter name
+     * @param paramName The parameter name
+     * @param generics The generics info
+     */
     void addGenericTypes(String paramName, Map<String, Object> generics) {
         genericTypes.put(paramName, generics);
     }
 
+    /**
+     * @return The parameters
+     */
     Map<String, Object> getParameters() {
         return Collections.unmodifiableMap(parameters);
     }
 
+    /**
+     * @return The parameter annotation metadata
+     */
     Map<String, AnnotationMetadata> getParameterMetadata() {
         return Collections.unmodifiableMap(annotationMetadata);
     }
 
+    /**
+     * @return The generic types
+     */
     Map<String, Map<String, Object>> getGenericTypes() {
         return Collections.unmodifiableMap(genericTypes);
     }
 
+    /**
+     * @return Is reflection required
+     */
     boolean isRequiresReflection() {
         return requiresReflection;
     }
 
+    /**
+     * @return The annotation metadata for the method
+     */
     public AnnotationMetadata getAnnotationMetadata() {
         return metadata;
     }
