@@ -52,7 +52,7 @@ class JpaSetupSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'datasources.default.name':'mydb',
-            'jpa.properties.hibernate.hbm2ddl.auto':'create-drop'
+            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop'
     )
 
     void "test configure @Transactional attribute"() {

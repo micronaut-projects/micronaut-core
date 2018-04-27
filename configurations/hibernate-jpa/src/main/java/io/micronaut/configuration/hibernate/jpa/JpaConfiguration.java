@@ -16,7 +16,7 @@
 package io.micronaut.configuration.hibernate.jpa;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.util.ArrayUtils;
 import org.hibernate.boot.registry.BootstrapServiceRegistry;
@@ -34,9 +34,8 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
-@ConfigurationProperties(JpaConfiguration.PREFIX)
+@EachProperty(value = JpaConfiguration.PREFIX, primary = "default")
 public class JpaConfiguration {
-    @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = "jpa";
 
     private final BootstrapServiceRegistry bootstrapServiceRegistry;
@@ -44,8 +43,8 @@ public class JpaConfiguration {
     private Map<String,Object> jpaProperties;
     private String[] packagesToScan;
 
-    public JpaConfiguration(ApplicationContext applicationContext,
-                            @Nullable Integrator integrator) {
+    protected JpaConfiguration(ApplicationContext applicationContext,
+                               @Nullable Integrator integrator) {
         ClassLoader classLoader = applicationContext.getClassLoader();
         BootstrapServiceRegistryBuilder bootstrapServiceRegistryBuilder =
                 createBootstrapServiceRegistryBuilder(integrator, classLoader);

@@ -15,9 +15,11 @@
  */
 package io.micronaut.configuration.hibernate.jpa;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.hibernate.Interceptor;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
@@ -49,12 +51,16 @@ public class EntityManagerFactoryBean {
 
     private final JpaConfiguration jpaConfiguration;
     private final Environment environment;
-
+    private final BeanLocator beanLocator;
     private Interceptor hibernateInterceptor;
 
-    public EntityManagerFactoryBean(JpaConfiguration jpaConfiguration, Environment environment) {
+    public EntityManagerFactoryBean(
+            JpaConfiguration jpaConfiguration,
+            Environment environment,
+            BeanLocator beanLocator) {
         this.jpaConfiguration = jpaConfiguration;
         this.environment = environment;
+        this.beanLocator = beanLocator;
     }
 
     /**
@@ -73,13 +79,16 @@ public class EntityManagerFactoryBean {
      */
     @Singleton
     @EachBean(DataSource.class)
-    protected StandardServiceRegistry hibernateStandardServiceRegistry(@Parameter String dataSourceName, DataSource dataSource) {
+    protected StandardServiceRegistry hibernateStandardServiceRegistry(
+            @Parameter String dataSourceName,
+            DataSource dataSource) {
         Map<String,Object > additionalSettings = new LinkedHashMap<>();
         additionalSettings.put(AvailableSettings.DATASOURCE, dataSource);
         additionalSettings.put(AvailableSettings.CURRENT_SESSION_CONTEXT_CLASS, SpringSessionContext.class.getName());
         additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME,dataSourceName);
         additionalSettings.put(AvailableSettings.SESSION_FACTORY_NAME_IS_JNDI,false);
-
+        JpaConfiguration jpaConfiguration = beanLocator.findBean(JpaConfiguration.class, Qualifiers.byName(dataSourceName))
+                                                       .orElse(this.jpaConfiguration);
         return jpaConfiguration.buildStandardServiceRegistry(
                 additionalSettings
         );
@@ -93,8 +102,13 @@ public class EntityManagerFactoryBean {
     @Singleton
     @EachBean(StandardServiceRegistry.class)
     @Requires(entities = Entity.class)
-    protected MetadataSources hibernateMetadataSources(StandardServiceRegistry standardServiceRegistry) {
+    protected MetadataSources hibernateMetadataSources(
+            @Parameter String dataSourceName,
+            StandardServiceRegistry standardServiceRegistry) {
         MetadataSources metadataSources = createMetadataSources(standardServiceRegistry);
+        JpaConfiguration jpaConfiguration = beanLocator.findBean(JpaConfiguration.class, Qualifiers.byName(dataSourceName))
+                .orElse(this.jpaConfiguration);
+
         String[] packagesToScan = jpaConfiguration.getPackagesToScan();
         if(ArrayUtils.isNotEmpty(packagesToScan)) {
             environment.scan(Entity.class, packagesToScan).forEach(metadataSources::addAnnotatedClass);
