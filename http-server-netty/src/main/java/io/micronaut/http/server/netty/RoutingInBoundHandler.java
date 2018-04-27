@@ -31,6 +31,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpFilter;
@@ -719,13 +720,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (result instanceof MutableHttpResponse) {
                             response = (MutableHttpResponse<?>) result;
                         } else {
-                            response = io.micronaut.http.HttpResponse.status(status)
-                                .body(result);
+                            response = io.micronaut.http.HttpResponse.status(status).body(result);
                         }
                     } else if (result instanceof HttpStatus) {
                         response = io.micronaut.http.HttpResponse.status((HttpStatus) result);
                     } else {
-                        response = io.micronaut.http.HttpResponse.ok(result);
+                        HttpStatus status = HttpStatus.OK;
+
+                        if (routeMatch instanceof MethodBasedRouteMatch) {
+                            final MethodBasedRouteMatch rm = (MethodBasedRouteMatch) routeMatch;
+                            if (rm.hasAnnotation(Status.class)) {
+                                status = rm.getAnnotation(Status.class).value();
+                            }
+                        }
+                        response = io.micronaut.http.HttpResponse.status(status).body(result);
                     }
 
                     emitter.onNext(response);
