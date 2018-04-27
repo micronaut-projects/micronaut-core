@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client;
 
-import com.typesafe.netty.http.StreamedHttpResponse;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
