@@ -13,24 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.exceptions;
+
+package io.micronaut.http.annotation;
+
+import io.micronaut.http.HttpStatus;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Parent class of all exceptions thrown during HTTP processing
+ * <p>Sets alternative HttpStatus response code when applied to a method and HttpStatus code is specified.</p>
  *
- * @author Graeme Rocher
+ * @author Ben Rhine
  * @since 1.0
  */
-public abstract class HttpException extends RuntimeException {
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.METHOD})
+public @interface Status {
 
-    public HttpException() {
-    }
-
-    public HttpException(String message) {
-        super(message);
-    }
-
-    public HttpException(String message, Throwable cause) {
-        super(message, cause);
-    }
+    /**
+     * @return The HttpStatus specified when declared on the method
+     */
+    HttpStatus value();
 }

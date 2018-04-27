@@ -1,31 +1,54 @@
+import java.util.regex.Pattern
+
+Pattern pattern = Pattern.compile("([\\w\\-.]+):([\\w\\-]+):([\\w\\-.]+)")
+
+List<String> bomDependencies = [
+    'groovy', 'jacksonDatabind', 'nettyHandler', 'nettyHandlerProxy', 'nettyHandlerProxy', 'rxJava2', 'validation',
+    'spring', 'springContext', 'springTx'
+]
+
 publishing {
     publications {
         maven(MavenPublication) {
             pom.withXml {
                 def xml = asNode()
+
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
+
+                def parsedDependencies = dependencyVersions
+                    .findAll { dep -> dep.key in bomDependencies }
+                    .collect { dep ->
+                        def matcher = pattern.matcher((String)dep.value) ; matcher.find()
+                        [name: dep.key, group: matcher.group(1), artifact: matcher.group(2),  version: matcher.group(3)]
+                    }
 
                 xml.children().last() + {
                     def mkp = delegate
 
+                    mkp.properties {
+                        for (dep in parsedDependencies) {
+                            mkp."${dep.name}.version"(dep.version)
+                        }
+                    }
+
                     mkp.dependencyManagement {
                         mkp.dependencies {
 
-                            for(profile in profiles) {
+                            for (profile in profiles) {
                                 mkp.dependency {
                                     mkp.groupId 'io.micronaut.profiles'
                                     mkp.artifactId profile.key
                                     def version = profile.value
-                                    if(!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
+                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
                                         throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
                                     }
                                     mkp.version(version)
                                 }
                             }
 
-                            for(Project p: rootProject.subprojects) {
-                                if (p.parent.name == "configurations") continue
+                            for (Project p : rootProject.subprojects) {
+                                if (p.name == "configurations") continue
                                 if (p.name.contains("test-suite")) continue
                                 if (p.name == "examples") continue
                                 if (p.name == "bom") continue
@@ -34,6 +57,14 @@ publishing {
                                     mkp.groupId p.group
                                     mkp.artifactId p.name
                                     mkp.version p.version
+                                }
+                            }
+
+                            for (dep in parsedDependencies) {
+                                mkp.dependency {
+                                    mkp.groupId dep.group
+                                    mkp.artifactId dep.artifact
+                                    mkp.version "\${${dep.name}.version}"
                                 }
                             }
                         }

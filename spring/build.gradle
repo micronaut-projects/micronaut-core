@@ -1,7 +1,7 @@
 dependencies {
-    compile "org.springframework:spring-core:$springVersion"
-    compile "org.springframework:spring-tx:$springVersion"
-    compile "org.springframework:spring-context:$springVersion"
+    compile dependencyVersions.spring
+    compile dependencyVersions.springTx
+    compile dependencyVersions.springContext
     compile project(":inject")
     compileOnly project(":inject-java")
     compile project(":aop")
