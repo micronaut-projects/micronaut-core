@@ -18,6 +18,8 @@ package io.micronaut.http.exceptions;
 
 import io.micronaut.http.HttpStatus;
 
+import java.util.Optional;
+
 /**
  * Exception thrown to return an specific HttpStatus and an error message.
  *
@@ -55,9 +57,9 @@ public class HttpStatusException extends HttpException {
     }
 
     /**
-     * @return The body for the response
+     * @return The optional body for the response
      */
-    public Object getBody() {
-        return body;
+    public Optional<Object> getBody() {
+        return Optional.ofNullable(body);
     }
 }
