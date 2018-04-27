@@ -67,6 +67,7 @@ ext {
         neo4j                : "org.neo4j.test:neo4j-harness:$neo4jVersion",
         spring               : "org.springframework:spring-core:$springVersion",
         springContext        : "org.springframework:spring-context:$springVersion",
+        springTx             : "org.springframework:spring-tx:$springVersion",
         hystrixCore          : "com.netflix.hystrix:hystrix-core:$hystrixVersion",
         hystrixSerialization : "com.netflix.hystrix:hystrix-serialization:$hystrixVersion",
         mongoDriver          : "org.mongodb:mongo-java-driver:$mongoVersion",
