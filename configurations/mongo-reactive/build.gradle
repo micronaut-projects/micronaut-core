@@ -1,5 +1,3 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 dependencies {
     compile project(":aop")
     compile project(":runtime")
@@ -9,12 +7,14 @@ dependencies {
     compile "org.mongodb:mongodb-driver-reactivestreams:1.7.0", {
         exclude group:'org.mongodb', module:'mongodb-driver-async'
     }
-    compile "org.mongodb:mongodb-driver-async:$mongoVersion"
-    compileOnly "org.mongodb:mongo-java-driver:$mongoVersion"
+    compile dependencyVersions.mongoDriverAsync
+
+    compileOnly dependencyVersions.mongoDriver
     compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+
     testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
-    testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
-    testCompile "org.mongodb:mongo-java-driver:$mongoVersion"
+    testCompile dependencyVersions.rxJava2
+    testCompile dependencyVersions.mongoDriver
 }
 //compileJava.options.forkOptions.jvmArgs =['-verbose']
 //compileJava.options.fork=true
