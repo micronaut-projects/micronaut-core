@@ -22,6 +22,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.PropertySource
+import org.grails.datastore.mapping.validation.ValidationException
 import org.grails.orm.hibernate.cfg.Settings
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -63,7 +64,7 @@ class GormConfigSpec extends Specification {
     }
 
 
-    void "test gorm config configures gorm"() {
+    void "test gorm configured correctly"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.build([(Settings.SETTING_DB_CREATE):'create-drop'])
                                                                   .mainClass(GormConfigSpec)
@@ -91,7 +92,7 @@ class GormConfigSpec extends Specification {
         applicationContext.stop()
     }
 
-    void "test gorm config configures gorm again"() {
+    void "test gorm configured correctly again"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
@@ -110,6 +111,23 @@ class GormConfigSpec extends Specification {
         applicationContext.containsBean(DataSource)
         count == 0
 
+        when:
+        Book.withNewSession {
+            new Book(title: "").save()
+        }
+
+        then:
+        def e = thrown(ValidationException)
+
+        when:
+        count = transactionService.withTransaction {
+            new Book(title: "the stand").save()
+            Book.count
+        }
+
+        then:
+        count == 1
+
         cleanup:
         applicationContext.stop()
     }
@@ -118,6 +136,10 @@ class GormConfigSpec extends Specification {
 @Entity
 class Book {
     String title
+
+    static constraints = {
+        title blank:false
+    }
 }
 
 @Service(Book)
