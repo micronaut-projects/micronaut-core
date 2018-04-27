@@ -46,7 +46,7 @@ import java.util.stream.Stream;
 public class DefaultRouter implements Router {
 
     private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];
-    private final Collection<StatusRoute> routesByStatus = new ArrayList<>();
+    private final SortedSet<StatusRoute> routesByStatus = new TreeSet<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
 
