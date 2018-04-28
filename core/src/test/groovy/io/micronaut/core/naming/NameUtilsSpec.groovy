@@ -117,4 +117,20 @@ class NameUtilsSpec extends Specification {
         "foo"         | 'Foo'
         "foo-1"       | 'Foo1'
     }
+
+    @Unroll
+    void "test extension #filename"() {
+        expect:
+        NameUtils.extension(filename) == extension
+
+        where:
+        filename                   | extension
+        "test.xml"                 | "xml"
+        "test/one/two.xml"         | "xml"
+        "test.one.two.xml"         | "xml"
+        "test-one.json"            | "json"
+        "three.one-two.properties" | "properties"
+        ""                         | ""
+        "one/two/three"            | ""
+    }
 }
