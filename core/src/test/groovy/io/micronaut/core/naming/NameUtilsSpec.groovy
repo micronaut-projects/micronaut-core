@@ -16,6 +16,7 @@
 
 package io.micronaut.core.naming
 
+import spock.lang.IgnoreRest
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -132,5 +133,22 @@ class NameUtilsSpec extends Specification {
         "three.one-two.properties" | "properties"
         ""                         | ""
         "one/two/three"            | ""
+    }
+
+    @IgnoreRest
+    @Unroll
+    void "test filename #path"() {
+        expect:
+        NameUtils.filename(path) == filename
+
+        where:
+        path                       | filename
+        "test.xml"                 | "test"
+        "/test/one/two.xml"         | "two"
+        "test.one.two.xml"         | "test.one.two"
+        "test-one.json"            | "test-one"
+        "three.one-two.properties" | "three.one-two"
+        ""                         | ""
+        "one/two/three"            | "three"
     }
 }

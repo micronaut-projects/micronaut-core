@@ -341,11 +341,11 @@ public class NameUtils {
         int lastWindowsPos = path.lastIndexOf('\\');
         int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
 
-        int index = lastSeparator > extensionPos ? -1 : extensionPos;
+        int index = lastSeparator > extensionPos ? path.length() : extensionPos;
         if (index == -1) {
             return "";
         } else {
-            return path.substring(lastSeparator - 1, index - 1);
+            return path.substring(lastSeparator + 1, index);
         }
     }
 
