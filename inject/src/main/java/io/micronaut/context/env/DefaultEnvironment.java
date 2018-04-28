@@ -35,17 +35,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -66,6 +63,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
+    private static final String PROPERTY_SOURCES_SYSTEM_PROPERTY_KEY = "micronaut.config.files";
+    private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
 
     private final Set<String> names;
@@ -76,6 +75,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
+    private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
 
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
@@ -291,6 +291,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     protected void readPropertySources(String name) {
         List<PropertySource> propertySources = readPropertySourceList(name);
+        propertySources.addAll(readPropertySourceListFromSystemProperties(PROPERTY_SOURCES_SYSTEM_PROPERTY_KEY));
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
             if(LOG.isDebugEnabled()) {
@@ -299,6 +300,44 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             processPropertySource(propertySource, propertySource.getConvention());
         }
 
+    }
+
+    /**
+     * Resolve the property sources for files passed via system property.
+     *
+     * @param key The key or System property which has list of property sources
+     * @return The list of property sources for each file in system property
+     */
+    protected List<PropertySource> readPropertySourceListFromSystemProperties(String key) {
+        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
+        Optional<String> files = Optional.ofNullable(System.getProperty(key));
+        Optional<Collection<String>> filePathList = files
+                .filter(value -> !value.isEmpty())
+                .map(value -> value.split(FILE_SEPARATOR))
+                .map(Arrays::asList)
+                .map(Collections::unmodifiableList);
+
+        filePathList.ifPresent(list -> {
+            if (!list.isEmpty()) {
+                list.forEach(filePath -> {
+                    if (!propertySourceLoaders.isEmpty()) {
+                        String extension = NameUtils.extension(filePath);
+                        String fileName = NameUtils.filename(filePath);
+                        Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
+                        if (propertySourceLoader.isPresent()) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                            }
+                            readPropertySourceFromLoader(fileName, filePath, propertySourceLoader.get(), propertySources);
+                        } else {
+                            throw new ConfigurationException("Unsupported properties file format: " + fileName);
+                        }
+                    }
+                });
+            }
+        });
+        return propertySources;
     }
 
     protected List<PropertySource> readPropertySourceList(String name) {
@@ -353,6 +392,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (definition.isPresent()) {
                 PropertySourceLoader loader = definition.load();
                 allLoaders.add(loader);
+                Set<String> extensions = loader.getExtensions();
+                for (String extension : extensions) {
+                    loaderByFormatMap.put(extension, loader);
+                }
             }
         }
         return allLoaders;
@@ -365,6 +408,28 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         for (String activeName : activeNames) {
             Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
             propertySource.ifPresent(propertySources::add);
+        }
+    }
+
+    /**
+     * Read the property source.
+     *
+     * @param fileName             Name of the file to be used as property source name
+     * @param filePath             Absolute file path
+     * @param propertySourceLoader The appropriate property source loader
+     * @param propertySources      List of property sources to add to
+     * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
+     */
+    private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                InputStream inputStream = new FileInputStream(file);
+                Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream);
+                propertySources.add(PropertySource.of(properties));
+            }
+        } catch (IOException e) {
+            throw new ConfigurationException("Unsupported properties file: " + fileName);
         }
     }
 

@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.naming.NameUtils
 import spock.lang.Specification
 
 /**
@@ -99,5 +101,63 @@ class DefaultEnvironmentSpec extends Specification {
         !env.activeNames.contains("foo")
         !env.activeNames.contains("x")
         !env.containsProperty("foo")
+    }
+
+    void "test system property source loader"() {
+        given: "a configuration property file is passed from system properties"
+        File configPropertiesFile = File.createTempFile("default", ".properties")
+        configPropertiesFile.write("foo=bar")
+        System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath}")
+
+        when: "load the property sources"
+        Environment env = new DefaultEnvironment("test").start()
+
+        then: "should be loaded from property source"
+        env.getProperty("foo", String).get() == "bar"
+
+        when: "multiple files are passed from system properties"
+        File anotherFile = File.createTempFile("config-file", ".properties")
+        anotherFile.write("testname=DefaultEnvironmentSpec")
+        System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath},${anotherFile.absolutePath}")
+
+        and: "load the property sources"
+        env.refresh()
+
+        then: "should load values from all files"
+        env.getProperty("foo", String).get() == "bar"
+        env.getProperty("testname", String).get() == "DefaultEnvironmentSpec"
+
+        when: "propertySource loader does not exists"
+        File unsupportedFile = File.createTempFile("unsupported", ".xml")
+        anotherFile.write("""
+<?xml version="1.0" encoding="UTF-8"?>
+<foo>bar</foo>
+""")
+        System.setProperty("micronaut.config.files", "${unsupportedFile.absolutePath}")
+
+        and: "load the property sources"
+        env.refresh()
+
+        then: "should throw exception"
+        def e = thrown(ConfigurationException)
+        e.message == "Unsupported properties file format: " + NameUtils.filename(unsupportedFile.absolutePath)
+
+        when: "file from system property source loader override the key"
+        System.setProperty("foo.baz", "10")
+        File config = File.createTempFile("config-file", ".properties")
+        config.write("foo.baz=50")
+        System.setProperty("micronaut.config.files", "${config.absolutePath}")
+
+        and:
+        env = new DefaultEnvironment("test").start()
+
+        then:
+        env.getProperty("foo.baz", Integer).get() == 50
+
+        when:"nothing is passed to micronaut.config.files"
+        System.setProperty("micronaut.config.files", "")
+
+        then: "should start normally"
+        new DefaultEnvironment("test").start()
     }
 }
