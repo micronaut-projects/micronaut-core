@@ -16,7 +16,6 @@
 
 package io.micronaut.core.naming
 
-import spock.lang.IgnoreRest
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -135,7 +134,6 @@ class NameUtilsSpec extends Specification {
         "one/two/three"            | ""
     }
 
-    @IgnoreRest
     @Unroll
     void "test filename #path"() {
         expect:
