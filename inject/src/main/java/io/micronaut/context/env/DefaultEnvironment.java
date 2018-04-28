@@ -22,6 +22,8 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
+import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -422,10 +424,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
         try {
-            File file = new File(filePath);
-            if (file.exists()) {
-                InputStream inputStream = new FileInputStream(file);
-                Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream);
+            ResourceLoader resourceLoader = FileSystemResourceLoader.defaultLoader();
+            Optional<InputStream> inputStream = resourceLoader.getResourceAsStream(filePath);
+            if (inputStream.isPresent()) {
+                Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
                 propertySources.add(PropertySource.of(properties));
             }
         } catch (IOException e) {
