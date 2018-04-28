@@ -1269,14 +1269,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private ExecutableElementParamInfo populateParameterData(ExecutableElement element) {
+            if (element == null) {
+                return new ExecutableElementParamInfo(false, null);
+            }
             AnnotationMetadata elementMetadata = annotationUtils.getAnnotationMetadata(element);
             ExecutableElementParamInfo params = new ExecutableElementParamInfo(
                     modelUtils.isPrivate(element),
                     elementMetadata
             );
-            if (element == null) {
-                return params;
-            }
             element.getParameters().forEach(paramElement -> {
 
                 String argName = paramElement.getSimpleName().toString();
