@@ -144,9 +144,9 @@ class DefaultEnvironmentSpec extends Specification {
 
         when: "file from system property source loader override the key"
         System.setProperty("foo.baz", "10")
-        File config = File.createTempFile("config-file", ".properties")
-        config.write("foo.baz=50")
-        System.setProperty("micronaut.config.files", "${config.absolutePath}")
+        configPropertiesFile = File.createTempFile("config-file", ".properties")
+        configPropertiesFile.write("foo.baz=50")
+        System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath}")
 
         and:
         env = new DefaultEnvironment("test").start()
@@ -159,5 +159,17 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should start normally"
         new DefaultEnvironment("test").start()
+
+        when: "file is is passed as file:path"
+        configPropertiesFile = File.createTempFile("config-file", ".properties")
+        configPropertiesFile.write("foo.baz=100")
+        System.setProperty("micronaut.config.files", "file:${configPropertiesFile.absolutePath}")
+
+        and:
+        env = new DefaultEnvironment("test").start()
+
+        then: "property is set"
+        env.getProperty("foo.baz", Integer).get() == 100
+
     }
 }
