@@ -34,7 +34,7 @@ class ConstructorExceptionSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(DependencyInjectionException)
         //e.cause.message == 'bad'
-        e.message == '''\
+        e.message.normalize() == '''\
 Failed to inject value for parameter [c] of class: io.micronaut.inject.failures.ctorexception.A
 
 Path Taken: B.a --> new A([C c])'''

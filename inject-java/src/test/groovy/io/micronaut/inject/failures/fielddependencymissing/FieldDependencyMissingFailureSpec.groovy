@@ -33,7 +33,7 @@ class FieldDependencyMissingFailureSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(DependencyInjectionException)
-        e.message == '''\
+        e.message.normalize() == '''\
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.fielddependencymissing.B
 
 Path Taken: B.a'''
