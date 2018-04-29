@@ -1,4 +1,4 @@
-The server starts by default on a random port. However, you can set the server to run in a specific port:
+The server starts by default on a random port. However, you can set the server to run on a specific port:
 
 [source, yaml]
 ----
