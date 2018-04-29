@@ -36,7 +36,7 @@ aop:
 httpServer:
   title: The HTTP Server
   runningServer: Running the Embedded Server
-  runningSpecificPort: Running Server on an specific Port
+  runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
   staticResources: Serving Static Resources
   binding: Simple Request Binding
