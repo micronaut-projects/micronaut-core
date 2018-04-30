@@ -18,10 +18,12 @@ package io.micronaut.context.env;
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
 import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.cli.Option;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
@@ -36,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.print.attribute.standard.MediaSize;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -422,9 +425,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
      */
     private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
+        ResourceResolver resourceResolver = new ResourceResolver();
+        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
+        ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
         try {
-            ResourceLoader resourceLoader = FileSystemResourceLoader.defaultLoader();
-            Optional<InputStream> inputStream = resourceLoader.getResourceAsStream(filePath);
+            Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
             if (inputStream.isPresent()) {
                 Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
                 propertySources.add(PropertySource.of(properties));
