@@ -48,7 +48,7 @@ public @interface Requires {
     /**
      * Expresses that the configuration will not load within the given environments
      *
-     * @return The names of the environments this configuration will load in
+     * @return The names of the environments this configuration will not load in
      */
     String[] notEnv() default {};
 
