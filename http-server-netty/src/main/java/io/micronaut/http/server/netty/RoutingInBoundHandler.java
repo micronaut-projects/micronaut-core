@@ -703,14 +703,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
                     }
                     Object result = routeMatch.execute();
+                    Class declaringType = ((MethodBasedRouteMatch) routeMatch).getDeclaringType();
 
                     if (result == null) {
                         Class<?> javaReturnType = routeMatch.getReturnType().getType();
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
-                            // This happens ex: when the route has a return type of String and it returns null
-                            // in the CustomeStaticMapping Test, try changing the simple() call to return null
-                            result = router.route(HttpStatus.NOT_FOUND)
+                            Optional<RouteMatch<Object>> statusRoute;
+                            // if declaringType is not null, this means its a locally marked method handler
+                            if (declaringType != null) {
+                                statusRoute = router.route(declaringType, HttpStatus.NOT_FOUND);
+                            } else {
+                                statusRoute = router.route(HttpStatus.NOT_FOUND);
+                            }
+                            result = statusRoute
                                 .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                 .filter(RouteMatch::isExecutable)
                                 .map(RouteMatch::execute)
@@ -729,9 +735,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         HttpStatus status = ((io.micronaut.http.HttpResponse) result).getStatus();
                         if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
 
-                            // PASS IN DECALRING TYPE HERE ALSO
                             // handle re-mapping of errors
-                            Class declaringType = ((MethodBasedRouteMatch) routeMatch).getDeclaringType();
                             result = router.route(declaringType, status)
                                 .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                 .filter(RouteMatch::isExecutable)

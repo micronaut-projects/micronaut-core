@@ -77,6 +77,16 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
     }
 
+    void "test that a not found response request data can be handled by a local method"() {
+        when:
+        rxClient.exchange('/test1/notFound').blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.NOT_FOUND.code
+        e.response.reason() == "We cannot find anything - from Test1Controller.notFoundHandler()"
+    }
+
     @Controller
     @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
@@ -84,6 +94,11 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         @Get
         HttpResponse bad() {
             HttpResponse.badRequest()
+        }
+
+        @Get
+        HttpResponse notFound() {
+            null // return a null to simulate a query is not found
         }
 
         @Post
@@ -94,6 +109,11 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         @Error(status = HttpStatus.BAD_REQUEST)
         HttpResponse badHandler() {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test1Controller.badHandler()")
+        }
+
+        @Error(status = HttpStatus.NOT_FOUND)
+        HttpResponse notFoundHandler() {
+            HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test1Controller.notFoundHandler()")
         }
     }
 
