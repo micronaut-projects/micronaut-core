@@ -736,12 +736,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
 
                             // handle re-mapping of errors
-                            result = router.route(declaringType, status)
-                                .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
-                                .filter(RouteMatch::isExecutable)
-                                .map(RouteMatch::execute)
-                                .map(Object.class::cast)
-                                .orElse(result);
+                            Optional<RouteMatch<Object>> statusRoute;
+                            // if declaringType is not null, this means its a locally marked method handler
+                            if (declaringType != null) {
+                                statusRoute = router.route(declaringType, status);
+                            } else {
+                                statusRoute = router.route(status);
+                            }
+                            result = statusRoute
+                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
+                                    .filter(RouteMatch::isExecutable)
+                                    .map(RouteMatch::execute)
+                                    .map(Object.class::cast)
+                                    .orElse(NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.notFound()));
                         }
                         if (result instanceof MutableHttpResponse) {
                             response = (MutableHttpResponse<?>) result;
