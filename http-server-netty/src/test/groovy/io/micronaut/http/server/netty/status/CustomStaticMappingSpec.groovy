@@ -87,6 +87,18 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         e.response.reason() == "We cannot find anything - from Test1Controller.notFoundHandler()"
     }
 
+    void "test that a unsupported media type is handled by a local method"() {
+        when:
+        HttpResponse<String> response = rxClient.exchange(
+                HttpRequest.POST('/test1/simple', [name: "Fred", age: 35])
+                        .contentType(MediaType.APPLICATION_XML)
+        ).blockingFirst()
+
+        then:
+        // in this body I dont get any string, and i dont understand why
+        response.getBody().get() == ""
+    }
+
     @Controller
     @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
@@ -114,6 +126,11 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         @Error(status = HttpStatus.NOT_FOUND)
         HttpResponse notFoundHandler() {
             HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test1Controller.notFoundHandler()")
+        }
+
+        @Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE, global = true)
+        String unsupportedMediaTypeHandler() {
+            "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"
         }
     }
 
