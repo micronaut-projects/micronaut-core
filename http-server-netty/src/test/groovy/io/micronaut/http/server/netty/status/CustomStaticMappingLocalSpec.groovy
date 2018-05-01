@@ -29,9 +29,10 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 
 /**
+ * Test the non global attribute for @Error.
  * Created by graemerocher on 13/09/2017.
  */
-class CustomStaticMappingSpec extends AbstractMicronautSpec {
+class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by the locally marked controller"() {
         when:
@@ -87,6 +88,9 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         e.response.reason() == "We cannot find anything - from Test1Controller.notFoundHandler()"
     }
 
+    /**
+     * This fails currently
+     */
     void "test that a unsupported media type is handled by a local method"() {
         when:
         HttpResponse<String> response = rxClient.exchange(
@@ -100,7 +104,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
     }
 
     @Controller
-    @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
+    @Requires(property = 'spec.name', value = 'CustomStaticMappingLocalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test1Controller {
         @Get
@@ -135,7 +139,7 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
     }
 
     @Controller
-    @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
+    @Requires(property = 'spec.name', value = 'CustomStaticMappingLocalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test2Controller {
         @Get
