@@ -20,27 +20,23 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
 
 /**
- * Created by graemerocher on 13/09/2017.
+ * Tests the global attribute for @Error
  */
-class CustomStaticMappingSpec extends AbstractMicronautSpec {
+class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
-    void "test that a bad request is handled is handled by the locally marked controller"() {
+    void "test that a bad request is handled is handled by a globally marked controller method"() {
         when:
         rxClient.exchange('/test1/bad').blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff - from Test1Controller.badHandler()"
+        e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
         when:
         rxClient.exchange('/test2/bad').blockingFirst()
@@ -52,17 +48,17 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
 
     }
 
-    void "test that a bad request response for invalid request data can be redirected by the router to the local method"() {
+    void "test that a bad request response for invalid request data can be handled by a globally marked controller method"() {
         when:
         rxClient.exchange(
                 HttpRequest.POST('/test1/simple', [name:"Fred"])
-                           .contentType(MediaType.FORM)
+                        .contentType(MediaType.FORM)
         ).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
-        e.response.reason() == "You sent me bad stuff - from Test1Controller.badHandler()"
+        e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
         when:
         rxClient.exchange(
@@ -84,23 +80,11 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.NOT_FOUND.code
-        e.response.reason() == "We cannot find anything - from Test1Controller.notFoundHandler()"
-    }
-
-    void "test that a unsupported media type is handled by a local method"() {
-        when:
-        HttpResponse<String> response = rxClient.exchange(
-                HttpRequest.POST('/test1/simple', [name: "Fred", age: 35])
-                        .contentType(MediaType.APPLICATION_XML)
-        ).blockingFirst()
-
-        then:
-        // in this body I dont get any string, and i dont understand why
-        response.getBody().get() == ""
+        e.response.reason() == "We cannot find anything - from Test2Controller.notFoundHandler()"
     }
 
     @Controller
-    @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
+    @Requires(property = 'spec.name', value = 'CustomStaticMappingGlobalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test1Controller {
         @Get
@@ -117,25 +101,10 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
         HttpResponse notFound() {
             null // return a null to simulate a query is not found
         }
-
-        @Error(status = HttpStatus.BAD_REQUEST)
-        HttpResponse badHandler() {
-            HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test1Controller.badHandler()")
-        }
-
-        @Error(status = HttpStatus.NOT_FOUND)
-        HttpResponse notFoundHandler() {
-            HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test1Controller.notFoundHandler()")
-        }
-
-        @Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE, global = true)
-        String unsupportedMediaTypeHandler() {
-            "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"
-        }
     }
 
     @Controller
-    @Requires(property = 'spec.name', value = 'CustomStaticMappingSpec')
+    @Requires(property = 'spec.name', value = 'CustomStaticMappingGlobalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test2Controller {
         @Get
@@ -148,9 +117,14 @@ class CustomStaticMappingSpec extends AbstractMicronautSpec {
             "name: $name, age: $age"
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatus.BAD_REQUEST, global = true)
         HttpResponse badHandler() {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test2Controller.badHandler()")
+        }
+
+        @Error(status = HttpStatus.NOT_FOUND, global = true)
+        HttpResponse notFoundHandler() {
+            HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test2Controller.notFoundHandler()")
         }
     }
 }
