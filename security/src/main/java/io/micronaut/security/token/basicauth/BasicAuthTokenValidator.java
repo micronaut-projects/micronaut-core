@@ -33,10 +33,11 @@ import java.util.Optional;
 
 /**
  * Basic Auth Token Validator.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = BasicAuthTokenReaderConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = BasicAuthTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @Singleton
 public class BasicAuthTokenValidator implements TokenValidator {
 

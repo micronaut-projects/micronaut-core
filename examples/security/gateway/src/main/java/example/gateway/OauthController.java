@@ -6,7 +6,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.endpoints.TokenRefreshRequest;
-import io.micronaut.security.token.render.AccessRefreshToken;
+import io.micronaut.security.token.jwt.render.AccessRefreshToken;
 import javax.inject.Singleton;
 
 @Singleton

@@ -21,7 +21,7 @@ import io.micronaut.core.util.Toggleable;
 /**
  * Defines Security Token Configuration.
  * @author Sergio del Amo
- * @version 1.0
+ * @since 1.0
  */
 public interface TokenConfiguration extends Toggleable {
 

@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEvent;
 
 /**
  * Event triggered when the user logs out.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

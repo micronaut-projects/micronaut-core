@@ -22,7 +22,7 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 /**
  * Defines Security Token Configuration.
  * @author Sergio del Amo
- * @version 1.0
+ * @since 1.0
  */
 @ConfigurationProperties(TokenConfigurationProperties.PREFIX)
 public class TokenConfigurationProperties implements TokenConfiguration {
@@ -30,7 +30,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".token";
 
     private static final String DEFAULT_ROLES_NAME = "roles";
-    protected boolean enabled = false;
+    protected boolean enabled = true;
     protected String rolesName = DEFAULT_ROLES_NAME;
 
     @Override

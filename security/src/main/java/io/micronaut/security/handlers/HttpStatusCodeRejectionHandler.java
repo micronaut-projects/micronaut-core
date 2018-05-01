@@ -22,13 +22,13 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.security.filters.SecurityFilter;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 
 /**
- * Handles the rejection of route by {@link SecurityFilter} with the response of correspondent HTTP Status coded.
+ * Handles the rejection of route by {@link io.micronaut.security.filters.SecurityFilter} with the response of correspondent HTTP Status coded.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

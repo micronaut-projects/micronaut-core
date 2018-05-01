@@ -18,11 +18,11 @@ package io.micronaut.security.handlers;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.security.filters.SecurityFilter;
 import org.reactivestreams.Publisher;
 
 /**
- * Describes the bean responsible of rejecting a route flagged by {@link SecurityFilter}.
+ * Describes the bean responsible of rejecting a route flagged by {@link io.micronaut.security.filters.SecurityFilter}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

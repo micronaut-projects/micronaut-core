@@ -24,6 +24,7 @@ import java.util.Optional;
 
 /**
  * Reads a token from an HTTP request and removes prefix from HTTP Header Value.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

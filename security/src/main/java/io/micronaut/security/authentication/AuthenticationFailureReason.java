@@ -18,6 +18,7 @@ package io.micronaut.security.authentication;
 
 /**
  * Enums describes the different authentication failures.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

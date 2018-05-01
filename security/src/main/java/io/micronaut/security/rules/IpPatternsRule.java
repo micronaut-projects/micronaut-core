@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 /**
  * A security rule implementation backed by the {@link SecurityConfigurationProperties#getIpPatterns()} ()}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

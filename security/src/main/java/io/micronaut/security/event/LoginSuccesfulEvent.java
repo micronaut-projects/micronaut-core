@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEvent;
 
 /**
  * Event triggered when a successful login takes place.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

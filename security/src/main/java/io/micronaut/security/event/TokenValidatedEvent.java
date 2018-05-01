@@ -20,8 +20,9 @@ import io.micronaut.context.event.ApplicationEvent;
 
 /**
  * Triggered when a token is validated.
+ *
  * @author Sergio del Amo
- * @version 1.0
+ * @since 1.0
  */
 public class TokenValidatedEvent extends ApplicationEvent {
 

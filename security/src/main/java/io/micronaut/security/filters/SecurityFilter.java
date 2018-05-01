@@ -26,19 +26,19 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.handlers.RejectionHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
-import io.micronaut.session.http.HttpSessionFilter;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * JWT Filter.
+ * Security Filter.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -47,16 +47,16 @@ import java.util.stream.Collectors;
 public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     /**
-     * The order of the rule.
-     */
-    public static final Integer ORDER = HttpSessionFilter.ORDER + 100;
-
-    /**
      * The attribute used to store the authentication object in the request.
      */
     public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
 
     private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
+
+    /**
+     * The order of the Security Filter.
+     */
+    protected final Integer order;
 
     protected final Collection<SecurityRule> securityRules;
     protected final Collection<AuthenticationFetcher> authenticationFetchers;
@@ -66,13 +66,16 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
      * @param securityRules The list of rules that will allow or reject the request
      * @param authenticationFetchers List of {@link AuthenticationFetcher} beans in the context.
      * @param rejectionHandler Bean which handles routes which need to be rejected
+     * @param securityFilterOrderProvider filter order provider
      */
     public SecurityFilter(Collection<SecurityRule> securityRules,
                           Collection<AuthenticationFetcher> authenticationFetchers,
-                          RejectionHandler rejectionHandler) {
+                          RejectionHandler rejectionHandler,
+                          @Nullable SecurityFilterOrderProvider securityFilterOrderProvider) {
         this.securityRules = securityRules;
         this.authenticationFetchers = authenticationFetchers;
         this.rejectionHandler = rejectionHandler;
+        this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getSecurityFilterOrder() : 0;
     }
 
     private Optional<RouteMatch> getRouteMatch(HttpRequest<?> request) {
@@ -105,12 +108,10 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         Optional<RouteMatch> routeMatch = getRouteMatch(request);
 
         if (LOG.isDebugEnabled()) {
-            if (attributes.isPresent()) {
-                LOG.debug("Attributes: {}", attributes.get().entrySet()
-                        .stream()
-                        .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                        .collect(Collectors.joining(", ")));
-            }
+            attributes.ifPresent(stringObjectMap -> LOG.debug("Attributes: {}", stringObjectMap.entrySet()
+                    .stream()
+                    .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                    .collect(Collectors.joining(", "))));
             if (authentication.isPresent()) {
                 LOG.debug("Failure to authenticate request. {} {}.", method, path);
             }
@@ -138,6 +139,6 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
     @Override
     public int getOrder() {
-        return ORDER;
+        return order;
     }
 }

@@ -17,7 +17,8 @@
 package io.micronaut.security.authentication;
 
 /**
- * 
+ * Defines an authentication provider.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

@@ -1,11 +1,13 @@
 package io.micronaut.security.authorization
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.management.endpoint.Endpoint
 import io.micronaut.management.endpoint.Read
 
 import javax.annotation.Nullable
 import java.security.Principal
 
+@Requires(property = 'spec.name', value = 'authorization')
 @Endpoint("nonSensitive")
 class NonSensitiveEndpoint {
 

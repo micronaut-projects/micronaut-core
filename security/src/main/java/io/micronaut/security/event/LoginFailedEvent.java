@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEvent;
 
 /**
  * Event triggered when an unsuccessful login takes place.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

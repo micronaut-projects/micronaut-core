@@ -24,6 +24,9 @@ import java.util.Optional;
 
 /**
  * Describes a bean which attempts to read an {@link Authentication} from a {@link HttpRequest} being executed.
+ *
+ * @author Sergio del Amo
+ * @since 1.0
  */
 public interface AuthenticationFetcher extends Ordered {
 

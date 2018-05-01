@@ -22,6 +22,7 @@ import java.util.Optional;
 
 /**
  * Authenticated user's representation.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

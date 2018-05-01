@@ -8,24 +8,18 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.PrincipalArgumentBinder
-import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.token.render.BearerAccessRefreshToken
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class AuthorizationSpec extends Specification implements AuthorizationUtils {
+class AuthorizationSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.authentication': true,
+            'spec.name': 'authorization',
             'endpoints.health.enabled': true,
             'endpoints.health.sensitive': true,
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login': true,
-            'micronaut.security.token.enabled': true,
-            'micronaut.security.token.jwt.enabled': true,
-            'micronaut.security.token.jwt.generator.signature.enabled': true,
-            'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
             'micronaut.security.interceptUrlMap': [
                     [pattern: '/urlMap/admin', access: ['ROLE_ADMIN', 'ROLE_X']],
                     [pattern: '/urlMap/**',    access: 'isAuthenticated()'],
@@ -36,7 +30,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test /health is secured"() {
         when:
-        get("/health")
+        client.toBlocking().exchange(HttpRequest.GET("/health"))
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -45,7 +39,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing an anonymous without authentication"() {
         when:
-        HttpResponse<String> response = get("/anonymous/hello")
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/anonymous/hello"), String)
 
         then:
         response.body() == 'You are anonymous'
@@ -56,13 +50,8 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
         embeddedServer.applicationContext.getBean(PrincipalArgumentBinder.class)
 
         when:
-        String token = loginWith("valid")
-
-        then:
-        token
-
-        when:
-        HttpResponse<String> response = get("/anonymous/hello", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/anonymous/hello")
+                .basicAuth("valid", "password"), String)
 
         then:
         response.body() == 'You are valid'
@@ -70,17 +59,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing the url map controller without authentication"() {
         when:
-        get("/urlMap/authenticated")
-
-        then:
-        HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
-    }
-
-    void "attempt to login with bad credentials"() {
-        when:
-        def creds = new UsernamePasswordCredentials("notFound", "password")
-        client.toBlocking().exchange(HttpRequest.POST('/login', creds), BearerAccessRefreshToken)
+        client.toBlocking().exchange(HttpRequest.GET("/urlMap/authenticated"))
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -89,38 +68,26 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing the url map controller"() {
         when:
-        String token = loginWith("valid")
-
-        then:
-        token
-
-        when:
-        HttpResponse<String> response = get("/urlMap/authenticated", token)
-
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/urlMap/authenticated")
+                .basicAuth("valid", "password"), String)
         then:
         response.body() == "valid is authenticated"
     }
 
     void "test accessing the url map controller and bind to java.util.Principal"() {
         when:
-        String token = loginWith("valid")
-
-        then:
-        token
-
-        when:
-        HttpResponse<String> response = get("/urlMap/principal", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/urlMap/principal")
+                .basicAuth("valid", "password"), String)
 
         then:
         response.body() == "valid is authenticated"
     }
 
     void "test accessing the url map admin action without the required role"() {
-        given:
-        String token = loginWith("valid")
-
         when:
-        get("/urlMap/admin", token)
+        client.toBlocking().exchange(HttpRequest.GET("/urlMap/admin")
+                .basicAuth("valid", "password"), String)
+
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -128,19 +95,17 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing the url map admin action with the required role"() {
-        given:
-        String token = loginWith("admin")
-
         when:
-        HttpResponse<String> response = get("/urlMap/admin", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/urlMap/admin")
+                .basicAuth("admin", "password"), String)
 
         then:
         response.body() == "You have admin"
     }
 
-    void "test accessing the secured controller without authentication"() {
+    void "test accessing the secured controller without authentication"() {when:
         when:
-        get("/secured/authenticated")
+        client.toBlocking().exchange(HttpRequest.GET("/secured/authenticated"))
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -148,22 +113,18 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing the secured controller"() {
-        given:
-        String token = loginWith("valid")
-
         when:
-        HttpResponse<String> response = get("/secured/authenticated", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/secured/authenticated")
+                .basicAuth("valid", "password"), String)
 
         then:
         response.body() == "valid is authenticated"
     }
 
     void "test accessing the secured admin action without the required role"() {
-        given:
-        String token = loginWith("valid")
-
         when:
-        get("/secured/admin", token)
+        client.toBlocking().exchange(HttpRequest.GET("/secured/admin")
+                .basicAuth("valid", "password"), String)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -171,22 +132,18 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing the secured admin action with the required role"() {
-        given:
-        String token = loginWith("admin")
-
         when:
-        HttpResponse<String> response = get("/secured/admin", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/secured/admin")
+                .basicAuth("admin", "password"), String)
 
         then:
         response.body() == "You have admin"
     }
 
     void "test accessing a controller without a rule"() {
-        given:
-        String token = loginWith("valid")
-
         when:
-        get("/noRule/index", token)
+        client.toBlocking().exchange(HttpRequest.GET("/noRule/index")
+                .basicAuth("valid", "password"), String)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -195,7 +152,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing a non sensitive endpoint without authentication"() {
         when:
-        HttpResponse<String> response = get("/nonSensitive")
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/nonSensitive"), String)
 
         then:
         response.body() == "Not logged in"
@@ -203,13 +160,8 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing a non sensitive endpoint with authentication"() {
         when:
-        String token = loginWith("valid")
-
-        then:
-        token
-
-        when:
-        HttpResponse<String> response = get("/nonSensitive", token)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/nonSensitive")
+                .basicAuth("valid", "password"), String)
 
         then:
         response.body() == "Logged in as valid"
@@ -217,7 +169,7 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
 
     void "test accessing a sensitive endpoint without authentication"() {
         when:
-        get("/sensitive")
+        client.toBlocking().exchange(HttpRequest.GET("/sensitive"), String)
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -225,12 +177,9 @@ class AuthorizationSpec extends Specification implements AuthorizationUtils {
     }
 
     void "test accessing a sensitive endpoint with authentication"() {
-        given:
-        String token = loginWith("valid")
-
         when:
-        HttpResponse<String> response = get("/sensitive", token)
-
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/sensitive")
+                .basicAuth("valid", "password"), String)
         then:
         response.body() == "Hello valid"
     }

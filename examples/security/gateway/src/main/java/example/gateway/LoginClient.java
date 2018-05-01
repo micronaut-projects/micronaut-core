@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.client.Client;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.endpoints.LoginController;
-import io.micronaut.security.token.render.BearerAccessRefreshToken;
+import io.micronaut.security.token.jwt.render.BearerAccessRefreshToken;
 
 /**
  * @author Sergio del Amo

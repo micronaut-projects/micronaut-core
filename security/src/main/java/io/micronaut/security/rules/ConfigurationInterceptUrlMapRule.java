@@ -25,6 +25,7 @@ import java.util.List;
 
 /**
  * A security rule implementation backed by the {@link SecurityConfiguration#getInterceptUrlMap()}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

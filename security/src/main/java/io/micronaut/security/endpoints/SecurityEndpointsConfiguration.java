@@ -30,7 +30,7 @@ public interface SecurityEndpointsConfiguration {
     boolean isLogin();
 
     /**
-     * @return true if you want to enable the {@link OauthController}
+     * @return true if you want to enable the refresh endpoint;
      */
     boolean isRefresh();
 

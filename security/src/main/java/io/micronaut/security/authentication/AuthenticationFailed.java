@@ -21,6 +21,7 @@ import java.util.Optional;
 
 /**
  * Signalises an authentication failure and stores the failure reason.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

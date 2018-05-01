@@ -21,6 +21,9 @@ import java.util.Map;
 
 /**
  * Adapter from {@link UserDetails} to {@link Authentication}.
+ *
+ * @author Sergio del Amo
+ * @since 1.0
  */
 public class AuthenticationUserDetailsAdapter implements Authentication {
 

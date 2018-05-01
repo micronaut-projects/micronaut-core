@@ -10,7 +10,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.token.render.AccessRefreshToken
+import io.micronaut.security.token.jwt.render.AccessRefreshToken
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.Shared

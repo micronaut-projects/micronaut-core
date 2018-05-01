@@ -21,7 +21,7 @@ import io.micronaut.http.client.Client;
 import io.micronaut.security.endpoints.OauthController;
 import io.micronaut.security.endpoints.OauthControllerApi;
 import io.micronaut.security.endpoints.TokenRefreshRequest;
-import io.micronaut.security.token.render.AccessRefreshToken;
+import io.micronaut.security.token.jwt.render.AccessRefreshToken;
 
 /**
  * @author Sergio del Amo

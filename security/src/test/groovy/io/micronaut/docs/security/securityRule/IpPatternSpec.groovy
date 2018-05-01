@@ -2,15 +2,15 @@ package io.micronaut.docs.security.securityRule
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.YamlAsciidocTagCleaner
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.security.authorization.AuthorizationUtils
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class IpPatternSpec extends Specification implements AuthorizationUtils, YamlAsciidocTagCleaner {
+class IpPatternSpec extends Specification implements YamlAsciidocTagCleaner {
 
     String yamlConfig = '''\
 //tag::yamlconfig[]
@@ -36,10 +36,6 @@ micronaut:
     Map<String, Object> config = [
             'endpoints.health.enabled'                 : true,
             'endpoints.health.sensitive'               : false,
-            'micronaut.security.token.enabled'           : true,
-            'micronaut.security.token.jwt.enabled'           : true,
-            'micronaut.security.token.jwt.generator.signature.enabled': true,
-            'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
     ] << flatten(ipPatternsMap)
 
     @Shared
@@ -52,7 +48,7 @@ micronaut:
 
     void "test accessing a resource from a whitelisted IP is successful"() {
         when:
-        get("/health")
+        client.toBlocking().exchange(HttpRequest.GET("/health"), String)
 
         then:
         noExceptionThrown()

@@ -7,7 +7,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
-import io.micronaut.security.token.render.BearerAccessRefreshToken;
+import io.micronaut.security.token.jwt.render.BearerAccessRefreshToken;
 
 @Controller("/")
 public class LoginController {

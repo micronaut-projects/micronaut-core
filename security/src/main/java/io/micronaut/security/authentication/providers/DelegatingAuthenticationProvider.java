@@ -25,6 +25,7 @@ import java.util.Optional;
 
 /**
  * AuthenticationProvider typically used with a persistence mechanism such as a DB.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

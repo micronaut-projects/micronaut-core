@@ -26,7 +26,7 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
 @ConfigurationProperties(BasicAuthTokenReaderConfigurationProperties.PREFIX)
 public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTokenReaderConfiguration {
 

@@ -12,7 +12,7 @@ import io.micronaut.security.authentication.Authentication
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.endpoints.TokenRefreshRequest
 import io.micronaut.security.token.jwt.generator.claims.JwtClaims
-import io.micronaut.security.token.render.AccessRefreshToken
+import io.micronaut.security.token.jwt.render.AccessRefreshToken
 import io.micronaut.security.token.validator.TokenValidator
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
