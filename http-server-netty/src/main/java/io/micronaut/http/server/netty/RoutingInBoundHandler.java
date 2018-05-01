@@ -709,12 +709,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Class<?> javaReturnType = routeMatch.getReturnType().getType();
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
-                            Optional<RouteMatch<Object>> statusRoute = null;
+                            Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                             // if declaringType is not null, this means its a locally marked method handler
                             if (declaringType != null) {
                                 statusRoute = router.route(declaringType, HttpStatus.NOT_FOUND);
                             }
-                            if (statusRoute == null){
+                            if (!statusRoute.isPresent()){
                                 statusRoute = router.route(HttpStatus.NOT_FOUND);
                             }
                             result = statusRoute
@@ -737,12 +737,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
 
                             // handle re-mapping of errors
-                            Optional<RouteMatch<Object>> statusRoute = null;
+                            Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                             // if declaringType is not null, this means its a locally marked method handler
                             if (declaringType != null) {
                                 statusRoute = router.route(declaringType, status);
                             }
-                            if (statusRoute == null){
+                            if (!statusRoute.isPresent()){
                                 statusRoute = router.route(status);
                             }
                             result = statusRoute
