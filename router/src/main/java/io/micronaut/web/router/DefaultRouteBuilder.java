@@ -188,8 +188,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
+        // do not allow multiple @Error global routes defined for one status
         if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status)) {
-            throw new RoutingException("Attempted to register multiple routes for http status " + String.valueOf(status.getCode()));
+            throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
