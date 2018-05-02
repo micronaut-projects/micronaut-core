@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.ParseException;
 import java.util.Map;
@@ -54,8 +55,8 @@ public class JwtTokenGenerator implements TokenGenerator {
      * @param encryptionConfiguration JWT Generator encryption configuration
      * @param claimsGenerator Claims generator
      */
-    public JwtTokenGenerator(@Nullable SignatureConfiguration signatureConfiguration,
-                             @Nullable EncryptionConfiguration encryptionConfiguration,
+    public JwtTokenGenerator(@Nullable @Named("generator") SignatureConfiguration signatureConfiguration,
+                             @Nullable @Named("generator") EncryptionConfiguration encryptionConfiguration,
                              JWTClaimsSetGenerator claimsGenerator) {
 
         this.signatureConfiguration = signatureConfiguration;

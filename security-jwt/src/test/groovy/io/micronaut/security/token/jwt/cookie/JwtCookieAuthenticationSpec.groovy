@@ -3,6 +3,7 @@ package io.micronaut.security.token.jwt.cookie
 import geb.spock.GebSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.endpoints.LoginController
 import io.micronaut.security.endpoints.LogoutController
@@ -26,7 +27,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
                     'micronaut.security.token.jwt.bearer.enabled': false,
                     'micronaut.security.token.jwt.cookie.enabled': true,
                     'micronaut.security.token.jwt.cookie.loginFailureTargetUrl': '/login/authFailed',
-                    'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
+                    'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
             ], 'test')
 
     @Shared
@@ -45,6 +46,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         context.getBean(JwtCookieLoginHandler.class)
         context.getBean(JwtCookieClearerLogoutHandler.class)
         context.getBean(SignatureConfiguration.class)
+        context.getBean(SignatureConfiguration.class, Qualifiers.byName("generator"))
 
         when:
         context.getBean(EncryptionConfiguration.class)

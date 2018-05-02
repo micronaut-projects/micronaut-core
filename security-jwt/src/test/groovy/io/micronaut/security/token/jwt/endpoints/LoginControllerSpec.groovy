@@ -7,6 +7,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
@@ -29,7 +30,7 @@ class LoginControllerSpec extends Specification {
                     'micronaut.security.enabled': true,
                     'micronaut.security.endpoints.login': true,
                     'micronaut.security.token.jwt.enabled': true,
-                    'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                    'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
 
     @Shared
@@ -45,6 +46,7 @@ class LoginControllerSpec extends Specification {
         context.getBean(AuthenticationProviderThrowingException.class)
         context.getBean(AuthenticationProviderUserPassword.class)
         context.getBean(SignatureConfiguration.class)
+        context.getBean(SignatureConfiguration.class, Qualifiers.byName("generator"))
 
         when:
         context.getBean(EncryptionConfiguration.class)

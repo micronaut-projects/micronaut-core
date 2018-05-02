@@ -1,11 +1,13 @@
 package io.micronaut.security.token.jwt.endpoints
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
@@ -27,7 +29,7 @@ class OauthControllerSpec extends Specification {
                     'micronaut.security.endpoints.login': true,
                     'micronaut.security.endpoints.refresh': true,
                     'micronaut.security.token.jwt.enabled': true,
-                    'micronaut.security.token.jwt.generator.signature.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                    'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
 
     @Shared
@@ -41,6 +43,7 @@ class OauthControllerSpec extends Specification {
     def "can obtain a new access token using the refresh token"() {
         expect:
         context.getBean(SignatureConfiguration.class)
+        context.getBean(SignatureConfiguration.class, Qualifiers.byName("generator"))
 
         when:
         context.getBean(EncryptionConfiguration.class)

@@ -18,7 +18,6 @@ package io.micronaut.security.token.jwt.encryption.rsa;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 
 import javax.inject.Singleton;
@@ -29,7 +28,6 @@ import javax.inject.Singleton;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(beans = RSAEncryptionConfiguration.class)
 @Factory
 public class RSAEncryptionFactory {
 

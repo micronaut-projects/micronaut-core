@@ -8,6 +8,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.token.generator.TokenGenerator
 import io.micronaut.security.token.jwt.AuthorizationUtils
@@ -55,6 +56,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
         embeddedServer.applicationContext.getBean(RSASignatureConfiguration.class)
         embeddedServer.applicationContext.getBean(RSASignatureFactory.class)
         embeddedServer.applicationContext.getBean(SignatureConfiguration.class)
+        embeddedServer.applicationContext.getBean(SignatureConfiguration.class, Qualifiers.byName("generator"))
         embeddedServer.applicationContext.getBean(TokenGenerator.class)
 
         when:
