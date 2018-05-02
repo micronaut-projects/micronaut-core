@@ -30,11 +30,10 @@ import javax.inject.Singleton;
  */
 // tag::class[]
 @Controller("/hello") // <1>
-@Singleton // <2>
 public class HelloController {
-    @Get("/")
+    @Get("/") // <2>
     public String index() {
-        return "Hello World";
-    } // <3>
+        return "Hello World"; // <3>
+    }
 }
 // end::class[]
