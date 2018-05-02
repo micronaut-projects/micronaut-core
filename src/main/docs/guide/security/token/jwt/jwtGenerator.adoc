@@ -1,0 +1,1 @@
+Micronaut relies on https://connect2id.com/products/nimbus-jose-jwt[Nimbus JOSE + JWT] library to provide JWT token signature and encryption.

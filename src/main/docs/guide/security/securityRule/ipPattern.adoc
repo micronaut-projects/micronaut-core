@@ -1,0 +1,8 @@
+When you turn on security, traffic coming from any ip address is allowed by default.
+
+You can however reject traffic not coming from a white list of IP Patterns as illustrated below:
+
+[source, yaml]
+----
+include::{testssecurity}/security/securityRule/IpPatternSpec.groovy[tag=yamlconfig,indent=0]
+----
