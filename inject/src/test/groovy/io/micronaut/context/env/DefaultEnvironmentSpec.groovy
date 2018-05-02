@@ -171,5 +171,25 @@ class DefaultEnvironmentSpec extends Specification {
         then: "property is set"
         env.getProperty("foo.baz", Integer).get() == 100
 
+        when: "configuration properties file passed with uppercase"
+        System.clearProperty("micronaut.config.files")
+        System.clearProperty("foo.baz")
+
+        configPropertiesFile = File.createTempFile("config-file", ".properties")
+        configPropertiesFile.write("foo.baz=100")
+        System.setProperty("MICRONAUT_CONFIG_FILES", "file:${configPropertiesFile.absolutePath}")
+
+        and:
+        env = new DefaultEnvironment("test").start()
+
+        then: "property is set"
+        env.getProperty("foo.baz", Integer).get() == 100
+
+        cleanup:
+        System.clearProperty("foo.bar")
+        System.clearProperty("foo.baz")
+        System.clearProperty("micronaut.config.files")
+        System.clearProperty("MICRONAUT.CONFIG.FILES")
+
     }
 }

@@ -33,6 +33,7 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -316,6 +317,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         Optional<String> files = Optional.ofNullable(System.getProperty(key));
+        files = files.isPresent() ? files : Optional.ofNullable(System.getProperty(StringUtils.convertDotToUnderscore(key)));
         Optional<Collection<String>> filePathList = files
                 .filter(value -> !value.isEmpty())
                 .map(value -> value.split(FILE_SEPARATOR))
