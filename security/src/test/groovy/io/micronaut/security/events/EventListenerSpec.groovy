@@ -1,6 +1,7 @@
 package io.micronaut.security.events
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -80,6 +81,7 @@ class EventListenerSpec extends Specification {
         (embeddedServer.applicationContext.getBean(LogoutEventListener).events*.getSource() as List<Authentication>).find { it.name == 'user'}
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class LoginSuccessfulEventListener implements ApplicationEventListener<LoginSuccessfulEvent> {
         List<LoginSuccessfulEvent> events = []
@@ -89,6 +91,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class LogoutEventListener implements ApplicationEventListener<LogoutEvent> {
         List<LogoutEvent> events = []
@@ -99,6 +102,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class LoginFailedEventListener implements ApplicationEventListener<LoginFailedEvent> {
         List<LoginFailedEvent> events = []
@@ -108,7 +112,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class TokenValidatedEventListener implements ApplicationEventListener<TokenValidatedEvent> {
         List<TokenValidatedEvent> events = []
@@ -118,6 +122,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class LogoutFailedEventListener implements ApplicationEventListener<LogoutEvent> {
         List<LogoutEvent> events = []
@@ -127,6 +132,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class CustomAuthenticationProvider implements AuthenticationProvider {
 
@@ -139,6 +145,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class CustomLoginHandler implements LoginHandler {
 
