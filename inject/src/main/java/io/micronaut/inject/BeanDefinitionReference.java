@@ -48,11 +48,6 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
     String getReplacesBeanTypeName();
 
     /**
-     * @return The name of the bean definition that this bean replaces
-     */
-    String getReplacesBeanDefinitionName();
-
-    /**
      * Loads the bean definition
      *
      * @return The loaded component definition or null if it shouldn't be loaded

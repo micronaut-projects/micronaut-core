@@ -52,7 +52,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final String beanDefinitionReferenceClassName;
     private String replaceBeanName;
     private boolean contextScope = false;
-    private String replaceBeanDefinitionName;
     private boolean requiresMethodProcessing;
 
     public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
@@ -100,15 +99,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      */
     public void setReplaceBeanName(String replaceBeanName) {
         this.replaceBeanName = replaceBeanName;
-    }
-
-    /**
-     * The name of the bean this bean replaces
-     *
-     * @param replaceBeanName The replace bean name
-     */
-    public void setReplaceBeanDefinitionName(String replaceBeanName) {
-        this.replaceBeanDefinitionName = replaceBeanName;
     }
 
     /**
@@ -192,7 +182,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         // start method: getReplacesBeanTypeName()
         writeReplacementIfNecessary(classWriter, replaceBeanName, "getReplacesBeanTypeName");
-        writeReplacementIfNecessary(classWriter, replaceBeanDefinitionName, "getReplacesBeanDefinitionName");
         return classWriter;
     }
 

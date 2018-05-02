@@ -74,11 +74,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
         return null; // no replacement semantics by default
     }
 
-    @Override
-    public String getReplacesBeanDefinitionName() {
-        return null; // no replacement
-    }
-
     /**
      * @return The loaded component definition
      */
