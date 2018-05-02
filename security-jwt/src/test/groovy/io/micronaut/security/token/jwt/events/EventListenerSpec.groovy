@@ -1,11 +1,10 @@
 package io.micronaut.security.token.jwt.events
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationProvider
@@ -13,15 +12,9 @@ import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
-import io.micronaut.security.event.LoginFailedEvent
-import io.micronaut.security.event.LoginSuccessfulEvent
-import io.micronaut.security.event.LogoutEvent
-import io.micronaut.security.event.TokenValidatedEvent
-import io.micronaut.security.handlers.LoginHandler
 import io.micronaut.security.token.jwt.event.AccessTokenGeneratedEvent
 import io.micronaut.security.token.jwt.event.RefreshTokenGeneratedEvent
 import spock.lang.AutoCleanup
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -54,6 +47,7 @@ class EventListenerSpec extends Specification {
                 old(embeddedServer.applicationContext.getBean(AccessTokenGeneratedEventListener).events.size()) + 1
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class RefreshTokenGeneratedEventListener implements ApplicationEventListener<RefreshTokenGeneratedEvent> {
         List<RefreshTokenGeneratedEvent> events = []
@@ -63,6 +57,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class AccessTokenGeneratedEventListener implements ApplicationEventListener<AccessTokenGeneratedEvent> {
         List<AccessTokenGeneratedEvent> events = []
@@ -72,6 +67,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
+    @Requires(property = "spec.name", value = "eventlistener")
     @Singleton
     static class CustomAuthenticationProvider implements AuthenticationProvider {
 
