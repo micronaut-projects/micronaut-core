@@ -19,6 +19,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -66,6 +67,11 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     default MutableHttpRequest<B> header(CharSequence name, CharSequence value) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.header(name, value);
+    }
+
+    @Override
+    default MutableHttpRequest<B> basicAuth(CharSequence username, CharSequence password) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.basicAuth(username, password);
     }
 
     @Override
