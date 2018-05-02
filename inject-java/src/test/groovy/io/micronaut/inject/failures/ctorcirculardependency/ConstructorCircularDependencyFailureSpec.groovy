@@ -32,7 +32,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
-        e.message == '''\
+        e.message.normalize() == '''\
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.ctorcirculardependency.B
 
 Message: Circular dependency detected

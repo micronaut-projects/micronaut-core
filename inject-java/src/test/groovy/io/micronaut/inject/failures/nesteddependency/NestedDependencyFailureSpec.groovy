@@ -33,7 +33,7 @@ class NestedDependencyFailureSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(DependencyInjectionException)
 
-        e.message == '''\
+        e.message.normalize() == '''\
 Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.nesteddependency.C
 
 Message: No bean of type [io.micronaut.inject.failures.nesteddependency.D] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.
