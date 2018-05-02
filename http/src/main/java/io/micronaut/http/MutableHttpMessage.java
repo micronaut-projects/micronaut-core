@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -59,6 +60,24 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      */
     default MutableHttpMessage<B> header(CharSequence name, CharSequence value) {
         getHeaders().add(name, value);
+        return this;
+    }
+
+    /**
+     * Set an {@link HttpHeaders#AUTHORIZATION} header, with value: "Basic Base64(username:password)".
+     *
+     * @param username The username part of the credentials
+     * @param password The password part of the credentials
+     */
+    default MutableHttpMessage<B> basicAuth(CharSequence username, CharSequence password) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(username);
+        sb.append(":");
+        sb.append(password);
+        final StringBuilder value = new StringBuilder();
+        value.append("Basic ");
+        value.append(new String(Base64.getEncoder().encode(sb.toString().getBytes())));
+        header(HttpHeaders.AUTHORIZATION, value.toString());
         return this;
     }
 
