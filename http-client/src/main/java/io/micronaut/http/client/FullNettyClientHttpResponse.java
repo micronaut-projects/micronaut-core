@@ -49,14 +49,14 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
+public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private final MutableConvertibleValues<Object> attributes;
-    private final io.netty.handler.codec.http.HttpResponse nettyHttpResponse;
+    private final FullHttpResponse nettyHttpResponse;
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
@@ -116,15 +116,13 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
         if (type == null) return Optional.empty();
-        if (!(this.nettyHttpResponse instanceof FullHttpResponse)) return Optional.empty();
 
-        io.netty.handler.codec.http.FullHttpResponse fullResponse = (FullHttpResponse) this.nettyHttpResponse;
         if (type.getType() == ByteBuffer.class) {
-            return Optional.of((T) byteBufferFactory.wrap(fullResponse.content()));
+            return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
         }
 
         if (type.getType() == ByteBuf.class) {
-            return Optional.of((T) (fullResponse.content()));
+            return Optional.of((T) (nettyHttpResponse.content()));
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
@@ -137,13 +135,13 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                         }
                         Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
                         if(!converted.isPresent()) {
-                            ByteBuf content = fullResponse.content();
+                            ByteBuf content = nettyHttpResponse.content();
                             return convertByteBuf(content, type);
                         }
                         return converted;
                     });
                 } else {
-                    ByteBuf content = fullResponse.content();
+                    ByteBuf content = nettyHttpResponse.content();
                     return convertByteBuf(content, type);
                 }
             }
@@ -180,5 +178,12 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
+    }
+
+    /**
+     * @return The Netty native response object
+     */
+    public FullHttpResponse getNativeResponse() {
+        return nettyHttpResponse;
     }
 }
