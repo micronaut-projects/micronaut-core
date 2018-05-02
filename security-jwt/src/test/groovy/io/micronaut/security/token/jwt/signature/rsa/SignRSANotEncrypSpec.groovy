@@ -34,7 +34,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
             'micronaut.security.endpoints.login': true,
             'micronaut.security.token.enabled': true,
             'micronaut.security.token.jwt.enabled': true,
-            'pemPath': pemFile.absolutePath,
+            'pem.path': pemFile.absolutePath,
     ], "test")
 
     @Shared
@@ -54,6 +54,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
         expect:
         embeddedServer.applicationContext.getBean(PS512RSASignatureConfiguration.class)
         embeddedServer.applicationContext.getBean(RSASignatureConfiguration.class)
+        embeddedServer.applicationContext.getBean(RSASignatureConfiguration.class, Qualifiers.byName("generator"))
         embeddedServer.applicationContext.getBean(RSASignatureFactory.class)
         embeddedServer.applicationContext.getBean(SignatureConfiguration.class)
         embeddedServer.applicationContext.getBean(SignatureConfiguration.class, Qualifiers.byName("generator"))
@@ -69,7 +70,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
         JwtTokenGenerator tokenGenerator = embeddedServer.applicationContext.getBean(JwtTokenGenerator.class)
 
         then:
-        tokenGenerator.getSignatureConfiguration() instanceof PS512RSASignatureConfiguration
+        tokenGenerator.getSignatureConfiguration() instanceof RSASignature
 
         when:
         String token = loginWith(client,'user', 'password')
