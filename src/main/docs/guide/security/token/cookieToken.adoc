@@ -1,0 +1,13 @@
+You can read a token from a Cookie too.
+
+It is enabled by default but requires Token Authentication to be enabled.
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.token.cookie.enabled` | `false` | link:{api}/io/micronaut/security/token/reader/CookieTokenReader.html[CookieTokenReader]. is disabled by default.
+
+| `micronaut.security.token.cookie.cookieName` | `JWT` | Cookie name
+
+|===

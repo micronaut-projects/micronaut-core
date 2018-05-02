@@ -1,0 +1,11 @@
+As illustrated below, you can use link:{api}/io/micronaut/security/Secured.html[Secured] annotation to configure
+access at link:{api}/io/micronaut/http/annotation/Controller.html[Controller] or Controller's Action level.
+
+[source, groovy]
+----
+include::{testssecurity}/security/securityRule/ExampleController.groovy[tag=exampleControllerPlusImports,indent=0]
+----
+
+<1> Authenticated users are able to access `authenticated` Controller's action.
+<2> Users granted any role `ROLE_ADMIN` OR `ROLE_X` roles can access `withroles` Controller's action.
+<3> Anonymous users (users not authenticated) can access `anonymous` Controller's action.

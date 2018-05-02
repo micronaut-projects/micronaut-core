@@ -1,0 +1,4 @@
+consul:
+  client:
+    registration:
+      enabled: false

@@ -1,0 +1,13 @@
+It is enabled by default but requires Token Authentication to be enabled.
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.basicAuth.enabled` | `true` | link:{api}/io/micronaut/security/token/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
+
+| `micronaut.security.basicAuth.headerName` | `Authorization` | Header name
+
+| `micronaut.security.basicAuth.prefix` | `Basic` | e.g. `Basic dXNlcjp1c2Vy`
+
+|===

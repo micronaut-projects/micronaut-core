@@ -1,0 +1,49 @@
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:1.4"
+    }
+}
+
+ext {
+    snakeYamlVersion = '1.19'
+}
+
+apply plugin:"com.energizedwork.webdriver-binaries"
+
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":runtime")
+    compile project(":management")
+    compile project(":http")
+    compile project(":session")
+    compile project(":security")
+
+    compile project(":http-server")
+    testCompile project(":http-client")
+
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
+
+    testCompile "org.gebish:geb-spock:2.1"
+    testRuntime "org.seleniumhq.selenium:selenium-chrome-driver:3.6.0"
+    testRuntime "org.seleniumhq.selenium:selenium-firefox-driver:3.6.0"
+    testCompile "org.seleniumhq.selenium:selenium-support:3.6.0"
+    testCompile "org.seleniumhq.selenium:selenium-api:3.6.0"
+    testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
+}
+
+webdriverBinaries {
+    chromedriver '2.38'
+    geckodriver '0.20.1'
+}
+
+test {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
+}
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

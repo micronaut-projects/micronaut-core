@@ -1,0 +1,45 @@
+In the previous strategy, the claims are just signed, so it prevents an attacker to tamper its contents to introduce malicious data or try a privilege escalation by adding more roles. However, the claims can be decoded just by using Base 64.
+
+If the claims contains sensitive information, you can use a JSON Web Encryption algorithm to prevent them to be decoded. Particularly, this plugin uses `RSA-OAEP` for key encryption and AES in Galois/Counter Mode (GCM) using a 128 bit key for content encryption.
+
+By default, RSA public/private keys ar generated every time the application runs. This means that generated tokens won’t be decrypted across executions of the application. So better create your own key pair using OpenSSL:
+
+[source, bash]
+.Certificate generation for JWT
+----
+openssl genrsa -out private_key.pem 2048
+openssl pkcs8 -topk8 -inform PEM -outform DER -in private_key.pem -out private_key.der -nocrypt
+openssl rsa -in private_key.pem -pubout -outform DER -out public_key.der
+----
+
+Then, configure the keys properly, along with the rest of the configuration:
+
+|===
+
+| Configuration Property | Default Value | Possible Values
+
+| `micronaut.security.token.jwt.generator.encryption.enabled` | false | false or true
+
+| `micronaut.security.token.jwt.generator.encryption.jweAlgorithm` | RSA-OAEP | Any value in: RSA1_5, RSA-OAEP, RSA-OAEP-256, A128KW, A192KW, A256KW, dir, ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW, A128GCMKW, A192GCMKW, A256GCMKW, PBES2-HS256+A128KW, PBES2-HS384+A192KW, PBES2-HS512+A256KW
+
+| `micronaut.security.token.jwt.generator.encryption.encryptionMethod` | A128GCM | Any value in: A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, A128CBC+HS256, A256CBC+HS512, A128GCM, A192GCM, A256GCM
+
+| `micronaut.security.token.jwt.generator.encryption.pemPath` | null | Full path to the PEM file
+
+|===
+
+
+=== Example configuration:
+
+[source, yaml]
+.JWT encryption example configuration
+----
+micronaut:
+  security:
+    jwt:
+      enabled: true
+      encryption:
+        enabled: true
+        privateKeyPath: /path/to/private_key.der
+        publicKeyPath: /path/to/public_key.der
+----

@@ -1,0 +1,41 @@
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+micronaut:
+  application:
+    name: security
+  security:
+    enabled: true
+    endpoints:
+      login: true
+      refresh: true
+    token:
+      bearer:
+        enabled: true
+    jwt:
+      enabled: true
+      generator:
+        defaultExpiration: 30
+        signature:
+          enabled: true
+          secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
+
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+ldap:
+  server: ldap.forumsys.com
+  port: 389
+  bindDN: cn=read-only-admin,dc=example,dc=com
+  bindPassword: password
+hibernate:
+  hbm2ddl:
+    auto: update
+dataSource:
+  driverClassName: org.h2.Driver
+  username: sa
+  password: ''
+  url: jdbc:h2:mem:devDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE

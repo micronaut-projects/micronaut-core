@@ -1,0 +1,4 @@
+When you enable security, a Micronaut filter attempts to read a JWT token with
+an implementation of link:{api}/io/micronaut/security/token/reader/TokenReader.html[TokenReader].
+
+Next, we list several implementations included:

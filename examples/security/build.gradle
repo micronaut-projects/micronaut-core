@@ -1,0 +1,6 @@
+allprojects {
+    task cleanOut(type: Delete) {
+        group 'build'
+        delete "${project.projectDir}/out"
+    }
+}
