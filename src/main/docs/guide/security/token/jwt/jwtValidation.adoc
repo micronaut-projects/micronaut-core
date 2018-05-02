@@ -1,0 +1,10 @@
+Micronaut's JWT validation support multiple Signature and Encryption configurations.
+
+Any beans of type link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureConfiguration.html[RSASignatureConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureConfiguration.html[ECSignatureConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/secret/SecretSignatureConfiguration.html[SecretSignatureConfiguration]
+participate as signature configurations in the JWT validation.
+
+Any beans of type link:{api}/io/micronaut/security/token/jwt/encryption/rsa/RSAEncryptionConfiguration.html[RSAEncryptionConfiguration],
+link:{api}/io/micronaut/security/token/jwt/encryption/ec/ECEncryptionConfiguration.html[ECEncryptionConfiguration],
+link:{api}/io/micronaut/security/token/jwt/encryption/secret/SecretEncryptionConfiguration.html[SecretEncryptionConfiguration] participate as encryption configurations in the JWT validation.
