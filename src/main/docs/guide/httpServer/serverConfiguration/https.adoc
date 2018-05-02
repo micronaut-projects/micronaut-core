@@ -1,4 +1,4 @@
-Micronaut supports HTTPS out of the box. By default is disabled and all requests are served using HTTP. To enable
+Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all requests are served using HTTP. To enable
 HTTPS support, modify your configuration. For example with `application.yml`:
 
 .HTTPS Configuration Example
@@ -64,7 +64,7 @@ browser but if we inspect the certificate we can check that it's the one generat
 image::https-certificate.jpg[]
 
 
-Finally we can test that the certificate is valid for the browser just adding an alias to the domain in `/etc/hosts` file:
+Finally we can test that the certificate is valid for the browser just by adding an alias to the domain in `/etc/hosts` file:
 
 [source,bash]
 ----
