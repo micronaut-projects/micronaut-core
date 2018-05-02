@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.signature.rsa
+package io.micronaut.security.token.jwt
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openssl.PEMException

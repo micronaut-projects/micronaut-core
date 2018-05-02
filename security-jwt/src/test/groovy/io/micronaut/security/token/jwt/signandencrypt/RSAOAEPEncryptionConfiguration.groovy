@@ -1,11 +1,12 @@
-package io.micronaut.security.token.jwt.signature.rsa
+package io.micronaut.security.token.jwt.signandencrypt
 
-import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
 import io.micronaut.security.token.jwt.KeyPairProvider
+import io.micronaut.security.token.jwt.encryption.rsa.RSAEncryptionConfiguration
 
-import javax.annotation.PostConstruct
 import javax.inject.Named
 import javax.inject.Singleton
 import java.security.KeyPair
@@ -13,25 +14,21 @@ import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 
 @Named("generator")
-@Requires(property = "spec.name", value = "signaturersa")
+@Requires(property = "spec.name", value = "signandencrypt")
 @Singleton
-class PS512RSASignatureConfiguration implements RSASignatureConfiguration {
+class RSAOAEPEncryptionConfiguration implements RSAEncryptionConfiguration {
 
     private RSAPrivateKey rsaPrivateKey
     private RSAPublicKey rsaPublicKey
-    private JWSAlgorithm jwsAlgorithm = JWSAlgorithm.RS512
+    JWEAlgorithm jweAlgorithm = JWEAlgorithm.RSA_OAEP_256
+    EncryptionMethod encryptionMethod = EncryptionMethod.A128GCM
 
-    PS512RSASignatureConfiguration(@Value('${pem.path}') String pemPath) {
+    RSAOAEPEncryptionConfiguration(@Value('${pem.path}') String pemPath) {
         Optional<KeyPair> keyPair = KeyPairProvider.keyPair(pemPath)
         if ( keyPair.isPresent() ) {
             this.rsaPublicKey = (RSAPublicKey) keyPair.get().getPublic()
             this.rsaPrivateKey = (RSAPrivateKey) keyPair.get().getPrivate()
         }
-    }
-
-    @Override
-    JWSAlgorithm getJwsAlgorithm() {
-        return jwsAlgorithm
     }
 
     @Override
@@ -42,5 +39,15 @@ class PS512RSASignatureConfiguration implements RSASignatureConfiguration {
     @Override
     RSAPrivateKey getPrivateKey() {
         return rsaPrivateKey
+    }
+
+    @Override
+    JWEAlgorithm getJweAlgorithm() {
+        return jweAlgorithm
+    }
+
+    @Override
+    EncryptionMethod getEncryptionMethod() {
+        return encryptionMethod
     }
 }
