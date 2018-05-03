@@ -14,17 +14,20 @@ class JWTClaimsSetGeneratorSpec extends Specification {
         def tokenConfiguration = Stub(TokenConfiguration) {
             getRolesName() >> 'roles'
         }
-        JWTClaimsSetGenerator generator = new JWTClaimsSetGenerator(tokenConfiguration)
+        JWTClaimsSetGenerator generator = new JWTClaimsSetGenerator(tokenConfiguration, null, null)
 
         when:
         Map<String, Object> claims = generator.generateClaims(new UserDetails('admin', ['ROLE_USER', 'ROLE_ADMIN']), 3600)
-
+        List<String> expectedClaimsNames = [JwtClaims.SUBJECT,
+                                           JwtClaims.ISSUED_AT,
+                                           JwtClaims.EXPIRATION_TIME,
+                                           JwtClaims.NOT_BEFORE,
+                                           "roles"]
         then:
         claims
-        claims.keySet().size() == 4
-        claims.get(JwtClaims.SUBJECT)
-        claims.get(JwtClaims.EXPIRATION_TIME)
-        claims.get("iat")
-        claims.get("roles")
+        claims.keySet().size() == expectedClaimsNames.size()
+        expectedClaimsNames.each { String claimName ->
+            assert claims.get(claimName)
+        }
     }
 }
