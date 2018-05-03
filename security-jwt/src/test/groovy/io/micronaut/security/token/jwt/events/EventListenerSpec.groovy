@@ -31,7 +31,7 @@ class EventListenerSpec extends Specification {
             'micronaut.security.enabled': true,
             'micronaut.security.token.jwt.enabled': true,
             'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
-            'micronaut.security.endpoints.login': true,
+            'micronaut.security.endpoints.login.enabled': true,
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
