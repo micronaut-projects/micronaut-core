@@ -1792,6 +1792,7 @@ public class DefaultBeanContext implements BeanContext {
         public R invoke(Object... arguments) {
             return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
         }
+
     }
 
     static final class BeanKey<T> implements BeanIdentifier {

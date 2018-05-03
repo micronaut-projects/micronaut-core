@@ -1,0 +1,19 @@
+You can read a token from a Cookie too.
+
+It is disabled by default. It requires JWT Authentication to be enabled.
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.token.jwt.cookie.enabled` | `false` | Disabled by default.
+
+| `micronaut.security.token.jwt.cookie.cookieName` | `JWT` | Cookie name
+
+| `micronaut.security.token.jwt.cookie.logoutTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after logout.
+
+| `micronaut.security.token.jwt.cookie.loginSuccessTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after a successful login.
+
+| `micronaut.security.token.jwt.cookie.loginFailureTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after a failed login.
+
+|===

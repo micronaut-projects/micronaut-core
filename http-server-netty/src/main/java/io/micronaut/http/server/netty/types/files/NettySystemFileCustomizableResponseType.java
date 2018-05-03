@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.async.DefaultCloseHandler;

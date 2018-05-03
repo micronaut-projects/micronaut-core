@@ -1,11 +1,3 @@
-import java.util.regex.Pattern
-
-Pattern pattern = Pattern.compile("([\\w\\-.]+):([\\w\\-]+):([\\w\\-.]+)")
-
-List<String> bomDependencies = [
-    'groovy', 'jacksonDatabind', 'nettyHandler', 'nettyHandlerProxy', 'nettyHandlerProxy', 'rxJava2', 'validation',
-    'spring', 'springContext', 'springTx'
-]
 
 publishing {
     publications {
@@ -16,19 +8,14 @@ publishing {
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 
-                def parsedDependencies = dependencyVersions
-                    .findAll { dep -> dep.key in bomDependencies }
-                    .collect { dep ->
-                        def matcher = pattern.matcher((String)dep.value) ; matcher.find()
-                        [name: dep.key, group: matcher.group(1), artifact: matcher.group(2),  version: matcher.group(3)]
-                    }
 
                 xml.children().last() + {
                     def mkp = delegate
 
+
                     mkp.properties {
-                        for (dep in parsedDependencies) {
-                            mkp."${dep.name}.version"(dep.version)
+                        for(dep in dependencyVersions) {
+                            mkp."${dep.key}.version"(dep.value.version)
                         }
                     }
 
@@ -60,11 +47,23 @@ publishing {
                                 }
                             }
 
-                            for (dep in parsedDependencies) {
+                            for (dep in dependencyVersions) {
+                                def info = dep.value
+                                def versionExpr = "\${${dep.key}.version}"
+
                                 mkp.dependency {
-                                    mkp.groupId dep.group
-                                    mkp.artifactId dep.artifact
-                                    mkp.version "\${${dep.name}.version}"
+                                    mkp.groupId info.group
+                                    mkp.artifactId info.name
+                                    mkp.version versionExpr
+                                }
+                                if(info.modules) {
+                                   for(m in info.modules) {
+                                       mkp.dependency {
+                                           mkp.groupId info.group
+                                           mkp.artifactId m
+                                           mkp.version versionExpr
+                                       }
+                                   }
                                 }
                             }
                         }
