@@ -6,8 +6,8 @@ dependencies {
     compile project(":inject")
     shadowCompile project(":aop")
     compile project(":aop")
-    shadowCompile dependencyVersions.groovy
-    compile dependencyVersions.groovy
+    shadowCompile dependencyVersion("groovy")
+    compile dependencyVersion("groovy")
 
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
@@ -17,7 +17,7 @@ dependencies {
 
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
-    testCompile dependencyVersions.groovyJson
+    testCompile dependencyModuleVersion("groovy", "groovy-json")
 }
 
 
@@ -34,7 +34,7 @@ shadowJar {
         exclude(project(":inject"))
         exclude(project(":core"))
 
-        exclude(dependency(dependencyVersions.slf4jApi))
+        exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))

@@ -41,10 +41,12 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.NettyHttpResponse;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.HttpServerException;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
 import io.micronaut.http.server.netty.async.DefaultCloseHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -221,7 +223,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         List<UriRouteMatch<Object>> uriRoutes = router
             .find(httpMethod, requestPath)
-            .filter((match) -> match.test(request))
+            .filter((match) -> {
+                return match.test(request);
+            })
             .collect(StreamUtils.minAll(
                 Comparator.comparingInt((match) -> match.getVariables().size()),
                 Collectors.toList()));
@@ -231,6 +235,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else if (uriRoutes.size() == 1) {
             UriRouteMatch<Object> establishedRoute = uriRoutes.get(0);
             request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
+            request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
             request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
             routeMatch = Optional.of(establishedRoute);
         }
@@ -692,11 +697,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
                             result = router.route(HttpStatus.NOT_FOUND)
-                                .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
-                                .filter(RouteMatch::isExecutable)
-                                .map(RouteMatch::execute)
-                                .map(Object.class::cast)
-                                .orElse(NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.notFound()));
+                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
+                                    .filter(RouteMatch::isExecutable)
+                                    .map(RouteMatch::execute)
+                                    .map(Object.class::cast)
+                                    .orElse(NettyHttpResponseFactory.getOr(request, io.micronaut.http.HttpResponse.notFound()));
+
                             if (result instanceof MutableHttpResponse) {
                                 response = (MutableHttpResponse<?>) result;
                             } else {
@@ -704,7 +710,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     .body(result);
                             }
                         } else {
-                            response = NettyHttpResponse.getOr(request, io.micronaut.http.HttpResponse.ok());
+                            response = NettyHttpResponseFactory.getOr(request, io.micronaut.http.HttpResponse.ok());
                         }
                     } else if (result instanceof io.micronaut.http.HttpResponse) {
                         HttpStatus status = ((io.micronaut.http.HttpResponse) result).getStatus();
@@ -888,7 +894,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     NettyHttpResponse response;
 
                                     if (message instanceof io.micronaut.http.HttpResponse) {
-                                        response = (NettyHttpResponse<?>) message;
+                                        Optional<NettyHttpResponse> optionalResponse = ConversionService.SHARED.convert(message, NettyHttpResponse.class);
+                                        response = optionalResponse.orElseThrow(() -> {
+                                            String errorMessage = String.format("Could not convert the response type [%s] to the required type necessary to process the response", message.getClass().getName());
+                                            return new HttpServerException(errorMessage);
+                                        });
                                         body = response.getBody().orElse(message);
                                         fullHttpResponse = response.getNativeResponse();
                                     } else {

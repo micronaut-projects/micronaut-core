@@ -1,6 +1,6 @@
 dependencies {
     compile project(":http")
     compileOnly project(":inject-java")
-    compile dependencyVersions.nettyCodecHttp
-    compile dependencyVersions.nettyHandler
+    compile dependencyVersion("netty")
+    compile dependencyModuleVersion("netty", "netty-handler")
 }

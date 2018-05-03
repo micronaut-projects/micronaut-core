@@ -6,35 +6,35 @@ dependencies {
         compile project(":$proj")
     }
 
-    shadowCompile dependencyVersions.validation
-    shadowCompile dependencyVersions.jacksonDatabind
-    shadowCompile dependencyVersions.rxJava2
+    shadowCompile dependencyVersion("validation")
+    shadowCompile dependencyVersion("jackson")
+    shadowCompile dependencyVersion("rxjava2")
 
-    compile dependencyVersions.validation
-    compile dependencyVersions.jacksonDatabind
-    compile dependencyVersions.rxJava2
+    compile dependencyVersion("validation")
+    compile dependencyVersion("jackson")
+    compile dependencyVersion("rxjava2")
 
     shadowRuntime([
-        dependencyVersions.jacksonDatatypeJdk8,
-        dependencyVersions.jacksonDatatypeJsr310
+        dependencyVersion('jackson.datatype'),
+        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
     runtime([
-        dependencyVersions.jacksonDatatypeJdk8,
-        dependencyVersions.jacksonDatatypeJsr310
+        dependencyVersion('jackson.datatype'),
+        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
-    compileOnly dependencyVersions.reactor
-    compileOnly dependencyVersions.rxJavaInterop
-    compileOnly dependencyVersions.caffeine
+    compileOnly dependencyVersion("reactor")
+    compileOnly dependencyVersion("rxjava1.interop")
+    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly project(":inject-java")
 
-    testCompile dependencyVersions.rxJavaInterop
-    testCompile dependencyVersions.reactor
+    testCompile dependencyVersion("rxjava1.interop")
+    testCompile dependencyVersion("reactor")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
 
-    testCompile dependencyVersions.gormDatastore
+    testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
 }
 
 shadowJar {
@@ -49,7 +49,7 @@ shadowJar {
         }
         exclude(project(":core"))
         exclude(dependency("com.fasterxml.*:.*:.*"))
-        exclude(dependency(dependencyVersions.slf4jApi))
+        exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))
