@@ -31,6 +31,7 @@ import io.micronaut.discovery.aws.parameterStore.AWSParameterStoreConfigClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import java.util.concurrent.FutureTask
@@ -39,6 +40,7 @@ import java.util.concurrent.FutureTask
  * Test for mocking of aws property store.
  * @author RVanderwerf
  */
+@Ignore
 class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
