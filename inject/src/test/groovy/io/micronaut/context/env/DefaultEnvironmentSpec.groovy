@@ -17,7 +17,6 @@ package io.micronaut.context.env
 
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
-import spock.lang.IgnoreRest
 import spock.lang.Specification
 
 /**
@@ -49,7 +48,7 @@ class DefaultEnvironmentSpec extends Specification {
         Environment env = new DefaultEnvironment("test").start()
 
         expect:
-        env.getProperty("test.foo", Map.class).get() == [bar:"10", baz:"20"]
+        env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
 
         cleanup:
         System.setProperty("test.foo.bar", "")
@@ -70,7 +69,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         when:
         System.setProperty("test.foo.bar", "30")
-        env= env.refresh()
+        env = env.refresh()
 
         then:
         env.getProperty("test.foo.bar", Integer).get() == 30
@@ -155,7 +154,7 @@ class DefaultEnvironmentSpec extends Specification {
         then:
         env.getProperty("foo.baz", Integer).get() == 50
 
-        when:"nothing is passed to micronaut.config.files"
+        when: "nothing is passed to micronaut.config.files"
         System.setProperty("micronaut.config.files", "")
 
         then: "should start normally"
@@ -173,10 +172,10 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("foo.baz", Integer).get() == 100
 
         cleanup:
+        System.clearProperty("foo")
         System.clearProperty("foo.bar")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
-        System.clearProperty("MICRONAUT.CONFIG.FILES")
 
     }
 
@@ -241,10 +240,10 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("foo.baz", Integer).get() == 100
 
         cleanup:
+        System.clearProperty("foo")
         System.clearProperty("foo.bar")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
-        System.clearProperty("MICRONAUT.CONFIG.FILES")
 
     }
 
@@ -261,10 +260,9 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", configPropertiesFile.absolutePath)
         Environment env = startEnv(anotherFile.absolutePath)
 
-        then: ""
+        then: "properties should be set from both loaders"
         env.getProperty("foo.test", String).get() == "bar"
         env.getProperty("foo.baz", Integer).get() == 12
-
 
         when: "files in system properties and env variables have same key"
         configPropertiesFile = File.createTempFile("default-system", ".properties")
@@ -275,9 +273,14 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", configPropertiesFile.absolutePath)
         env = startEnv(anotherFile.absolutePath)
 
-
         then:
         env.getProperty("foo.baz", Integer).get() == 112
+
+        cleanup:
+        System.clearProperty("foo")
+        System.clearProperty("foo.test")
+        System.clearProperty("foo.baz")
+        System.clearProperty("micronaut.config.files")
     }
 
     private static Environment startEnv(String files) {
