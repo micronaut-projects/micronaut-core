@@ -31,49 +31,135 @@ ext {
 }
 
 ext {
+
     dependencyVersions = [
-        caffeine             : "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
-        yaml                 : "org.yaml:snakeyaml:$yamlVersion",
-        lombok               : "org.projectlombok:lombok:$lombokVersion",
-        cglib                : "cglib:cglib:$cglibVersion",
-        asm                  : "org.ow2.asm:asm:$asmVersion",
-        asmCommons           : "org.ow2.asm:asm-commons:$asmVersion",
-        asmTree              : "org.ow2.asm:asm-tree:$asmVersion",
-        gormCore             : "org.grails:grails-datastore-core:$gormVersion",
-        gormDatastore        : "org.grails:grails-datastore-gorm:$gormVersion",
-        gormHibernate5       : "org.grails:grails-datastore-gorm-hibernate5:$gormVersion",
-        grailsDocs           : "org.grails:grails-docs:$grailsVersion",
-        groovy               : "org.codehaus.groovy:groovy:$groovyVersion",
-        groovyTest           : "org.codehaus.groovy:groovy-test:$groovyVersion",
-        groovyAnt            : "org.codehaus.groovy:groovy-ant:$groovyVersion",
-        groovyJson           : "org.codehaus.groovy:groovy-json:$groovyVersion",
-        groovyJmx            : "org.codehaus.groovy:groovy-jmx:$groovyVersion",
-        jacksonDatabind      : "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion",
-        jacksonAfterburner   : "com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion",
-        jacksonDatatypeJdk8  : "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion",
-        jacksonDatatypeJsr310: "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion",
-        lettuce              : "io.lettuce:lettuce-core:$lettuceVersion",
-        nettyHandler         : "io.netty:netty-handler:$nettyVersion",
-        nettyHandlerProxy    : "io.netty:netty-handler-proxy:$nettyVersion",
-        nettyCodecHttp       : "io.netty:netty-codec-http:$nettyVersion",
-        reactor              : "io.projectreactor:reactor-core:$reactorVersion",
-        rxJava2              : "io.reactivex.rxjava2:rxjava:$rxJava2Version",
-        rxJavaInterop        : "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion",
-        rxJava1              : "io.reactivex:rxjava:$rxJava1Version",
-        validation           : "javax.validation:validation-api:$validationVersion",
-        slf4jSimple          : "org.slf4j:slf4j-simple:$slf4jVersion",
-        slf4jApi             : "org.slf4j:slf4j-api:$slf4jVersion",
-        spock                : "org.spockframework:spock-core:$spockVersion",
-        neo4j                : "org.neo4j.test:neo4j-harness:$neo4jVersion",
-        spring               : "org.springframework:spring-core:$springVersion",
-        springContext        : "org.springframework:spring-context:$springVersion",
-        springTx             : "org.springframework:spring-tx:$springVersion",
-        springOrm            : "org.springframework:spring-orm:$springVersion",
-        hystrixCore          : "com.netflix.hystrix:hystrix-core:$hystrixVersion",
-        hystrixSerialization : "com.netflix.hystrix:hystrix-serialization:$hystrixVersion",
-        mongoDriver          : "org.mongodb:mongo-java-driver:$mongoVersion",
-        mongoDriverAsync     : "org.mongodb:mongodb-driver-async:$mongoVersion",
+            groovy: [
+                    version:groovyVersion,
+                    group:'org.codehaus.groovy',
+                    name: 'groovy',
+                    modules:['groovy-test','groovy-ant','groovy-json','groovy-jmx']
+            ],
+            gorm: [
+                    version:gormVersion,
+                    group:'org.grails',
+                    name: 'grails-datastore-core',
+                    modules:['grails-datastore-gorm','grails-datastore-gorm-hibernate5']
+            ],
+            jackson: [
+                version: jacksonVersion,
+                group:'com.fasterxml.jackson.core',
+                name:'jackson-databind'
+            ],
+            'jackson.modules': [
+                    version: jacksonVersion,
+                    group:'com.fasterxml.jackson.module',
+                    name:'jackson-module-afterburner'
+            ],
+            'jackson.datatype': [
+                    version: jacksonVersion,
+                    group:'com.fasterxml.jackson.datatype',
+                    name:'jackson-datatype-jdk8',
+                    modules:['jackson-datatype-jsr310']
+            ],
+            mongodb:[
+                version: mongoVersion,
+                group:'org.mongodb',
+                name:'mongo-java-driver',
+                modules:['mongodb-driver-async']
+            ],
+            neo4j: [
+                version: neo4jVersion,
+                group:'org.neo4j.test',
+                name:'neo4j-harness'
+            ],
+            'neo4j.bolt': [
+                version: '1.5.1',
+                group:'org.neo4j.driver',
+                name:'neo4j-java-driver'
+            ],
+            netty: [
+                version: nettyVersion,
+                group:'io.netty',
+                name:'netty-codec-http',
+                modules:['netty-handler','netty-handler-proxy']
+            ],
+            lettuce: [
+                version: lettuceVersion,
+                group:'io.lettuce',
+                name:'lettuce-core'
+
+            ],
+            spring: [
+                version: springVersion,
+                group:'org.springframework',
+                name: 'spring-core',
+                modules:['spring-context', 'spring-tx', 'spring-orm']
+            ],
+            snakeyaml: [
+                version: yamlVersion,
+                group:'org.yaml',
+                name: 'snakeyaml'
+            ],
+            slf4j: [
+                version: slf4jVersion,
+                group:'org.slf4j',
+                name: 'slf4j-api',
+                modules: ['slf4j-simple']
+            ],
+            spock: [
+                version: spockVersion,
+                group:'org.spockframework',
+                name: 'spock-core'
+            ],
+            rxjava1: [
+                version: rxJava1Version,
+                group:'io.reactivex',
+                name: 'rxjava'
+            ],
+            'rxjava1.interop': [
+                    version: rxJavaInteropVersion,
+                    group:'com.github.akarnokd',
+                    name: 'rxjava2-interop'
+            ],
+            rxjava2: [
+                version: rxJava2Version,
+                group:'io.reactivex.rxjava2',
+                name: 'rxjava'
+            ],
+            reactor:[
+                version: reactorVersion,
+                group:'io.projectreactor',
+                name: 'reactor-core'
+            ],
+            validation: [
+                version: validationVersion,
+                group:'javax.validation',
+                name: 'validation-api'
+            ],
+            hystrix: [
+                    version: hystrixVersion,
+                    group:'com.netflix.hystrix',
+                    name: 'hystrix-core',
+                    modules:['hystrix-serialization']
+            ]
+
     ]
+
+    dependencyVersion = { String name ->
+        def dep = dependencyVersions[name]
+        if(dep == null) {
+            throw new IllegalArgumentException("No core dependency defined for name: $name")
+        }
+        return "$dep.group:$dep.name:$dep.version".toString()
+    }
+    dependencyModuleVersion = { String name, String module ->
+        def dep = dependencyVersions[name]
+        if(dep == null) {
+            throw new IllegalArgumentException("No core dependency defined for name: $name")
+        }
+        return "$dep.group:$module:$dep.version".toString()
+    }
+
 }
 
 subprojects { subproject ->
@@ -160,26 +246,25 @@ subprojects { subproject ->
 
     dependencies {
         if (subproject.name != "bom") {
-            compile dependencyVersions.slf4jApi
+            compile dependencyVersion("slf4j")
         }
-//        shadowCompile dependencyVersions.slf4jApi
 
-        compileOnly dependencyVersions.caffeine
-        testCompile dependencyVersions.caffeine
-        testCompile dependencyVersions.groovy
-        testCompile(dependencyVersions.spock) {
+        compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testCompile dependencyVersion("groovy")
+        testCompile(dependencyVersion("spock")) {
             exclude module:'groovy-all'
         }
         testCompile "cglib:cglib-nodep:2.2.2"
         testCompile "org.objenesis:objenesis:1.4"
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile dependencyVersions.groovyTest
-        compileOnly dependencyVersions.asm
-        compileOnly dependencyVersions.asmCommons
+        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+        compileOnly "org.ow2.asm:asm:$asmVersion"
+        compileOnly "org.ow2.asm:asm-commons:$asmVersion"
 
-        testCompile dependencyVersions.asm
-        testCompile dependencyVersions.asmCommons
+        testCompile "org.ow2.asm:asm:$asmVersion"
+        testCompile "org.ow2.asm:asm-commons:$asmVersion"
     }
 
     task allDeps(type: DependencyReportTask) {}

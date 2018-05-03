@@ -3,7 +3,7 @@ dependencies {
     compile project(":configurations:hibernate-validator")
     compile project(":configurations:gorm-common")
 
-    compile dependencyVersions.groovy
+    compile dependencyVersion("groovy")
     compileOnly project(":inject-groovy")
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
@@ -12,7 +12,7 @@ dependencies {
     compile project(":spring")
     testCompile project(":inject-groovy")
     compile "org.grails:grails-datastore-gorm-mongodb:6.1.4.RELEASE"
-    compile dependencyVersions.mongoDriver
+    compile dependencyVersion("mongodb")
 
     testCompile project(":http-server")
     testCompile project(":http-client")

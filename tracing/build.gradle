@@ -15,8 +15,8 @@ dependencies {
     compileOnly 'io.opentracing.brave:brave-opentracing:0.30.0'
 
     compileOnly 'io.jaegertracing:jaeger-core:0.27.0-RC1'
-    compileOnly dependencyVersions.reactor
-    compileOnly dependencyVersions.rxJavaInterop
+    compileOnly dependencyVersion("reactor")
+    compileOnly dependencyVersion("rxjava1.interop")
 
 
     testCompile project(":configurations:netflix-hystrix")
@@ -24,7 +24,7 @@ dependencies {
     testCompile project(":inject-java")
     testCompile project(":http-server-netty")
 
-    testCompile dependencyVersions.reactor
+    testCompile dependencyVersion("reactor")
     testCompile 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
     testCompile 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
     testCompile 'io.opentracing.brave:brave-opentracing:0.30.0'

@@ -1,8 +1,8 @@
 dependencies {
-    compile dependencyVersions.groovy
+    compile dependencyVersion("groovy")
     compileOnly project(":inject-java")
     compile project(":inject")
     compile project(":spring")
 
-    compile dependencyVersions.gormDatastore
+    compile dependencyModuleVersion("gorm", "grails-datastore-gorm")
 }
