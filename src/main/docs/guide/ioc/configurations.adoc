@@ -25,31 +25,3 @@ package my.package
 
 In the above example, all bean definitions within the annotated package will only be loaded and made available if a `javax.sql.DataSource` bean is present. This allows you to implement conditional auto-configuration of bean definitions.
 
-=== Configuration Requirements
-
-The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
-
-
-.Using @Requires
-|===
-|Requirement | Example
-
-|Require the presence of one ore more classes
-|`@Requires(classes=javax.servlet.Servlet)`
-
-|Require the presence one or more beans
-|`@Requires(beans=javax.sql.DataSource)`
-
-|Require the presence of an environment variable
-|`@Requires(env='TRAVIS')`
-
-|Require the presence of another configuration package
-|`@Requires(configuration='foo.bar')`
-
-|Require particular SDK version
-|`@Requires(sdk=Sdk.JAVA, value="1.8")`
-
-|Require a property with an optional value
-|`@Requires(property='data-source.url')`
-|===
-
