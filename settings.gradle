@@ -29,6 +29,9 @@ include "jdbc"
 include "runtime-groovy"
 include "cli"
 include "bom"
+include "security"
+include "security-jwt"
+include "security-session"
 
 // configurations
 include "configurations:gorm-common"

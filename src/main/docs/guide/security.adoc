@@ -1,0 +1,10 @@
+To enable security capabilities enable security:
+
+[source, yaml]
+----
+micronaut:
+    security:
+        enabled: true
+----
+
+Once you enable security, Micronaut returns HTTP Status Unauthorized ( 401 ) for any endpoint invocation.

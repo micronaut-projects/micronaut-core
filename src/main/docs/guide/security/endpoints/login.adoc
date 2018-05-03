@@ -1,0 +1,24 @@
+You can enable `LoginController` with configuration property:
+
+|===
+
+| Configuration Property | Default Value | Possible Values
+
+| `micronaut.security.endpoints.login` | false | true or false
+
+|===
+
+The response of the Login Endpoint is handled by a bean instance of link:{api}/io/micronaut/security/handlers/LoginHandler.html[LoginHandler].
+
+=== Login Endpoint invocation example
+
+[source, bash]
+.Login Endpoint invocation example
+----
+curl -X "POST" "http://localhost:8080/login" \
+     -H 'Content-Type: application/json; charset=utf-8' \
+     -d $'{
+  "username": "euler",
+  "password": "password"
+}'
+----

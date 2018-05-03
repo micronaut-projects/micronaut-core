@@ -107,6 +107,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return an {@link HttpStatus#UNAUTHORIZED} response with an empty body
+     *
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> unauthorized() {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No Server implementation found on classpath")
+        );
+
+        return factory.status(HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
      * Return an {@link HttpStatus#NOT_FOUND} response with a body
      *
      * @return The response
