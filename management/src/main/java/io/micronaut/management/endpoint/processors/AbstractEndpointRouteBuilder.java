@@ -33,6 +33,7 @@ import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Abstract {@link io.micronaut.web.router.RouteBuilder} implementation for {@link Endpoint} method processors.
@@ -43,21 +44,30 @@ import java.util.regex.Pattern;
 abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, Completable {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
-    private static final List<String> NON_PATH_TYPES = Arrays.asList("java.security.Principal");
-
 
     private Map<Class, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
     private final ApplicationContext beanContext;
 
+    private final List<String> nonPathTypes;
+
     /**
      * @param applicationContext The application context
      * @param uriNamingStrategy  The URI naming strategy
      * @param conversionService  The conversion service
+     * @param nonPathTypesProviders A list of providers which defines paths not to be used as Path paramters
      */
-    AbstractEndpointRouteBuilder(ApplicationContext applicationContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
+                                 UriNamingStrategy uriNamingStrategy,
+                                 ConversionService<?> conversionService,
+                                 Collection<NonPathTypesProvider> nonPathTypesProviders) {
         super(applicationContext, uriNamingStrategy, conversionService);
         this.beanContext = applicationContext;
+        nonPathTypes = nonPathTypesProviders.stream()
+                .map(NonPathTypesProvider::nonPathTypes)
+                .flatMap(List::stream)
+                .map(Class::getName)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -137,7 +147,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * @return Whether the argument is a path parameter
      */
     protected boolean isPathParameter(Argument argument) {
-        if (NON_PATH_TYPES.contains(argument.getType().getName())) {
+        if (nonPathTypes.contains(argument.getType().getName())) {
             return false;
         }
         return argument.getAnnotations().length == 0 || argument.getAnnotation(QueryValue.class) != null;
