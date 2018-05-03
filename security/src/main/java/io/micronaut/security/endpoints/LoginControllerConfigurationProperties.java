@@ -16,26 +16,31 @@
 
 package io.micronaut.security.endpoints;
 
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.security.config.SecurityConfigurationProperties;
+
 /**
- * Configuration for the security endpoints.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface SecurityEndpointsConfiguration {
+@ConfigurationProperties(LoginControllerConfigurationProperties.PREFIX)
+public class LoginControllerConfigurationProperties implements LoginControllerConfiguration {
+    public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.login";
+
+    private boolean enabled = false;
+    private String path = "/login";
 
     /**
      * @return true if you want to enable the {@link LoginController}
      */
-    boolean isLogin();
+    @Override
+    public boolean isEnabled() {
+         return this.enabled;
+    }
 
-    /**
-     * @return true if you want to enable the refresh endpoint;
-     */
-    boolean isRefresh();
-
-    /**
-     * @return true if you want to enable the {@link LogoutController}
-     */
-    boolean isLogout();
+    @Override
+    public String getPath() {
+        return this.path;
+    }
 }
