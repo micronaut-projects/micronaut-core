@@ -18,6 +18,9 @@ package io.micronaut.security.authentication.providers;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.authentication.*;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.List;
@@ -57,30 +60,31 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
      * @return An AuthenticationResponse object which encapsulates the authentication result.
      */
     @Override
-    public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
+    public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
         final String username = authenticationRequest.getIdentity().toString();
-        Optional<UserState> optionalUserState = userFetcher.findByUsername(username);
 
-        if (!optionalUserState.isPresent()) {
-            return new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND);
-        }
-        UserState user = optionalUserState.get();
-        if (!user.isEnabled()) {
-            return new AuthenticationFailed(AuthenticationFailureReason.USER_DISABLED);
-        }
-        if (user.isAccountExpired()) {
-            return new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_EXPIRED);
-        }
-        if (user.isAccountLocked()) {
-            return new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_LOCKED);
-        }
-        if (user.isPasswordExpired()) {
-            return new AuthenticationFailed(AuthenticationFailureReason.PASSWORD_EXPIRED);
-        }
-        if (!passwordEncoder.matches(authenticationRequest.getSecret().toString(), user.getPassword())) {
-            return new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
-        }
-        List<String> authorities = authoritiesFetcher.findAuthoritiesByUsername(username);
-        return new UserDetails(username, authorities);
+        Flowable<UserState> userState = Flowable.fromPublisher(userFetcher.findByUsername(username));
+
+        // TODO: handle exception?
+        return userState.switchMap(user -> {
+            if (!user.isEnabled()) {
+                return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.USER_DISABLED));
+            }
+            if (user.isAccountExpired()) {
+                return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_EXPIRED));
+            }
+            if (user.isAccountLocked()) {
+                return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.ACCOUNT_LOCKED));
+            }
+            if (user.isPasswordExpired()) {
+                return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.PASSWORD_EXPIRED));
+            }
+            if (!passwordEncoder.matches(authenticationRequest.getSecret().toString(), user.getPassword())) {
+                return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH));
+            }
+            return Flowable.fromPublisher(authoritiesFetcher.findAuthoritiesByUsername(username))
+                            .map(authorities -> new UserDetails(username, authorities));
+        }).switchIfEmpty(Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND)));
+
     }
 }

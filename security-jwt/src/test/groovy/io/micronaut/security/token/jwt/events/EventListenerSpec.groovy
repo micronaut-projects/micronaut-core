@@ -14,6 +14,8 @@ import io.micronaut.security.authentication.UserDetails
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.jwt.event.AccessTokenGeneratedEvent
 import io.micronaut.security.token.jwt.event.RefreshTokenGeneratedEvent
+import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -72,11 +74,11 @@ class EventListenerSpec extends Specification {
     static class CustomAuthenticationProvider implements AuthenticationProvider {
 
         @Override
-        AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
+        Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
             if ( authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password' ) {
-                return new UserDetails('user', [])
+                return Flowable.just(new UserDetails('user', []))
             }
-            return new AuthenticationFailed()
+            return Flowable.just(new AuthenticationFailed())
         }
     }
 

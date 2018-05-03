@@ -16,12 +16,15 @@
 
 package io.micronaut.security.authentication.providers;
 
+import org.reactivestreams.Publisher;
+
 import java.util.List;
 
 /**
  * Responsible for finding granted authorities for a given user.
  *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface AuthoritiesFetcher {
@@ -30,7 +33,7 @@ public interface AuthoritiesFetcher {
      * Returns granted roles for the given username.
      *
      * @param username e.g. admin
-     * @return A list of authorities, or null if none could be found
+     * @return A publisher that emits a list of authorities or empty if non a present
      */
-    List<String> findAuthoritiesByUsername(String username);
+    Publisher<List<String>> findAuthoritiesByUsername(String username);
 }

@@ -16,6 +16,8 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.type.ReturnType;
+import io.micronaut.http.*;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
@@ -27,10 +29,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StreamUtils;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -47,6 +45,7 @@ import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.HttpServerException;
+import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
 import io.micronaut.http.server.netty.async.DefaultCloseHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -223,9 +222,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         List<UriRouteMatch<Object>> uriRoutes = router
             .find(httpMethod, requestPath)
-            .filter((match) -> {
-                return match.test(request);
-            })
+            .filter((match) -> match.test(request))
             .collect(StreamUtils.minAll(
                 Comparator.comparingInt((match) -> match.getVariables().size()),
                 Collectors.toList()));
@@ -691,9 +688,58 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
                     }
                     Object result = routeMatch.execute();
+                    ReturnType<?> genericReturnType = routeMatch.getReturnType();
+                    Class<?> javaReturnType = genericReturnType.getType();
 
-                    if (result == null) {
-                        Class<?> javaReturnType = routeMatch.getReturnType().getType();
+                    if(result != null && isResponsePublisher(genericReturnType, javaReturnType)) {
+                        // special case, handle an emitted http response
+                        @SuppressWarnings("unchecked")
+                        Flowable<HttpResponse<?>> responseFlowable = ConversionService.SHARED.convert(result, Flowable.class)
+                                                                                      .orElseThrow(()->new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+
+                        responseFlowable.subscribeOn(Schedulers.from(executor))
+                                        .subscribe(new Subscriber<HttpResponse<?>>() {
+                            boolean emitted = false;
+                            @Override
+                            public void onSubscribe(Subscription s) {
+                                s.request(1);
+                            }
+
+                            @Override
+                            public void onNext(HttpResponse<?> httpResponse) {
+                                emitted = true;
+                                if(!(httpResponse instanceof MutableHttpResponse)) {
+                                    Optional<NettyHttpResponse> converted = ConversionService.SHARED.convert(httpResponse, NettyHttpResponse.class);
+                                    if(converted.isPresent()) {
+                                        emitter.onNext(converted.get());
+                                    }
+                                    else {
+                                        emitter.onError(new InternalServerException("Emitted response is not mutable"));
+                                    }
+                                }
+                                else {
+                                    emitter.onNext((MutableHttpResponse<?>) httpResponse);
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                                emitted = true;
+                                emitter.onError(t);
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                if(!emitted) {
+                                    emitter.onNext(io.micronaut.http.HttpResponse.status(HttpStatus.NOT_FOUND));
+                                }
+                                emitter.onComplete();
+                            }
+                        });
+
+                        return;
+                    }
+                    else if (result == null) {
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
                             result = router.route(HttpStatus.NOT_FOUND)
@@ -791,6 +837,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return null;
         });
         return route;
+    }
+
+    private boolean isResponsePublisher(ReturnType<?> genericReturnType, Class<?> javaReturnType) {
+        return Publishers.isConvertibleToPublisher(javaReturnType) && genericReturnType.getFirstTypeVariable().map(arg -> HttpResponse.class.isAssignableFrom(arg.getType())).orElse(false);
     }
 
     private Publisher<? extends io.micronaut.http.HttpResponse<?>> filterPublisher(
