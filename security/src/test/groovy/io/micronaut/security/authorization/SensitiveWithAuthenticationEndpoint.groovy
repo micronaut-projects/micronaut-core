@@ -5,14 +5,12 @@ import io.micronaut.management.endpoint.Endpoint
 import io.micronaut.management.endpoint.Read
 import io.micronaut.security.authentication.Authentication
 
-import java.security.Principal
-
 @Requires(property = 'spec.name', value = 'authorization')
-@Endpoint(id = "sensitive", defaultSensitive = true)
-class SensitiveEndpoint {
+@Endpoint(id = "sensitiveauthentication", defaultSensitive = true)
+class SensitiveWithAuthenticationEndpoint {
 
     @Read
-    String hello(Principal principal) {
-        "Hello ${principal.name}"
+    String hello(Authentication authentication) {
+        "Hello ${authentication.name}"
     }
 }
