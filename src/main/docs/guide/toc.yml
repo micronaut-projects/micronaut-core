@@ -19,6 +19,7 @@ ioc:
     refreshable: Refreshable Scope
   factories: Bean Factories
   conditionalBeans: Conditional Beans
+  beanPriority: Bean Priority
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
