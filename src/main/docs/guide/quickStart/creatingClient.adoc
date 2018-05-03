@@ -16,3 +16,37 @@ include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=
 <4> The `retrieve` method returns the response of the controller as a `String`
 
 
+In addition to a low-level client, Micronaut features a high-level compile-time client, powered by the api:http.client.Client[] annotation.
+
+To create a client, simply create an interface annotated with `@Client`. For example:
+
+
+.src/main/java/hello/world/HelloClient.java
+[source,groovy]
+----
+include::{testsuite}/server/intro/HelloClient.java[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/HelloClient.java[tags=class, indent=0]
+----
+
+<1> The `@Client` annotation is used with value that is a relative path to the current server
+<2> The same link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation used on the server is used to define the client mapping
+<3> A RxJava rx:Single[] is returned with the value read from the server
+
+To test the `HelloClient` simply retrieve it from the api:context.ApplicationContext[] associated with the server:
+
+.Testing HelloClient
+[source,groovy]
+----
+include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class, indent=0]
+----
+
+<1> The api:runtime.server.EmbeddedServer[] is run
+<2> The `HelloClient` is retrieved from the api:context.ApplicationContext[]
+<3> The client is invoked using RxJava's `blockingGet` method
+
+The api:http.client.Client[] annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.
+
+The api:http.client.Client[] annotation is very flexible. See the section on the <<httpClient, Micronaut HTTP Client>> for more information.
