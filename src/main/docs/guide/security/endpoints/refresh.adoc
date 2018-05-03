@@ -1,4 +1,4 @@
-INFO: This controller can only be enabled if you are using JWT authentication.
+NOTE: This controller can only be enabled if you are using JWT authentication.
 
 By default, issued access tokens expire after a period of time, and they are paired with refresh tokens. To
 ease the refresh, you can enable link:{api}/io/micronaut/security/token/jwt/endpoints/OauthController.html[OauthController], with configuration property:
