@@ -8,7 +8,7 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":http-client")
-    testCompile dependencyVersions.groovyJson
+    testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
-    testCompile dependencyVersions.rxJava2
+    testCompile dependencyVersion("rxjava2")
 }
