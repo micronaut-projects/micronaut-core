@@ -1,6 +1,6 @@
-You can read a token from a Cookie too.
+You can read a JWT token from a Cookie too.
 
-It is disabled by default. It requires JWT Authentication to be enabled.
+Reading tokens from Cookies is disabled by default. Note that using JWT tokens from cookies requires JWT Authentication to be enabled.
 
 |===
 

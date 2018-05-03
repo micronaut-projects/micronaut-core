@@ -13,7 +13,7 @@ JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a sec
 
 |===
 
-=== How does a JWT looks like?
+=== What does a JWT look like?
 
 image::jwt.png[]
 
