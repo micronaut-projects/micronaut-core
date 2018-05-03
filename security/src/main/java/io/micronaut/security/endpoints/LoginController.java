@@ -44,8 +44,8 @@ import io.reactivex.Single;
  *
  * @since 1.0
  */
-@Controller("/")
-@Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".login")
+@Requires(property = LoginControllerConfigurationProperties.PREFIX + ".enabled")
+@Controller("${" + LoginControllerConfigurationProperties.PREFIX + ".path:/login}")
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LoginController {
 
@@ -74,7 +74,7 @@ public class LoginController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post
+    @Post("/")
     public Single<HttpResponse> login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
         Flowable<AuthenticationResponse> authenticationResponseFlowable = Flowable.fromPublisher(authenticator.authenticate(usernamePasswordCredentials));
 

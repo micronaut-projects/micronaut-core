@@ -1,7 +1,6 @@
 package io.micronaut.security.token.jwt.endpoints
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.Qualifier
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -30,8 +29,8 @@ class OauthControllerSpec extends Specification {
             [
                     'spec.name': 'endpoints',
                     'micronaut.security.enabled': true,
-                    'micronaut.security.endpoints.login': true,
-                    'micronaut.security.endpoints.refresh': true,
+                    'micronaut.security.endpoints.login.enabled': true,
+                    'micronaut.security.endpoints.oauth.enabled': true,
                     'micronaut.security.token.jwt.enabled': true,
                     'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
             ], 'test')
