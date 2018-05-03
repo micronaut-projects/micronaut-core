@@ -19,6 +19,7 @@ package io.micronaut.security.filters;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
+import org.reactivestreams.Publisher;
 
 import java.util.Optional;
 
@@ -35,5 +36,5 @@ public interface AuthenticationFetcher extends Ordered {
      * @param request {@link HttpRequest} being executed.
      * @return {@link Authentication} if found
      */
-    Optional<Authentication> fetchAuthentication(HttpRequest<?> request);
+    Publisher<Authentication> fetchAuthentication(HttpRequest<?> request);
 }

@@ -23,17 +23,23 @@ import io.micronaut.security.event.TokenValidatedEvent;
 import io.micronaut.security.filters.AuthenticationFetcher;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Optional;
 
 /**
  * Attempts to retrieve a token form the {@link HttpRequest} and if existing validated.
  * It uses the list of {@link TokenReader} and {@link TokenValidator} registered in the ApplicationContext.
+ *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
@@ -51,8 +57,8 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
 
     /**
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
-     * @param tokenReaders The list {@link TokenReader} which attempt to read the request
-     * @param eventPublisher The Application event publiser
+     * @param tokenReaders    The list {@link TokenReader} which attempt to read the request
+     * @param eventPublisher  The Application event publiser
      */
     public TokenAuthenticationFetcher(Collection<TokenValidator> tokenValidators,
                                       Collection<TokenReader> tokenReaders,
@@ -63,7 +69,7 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     }
 
     @Override
-    public Optional<Authentication> fetchAuthentication(HttpRequest<?> request) {
+    public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
 
         String method = request.getMethod().toString();
         String path = request.getPath();
@@ -83,19 +89,32 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
             }
         }
 
-        Optional<Authentication> authentication = Optional.empty();
-        for (TokenValidator tokenValidator : tokenValidators) {
-            authentication = token.flatMap(tokenValidator::validateToken);
-            if (authentication.isPresent()) {
-                token.ifPresent(s -> eventPublisher.publishEvent(new TokenValidatedEvent(s)));
-                break;
-            }
+        if (!token.isPresent()) {
+            return Flowable.empty();
+        } else {
+            Iterator<TokenValidator> tokenValidatorIterator = tokenValidators.iterator();
+            String tokenString = token.get();
+            return attemptTokenValidation(tokenValidatorIterator, tokenString);
         }
-        return authentication;
     }
 
     @Override
     public int getOrder() {
         return ORDER;
+    }
+
+    private Flowable<Authentication> attemptTokenValidation(Iterator<TokenValidator> tokenValidatorIterator, String tokenString) {
+        if (tokenValidatorIterator.hasNext()) {
+            TokenValidator tokenValidator = tokenValidatorIterator.next();
+            return Flowable.just(tokenString).switchMap(tokenValue ->
+                    Flowable.fromPublisher(tokenValidator.validateToken(tokenValue)).map(authentication -> {
+                        eventPublisher.publishEvent(new TokenValidatedEvent(tokenValue));
+                        return authentication;
+                    })
+            ).switchIfEmpty(attemptTokenValidation(
+                    tokenValidatorIterator, tokenString
+            ));
+        }
+        return Flowable.empty();
     }
 }

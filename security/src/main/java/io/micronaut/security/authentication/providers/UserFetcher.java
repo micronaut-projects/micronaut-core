@@ -16,13 +16,14 @@
 
 package io.micronaut.security.authentication.providers;
 
-import java.util.Optional;
+import org.reactivestreams.Publisher;
 
 /**
  * Responsible for returning user information based
  * on their username.
  *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface UserFetcher {
@@ -31,7 +32,7 @@ public interface UserFetcher {
      * Fetches a user based on the username.
      *
      * @param username e.g. admin
-     * @return The users information
+     * @return The users information or an empty publisher if no user is present
      */
-    Optional<UserState> findByUsername(String username);
+    Publisher<UserState> findByUsername(String username);
 }

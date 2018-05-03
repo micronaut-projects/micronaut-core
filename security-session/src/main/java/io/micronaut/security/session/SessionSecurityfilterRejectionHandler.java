@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.security.session;
+package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.async.publisher.Publishers;

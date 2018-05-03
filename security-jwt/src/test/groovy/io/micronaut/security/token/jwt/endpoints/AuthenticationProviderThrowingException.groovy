@@ -4,6 +4,8 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.security.authentication.AuthenticationProvider
 import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
+import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 
@@ -11,7 +13,7 @@ import javax.inject.Singleton
 @Requires(property = 'spec.name', value = 'endpoints')
 class AuthenticationProviderThrowingException implements AuthenticationProvider {
     @Override
-    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
-        throw new Exception()
+    Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
+        Flowable.error(new Exception())
     }
 }

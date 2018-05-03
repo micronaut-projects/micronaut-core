@@ -6,6 +6,8 @@ import io.micronaut.security.authentication.AuthenticationProvider
 import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
+import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 
@@ -14,10 +16,10 @@ import javax.inject.Singleton
 class AuthenticationProviderUserPassword implements AuthenticationProvider {
 
     @Override
-    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
+    Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
         if ( authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password' ) {
-            return new UserDetails('user', [])
+            return Flowable.just(new UserDetails('user', []))
         }
-        return new AuthenticationFailed()
+        return Flowable.just(new AuthenticationFailed())
     }
 }

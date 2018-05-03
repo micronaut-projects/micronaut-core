@@ -72,6 +72,12 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.conversionService = conversionService;
     }
 
+    @Override
+    public String toString() {
+        HttpStatus status = getStatus();
+        return status.getCode() + " " + status.getReason();
+    }
+
     /**
      * @param conversionService The conversion service
      */
