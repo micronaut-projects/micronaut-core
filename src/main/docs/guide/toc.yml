@@ -4,7 +4,6 @@ quickStart:
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
-  testingApp: Testing the Application
   deployingApp: Deploying the Application
 ioc:
   title: Inversion of Control
