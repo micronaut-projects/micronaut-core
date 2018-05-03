@@ -123,7 +123,7 @@ curl -X "POST" "{url}/weather/evict"
 
         @PostConstruct
         void init() {
-            forecast = "Scattered Clouds ${new Date().format('dd/MMM/yy HH:ss.SSS')}"
+            forecast = "Scattered Clouds ${new Date().format('dd/MMM/yy HH:ss.SSS')}" // <2>
         }
 
         String latestForecast() {
@@ -132,7 +132,7 @@ curl -X "POST" "{url}/weather/evict"
     }
     //end::weatherService[]
 
-    //tag::weatherController[]
+
     @Controller('/weather')
     static class WeatherController {
         @Inject
@@ -148,11 +148,13 @@ curl -X "POST" "{url}/weather/evict"
 
         @Post("/evict")
         HttpResponse<Map<String, String>> evict() {
-            applicationContext.publishEvent(new RefreshEvent()) // <2>
+            //tag::publishEvent[]
+            applicationContext.publishEvent(new RefreshEvent())
+            //end::publishEvent[]
             ok([msg: 'OK']) as HttpResponse<Map<String, String>>
         }
     }
-    //end::weatherController[]
+
 
 
 }

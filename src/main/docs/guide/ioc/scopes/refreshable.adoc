@@ -1,4 +1,4 @@
-`@Refreshable` scope is a custom scope that allows a bean’s state to be refreshed via:
+The api:runtime.context.scope.Refreshable[] scope is a custom scope that allows a bean’s state to be refreshed via:
 
 - `/refresh` endpoint.
 - Publication of a `RefreshEvent`.
@@ -7,64 +7,17 @@ The following example, illustrates the `@Refreshable` scope behavior.
 
 [source,groovy]
 ----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=weatherController, indent=0]
-
 include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=weatherService, indent=0]
 ----
 
-<1> `WeatherService` is annotated with `@Refreshable` scope. The publication of a `RefreshEvent` causes its destruction.
-<1> `WeatherController.evict` method publishes `RefreshEvent` in the Application Context.
+<1> The `WeatherService` is annotated with `@Refreshable` scope which stores an instance until a refresh event is triggered
+<2> The value of the `forecast` property is set to a fixed value when the bean is created and won't change until the bean is refreshed
 
-If you invoke the `/weather/forecast` twice, you will see identical responses.
+If you invoke the `latestForecast()` twice, you will see identical responses such as `"Scattered Clouds 01/Feb/18 10:29.199"`.
 
-:url: http://localhost:8080
-[source, bash, subs="attributes"]
-----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=forecastCurlCommand, indent=0]
-----
-returns:
-[source, json]
-----
-{
-    "forecast": "Scattered Clouds 01/Feb/18 10:29.199"
-}
-----
+When the `/refresh` endpoint is invoked or a api:runtime.context.scope.RefreshEvent[] is published then the instance is invalided a new instance is created the next time the object is requested. For example:
 
-[source, bash, subs="attributes"]
+[source,groovy]
 ----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=forecastCurlCommand]
+include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=publishEvent, indent=0]
 ----
-returns
-[source, json]
-----
-{
-    "forecast": "Scattered Clouds 01/Feb/18 10:29.199"
-}
-----
-
-If you invoke the `/weather/evict` endpoint, the `WeatherService` beans gets destroyed.
-
-[source, bash, subs="attributes"]
-----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=evictCurlCommand]
-----
-[source, json]
-----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=evictResponse]
-----
-
-The next time you invoke the `/weather/forecast` endpoint, the `WeatherService` is instantiated again which leads to a different
-response.
-
-[source, bash, subs="attributes"]
-----
-include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=forecastCurlCommand]
-----
-[source, json]
-----
-{
-    "forecast": "Scattered Clouds 01/Feb/18 10:33.199" <1>
-}
-----
-
-<1> Date has changed.
