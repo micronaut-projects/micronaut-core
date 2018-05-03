@@ -1,0 +1,29 @@
+`@Primary` is a qualifier that indicates that a bean is the primary bean that should be selected in the case of multiple possible interface implementations.
+
+Check this example:
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=clazz, indent=0]
+----
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=clazz, indent=0]
+----
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/ColorPicker.groovy[tags=clazz, indent=0]
+----
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/TestController.groovy[tags=clazz, indent=0]
+----
+
+<1> Although there are two `ColorPicker` beans, `Green` gets injected due to the `@Primary` annotation.
