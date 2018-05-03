@@ -27,6 +27,9 @@ import io.micronaut.security.handlers.RejectionHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.web.router.RouteMatch;
+import io.reactivex.Flowable;
+import io.reactivex.Maybe;
+import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,12 +38,14 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
  * Security Filter.
  *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Filter("/**")
@@ -78,6 +83,77 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getSecurityFilterOrder() : 0;
     }
 
+    @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        String method = request.getMethod().toString();
+        String path = request.getPath();
+
+        Maybe<Authentication> authentication = Flowable.fromIterable(authenticationFetchers)
+                                                     .flatMap(authenticationFetcher -> authenticationFetcher.fetchAuthentication(request))
+                                                     .firstElement();
+
+        return authentication.toFlowable().flatMap((Function<Authentication, Publisher<MutableHttpResponse<?>>>) authentication1 -> {
+            request.setAttribute(AUTHENTICATION, authentication1);
+            Map<String, Object> attributes = authentication1.getAttributes();
+            Optional<RouteMatch> routeMatch = getRouteMatch(request);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Attributes: {}", attributes.entrySet()
+                        .stream()
+                        .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                        .collect(Collectors.joining(", ")));
+            }
+            for (SecurityRule rule: securityRules) {
+                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes);
+                if (result == SecurityRuleResult.REJECTED) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
+                    }
+                    return rejectionHandler.reject(request, true);
+                }
+                if (result == SecurityRuleResult.ALLOWED) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
+                    }
+                    return chain.proceed(request);
+                }
+            }
+
+            //no rule found for the given request, reject
+            return rejectionHandler.reject(request, true);
+        }).switchIfEmpty(Flowable.just(securityRules).flatMap( securityRules -> {
+            request.setAttribute(AUTHENTICATION, null);
+            Optional<RouteMatch> routeMatch = getRouteMatch(request);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Failure to authenticate request. {} {}.", method, path);
+            }
+
+
+            for (SecurityRule rule: securityRules) {
+                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null),null);
+                if (result == SecurityRuleResult.REJECTED) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
+                    }
+                    return rejectionHandler.reject(request, false);
+                }
+                if (result == SecurityRuleResult.ALLOWED) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
+                    }
+                    return chain.proceed(request);
+                }
+            }
+
+            //no rule found for the given request, reject
+            return rejectionHandler.reject(request, false);
+        }));
+    }
+
     private Optional<RouteMatch> getRouteMatch(HttpRequest<?> request) {
         Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
         if (routeMatchAttribute.isPresent()) {
@@ -88,57 +164,5 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
             }
             return Optional.empty();
         }
-    }
-
-    @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-        String method = request.getMethod().toString();
-        String path = request.getPath();
-
-        Optional<Authentication> authentication = Optional.empty();
-        for (AuthenticationFetcher authenticationFetcher : authenticationFetchers) {
-            authentication = authenticationFetcher.fetchAuthentication(request);
-            if (authentication.isPresent()) {
-                break;
-            }
-        }
-
-        request.setAttribute(AUTHENTICATION, authentication.orElse(null));
-        Optional<Map<String, Object>> attributes = authentication.map(Authentication::getAttributes);
-        Optional<RouteMatch> routeMatch = getRouteMatch(request);
-
-        if (LOG.isDebugEnabled()) {
-            attributes.ifPresent(stringObjectMap -> LOG.debug("Attributes: {}", stringObjectMap.entrySet()
-                    .stream()
-                    .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                    .collect(Collectors.joining(", "))));
-            if (authentication.isPresent()) {
-                LOG.debug("Failure to authenticate request. {} {}.", method, path);
-            }
-        }
-
-        for (SecurityRule rule: securityRules) {
-            SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes.orElse(null));
-            if (result == SecurityRuleResult.REJECTED) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
-                }
-                return rejectionHandler.reject(request, attributes.isPresent());
-            }
-            if (result == SecurityRuleResult.ALLOWED) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
-                }
-                return chain.proceed(request);
-            }
-        }
-
-        //no rule found for the given request, reject
-        return rejectionHandler.reject(request, attributes.isPresent());
-    }
-
-    @Override
-    public int getOrder() {
-        return order;
     }
 }

@@ -23,7 +23,7 @@
 
 @Configuration
 @Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled")
-package io.micronaut.docs.security.session;
+package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

@@ -90,6 +90,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     private Publisher<MutableHttpResponse<?>> encodeSessionId(HttpRequest<?> request, Publisher<MutableHttpResponse<?>> responsePublisher) {
         Flowable<SessionAndResponse> responseFlowable = Flowable.fromPublisher(responsePublisher)
             .switchMap(mutableHttpResponse -> {
+
                 Optional<Session> opt = request.getAttributes().get(SESSION_ATTRIBUTE, Session.class);
                 if (opt.isPresent()) {
                     Session session = opt.get();
