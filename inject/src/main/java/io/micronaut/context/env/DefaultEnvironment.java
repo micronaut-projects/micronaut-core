@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
 import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.cli.Option;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -39,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import javax.print.attribute.standard.MediaSize;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -68,7 +66,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
-    private static final String PROPERTY_SOURCES_SYSTEM_PROPERTY_KEY = "micronaut.config.files";
+    private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
 
@@ -296,7 +294,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     protected void readPropertySources(String name) {
         List<PropertySource> propertySources = readPropertySourceList(name);
-        propertySources.addAll(readPropertySourceListFromSystemProperties(PROPERTY_SOURCES_SYSTEM_PROPERTY_KEY));
+        propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(PROPERTY_SOURCES_KEY)));
+        propertySources.addAll(readPropertySourceListFromFiles(
+                readPropertySourceListKeyFromEnvironment())
+        );
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
             if(LOG.isDebugEnabled()) {
@@ -308,17 +309,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     /**
-     * Resolve the property sources for files passed via system property.
+     * Reads the value of MICRONAUT_CONFIG_FILES environment variable.
      *
-     * @param key The key or System property which has list of property sources
-     * @return The list of property sources for each file in system property
+     * @return The comma-separated list of files
      */
-    protected List<PropertySource> readPropertySourceListFromSystemProperties(String key) {
+    protected String readPropertySourceListKeyFromEnvironment() {
+        return System.getenv(StringUtils.convertDotToUnderscore(PROPERTY_SOURCES_KEY));
+    }
+
+    /**
+     * Resolve the property sources for files passed via system property and system env.
+     *
+     * @param files The comma separated list of files
+     * @return The list of property sources for each file
+     */
+    protected List<PropertySource> readPropertySourceListFromFiles(String files) {
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
-        Optional<String> files = Optional.ofNullable(System.getProperty(key));
-        files = files.isPresent() ? files : Optional.ofNullable(System.getProperty(StringUtils.convertDotToUnderscore(key)));
-        Optional<Collection<String>> filePathList = files
+        Optional<Collection<String>> filePathList = Optional.ofNullable(files)
                 .filter(value -> !value.isEmpty())
                 .map(value -> value.split(FILE_SEPARATOR))
                 .map(Arrays::asList)
