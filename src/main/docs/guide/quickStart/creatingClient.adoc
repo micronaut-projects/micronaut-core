@@ -1,1 +1,18 @@
-TODO
+As mentioned previously, Micronaut is both an HTTP server and an HTTP client. A low-level HTTP client is provided out of the box which you can use to test the `HelloController` created in the previous section.
+
+For example, the following test is written using http://spockframework.org[Spock Framework]:
+
+.Testing Hello World
+[source,groovy]
+----
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=0]
+----
+
+<1> The api:runtime.server.EmbeddedServer[] is configured as a shared and automatically cleaned up test field
+<2> A api:http.client.HttpClient[] instance shared field is also defined
+<3> The test using the `toBlocking()` method to make a blocking call
+<4> The `retrieve` method returns the response of the controller as a `String`
+
+
