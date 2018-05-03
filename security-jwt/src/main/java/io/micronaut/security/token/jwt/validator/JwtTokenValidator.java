@@ -31,6 +31,8 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import io.micronaut.security.token.validator.TokenValidator;
+import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
@@ -65,7 +67,7 @@ public class JwtTokenValidator implements TokenValidator {
         this.encryptionConfigurations.addAll(encryptionConfigurations);
     }
 
-    private Optional<Authentication> validatePlainJWT(JWT jwt) throws ParseException {
+    private Publisher<Authentication> validatePlainJWT(JWT jwt) throws ParseException {
         if (signatureConfigurations.isEmpty()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("JWT is not signed and no signature configurations -> verified");
@@ -74,12 +76,12 @@ public class JwtTokenValidator implements TokenValidator {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("A non-signed JWT cannot be accepted as signature configurations have been defined");
             }
-            return Optional.empty();
+            return Flowable.empty();
         }
         return createAuthentication(jwt);
     }
 
-    private Optional<Authentication> validateSignedJWT(SignedJWT signedJWT) throws ParseException {
+    private Publisher<Authentication> validateSignedJWT(SignedJWT signedJWT) throws ParseException {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is signed");
         }
@@ -112,10 +114,10 @@ public class JwtTokenValidator implements TokenValidator {
         if (LOG.isDebugEnabled()) {
             LOG.debug("No signature algorithm found for JWT: {}", signedJWT.getParsedString());
         }
-        return Optional.empty();
+        return Flowable.empty();
     }
 
-    private Optional<Authentication> validateEncryptedJWT(JWT jwt, EncryptedJWT encryptedJWT, String token) throws ParseException  {
+    private Publisher<Authentication> validateEncryptedJWT(JWT jwt, EncryptedJWT encryptedJWT, String token) throws ParseException  {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is encrypted");
         }
@@ -135,7 +137,7 @@ public class JwtTokenValidator implements TokenValidator {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("encrypted JWT could couldn't be converted to a signed JWT.");
                         }
-                        return Optional.empty();
+                        return Flowable.empty();
                     }
                     return validateSignedJWT(signedJWT);
 
@@ -149,11 +151,11 @@ public class JwtTokenValidator implements TokenValidator {
         if (LOG.isDebugEnabled()) {
             LOG.debug("No encryption algorithm found for JWT: {}", token);
         }
-        return Optional.empty();
+        return Flowable.empty();
     }
 
     @Override
-    public Optional<Authentication> validateToken(String token) {
+    public Publisher<Authentication> validateToken(String token) {
         try {
             // Parse the token
             JWT jwt = JWTParser.parse(token);
@@ -170,26 +172,26 @@ public class JwtTokenValidator implements TokenValidator {
                 return validateSignedJWT(signedJWT);
             }
 
-            return Optional.empty();
+            return Flowable.empty();
 
         } catch (final ParseException e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cannot decrypt / verify JWT: {}", e.getMessage());
             }
-            return Optional.empty();
+            return Flowable.empty();
         }
     }
 
-    private Optional<Authentication> createAuthentication(final JWT jwt) throws ParseException {
+    private Publisher<Authentication> createAuthentication(final JWT jwt) throws ParseException {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
         final String subject = claimSet.getSubject();
         if (subject == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("JWT must contain a subject ('sub' claim)");
             }
-            return Optional.empty();
+            return Flowable.empty();
         }
 
-        return Optional.of(new AuthenticationJWTClaimsSetAdapter(claimSet));
+        return Flowable.just(new AuthenticationJWTClaimsSetAdapter(claimSet));
     }
 }

@@ -18,6 +18,8 @@ package io.micronaut.security.token.validator;
 
 import io.micronaut.core.order.Ordered;
 import io.micronaut.security.authentication.Authentication;
+import org.reactivestreams.Publisher;
+
 import java.util.Optional;
 
 /**
@@ -34,5 +36,5 @@ public interface TokenValidator extends Ordered {
      * @param token The token string
      * @return The authentication or {@link Optional#empty} if the validation fails
      */
-    Optional<Authentication> validateToken(String token);
+    Publisher<Authentication> validateToken(String token);
 }

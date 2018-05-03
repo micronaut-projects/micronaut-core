@@ -3,6 +3,8 @@ package io.micronaut.security.authorization
 import io.micronaut.context.annotation.Requires
 import io.micronaut.security.authentication.providers.UserFetcher
 import io.micronaut.security.authentication.providers.UserState
+import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 
@@ -11,7 +13,7 @@ import javax.inject.Singleton
 class TestingUserFetcher implements UserFetcher {
 
     @Override
-    Optional<UserState> findByUsername(String username) {
+    Publisher<UserState> findByUsername(String username) {
         TestUserState testUserState = new TestUserState(username)
         switch (username) {
             case "disabled":
@@ -33,7 +35,12 @@ class TestingUserFetcher implements UserFetcher {
                 testUserState = null
                 break
         }
-        return Optional.ofNullable(testUserState)
+        if(testUserState != null) {
+            return Flowable.just(testUserState)
+        }
+        else {
+            return Flowable.empty()
+        }
     }
 
     private static class TestUserState implements UserState {
