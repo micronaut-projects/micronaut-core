@@ -15,10 +15,6 @@
  */
 package io.micronaut.docs.server.intro
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.HttpClient
-
 // tag::imports[]
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
