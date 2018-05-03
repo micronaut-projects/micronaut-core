@@ -19,7 +19,11 @@ package io.micronaut.management.endpoint.beans;
 import io.micronaut.context.BeanContext;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
+
+import java.util.Collections;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -46,7 +50,9 @@ public class BeansEndpoint {
      * @return A {@link Publisher} with the beans
      */
     @Read
-    public Publisher getBeans() {
-        return beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions());
+    public Single getBeans() {
+        return Flowable.fromPublisher(
+                beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions())
+        ).first(Collections.emptyMap());
     }
 }
