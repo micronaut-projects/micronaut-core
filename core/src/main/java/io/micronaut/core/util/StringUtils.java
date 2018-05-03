@@ -17,14 +17,7 @@
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.StringTokenizer;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -194,5 +187,34 @@ public class StringUtils {
             }
         }
         return tokens.toArray(new String[tokens.size()]);
+    }
+
+    /**
+     * Replace the dots in the property with underscore and
+     * transform to uppercase.
+     *
+     * @param dottedProperty The property with dots, example - a.b.c
+     * @return The converted value
+     */
+    public static String convertDotToUnderscore(String dottedProperty) {
+        return convertDotToUnderscore(dottedProperty, true);
+    }
+
+    /**
+     * Replace the dots in the property with underscore and
+     * transform to uppercase based on given flag.
+     *
+     * @param dottedProperty The property with dots, example - a.b.c
+     * @param uppercase To transform to uppercase string
+     * @return The converted value
+     */
+    public static String convertDotToUnderscore(String dottedProperty, boolean uppercase) {
+        if (dottedProperty == null) {
+            return  dottedProperty;
+        }
+        Optional<String> converted = Optional.of(dottedProperty)
+                .map(value -> value.replace('.','_'))
+                .map(value -> uppercase ? value.toUpperCase() : value);
+        return converted.get();
     }
 }

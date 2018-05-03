@@ -327,4 +327,26 @@ public class NameUtils {
         }
         return result;
     }
+
+    /**
+     * Retrieves the fileName of a file without extension.
+     * Ex: index.html -> index
+     *
+     * @param path The path of the file
+     * @return The file name without extension
+     */
+    public static String filename(String path) {
+        int extensionPos = path.lastIndexOf('.');
+        int lastUnixPos = path.lastIndexOf('/');
+        int lastWindowsPos = path.lastIndexOf('\\');
+        int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
+
+        int index = lastSeparator > extensionPos ? path.length() : extensionPos;
+        if (index == -1) {
+            return "";
+        } else {
+            return path.substring(lastSeparator + 1, index);
+        }
+    }
+
 }
