@@ -16,17 +16,20 @@
 
 package io.micronaut.security.authentication;
 
+import org.reactivestreams.Publisher;
+
 /**
  * Defines an authentication provider.
  *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface AuthenticationProvider {
 
     /**
      * @param authenticationRequest The request
-     * @return The response
+     * @return A publisher that emits a single response
      */
-    AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest);
+    Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest);
 }

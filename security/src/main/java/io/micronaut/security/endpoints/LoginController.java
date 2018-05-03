@@ -31,12 +31,20 @@ import io.micronaut.security.event.LoginFailedEvent;
 import io.micronaut.security.event.LoginSuccessfulEvent;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
+import io.reactivex.Maybe;
+import io.reactivex.Single;
+import io.reactivex.functions.Function;
+import org.reactivestreams.Publisher;
 
 import java.util.Optional;
 
 /**
  *
+ * Handles login requests
+ *
  * @author Sergio del Amo
+ * @author Graeme Rocher
+ *
  * @since 1.0
  */
 @Controller("/")
@@ -70,20 +78,21 @@ public class LoginController {
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post
-    public HttpResponse login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
-        Optional<AuthenticationResponse> response = authenticator.authenticate(usernamePasswordCredentials);
-        if (response.isPresent()) {
-            AuthenticationResponse authResponse = response.get();
-            if (authResponse.isAuthenticated()) {
-                UserDetails userDetails = (UserDetails) authResponse;
+    public Maybe<HttpResponse> login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
+        Maybe<AuthenticationResponse> authenticationResponse = Single.fromPublisher(authenticator.authenticate(usernamePasswordCredentials)).toMaybe();
+
+        return authenticationResponse.map(auth -> {
+            if (auth.isAuthenticated()) {
+                UserDetails userDetails = (UserDetails) auth;
                 eventPublisher.publishEvent(new LoginSuccessfulEvent(userDetails));
                 return loginHandler.loginSuccess(userDetails, request);
             } else {
-                AuthenticationFailed authenticationFailed = (AuthenticationFailed) authResponse;
+                AuthenticationFailed authenticationFailed = (AuthenticationFailed) auth;
                 eventPublisher.publishEvent(new LoginFailedEvent(authenticationFailed));
                 return loginHandler.loginFailed(authenticationFailed);
             }
-        }
-        throw new AuthenticationException(response.flatMap(AuthenticationResponse::getMessage).orElse(null));
+        }).switchIfEmpty(Maybe.error(
+                new AuthenticationException((String)null)
+        ));
     }
 }

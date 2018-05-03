@@ -2,6 +2,8 @@ package io.micronaut.security.token.jwt.bearer
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.security.authentication.providers.AuthoritiesFetcher
+import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 
@@ -10,7 +12,7 @@ import javax.inject.Singleton
 class TestingAuthoritiesFetcher implements AuthoritiesFetcher {
 
     @Override
-    List<String> findAuthoritiesByUsername(String username) {
-        (username == "admin") ?  ["ROLE_ADMIN"] : ["foo", "bar"]
+    Publisher<List<String>> findAuthoritiesByUsername(String username) {
+        Flowable.just((username == "admin") ?  ["ROLE_ADMIN"] : ["foo", "bar"])
     }
 }
