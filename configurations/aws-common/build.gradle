@@ -3,6 +3,9 @@ dependencies {
     compile project(":inject")
     compile project(":http-client")
     compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+    // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-ssm
+    compile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
+
     testCompile project(":discovery-client")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
