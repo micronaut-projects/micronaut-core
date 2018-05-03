@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.security.session;
+package io.micronaut.security.session;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
@@ -25,13 +25,17 @@ import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.security.token.TokenAuthenticationFetcher;
 import io.micronaut.session.Session;
 import io.micronaut.session.http.HttpSessionFilter;
+import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
  * Attempts to retrieve an instance of {@link Authentication} from {@link Session}.
+ *
  * @author Sergio del Amo
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
@@ -43,7 +47,7 @@ public class SessionAuthenticationFetcher implements AuthenticationFetcher {
     public static final Integer ORDER = TokenAuthenticationFetcher.ORDER - 100;
 
     @Override
-    public Optional<Authentication> fetchAuthentication(HttpRequest<?> request) {
+    public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
         Optional<Session> opt = request.getAttributes().get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if (opt.isPresent()) {
             Session session = opt.get();
@@ -51,13 +55,13 @@ public class SessionAuthenticationFetcher implements AuthenticationFetcher {
             if (optObj.isPresent()) {
                 Object obj = optObj.get();
                 if (obj instanceof Authentication) {
-                    return Optional.of((Authentication) obj);
+                    return Flowable.just((Authentication) obj);
                 } else if (obj instanceof UserDetails) {
-                    return Optional.of(new AuthenticationUserDetailsAdapter((UserDetails) obj));
+                    return Flowable.just(new AuthenticationUserDetailsAdapter((UserDetails) obj));
                 }
             }
         }
-        return Optional.empty();
+        return Flowable.empty();
     }
 
     @Override

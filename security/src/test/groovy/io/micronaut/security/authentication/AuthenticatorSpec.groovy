@@ -1,5 +1,6 @@
 package io.micronaut.security.authentication
 
+import io.reactivex.Flowable
 import spock.lang.Specification
 
 class AuthenticatorSpec extends Specification {
@@ -10,43 +11,44 @@ class AuthenticatorSpec extends Specification {
 
         when:
         def creds = new UsernamePasswordCredentials('admin', 'admin')
-        Optional<AuthenticationResponse> rsp = authenticator.authenticate(creds)
+        Flowable<AuthenticationResponse> rsp = Flowable.fromPublisher(authenticator.authenticate(creds))
+        rsp.blockingFirst()
 
         then:
-        !rsp.isPresent()
+        thrown(NoSuchElementException)
+
     }
 
     def "if any authentication provider throws exception, continue with authentication"() {
         given:
         def authProviderExceptionRaiser = Stub(AuthenticationProvider) {
-            authenticate(_) >> { throw new Exception('Authentication provider raised exception') }
+            authenticate(_) >> { Flowable.error( new Exception('Authentication provider raised exception') ) }
         }
         def authProviderOK = Stub(AuthenticationProvider) {
-            authenticate(_) >> new UserDetails('admin', [])
+            authenticate(_) >> Flowable.just(new UserDetails('admin', []))
         }
         Authenticator authenticator = new Authenticator([authProviderExceptionRaiser, authProviderOK])
 
         when:
         def creds = new UsernamePasswordCredentials('admin', 'admin')
-        Optional<AuthenticationResponse> rsp = authenticator.authenticate(creds)
+        Flowable<AuthenticationResponse> rsp = authenticator.authenticate(creds)
 
         then:
-        rsp.isPresent()
-        rsp.get() instanceof UserDetails
+        rsp.blockingFirst() instanceof UserDetails
     }
 
     def "if no authentication provider can authentication, the last error is sent back"() {
         given:
         def authProviderFailed = Stub(AuthenticationProvider) {
-            authenticate(_) >> new AuthenticationFailed()
+            authenticate(_) >> Flowable.just( new AuthenticationFailed() )
         }
         Authenticator authenticator = new Authenticator([authProviderFailed])
 
         when:
         def creds = new UsernamePasswordCredentials('admin', 'admin')
-        Optional<AuthenticationResponse> rsp = authenticator.authenticate(creds)
+        Flowable<AuthenticationResponse> rsp = Flowable.fromPublisher(authenticator.authenticate(creds))
 
         then:
-        rsp.get() instanceof AuthenticationFailed
+        rsp.blockingFirst() instanceof AuthenticationFailed
     }
 }

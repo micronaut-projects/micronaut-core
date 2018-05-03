@@ -24,6 +24,9 @@ import io.micronaut.security.authentication.Authenticator;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.validator.TokenValidator;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
@@ -59,22 +62,25 @@ public class BasicAuthTokenValidator implements TokenValidator {
     }
 
     @Override
-    public Optional<Authentication> validateToken(String encodedToken) {
-
+    public Publisher<Authentication> validateToken(String encodedToken) {
         Optional<UsernamePasswordCredentials> creds = credsFromEncodedToken(encodedToken);
         if (creds.isPresent()) {
-            Optional<AuthenticationResponse> response = authenticator.authenticate(creds.get());
-            if (response.map(AuthenticationResponse::isAuthenticated).orElse(false)) {
-                UserDetails userDetails = (UserDetails) response.get();
-                return Optional.of(new AuthenticationUserDetailsAdapter(userDetails));
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Could not authenticate {}", creds.get().getUsername());
-                }
-            }
-        }
+            Flowable<AuthenticationResponse> authenticationResponse = Flowable.fromPublisher(authenticator.authenticate(creds.get()));
 
-        return Optional.empty();
+            return authenticationResponse.switchMap(response -> {
+                if (response.isAuthenticated()) {
+                    UserDetails userDetails = (UserDetails) response;
+                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails));
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Could not authenticate {}", creds.get().getUsername());
+                    }
+                    return Flowable.empty();
+                }
+
+            });
+        }
+        return Flowable.empty();
     }
 
     @Override
