@@ -53,6 +53,7 @@ httpServer:
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
   producesAnnotation: Response Content-Type
+  consumesAnnotation: Accepted Request Content-Type
   routing: HTTP Routing
   staticResources: Serving Static Resources
   binding: Simple Request Binding
