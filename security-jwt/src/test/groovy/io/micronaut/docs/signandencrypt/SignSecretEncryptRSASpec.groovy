@@ -47,14 +47,14 @@ micronaut:
                             'enabled': true,
                             'token': [
                                     'jwt': [
-                                        'enabled': true,
-                                        'signatures': [
-                                                'secret': [
-                                                        'generator': [
-                                                                'secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
-                                                        ]
-                                                ]
-                                        ]
+                                            'enabled': true,
+                                            'signatures': [
+                                                    'secret': [
+                                                            'generator': [
+                                                                    'secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                                                            ]
+                                                    ]
+                                            ]
                                     ]
                             ]
                     ]
@@ -65,9 +65,9 @@ micronaut:
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'signandencrypt',
-            'micronaut.security.endpoints.login.enabled': true,
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'micronaut.security.endpoints.login': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'pem.path': pemFile.absolutePath,
     ] << flatten(configMap), "test")
 
@@ -75,9 +75,9 @@ micronaut:
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is secured"() {
+    void "test /beans is secured"() {
         when:
-        get("/health")
+        get("/beans")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
@@ -110,7 +110,7 @@ micronaut:
         JWTParser.parse(token) instanceof EncryptedJWT
 
         when:
-        get("/health", token)
+        get("/beans", token)
 
         then:
         noExceptionThrown()

@@ -28,8 +28,8 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'signaturersa',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.token.enabled': true,
@@ -41,16 +41,16 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is secured"() {
+    void "test /beans is secured"() {
         when:
-        get("/health")
+        get("/beans")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
     }
 
-    void "/health can be accessed if authenticated"() {
+    void "/beans can be accessed if authenticated"() {
         expect:
         embeddedServer.applicationContext.getBean(PS512RSASignatureConfiguration.class)
         embeddedServer.applicationContext.getBean(RSASignatureConfiguration.class)
@@ -81,7 +81,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
         JWTParser.parse(token) instanceof SignedJWT
 
         when:
-        get("/health", token)
+        get("/beans", token)
 
         then:
         noExceptionThrown()

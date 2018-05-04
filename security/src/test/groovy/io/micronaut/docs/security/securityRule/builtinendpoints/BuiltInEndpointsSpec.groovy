@@ -20,7 +20,7 @@ endpoints:
   beans:
     enabled: true
     sensitive: true # <1>
-  health:
+  info:
     enabled: true
     sensitive: false  # <2>
 '''//end::yamlconfig[]
@@ -32,7 +32,7 @@ endpoints:
                             enabled                : true,
                             sensitive              : true,
                     ],
-                    health: [
+                    info: [
                             enabled                : true,
                             sensitive              : false,
                     ],
@@ -56,7 +56,7 @@ endpoints:
 
     void "test accessing a non sensitive endpoint without authentication"() {
         when:
-        client.toBlocking().exchange(HttpRequest.GET("/health"))
+        client.toBlocking().exchange(HttpRequest.GET("/info"))
 
         then:
         noExceptionThrown()
