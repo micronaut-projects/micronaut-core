@@ -34,11 +34,10 @@ import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.reactivex.functions.Function;
 
 /**
  *
- * Handles login requests
+ * Handles login requests.
  *
  * @author Sergio del Amo
  * @author Graeme Rocher

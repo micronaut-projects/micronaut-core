@@ -24,7 +24,6 @@ import io.micronaut.security.filters.AuthenticationFetcher;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

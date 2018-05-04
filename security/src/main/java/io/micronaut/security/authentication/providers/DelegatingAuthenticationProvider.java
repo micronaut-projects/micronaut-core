@@ -19,12 +19,9 @@ package io.micronaut.security.authentication.providers;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.security.authentication.*;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * AuthenticationProvider typically used with a persistence mechanism such as a DB.
