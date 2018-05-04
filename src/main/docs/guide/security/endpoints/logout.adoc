@@ -4,7 +4,8 @@ You can enable `LogoutController` with configuration property:
 
 | Configuration Property | Default Value | Possible Values
 
-| `micronaut.security.endpoints.logout` | false | true or false
+| `micronaut.security.endpoints.logout.enabled` | false | true or false
+| `micronaut.security.endpoints.logout.path` | `/logout` | default path for `POST` requests.
 
 |===
 
