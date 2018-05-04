@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.spring.tx.annotation;
 
 import io.micronaut.core.util.ArrayUtils;
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
-import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,8 +25,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Extends {@link RuleBasedTransactionAttribute} so that it can be bound from annotation metadata and
- * defaults to rollback on all exception types apart from those configured
+ * Extends {@link org.springframework.transaction.interceptor.RuleBasedTransactionAttribute} so that it can be bound
+ * from annotation metadata and defaults to rollback on all exception types apart from those configured.
  *
  * @author graemerocher
  * @since 1.0
@@ -37,38 +37,42 @@ public class BindableRuleBasedTransactionAttribute extends DefaultTransactionAtt
     private Set<Class<? extends Throwable>> rollbackFor = null;
 
     /**
-     * Configures the exceptions to not rollback for
+     * Configures the exceptions to not rollback for.
+     *
      * @param exceptions The exceptions not to rollback for
      */
-    public final void setNoRollbackFor(Class<? extends Throwable>...exceptions) {
-        if(ArrayUtils.isNotEmpty(exceptions)) {
+    public final void setNoRollbackFor(Class<? extends Throwable>... exceptions) {
+        if (ArrayUtils.isNotEmpty(exceptions)) {
             noRollbackFor.addAll(Arrays.asList(exceptions));
         }
     }
 
     /**
-     * Configures the exceptions to rollback for
+     * Configures the exceptions to rollback for.
+     *
      * @param exceptions The exceptions to rollback for
      */
-    public final void setRollbackFor(Class<? extends Throwable>...exceptions) {
-        if(ArrayUtils.isNotEmpty(exceptions)) {
-            if(rollbackFor == null) rollbackFor = new HashSet<>();
+    public final void setRollbackFor(Class<? extends Throwable>... exceptions) {
+        if (ArrayUtils.isNotEmpty(exceptions)) {
+            if (rollbackFor == null) {
+                rollbackFor = new HashSet<>();
+            }
             rollbackFor.addAll(Arrays.asList(exceptions));
         }
     }
 
     /**
-     * @return An unmodifiable set of exceptions to not rollback for
+     * @return An unmodifiable set of exceptions to not rollback for.
      */
     public final Set<Class<? extends Throwable>> getNoRollbackFor() {
         return Collections.unmodifiableSet(noRollbackFor);
     }
 
     /**
-     * @return An unmodifiable set of exceptions to rollback for
+     * @return An unmodifiable set of exceptions to rollback for.
      */
     public final Set<Class<? extends Throwable>> getRollbackFor() {
-        if(rollbackFor != null) {
+        if (rollbackFor != null) {
             return Collections.unmodifiableSet(rollbackFor);
         }
         return Collections.emptySet();
@@ -76,26 +80,25 @@ public class BindableRuleBasedTransactionAttribute extends DefaultTransactionAtt
 
     @Override
     public final boolean rollbackOn(Throwable ex) {
-        if(ex == null) {
+        if (ex == null) {
             return false;
         }
 
         for (Class<? extends Throwable> aClass : noRollbackFor) {
-            if(aClass.isInstance(ex)) {
+            if (aClass.isInstance(ex)) {
                 return false;
             }
         }
 
-        if(rollbackFor != null) {
+        if (rollbackFor != null) {
             for (Class<? extends Throwable> aClass : rollbackFor) {
-                if(aClass.isInstance(ex)) {
+                if (aClass.isInstance(ex)) {
                     return true;
                 }
             }
 
             return false;
-        }
-        else {
+        } else {
             return true;
         }
     }
