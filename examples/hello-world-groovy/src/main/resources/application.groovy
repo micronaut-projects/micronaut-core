@@ -1,2 +1,2 @@
-micronaut.server.executors.io.type = "fixed"
-micronaut.server.executors.io.nThreads = 75
+micronaut.executors.io.type = "fixed"
+micronaut.executors.io.nThreads = 75

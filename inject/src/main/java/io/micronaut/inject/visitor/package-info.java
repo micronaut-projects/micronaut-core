@@ -12,7 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *//**
+ */
+/**
+ * Contains interfaces for defining type visitors that work across languages
+ *
  * @author graemerocher
  * @since 1.0
  */
