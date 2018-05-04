@@ -15,3 +15,14 @@ include::{testsdir}/config/value/EngineImpl.groovy[tags=class, indent=0]
 
 Unlike the aforementioned frameworks, Micronaut will use ASM to generate reflection free bytecode to optimize startup time and value injection performance.
 
+Note that there is nothing special about `@Value` itself regarding the resolution of property value placeholders. Due to Micronaut's extensive support for annotation metadata you can in fact use property placeholder expressions on any annotation. For example, to make the path of a `@Controller` configurable you can do:
+
+[source,java]
+----
+@Controller("${hello.controller.path:/hello}")
+class HelloController {
+    ...
+}
+----
+
+In the above case if `hello.controller.path` is specified in configuration then the controller will be mapped to the path specified otherwise it will be mapped to `/hello`.
