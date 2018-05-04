@@ -16,8 +16,8 @@ class BasicAuthSpec extends Specification  {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'basicauth',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
     ], 'test')
 
@@ -25,14 +25,14 @@ class BasicAuthSpec extends Specification  {
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is not accesible if you don't supply Basic Auth in HTTP Header Authorization"() {
+    void "test /beans is not accesible if you don't supply Basic Auth in HTTP Header Authorization"() {
         expect:
         embeddedServer.applicationContext.getBean(BasicAuthTokenReader.class)
         embeddedServer.applicationContext.getBean(BasicAuthTokenValidator.class)
         embeddedServer.applicationContext.getBean(AuthenticationProviderUserPassword.class)
 
         when:
-        String path = "/health"
+        String path = "/beans"
         client.toBlocking().exchange(HttpRequest.GET(path), String)
 
         then:
@@ -40,7 +40,7 @@ class BasicAuthSpec extends Specification  {
         e.status == HttpStatus.UNAUTHORIZED
     }
 
-    void "test /health is not accesible if you don't supply a valid Base64 encoded token in the Basic Auth in HTTP Header Authorization"() {
+    void "test /beans is not accesible if you don't supply a valid Base64 encoded token in the Basic Auth in HTTP Header Authorization"() {
         expect:
         embeddedServer.applicationContext.getBean(BasicAuthTokenReader.class)
         embeddedServer.applicationContext.getBean(BasicAuthTokenValidator.class)
@@ -48,7 +48,7 @@ class BasicAuthSpec extends Specification  {
 
         when:
         String token = 'Basic'
-        String path = "/health"
+        String path = "/beans"
         client.toBlocking().exchange(HttpRequest.GET(path).header("Authorization", "Basic ${token}".toString()), String)
 
         then:
@@ -56,7 +56,7 @@ class BasicAuthSpec extends Specification  {
         e.status == HttpStatus.UNAUTHORIZED
     }
 
-    void "test /health is secured but accesible if you supply valid credentials with Basic Auth"() {
+    void "test /beans is secured but accesible if you supply valid credentials with Basic Auth"() {
         expect:
         embeddedServer.applicationContext.getBean(BasicAuthTokenReader.class)
         embeddedServer.applicationContext.getBean(BasicAuthTokenValidator.class)
@@ -64,14 +64,14 @@ class BasicAuthSpec extends Specification  {
 
         when:
         String token = 'dXNlcjpwYXNzd29yZA==' // user:passsword Base64
-        String path = "/health"
+        String path = "/beans"
         client.toBlocking().exchange(HttpRequest.GET(path).header("Authorization", "Basic ${token}".toString()), String)
 
         then:
         noExceptionThrown()
     }
 
-    void "test /health is not accesible if you valid Base64 encoded token but authentication fails"() {
+    void "test /beans is not accesible if you valid Base64 encoded token but authentication fails"() {
         expect:
         embeddedServer.applicationContext.getBean(BasicAuthTokenReader.class)
         embeddedServer.applicationContext.getBean(BasicAuthTokenValidator.class)
@@ -79,7 +79,7 @@ class BasicAuthSpec extends Specification  {
 
         when:
         String token = 'dXNlcjp1c2Vy' // user:user Base64 encoded
-        String path = "/health"
+        String path = "/beans"
         client.toBlocking().exchange(HttpRequest.GET(path).header("Authorization", "Basic ${token}".toString()), String)
 
         then:
