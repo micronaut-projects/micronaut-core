@@ -11,8 +11,10 @@ import io.micronaut.security.token.jwt.bearer.BearerTokenReader
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
 import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Shared
 
+@IgnoreIf({ System.getenv("JENKINS_URL") })
 class JwtCookieAuthenticationSpec extends GebSpec {
 
     @Shared
