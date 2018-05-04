@@ -47,14 +47,14 @@ micronaut:
                             'enabled': true,
                             'token': [
                                     'jwt': [
-                                        'enabled': true,
-                                        'signatures': [
-                                                'secret': [
-                                                        'generator': [
-                                                                'secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
-                                                        ]
-                                                ]
-                                        ]
+                                            'enabled': true,
+                                            'signatures': [
+                                                    'secret': [
+                                                            'generator': [
+                                                                    'secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                                                            ]
+                                                    ]
+                                            ]
                                     ]
                             ]
                     ]
@@ -84,7 +84,7 @@ micronaut:
         e.status == HttpStatus.UNAUTHORIZED
     }
 
-    void "/beans can be accessed if authenticated"() {
+    void "/health can be accessed if authenticated"() {
         expect:
         new Yaml().load(cleanYamlAsciidocTag(yamlConfig)) == configMap
         embeddedServer.applicationContext.getBean(RSAOAEPEncryptionConfiguration.class)
