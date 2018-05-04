@@ -18,19 +18,16 @@ package io.micronaut.security.token.jwt.generator;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.token.generator.TokenGenerator;
 import io.micronaut.security.token.jwt.event.AccessTokenGeneratedEvent;
 import io.micronaut.security.token.jwt.event.RefreshTokenGeneratedEvent;
-import io.micronaut.security.token.generator.TokenGenerator;
+import io.micronaut.security.token.jwt.generator.claims.ClaimsGenerator;
 import io.micronaut.security.token.jwt.render.AccessRefreshToken;
 import io.micronaut.security.token.jwt.render.TokenRenderer;
-import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.inject.Singleton;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,6 +43,7 @@ public class AccessRefreshTokenGenerator {
 
     private static final Logger LOG = LoggerFactory.getLogger(AccessRefreshTokenGenerator.class);
 
+    protected final ClaimsGenerator claimsGenerator;
     protected final JwtGeneratorConfiguration jwtGeneratorConfiguration;
     protected final TokenRenderer tokenRenderer;
     protected final TokenGenerator tokenGenerator;
@@ -56,15 +54,18 @@ public class AccessRefreshTokenGenerator {
      * @param jwtGeneratorConfiguration Instance of {@link JwtGeneratorConfiguration}
      * @param tokenRenderer Instance of {@link TokenRenderer}
      * @param tokenGenerator Intance of {@link TokenGenerator}
+     * @param claimsGenerator Claims generator
      * @param eventPublisher The Application event publiser
      */
     public AccessRefreshTokenGenerator(JwtGeneratorConfiguration jwtGeneratorConfiguration,
                                        TokenRenderer tokenRenderer,
                                        TokenGenerator tokenGenerator,
+                                       ClaimsGenerator claimsGenerator,
                                        ApplicationEventPublisher eventPublisher) {
         this.jwtGeneratorConfiguration = jwtGeneratorConfiguration;
         this.tokenRenderer = tokenRenderer;
         this.tokenGenerator = tokenGenerator;
+        this.claimsGenerator = claimsGenerator;
         this.eventPublisher = eventPublisher;
     }
 
@@ -106,8 +107,7 @@ public class AccessRefreshTokenGenerator {
      * @return The http response
      */
     public Optional<AccessRefreshToken> generate(String refreshToken, Map<String, Object> oldClaims) {
-        Map<String, Object> claims = new HashMap<>(oldClaims);
-        claims.put(JwtClaims.EXPIRATION_TIME, expirationDate());
+        Map<String, Object> claims = claimsGenerator.generateClaimsSet(oldClaims, jwtGeneratorConfiguration.getAccessTokenExpiration());
 
         Optional<String> optionalAccessToken = tokenGenerator.generateToken(claims);
         if (!optionalAccessToken.isPresent()) {
@@ -123,15 +123,5 @@ public class AccessRefreshTokenGenerator {
         eventPublisher.publishEvent(new AccessTokenGeneratedEvent(accessToken));
         return Optional.of(tokenRenderer.render(jwtGeneratorConfiguration.getAccessTokenExpiration(), accessToken, refreshToken));
 
-    }
-
-    /**
-     * An expiration Date built with current date + default expiration.
-     * @return java.util.Date
-     */
-    protected Date expirationDate() {
-        Integer expiration = jwtGeneratorConfiguration.getAccessTokenExpiration();
-        LOG.debug("Setting expiration to {}", expiration.toString());
-        return Date.from(Instant.now().plus(expiration, ChronoUnit.SECONDS));
     }
 }
