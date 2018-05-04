@@ -148,7 +148,7 @@ public class ClassUtils {
             } else {
                 return Optional.of(Class.forName(name, true, classLoader));
             }
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
             return Optional.empty();
         }
     }
