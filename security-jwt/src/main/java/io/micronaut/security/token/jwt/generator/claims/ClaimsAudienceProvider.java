@@ -16,31 +16,19 @@
 
 package io.micronaut.security.token.jwt.generator.claims;
 
-import io.micronaut.security.authentication.UserDetails;
-
-import java.util.Map;
+import java.util.List;
 
 /**
- *
+ * Identifies the recipients that the JWT is intented for.
+ * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.3">aud (Audience) Claim</a>
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface ClaimsGenerator {
+public interface ClaimsAudienceProvider {
 
     /**
      *
-     * @param userDetails Authenticated user's representation.
-     * @param expiration JWT token expiration time in seconds
-     * @return The Claims
+     * @return a List of JWT recipients identifiers.
      */
-    Map<String, Object> generateClaims(UserDetails userDetails, Integer expiration);
-
-    /**
-     * Generate a claims set based on claims.
-     *
-     * @param oldClaims The old claims to use as a base in the new token generation.
-     * @param expiration JWT token expiration time in seconds
-     * @return The Claims
-     */
-    Map<String, Object> generateClaimsSet(Map<String, ?> oldClaims, Integer expiration);
+    List<String> audience();
 }

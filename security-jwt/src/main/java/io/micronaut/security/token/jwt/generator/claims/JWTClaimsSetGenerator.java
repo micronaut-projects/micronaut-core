@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.generator.claims;
 
 import com.nimbusds.jwt.JWTClaimsSet;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.config.TokenConfiguration;
 import org.slf4j.Logger;
@@ -25,8 +26,11 @@ import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -34,18 +38,29 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
+public class JWTClaimsSetGenerator implements ClaimsGenerator {
 
     private static final Logger LOG = LoggerFactory.getLogger(JWTClaimsSetGenerator.class);
 
     private final TokenConfiguration tokenConfiguration;
+    private final JwtIdGenerator jwtIdGenerator;
+    private final ClaimsAudienceProvider claimsAudienceProvider;
+
+    @Value("${micronaut.application.name:micronaut}")
+    private String appName;
 
     /**
      *
      * @param tokenConfiguration Token Configuration
+     * @param jwtIdGenerator Generator which creates unique JWT ID
+     * @param claimsAudienceProvider Provider which identifies the recipients that the JWT is intented for.
      */
-    public JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration) {
+    public JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration,
+                                 @Nullable JwtIdGenerator jwtIdGenerator,
+                                 @Nullable ClaimsAudienceProvider claimsAudienceProvider) {
         this.tokenConfiguration = tokenConfiguration;
+        this.jwtIdGenerator = jwtIdGenerator;
+        this.claimsAudienceProvider = claimsAudienceProvider;
     }
 
     /**
@@ -56,38 +71,124 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator<JWTClaimsSet> {
      */
     @Override
     public Map<String, Object> generateClaims(UserDetails userDetails, @Nullable Integer expiration) {
-        return generateClaimsSet(userDetails, expiration).getClaims();
+        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
+        populateSub(builder, userDetails);
+        populateIat(builder);
+        populateExp(builder, expiration);
+        populateJti(builder);
+        populateIss(builder);
+        populateAud(builder);
+        populateNbf(builder);
+        populateWithUserDetails(builder, userDetails);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Generated claim set: {}", builder.build().toJSONObject().toString());
+        }
+        return builder.build().getClaims();
     }
 
-    private JWTClaimsSet generateClaimsSet(UserDetails userDetails, @Nullable Integer expiration) {
-        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
-        builder.subject(userDetails.getUsername());
+    /**
+     * Populates iss claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.1">iss (Issuer) Claim</a>
+     * @param builder The Claims Builder
+     */
+    protected void populateIss(JWTClaimsSet.Builder builder) {
+        if (appName != null) {
+            builder.issuer(appName); // iss
+        }
+    }
 
-        builder.issueTime(new Date());
+    /**
+     * Populates sub claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.2">sub (Subject) Claim</a>
+     * @param builder The Claims Builder
+     * @param userDetails Authenticated user's representation.
+     */
+    protected void populateSub(JWTClaimsSet.Builder builder, UserDetails userDetails) {
+        builder.subject(userDetails.getUsername()); // sub
+    }
 
+    /**
+     * Populates aud claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.3">aud (Audience) Claim</a>
+     * @param builder The Claims Builder
+     */
+    protected void populateAud(JWTClaimsSet.Builder builder) {
+        if (claimsAudienceProvider != null) {
+            builder.audience(claimsAudienceProvider.audience()); // aud
+        }
+    }
+
+    /**
+     * Populates exp claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.4">exp (ExpirationTime) Claim</a>
+     * @param builder The Claims Builder
+     * @param expiration expiration time in seconds
+     *
+     */
+    protected void populateExp(JWTClaimsSet.Builder builder, @Nullable Integer expiration) {
         if (expiration != null) {
             LOG.debug("Setting expiration to {}", expiration.toString());
-            builder.expirationTime(Date.from(Instant.now().plus(expiration, ChronoUnit.SECONDS)));
+            builder.expirationTime(Date.from(Instant.now().plus(expiration, ChronoUnit.SECONDS))); // exp
         }
+    }
 
+    /**
+     * Populates nbf claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.5">nbf (Not Before) Claim</a>
+     * @param builder The Claims Builder
+     */
+    protected void populateNbf(JWTClaimsSet.Builder builder) {
+        builder.notBeforeTime(new Date()); // nbf
+    }
+
+    /**
+     * Populates iat claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.6">iat (Issued At) Claim</a>
+     * @param builder The Claims Builder
+     */
+    protected void populateIat(JWTClaimsSet.Builder builder) {
+        builder.issueTime(new Date()); // iat
+    }
+
+    /**
+     * Populates jti claim.
+     * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.7">jti (JWT ID) Claim</a>
+     * @param builder The Claims Builder
+     */
+    protected void populateJti(JWTClaimsSet.Builder builder) {
+        if (jwtIdGenerator != null) {
+            builder.jwtID(jwtIdGenerator.generateJtiClaim()); // jti
+        }
+    }
+
+    /**
+     * Populates Claims with UserDetails object.
+     * @param builder the Claims Builder
+     * @param userDetails Authenticated user's representation.
+     */
+    protected void populateWithUserDetails(JWTClaimsSet.Builder builder, UserDetails userDetails) {
         builder.claim(tokenConfiguration.getRolesName(), userDetails.getRoles());
-
-        LOG.debug("Generated claim set: {}", builder.build().toJSONObject().toString());
-
-        return builder.build();
     }
 
     /**
      *
-     * @param claims The claims to be included in the JWT
+     * @param oldClaims The old claims to use as a base in the new token generation.
+     * @param expiration expiration time in seconds
      * @return Instance of {@link JWTClaimsSet}
      */
     @Override
-    public JWTClaimsSet generateClaimsSet(Map<String, ?> claims) {
+    public Map<String, Object> generateClaimsSet(Map<String, ?> oldClaims, Integer expiration) {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
-        for (String k : claims.keySet()) {
-            builder.claim(k, claims.get(k));
+        List<String> excludedClaims = Arrays.asList(JwtClaims.EXPIRATION_TIME, JwtClaims.ISSUED_AT, JwtClaims.NOT_BEFORE);
+        for (String k : oldClaims.keySet()
+                .stream()
+                .filter(p -> !excludedClaims.contains(p))
+                .collect(Collectors.toList())) {
+            builder.claim(k, oldClaims.get(k));
         }
-        return builder.build();
+        populateExp(builder, expiration);
+        populateIat(builder);
+        populateNbf(builder);
+        return builder.build().getClaims();
     }
 }
