@@ -17,8 +17,10 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.Value;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 
 import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.security.Principal;
 
@@ -32,16 +34,35 @@ import java.security.Principal;
 public class HealthLevelOfDetailResolver {
 
     protected final boolean securityEnabled;
+    protected final EndpointConfiguration endpointConfiguration;
 
-    public HealthLevelOfDetailResolver(@Value("${micronaut.security.enabled:false}") boolean securityEnabled) {
+    /**
+     *
+     * @param securityEnabled Wether micronaut security is enabled
+     * @param endpointConfiguration Health endpoint configuration
+     */
+    public HealthLevelOfDetailResolver(@Value("${micronaut.security.enabled:false}") boolean securityEnabled,
+                                       @Nullable @Named("health") EndpointConfiguration endpointConfiguration) {
         this.securityEnabled = securityEnabled;
+        this.endpointConfiguration = endpointConfiguration;
     }
 
-    HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
-        if ( securityEnabled && principal == null) {
+    /**
+     *
+     * @param principal Authenticated user
+     * @return The {@link HealthLevelOfDetail}
+     */
+    public HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
+        if (
+                ( securityEnabled && principal == null) ||
+                (
+                    !securityEnabled &&
+                    endpointConfiguration != null &&
+                    (endpointConfiguration.isSensitive().isPresent() && endpointConfiguration.isSensitive().get())
+                )
+        ) {
             return HealthLevelOfDetail.STATUS;
         }
-
         return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
     }
 }

@@ -31,8 +31,8 @@ micronaut:
     @Shared
     Map<String, Object> config = [
             'spec.name' : 'docsbasicauth',
-            'endpoints.health.enabled'                 : true,
-            'endpoints.health.sensitive'               : true,
+            'endpoints.beans.enabled'                 : true,
+            'endpoints.beans.sensitive'               : true,
     ] << flatten(confMap)
 
     @Shared
@@ -43,7 +43,7 @@ micronaut:
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is secured but accesible if you supply valid credentials with Basic Auth"() {
+    void "test /beans is secured but accesible if you supply valid credentials with Basic Auth"() {
         when:
         Map m = new Yaml().load(cleanYamlAsciidocTag(yamlConfig))
 
@@ -52,7 +52,7 @@ micronaut:
 
         when:
         String token = 'dXNlcjpwYXNzd29yZA==' // user:passsword Base64
-        client.toBlocking().exchange(HttpRequest.GET("/health")
+        client.toBlocking().exchange(HttpRequest.GET("/beans")
                 .header("Authorization", "Basic ${token}".toString()), String)
 
         then:
