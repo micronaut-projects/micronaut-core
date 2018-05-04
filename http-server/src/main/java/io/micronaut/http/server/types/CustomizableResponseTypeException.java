@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types;
 
 /**
- * Used when a special type handler encounters an error
+ * Used when a special type handler encounters an error.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class CustomizableResponseTypeException extends RuntimeException {
 
+    /**
+     * @param msg The message
+     */
     public CustomizableResponseTypeException(String msg) {
         super(msg);
     }
 
+    /**
+     * @param msg   The message
+     * @param cause The throwable
+     */
     public CustomizableResponseTypeException(String msg, Throwable cause) {
         super(msg, cause);
     }

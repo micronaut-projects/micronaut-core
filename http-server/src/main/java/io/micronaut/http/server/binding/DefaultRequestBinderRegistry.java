@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -46,7 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Default implementation of the {@link RequestBinderRegistry} interface
+ * Default implementation of the {@link RequestBinderRegistry} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,12 +55,19 @@ import java.util.Set;
 @Singleton
 public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
+    private static final long CACHE_MAX_SIZE = 30;
+
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Integer, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
-    private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache = Caffeine.newBuilder().maximumSize(30).build();
+    private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
+        Caffeine.newBuilder().maximumSize(CACHE_MAX_SIZE).build();
 
+    /**
+     * @param conversionService The conversion service
+     * @param binders           The request argument binders
+     */
     public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder... binders) {
         this.conversionService = conversionService;
 
@@ -130,6 +138,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         return Optional.of(new ParameterAnnotationBinder<>(conversionService));
     }
 
+    /**
+     * @param argument       The argument
+     * @param annotationType The class for annotation
+     * @param <T>            The type
+     * @return The request argument binder
+     */
     protected <T> RequestArgumentBinder findBinder(Argument<T> argument, Class<? extends Annotation> annotationType) {
         TypeAndAnnotation key = new TypeAndAnnotation(argument, annotationType);
         return argumentBinderCache.get(key, key1 -> {
@@ -139,7 +153,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(javaType);
                 for (Class itfce : allInterfaces) {
                     requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(itfce), annotationType));
-                    if (requestArgumentBinder != null) break;
+                    if (requestArgumentBinder != null) {
+                        break;
+                    }
                 }
 
                 if (requestArgumentBinder == null) {
@@ -152,6 +168,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     }
 
+    /**
+     * Registers a default converter.
+     *
+     * @param conversionService The conversion service
+     */
     protected void registerDefaultConverters(ConversionService<?> conversionService) {
         conversionService.addConverter(
             CharSequence.class,
@@ -159,6 +180,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     }
 
+    /**
+     * @param byAnnotation The request argument binder
+     */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
         DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
         byAnnotation.put(Body.class, bodyBinder);
@@ -173,10 +197,17 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
     }
 
+    /**
+     * Type and annotation.
+     */
     private static final class TypeAndAnnotation {
         private final Argument<?> type;
         private final Class<? extends Annotation> annotation;
 
+        /**
+         * @param type       The type
+         * @param annotation The annotation
+         */
         public TypeAndAnnotation(Argument<?> type, Class<? extends Annotation> annotation) {
             this.type = type;
             this.annotation = annotation;
@@ -184,12 +215,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             TypeAndAnnotation that = (TypeAndAnnotation) o;
 
-            if (!type.equalsType(that.type)) return false;
+            if (!type.equalsType(that.type)) {
+                return false;
+            }
             return annotation.equals(that.annotation);
         }
 

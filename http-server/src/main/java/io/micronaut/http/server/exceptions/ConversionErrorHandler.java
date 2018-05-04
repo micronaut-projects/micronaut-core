@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.context.annotation.Primary;
@@ -26,7 +27,7 @@ import io.micronaut.http.hateos.VndError;
 import javax.inject.Singleton;
 
 /**
- * Handles exception of type {@link ConversionErrorException}
+ * Handles exception of type {@link ConversionErrorException}.
  *
  * @author Graeme Rocher
  * @since 1.0

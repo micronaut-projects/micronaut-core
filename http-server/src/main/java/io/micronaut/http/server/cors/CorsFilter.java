@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
@@ -47,7 +48,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Responsible for handling CORS requests and responses
+ * Responsible for handling CORS requests and responses.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -83,7 +84,7 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     /**
-     * Handles a CORS response
+     * Handles a CORS response.
      *
      * @param request  The {@link HttpRequest} object
      * @param response The {@link MutableHttpResponse} object
@@ -119,7 +120,7 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     /**
-     * Handles a CORS {@link HttpRequest}
+     * Handles a CORS {@link HttpRequest}.
      *
      * @param request The {@link HttpRequest} object
      * @return An optional {@link MutableHttpResponse}. The request should proceed normally if empty
@@ -171,34 +172,62 @@ public class CorsFilter implements HttpServerFilter {
         return Optional.empty();
     }
 
+    /**
+     * @param config   The {@link CorsOriginConfiguration} instance
+     * @param response The {@link MutableHttpResponse} object
+     */
     protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowCredentials()) {
             response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, Boolean.toString(true));
         }
     }
 
+    /**
+     * @param exposedHeaders A list of the exposed headers
+     * @param response       The {@link MutableHttpResponse} object
+     */
     protected void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
         exposedHeaders.forEach(header -> response.header(ACCESS_CONTROL_EXPOSE_HEADERS, header));
     }
 
+    /**
+     * @param response The {@link MutableHttpResponse} object
+     */
     protected void setVary(MutableHttpResponse<?> response) {
         response.header(VARY, ORIGIN);
     }
 
+
+    /**
+     * @param origin   The origin
+     * @param response The {@link MutableHttpResponse} object
+     */
     protected void setOrigin(String origin, MutableHttpResponse response) {
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
     }
 
+    /**
+     * @param method   The {@link HttpMethod} object
+     * @param response The {@link MutableHttpResponse} object
+     */
     protected void setAllowMethods(HttpMethod method, MutableHttpResponse response) {
         response.header(ACCESS_CONTROL_ALLOW_METHODS, method);
     }
 
+    /**
+     * @param optionalAllowHeaders A list with optional allow headers
+     * @param response             The {@link MutableHttpResponse} object
+     */
     protected void setAllowHeaders(List optionalAllowHeaders, MutableHttpResponse response) {
         optionalAllowHeaders.forEach(header ->
             response.header(ACCESS_CONTROL_ALLOW_HEADERS, header.toString())
         );
     }
 
+    /**
+     * @param maxAge   The max age
+     * @param response The {@link MutableHttpResponse} object
+     */
     protected void setMaxAge(long maxAge, MutableHttpResponse response) {
         if (maxAge > -1) {
             response.header(ACCESS_CONTROL_MAX_AGE, Long.toString(maxAge));

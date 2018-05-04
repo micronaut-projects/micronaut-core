@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 /**
- * A marker interface for argument binders that are non-blocking
+ * A marker interface for argument binders that are non-blocking.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */

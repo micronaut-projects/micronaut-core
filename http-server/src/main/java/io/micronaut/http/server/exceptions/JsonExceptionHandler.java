@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,7 +29,7 @@ import io.micronaut.http.hateos.VndError;
 import javax.inject.Singleton;
 
 /**
- * Default exception handler for JSON processing errors
+ * Default exception handler for JSON processing errors.
  *
  * @author Graeme Rocher
  * @since 1.0

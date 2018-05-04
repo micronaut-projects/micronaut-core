@@ -13,20 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 
 /**
- * A generic hook for handling exceptions that occurs during the execution of an HTTP request
+ * A generic hook for handling exceptions that occurs during the execution of an HTTP request.
  *
+ * @param <T> The throwable
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ExceptionHandler<T extends Throwable, R> {
 
     /**
-     * Handles an exception and returns the result
+     * Handles an exception and returns the result.
      *
      * @param request   The request
      * @param exception The exception type
