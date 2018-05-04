@@ -132,7 +132,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
      * @param object The bean
      * @return The lock on the object
      */
-    ReadWriteLock getLock(Object object) {
+    protected ReadWriteLock getLock(Object object) {
         ReadWriteLock readWriteLock = locks.get(object);
         if (readWriteLock == null) {
             throw new IllegalStateException("No lock present for object: " + object);
