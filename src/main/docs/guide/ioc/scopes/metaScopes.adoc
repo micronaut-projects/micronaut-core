@@ -1,0 +1,39 @@
+Scopes can be defined on Meta annotations that you can then apply to your classes. Consider the following example meta annotation:
+
+.Driver.java Annotation
+[source,java]
+----
+include::{testsuite}/ioc/scopes/Driver.java[tags=imports, indent=0]
+
+include::{testsuite}/ioc/scopes/Driver.java[tags=class, indent=0]
+----
+
+<1> The scope declares a requirement on a `Car` class using api:context.annotation.Requires[]
+<2> The annotation is declared as `@Singleton`
+
+In the example above the `@Singleton` annotation is applied to the `@Driver` annotation which results in every class that is annotated with `@Driver` being regarded as singleton.
+
+Note that in this case it is not possible to alter the scope when the annotation is applied. For example, the following will not override the scope declared by `@Driver` and is invalid:
+
+.Declaring Another Scope
+[source,java]
+----
+@Driver
+@Prototype
+class Foo {}
+----
+
+If you wish for the scope to be overridable you should instead using the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
+
+.Using @DefaultScope
+[source,java]
+----
+@Requires(classes = Car.class )
+@DefaultScope(Singleton.class) // <1>
+@Documented
+@Retention(RUNTIME)
+public @interface Driver {
+}
+----
+
+<1> api:context.annotation.DefaultScope[] is used to declare which scope to be used if non is present

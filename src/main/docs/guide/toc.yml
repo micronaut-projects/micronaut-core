@@ -16,6 +16,7 @@ ioc:
     title: Scopes
     builtInScopes: Built-In Scopes
     refreshable: Refreshable Scope
+    metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   configurations: Bean Configurations
