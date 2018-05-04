@@ -21,8 +21,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
-
 /**
  * Describes a bean which attempts to read an {@link Authentication} from a {@link HttpRequest} being executed.
  *
@@ -33,6 +31,7 @@ public interface AuthenticationFetcher extends Ordered {
 
     /**
      * Attempts to read an {@link Authentication} from a {@link HttpRequest} being executed.
+     *
      * @param request {@link HttpRequest} being executed.
      * @return {@link Authentication} if found
      */

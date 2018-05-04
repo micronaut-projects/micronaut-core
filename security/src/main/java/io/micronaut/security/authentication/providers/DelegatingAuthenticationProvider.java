@@ -17,7 +17,12 @@
 package io.micronaut.security.authentication.providers;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.authentication.*;
+import io.micronaut.security.authentication.AuthenticationFailed;
+import io.micronaut.security.authentication.AuthenticationFailureReason;
+import io.micronaut.security.authentication.AuthenticationProvider;
+import io.micronaut.security.authentication.AuthenticationRequest;
+import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.authentication.UserDetails;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -38,9 +43,8 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
     protected final AuthoritiesFetcher authoritiesFetcher;
 
     /**
-     *
-     * @param userFetcher Fetches users from persistence
-     * @param passwordEncoder Collaborator which checks if a raw password matches an encoded password
+     * @param userFetcher        Fetches users from persistence
+     * @param passwordEncoder    Collaborator which checks if a raw password matches an encoded password
      * @param authoritiesFetcher Fetches authorities for a particular user
      */
     public DelegatingAuthenticationProvider(UserFetcher userFetcher,
@@ -53,6 +57,7 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
 
     /**
      * Attempts to authenticate a user.
+     *
      * @param authenticationRequest The authentication request data
      * @return An AuthenticationResponse object which encapsulates the authentication result.
      */
@@ -79,8 +84,9 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
             if (!passwordEncoder.matches(authenticationRequest.getSecret().toString(), user.getPassword())) {
                 return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH));
             }
-            return Flowable.fromPublisher(authoritiesFetcher.findAuthoritiesByUsername(username))
-                            .map(authorities -> new UserDetails(username, authorities));
+            return Flowable
+                .fromPublisher(authoritiesFetcher.findAuthoritiesByUsername(username))
+                .map(authorities -> new UserDetails(username, authorities));
         }).switchIfEmpty(Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND)));
 
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.docs.aop.validation;
 
-package io.micronaut.security;
-
-import io.micronaut.management.endpoint.processors.NonPathTypesProvider;
-import io.micronaut.security.authentication.Authentication;
-
+// tag::imports[]
+import io.micronaut.validation.Validated;
 import javax.inject.Singleton;
-import java.util.Collections;
-import java.util.List;
+import javax.validation.constraints.NotBlank;
+import java.util.*;
+// end::imports[]
 
 /**
- *
- * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
-@Singleton
-public class SecurityNonPathTypesProvider implements NonPathTypesProvider {
 
-    @Override
-    public List<Class> nonPathTypes() {
-        return Collections.singletonList(Authentication.class);
+// tag::class[]
+@Singleton
+@Validated // <1>
+public class BookService {
+
+    private Map<String, String> authorsByTitle = new LinkedHashMap<>();
+
+    public String getAuthor(@NotBlank String title) { // <2>
+        return authorsByTitle.get(title);
+    }
+
+    public void addBook(@NotBlank String author, @NotBlank String title) {
+        authorsByTitle.put(title, author);
     }
 }
+// end::class[]
