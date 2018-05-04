@@ -69,6 +69,11 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
+    public int getOrder() {
+        return ORDER;
+    }
+
+    @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         for (HttpSessionIdResolver resolver : resolvers) {
             List<String> ids = resolver.resolveIds(request);
@@ -133,10 +138,5 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
             this.session = session;
             this.response = response;
         }
-    }
-
-    @Override
-    public int getOrder() {
-        return ORDER;
     }
 }
