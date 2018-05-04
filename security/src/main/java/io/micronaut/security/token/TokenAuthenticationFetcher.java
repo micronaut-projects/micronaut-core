@@ -24,7 +24,6 @@ import io.micronaut.security.filters.AuthenticationFetcher;
 import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,12 +106,12 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
         if (tokenValidatorIterator.hasNext()) {
             TokenValidator tokenValidator = tokenValidatorIterator.next();
             return Flowable.just(tokenString).switchMap(tokenValue ->
-                    Flowable.fromPublisher(tokenValidator.validateToken(tokenValue)).map(authentication -> {
-                        eventPublisher.publishEvent(new TokenValidatedEvent(tokenValue));
-                        return authentication;
-                    })
+                Flowable.fromPublisher(tokenValidator.validateToken(tokenValue)).map(authentication -> {
+                    eventPublisher.publishEvent(new TokenValidatedEvent(tokenValue));
+                    return authentication;
+                })
             ).switchIfEmpty(attemptTokenValidation(
-                    tokenValidatorIterator, tokenString
+                tokenValidatorIterator, tokenString
             ));
         }
         return Flowable.empty();

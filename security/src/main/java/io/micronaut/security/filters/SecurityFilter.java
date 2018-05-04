@@ -38,7 +38,6 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
@@ -68,9 +67,9 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
     protected final RejectionHandler rejectionHandler;
 
     /**
-     * @param securityRules The list of rules that will allow or reject the request
-     * @param authenticationFetchers List of {@link AuthenticationFetcher} beans in the context.
-     * @param rejectionHandler Bean which handles routes which need to be rejected
+     * @param securityRules               The list of rules that will allow or reject the request
+     * @param authenticationFetchers      List of {@link AuthenticationFetcher} beans in the context.
+     * @param rejectionHandler            Bean which handles routes which need to be rejected
      * @param securityFilterOrderProvider filter order provider
      */
     public SecurityFilter(Collection<SecurityRule> securityRules,
@@ -94,20 +93,21 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         String path = request.getPath();
 
         Maybe<Authentication> authentication = Flowable.fromIterable(authenticationFetchers)
-                                                     .flatMap(authenticationFetcher -> authenticationFetcher.fetchAuthentication(request))
-                                                     .firstElement();
+            .flatMap(authenticationFetcher -> authenticationFetcher.fetchAuthentication(request))
+            .firstElement();
 
         return authentication.toFlowable().flatMap((Function<Authentication, Publisher<MutableHttpResponse<?>>>) authentication1 -> {
             request.setAttribute(AUTHENTICATION, authentication1);
             Map<String, Object> attributes = authentication1.getAttributes();
             Optional<RouteMatch> routeMatch = getRouteMatch(request);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Attributes: {}", attributes.entrySet()
-                        .stream()
-                        .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                        .collect(Collectors.joining(", ")));
+                LOG.debug("Attributes: {}", attributes
+                    .entrySet()
+                    .stream()
+                    .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                    .collect(Collectors.joining(", ")));
             }
-            for (SecurityRule rule: securityRules) {
+            for (SecurityRule rule : securityRules) {
                 SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes);
                 if (result == SecurityRuleResult.REJECTED) {
                     if (LOG.isDebugEnabled()) {
@@ -125,16 +125,15 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
             //no rule found for the given request, reject
             return rejectionHandler.reject(request, true);
-        }).switchIfEmpty(Flowable.just(securityRules).flatMap( securityRules -> {
+        }).switchIfEmpty(Flowable.just(securityRules).flatMap(securityRules -> {
             request.setAttribute(AUTHENTICATION, null);
             Optional<RouteMatch> routeMatch = getRouteMatch(request);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Failure to authenticate request. {} {}.", method, path);
             }
 
-
-            for (SecurityRule rule: securityRules) {
-                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null),null);
+            for (SecurityRule rule : securityRules) {
+                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), null);
                 if (result == SecurityRuleResult.REJECTED) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());

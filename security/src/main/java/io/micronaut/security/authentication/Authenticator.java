@@ -24,16 +24,14 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * An Authenticator operates on several {@link AuthenticationProvider} instances returning the first
- * authenticated {@link AuthenticationResponse}
+ * authenticated {@link AuthenticationResponse}.
  *
  * @author Sergio del Amo
  * @author Graeme Rocher
- *
  * @since 1.0
  */
 @Singleton
@@ -54,24 +52,24 @@ public class Authenticator {
      * @return Empty optional if authentication failed. If any {@link AuthenticationProvider} authenticates, that {@link AuthenticationResponse} is sent.
      */
     public Publisher<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
-        if(this.authenticationProviders == null) {
+        if (this.authenticationProviders == null) {
             return Flowable.empty();
         }
         Iterator<AuthenticationProvider> providerIterator = authenticationProviders.iterator();
-        if(providerIterator.hasNext()) {
+        if (providerIterator.hasNext()) {
             Flowable<AuthenticationProvider> providerFlowable = Flowable.just(providerIterator.next());
             AtomicReference<AuthenticationResponse> lastFailure = new AtomicReference<>();
             return attemptAuthenticationRequest(credentials, providerIterator, providerFlowable, lastFailure);
-        }
-        else {
+        } else {
             return Flowable.empty();
         }
     }
 
     private Flowable<AuthenticationResponse> attemptAuthenticationRequest(
-            UsernamePasswordCredentials credentials,
-            Iterator<AuthenticationProvider> providerIterator,
-            Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
+        UsernamePasswordCredentials credentials,
+        Iterator<AuthenticationProvider> providerIterator,
+        Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
+
         return providerFlowable.switchMap(authenticationProvider -> {
             Flowable<AuthenticationResponse> responseFlowable = Flowable.fromPublisher(authenticationProvider.authenticate(credentials));
             Flowable<AuthenticationResponse> authenticationAttemptFlowable = responseFlowable.switchMap(authenticationResponse -> {
@@ -81,10 +79,10 @@ public class Authenticator {
                     lastFailure.set(authenticationResponse);
                     // recurse
                     return attemptAuthenticationRequest(
-                            credentials,
-                            providerIterator,
-                            Flowable.just(providerIterator.next()),
-                            lastFailure);
+                        credentials,
+                        providerIterator,
+                        Flowable.just(providerIterator.next()),
+                        lastFailure);
                 } else {
                     lastFailure.set(authenticationResponse);
                     return Flowable.just(authenticationResponse);
@@ -97,14 +95,13 @@ public class Authenticator {
                 if (providerIterator.hasNext()) {
                     // recurse
                     return attemptAuthenticationRequest(
-                            credentials,
-                            providerIterator,
-                            Flowable.just(providerIterator.next()),
-                            lastFailure);
-                }
-                else {
+                        credentials,
+                        providerIterator,
+                        Flowable.just(providerIterator.next()),
+                        lastFailure);
+                } else {
                     AuthenticationResponse lastFailureResponse = lastFailure.get();
-                    if(lastFailureResponse != null) {
+                    if (lastFailureResponse != null) {
                         return Flowable.just(lastFailureResponse);
                     }
                     return Flowable.empty();
