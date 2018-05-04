@@ -31,7 +31,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
             'endpoints.beans.enabled': true,
             'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
-            'micronaut.security.endpoints.login': true,
+            'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.token.enabled': true,
             'micronaut.security.token.jwt.enabled': true,
             'pem.path': pemFile.absolutePath,
