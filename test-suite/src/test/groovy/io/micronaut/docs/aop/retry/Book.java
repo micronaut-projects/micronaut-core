@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro;
-
-// tag::imports[]
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-// end::imports[]
+package io.micronaut.docs.aop.retry;
 
 /**
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-// tag::class[]
-@Controller("/hello") // <1>
-public class HelloController {
-    @Get("/") // <2>
-    public String index() {
-        return "Hello World"; // <3>
+public class Book {
+    private String title;
+
+    public Book(String title) {
+        this.title = title;
+    }
+
+    public String getTitle() {
+        return title;
     }
 }
-// end::class[]
