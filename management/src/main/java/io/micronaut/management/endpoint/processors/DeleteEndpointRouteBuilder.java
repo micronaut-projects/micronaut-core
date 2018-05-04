@@ -24,6 +24,7 @@ import io.micronaut.management.endpoint.Delete;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 
 /**
  * A processor that processes references to {@link Delete} operations {@link io.micronaut.management.endpoint.Endpoint}
@@ -39,9 +40,13 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param beanContext       The application contect
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
+     * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
      */
-    public DeleteEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
-        super(beanContext, uriNamingStrategy, conversionService);
+    public DeleteEndpointRouteBuilder(ApplicationContext beanContext,
+                                      UriNamingStrategy uriNamingStrategy,
+                                      ConversionService<?> conversionService,
+                                      Collection<NonPathTypesProvider> nonPathTypesProviders) {
+        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders);
     }
 
     @Override

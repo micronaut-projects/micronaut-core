@@ -183,4 +183,12 @@ class AuthorizationSpec extends Specification {
         then:
         response.body() == "Hello valid"
     }
+
+    void "test accessing a sensitive endpoint with Authentication binded with authentication"() {
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/sensitiveauthentication")
+                .basicAuth("valid", "password"), String)
+        then:
+        response.body() == "Hello valid"
+    }
 }
