@@ -13,9 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.spring.tx.annotation;
 
-
+import io.micronaut.aop.Around;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.Blocking;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -24,26 +31,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.core.annotation.Blocking;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Propagation;
-
 /**
  * Describes transaction attributes on a method or class. This is a variation of Spring's
  * {@link org.springframework.transaction.annotation.Transactional} that uses Micronaut AOP
  *
- *
- *
  * <p>This annotation type is generally directly comparable to Spring's
  * {@link org.springframework.transaction.interceptor.RuleBasedTransactionAttribute}
- * class, and in fact {@link AnnotationTransactionAttributeSource} will directly
- * convert the data to the latter class, so that Spring's transaction support code
- * does not have to know about annotations. If no rules are relevant to the exception,
+ * class, and in fact {@link org.springframework.transaction.annotation.AnnotationTransactionAttributeSource}
+ * will directly convert the data to the latter class, so that Spring's transaction support
+ * code does not have to know about annotations. If no rules are relevant to the exception,
  * it will be treated like
  * {@link org.springframework.transaction.interceptor.DefaultTransactionAttribute}
  * (rolling back on {@link RuntimeException} and {@link Error} but not on checked
@@ -56,11 +52,12 @@ import org.springframework.transaction.annotation.Propagation;
  * @author Colin Sampaleanu
  * @author Juergen Hoeller
  * @author Sam Brannen
- * @since 1.2
  * @see org.springframework.transaction.interceptor.TransactionAttribute
  * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute
  * @see org.springframework.transaction.interceptor.RuleBasedTransactionAttribute
+ * @since 1.2
  */
+@SuppressWarnings("JavadocStyle")
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
@@ -72,6 +69,8 @@ public @interface Transactional {
 
     /**
      * Alias for {@link #transactionManager}.
+     *
+     * @return The transaction manager
      * @see #transactionManager
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "transactionManager")
@@ -83,8 +82,10 @@ public @interface Transactional {
      * matching the qualifier value (or the bean name) of a specific
      * {@link org.springframework.transaction.PlatformTransactionManager}
      * bean definition.
-     * @since 4.2
+     *
+     * @return The transaction manager
      * @see #value
+     * @since 4.2
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "value")
     String transactionManager() default "";
@@ -92,6 +93,8 @@ public @interface Transactional {
     /**
      * The transaction propagation type.
      * <p>Defaults to {@link Propagation#REQUIRED}.
+     *
+     * @return The propatation
      * @see org.springframework.transaction.interceptor.TransactionAttribute#getPropagationBehavior()
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "propagation")
@@ -100,6 +103,8 @@ public @interface Transactional {
     /**
      * The transaction isolation level.
      * <p>Defaults to {@link Isolation#DEFAULT}.
+     *
+     * @return The isolation level
      * @see org.springframework.transaction.interceptor.TransactionAttribute#getIsolationLevel()
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "isolation")
@@ -108,6 +113,8 @@ public @interface Transactional {
     /**
      * The timeout for this transaction.
      * <p>Defaults to the default timeout of the underlying transaction system.
+     *
+     * @return The timeout
      * @see org.springframework.transaction.interceptor.TransactionAttribute#getTimeout()
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "timeout")
@@ -121,6 +128,8 @@ public @interface Transactional {
      * A transaction manager which cannot interpret the read-only hint will
      * <i>not</i> throw an exception when asked for a read-only transaction
      * but rather silently ignore the hint.
+     *
+     * @return Whether is read-only transaction
      * @see org.springframework.transaction.interceptor.TransactionAttribute#isReadOnly()
      */
     @AliasFor(annotation = org.springframework.transaction.annotation.Transactional.class, member = "readOnly")
@@ -137,6 +146,8 @@ public @interface Transactional {
      * <p>This is the preferred way to construct a rollback rule (in contrast to
      * {@link #rollbackForClassName}), matching the exception class and its subclasses.
      * <p>Similar to {@link org.springframework.transaction.interceptor.RollbackRuleAttribute#RollbackRuleAttribute(Class clazz)}.
+     *
+     * @return Rollback for exceptions
      * @see #rollbackForClassName
      * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
      */
@@ -158,6 +169,8 @@ public @interface Transactional {
      * {@link Exception} names such as {@code "BaseBusinessException"} there is no
      * need to use a FQN.
      * <p>Similar to {@link org.springframework.transaction.interceptor.RollbackRuleAttribute#RollbackRuleAttribute(String exceptionName)}.
+     *
+     * @return Rollback for classname
      * @see #rollbackFor
      * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
      */
@@ -172,6 +185,8 @@ public @interface Transactional {
      * to {@link #noRollbackForClassName}), matching the exception class and
      * its subclasses.
      * <p>Similar to {@link org.springframework.transaction.interceptor.NoRollbackRuleAttribute#NoRollbackRuleAttribute(Class clazz)}.
+     *
+     * @return Do not rollback for exceptions
      * @see #noRollbackForClassName
      * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
      */
@@ -185,6 +200,8 @@ public @interface Transactional {
      * <p>See the description of {@link #rollbackForClassName} for further
      * information on how the specified names are treated.
      * <p>Similar to {@link org.springframework.transaction.interceptor.NoRollbackRuleAttribute#NoRollbackRuleAttribute(String exceptionName)}.
+     *
+     * @return Do not rollback for class name
      * @see #noRollbackFor
      * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
      */
