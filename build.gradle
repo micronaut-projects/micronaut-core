@@ -61,6 +61,16 @@ ext {
                     name:'jackson-datatype-jdk8',
                     modules:['jackson-datatype-jsr310']
             ],
+            'micrometer.core': [
+                version: micrometerVersion,
+                group:'io.micrometer',
+                name:'micrometer-core'
+            ],
+            'micrometer.graphite': [
+                version: micrometerVersion,
+                group:'io.micrometer',
+                name:'micrometer-graphite'
+            ],
             mongodb:[
                 version: mongoVersion,
                 group:'org.mongodb',
