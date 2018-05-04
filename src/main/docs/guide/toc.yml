@@ -93,10 +93,10 @@ cloud:
   configurationSharing: Configuration Sharing
   serviceDiscovery:
     title: Service Discovery
-    serviceDiscoveryConsul: Service Discovery with Consul
-    serviceDiscoveryEureka: Service Discovery with Eureka
-    serviceDiscoveryKubernetes: Service Discovery with Kubernetes
-    serviceDiscoveryRoute53: Service Discovery with AWS Route 53
+    serviceDiscoveryConsul: Consul Support
+    serviceDiscoveryEureka: Eureka Support
+    serviceDiscoveryKubernetes: Kubernetes Support
+    serviceDiscoveryRoute53: AWS Route 53 Support
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support

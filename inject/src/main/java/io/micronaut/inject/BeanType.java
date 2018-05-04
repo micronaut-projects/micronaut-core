@@ -51,7 +51,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * processed by registered {@link ExecutableMethodProcessor} instances unless this method returns true.
      *
      * @return Whether the bean definition requires method processing
-     * @see Executable#preprocess()
+     * @see Executable#processOnStartup()
      */
     default boolean requiresMethodProcessing() {
         return false;

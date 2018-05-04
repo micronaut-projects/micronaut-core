@@ -16,9 +16,6 @@
 package io.micronaut.retry.intercept
 
 import io.micronaut.retry.CircuitState
-import io.micronaut.retry.CircuitState
-import io.micronaut.retry.intercept.CircuitBreakerRetry
-import io.micronaut.retry.intercept.SimpleRetry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
