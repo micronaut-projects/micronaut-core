@@ -1533,6 +1533,12 @@ public class DefaultBeanContext implements BeanContext {
             } else {
                 Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
                 if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
+                    if(AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.LOG.debug(
+                                "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
+                                beanDefinitionReference.getName(),
+                                beanConfiguration);
+                    }
                     continue;
                 }
             }
