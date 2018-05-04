@@ -15,6 +15,7 @@
  */
 package io.micronaut.docs.aop.retry;
 
+import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.reactivex.Flowable;
 
@@ -36,6 +37,14 @@ public class BookService {
         );
     }
 
+    // tag::circuit[]
+    @CircuitBreaker(reset = "30s")
+    public List<Book> findBooks() {
+    // end::circuit[]
+        return Collections.singletonList(
+                new Book("The Stand")
+        );
+    }
     // tag::attempts[]
     @Retryable( attempts = "5",
                 delay = "2s" )
