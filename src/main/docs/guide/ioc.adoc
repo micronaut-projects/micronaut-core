@@ -4,7 +4,7 @@ Micronaut takes heavy inspiration from Spring, and in fact, the core developers 
 
 Unlike Spring which relies exclusively on runtime reflection and proxies, Micronaut, on the other hand, uses compile time data to implement dependency injection.
 
-This is a similar approach taken by tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as Spring does but without using reflection.
+This is a similar approach taken by tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as Spring does but without using reflection or caching excessive amounts of reflection metadata.
 
 The goals of the Micronaut IoC container are summarized as:
 

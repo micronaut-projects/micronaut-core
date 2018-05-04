@@ -718,7 +718,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                        boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "preprocess", Boolean.class).orElse(false);
+                        boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false);
                         if (preprocess) {
                             getBeanWriter().setRequiresMethodProcessing(true)
                         }
