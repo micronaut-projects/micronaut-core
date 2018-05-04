@@ -54,7 +54,7 @@ public interface TaskScheduler {
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
-     * @throws RejectedExecutionException if the task cannot be
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      */
@@ -69,7 +69,7 @@ public interface TaskScheduler {
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
-     * @throws RejectedExecutionException if the task cannot be
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      */
@@ -83,7 +83,7 @@ public interface TaskScheduler {
      * @param callable The function to execute
      * @param <V>      The type of the callable's result
      * @return a ScheduledFuture that can be used to extract result or cancel
-     * @throws RejectedExecutionException if the task cannot be
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
      *                                    scheduled for execution
      * @throws NullPointerException       if callable or delay is null
      */
@@ -108,7 +108,7 @@ public interface TaskScheduler {
      * @return a ScheduledFuture representing pending completion of
      * the task, and whose {@code get()} method will throw an
      * exception upon cancellation
-     * @throws RejectedExecutionException if the task cannot be
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
      *                                    scheduled for execution
      * @throws NullPointerException       if command or period is null
      * @throws IllegalArgumentException   if period less than or equal to zero
@@ -133,7 +133,7 @@ public interface TaskScheduler {
      * @return a ScheduledFuture representing pending completion of
      * the task, and whose {@code get()} method will throw an
      * exception upon cancellation
-     * @throws RejectedExecutionException if the task cannot be
+     * @throws java.util.concurrent.RejectedExecutionException if the task cannot be
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      * @throws IllegalArgumentException   if delay less than or equal to zero

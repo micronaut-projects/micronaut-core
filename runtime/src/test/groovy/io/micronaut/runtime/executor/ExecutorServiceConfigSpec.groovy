@@ -39,9 +39,9 @@ class ExecutorServiceConfigSpec extends Specification {
     void "test configure custom executor with invalidate cache: #invalidateCache"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'micronaut.server.executors.one.type':'FIXED',
-                'micronaut.server.executors.one.nThreads':'5',
-                'micronaut.server.executors.two.type':'work_stealing'
+                'micronaut.executors.one.type':'FIXED',
+                'micronaut.executors.one.nThreads':'5',
+                'micronaut.executors.two.type':'work_stealing'
         )
 
         when:
@@ -100,9 +100,9 @@ class ExecutorServiceConfigSpec extends Specification {
     void "test configure custom executor - distinct initialization order with invalidate cache: #invalidateCache"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'micronaut.server.executors.one.type':'FIXED',
-                'micronaut.server.executors.one.nThreads':'5',
-                'micronaut.server.executors.two.type':'work_stealing'
+                'micronaut.executors.one.type':'FIXED',
+                'micronaut.executors.one.nThreads':'5',
+                'micronaut.executors.two.type':'work_stealing'
         )
 
 
@@ -143,9 +143,9 @@ class ExecutorServiceConfigSpec extends Specification {
     void "test configure existing IO executor - distinct initialization order with invalidate cache: #invalidateCache"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                'micronaut.server.executors.io.type':'FIXED',
-                'micronaut.server.executors.io.nThreads':'5',
-                'micronaut.server.executors.two.type':'work_stealing'
+                'micronaut.executors.io.type':'FIXED',
+                'micronaut.executors.io.nThreads':'5',
+                'micronaut.executors.two.type':'work_stealing'
         )
 
 

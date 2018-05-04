@@ -29,7 +29,7 @@ public interface ExecutorConfiguration {
     /**
      * The prefix used for configuration.
      */
-    String PREFIX = "micronaut.server.executors";
+    String PREFIX = "micronaut.executors";
 
     /**
      * The prefix used for I/O pool configuration.

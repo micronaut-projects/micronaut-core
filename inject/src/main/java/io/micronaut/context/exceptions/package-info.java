@@ -12,7 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *//**
+ */
+/**
+ * Contains common exceptions thrown from the {@link io.micronaut.context.BeanContext}
+ *
  * @author graemerocher
  * @since 1.0
  */
