@@ -17,7 +17,6 @@ package io.micronaut.docs.server.routes;
 
 // tag::imports[]
 import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
 import javax.inject.*;

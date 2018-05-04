@@ -16,13 +16,8 @@
 package io.micronaut.docs.server.request;
 
 // tag::imports[]
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
 import io.micronaut.http.*;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.*;
 import javax.inject.Singleton;
 
 import static io.micronaut.http.HttpResponse.*; // <1>
@@ -43,7 +38,7 @@ public class MessageController {
                              .getFirst("name")
                              .orElse("Nobody"); // <3>
 
-        return HttpResponse.ok("Hello " + name + "!!")
+        return ok("Hello " + name + "!!")
                  .header("X-My-Header", "Foo"); // <4>
     }
 }

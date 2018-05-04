@@ -16,10 +16,7 @@
 package io.micronaut.docs.server.routes;
 
 // tag::imports[]
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.*;
 import javax.inject.Singleton;
 // end::imports[]
 

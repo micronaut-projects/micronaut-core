@@ -16,13 +16,9 @@
 package io.micronaut.docs.server.sse;
 
 // tag::imports[]
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.sse.Event;
 import io.reactivex.Flowable;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.sse.Event;
-import io.micronaut.http.annotation.Get;
 import org.reactivestreams.Publisher;
 // end::imports[]
 

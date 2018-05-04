@@ -19,9 +19,6 @@ package io.micronaut.docs.server.routes;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.HttpClient;
 import org.junit.*;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import static org.junit.Assert.*;
 // end::imports[]
