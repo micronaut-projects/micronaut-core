@@ -22,7 +22,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.generator.TokenGenerator;
-import io.micronaut.security.token.jwt.generator.claims.JWTClaimsSetGenerator;
+import io.micronaut.security.token.jwt.generator.claims.ClaimsGenerator;
 import io.micronaut.security.token.jwt.validator.JwtTokenValidator;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
@@ -46,7 +46,7 @@ public class JwtTokenGenerator implements TokenGenerator {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwtTokenValidator.class);
 
-    protected final JWTClaimsSetGenerator claimsGenerator;
+    protected final ClaimsGenerator claimsGenerator;
     protected final SignatureConfiguration signatureConfiguration;
     protected final EncryptionConfiguration encryptionConfiguration;
 
@@ -57,7 +57,7 @@ public class JwtTokenGenerator implements TokenGenerator {
      */
     public JwtTokenGenerator(@Nullable @Named("generator") SignatureConfiguration signatureConfiguration,
                              @Nullable @Named("generator") EncryptionConfiguration encryptionConfiguration,
-                             JWTClaimsSetGenerator claimsGenerator) {
+                             ClaimsGenerator claimsGenerator) {
 
         this.signatureConfiguration = signatureConfiguration;
         this.encryptionConfiguration = encryptionConfiguration;
