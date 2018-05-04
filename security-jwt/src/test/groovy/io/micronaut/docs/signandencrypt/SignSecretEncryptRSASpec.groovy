@@ -65,9 +65,9 @@ micronaut:
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'signandencrypt',
-            'micronaut.security.endpoints.login': true,
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'micronaut.security.endpoints.login.enabled': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'pem.path': pemFile.absolutePath,
     ] << flatten(configMap), "test")
 
@@ -75,16 +75,16 @@ micronaut:
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is secured"() {
+    void "test /beans is secured"() {
         when:
-        get("/health")
+        get("/beans")
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
     }
 
-    void "/health can be accessed if authenticated"() {
+    void "/beans can be accessed if authenticated"() {
         expect:
         new Yaml().load(cleanYamlAsciidocTag(yamlConfig)) == configMap
         embeddedServer.applicationContext.getBean(RSAOAEPEncryptionConfiguration.class)
@@ -110,7 +110,7 @@ micronaut:
         JWTParser.parse(token) instanceof EncryptedJWT
 
         when:
-        get("/health", token)
+        get("/beans", token)
 
         then:
         noExceptionThrown()

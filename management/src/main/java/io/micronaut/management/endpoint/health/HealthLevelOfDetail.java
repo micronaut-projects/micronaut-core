@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint.processors;
+/**
+ *  <p>This class provides a set of common constants for health status  .</p>
+ *
+ * @author Sergio
+ * @since 1.0
+ */
 
-import java.util.List;
+package io.micronaut.management.endpoint.health;
 
 /**
- * Defines a list of types which will not be used as path parameters.
+ *
+ * <p>This class provides a set of common constants to indicate the level of detail to be included in the Health status response.</p>
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface NonPathTypesProvider {
-
-    /**
-     * @return The non-path types
-     */
-    List<Class> nonPathTypes();
+public enum HealthLevelOfDetail {
+    STATUS_DESCRIPTION_DETAILS,
+    STATUS
 }

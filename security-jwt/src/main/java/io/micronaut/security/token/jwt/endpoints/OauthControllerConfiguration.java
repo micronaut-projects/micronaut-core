@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint.processors;
+package io.micronaut.security.token.jwt.endpoints;
 
-import java.util.List;
+import io.micronaut.core.util.Toggleable;
 
 /**
- * Defines a list of types which will not be used as path parameters.
- *
+ * Encapsulates the configuration of {@link OauthController}.
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface NonPathTypesProvider {
+public interface OauthControllerConfiguration extends Toggleable {
 
     /**
-     * @return The non-path types
+     * @return e.g. /oauth/access_token
      */
-    List<Class> nonPathTypes();
+    String getPath();
 }
