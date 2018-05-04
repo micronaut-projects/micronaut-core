@@ -20,7 +20,6 @@ import io.micronaut.management.endpoint.processors.NonPathTypesProvider;
 import io.micronaut.security.authentication.Authentication;
 
 import javax.inject.Singleton;
-import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
 
