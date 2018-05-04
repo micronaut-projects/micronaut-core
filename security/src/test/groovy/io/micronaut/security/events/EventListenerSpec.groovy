@@ -35,8 +35,8 @@ class EventListenerSpec extends Specification {
             'endpoints.health.enabled': true,
             'endpoints.health.sensitive': true,
             'micronaut.security.enabled': true,
-            'micronaut.security.endpoints.login': true,
-            'micronaut.security.endpoints.logout': true,
+            'micronaut.security.endpoints.login.enabled': true,
+            'micronaut.security.endpoints.logout.enabled': true,
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 

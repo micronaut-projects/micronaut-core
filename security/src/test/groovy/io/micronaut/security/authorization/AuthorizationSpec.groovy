@@ -19,7 +19,7 @@ class AuthorizationSpec extends Specification {
             'endpoints.health.enabled': true,
             'endpoints.health.sensitive': true,
             'micronaut.security.enabled': true,
-            'micronaut.security.endpoints.login': true,
+            'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.interceptUrlMap': [
                     [pattern: '/urlMap/admin', access: ['ROLE_ADMIN', 'ROLE_X']],
                     [pattern: '/urlMap/**',    access: 'isAuthenticated()'],

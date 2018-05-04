@@ -65,7 +65,7 @@ micronaut:
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'signandencrypt',
-            'micronaut.security.endpoints.login': true,
+            'micronaut.security.endpoints.login.enabled': true,
             'endpoints.health.enabled': true,
             'endpoints.health.sensitive': true,
             'pem.path': pemFile.absolutePath,

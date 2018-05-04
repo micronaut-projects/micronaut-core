@@ -66,9 +66,9 @@ public class Authenticator {
     }
 
     private Flowable<AuthenticationResponse> attemptAuthenticationRequest(
-        UsernamePasswordCredentials credentials,
-        Iterator<AuthenticationProvider> providerIterator,
-        Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
+            UsernamePasswordCredentials credentials,
+            Iterator<AuthenticationProvider> providerIterator,
+            Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
 
         return providerFlowable.switchMap(authenticationProvider -> {
             Flowable<AuthenticationResponse> responseFlowable = Flowable.fromPublisher(authenticationProvider.authenticate(credentials));
@@ -79,10 +79,10 @@ public class Authenticator {
                     lastFailure.set(authenticationResponse);
                     // recurse
                     return attemptAuthenticationRequest(
-                        credentials,
-                        providerIterator,
-                        Flowable.just(providerIterator.next()),
-                        lastFailure);
+                            credentials,
+                            providerIterator,
+                            Flowable.just(providerIterator.next()),
+                            lastFailure);
                 } else {
                     lastFailure.set(authenticationResponse);
                     return Flowable.just(authenticationResponse);
@@ -95,10 +95,10 @@ public class Authenticator {
                 if (providerIterator.hasNext()) {
                     // recurse
                     return attemptAuthenticationRequest(
-                        credentials,
-                        providerIterator,
-                        Flowable.just(providerIterator.next()),
-                        lastFailure);
+                            credentials,
+                            providerIterator,
+                            Flowable.just(providerIterator.next()),
+                            lastFailure);
                 } else {
                     AuthenticationResponse lastFailureResponse = lastFailure.get();
                     if (lastFailureResponse != null) {

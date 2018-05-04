@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.validator;
+package io.micronaut.security.endpoints;
 
-import io.micronaut.core.order.Ordered;
-import io.micronaut.security.authentication.Authentication;
-import org.reactivestreams.Publisher;
+import io.micronaut.core.util.Toggleable;
 
 /**
- * Responsible for token validation and claims retrieval.
- *
+ * Encapsulates the configuration of {@link LoginController}.
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenValidator extends Ordered {
+public interface LoginControllerConfiguration extends Toggleable {
 
     /**
-     * Validates the provided token and returns the authentication state.
-     *
-     * @param token The token string
-     * @return The {@link Authentication}
+     * @return path
      */
-    Publisher<Authentication> validateToken(String token);
+    String getPath();
 }
