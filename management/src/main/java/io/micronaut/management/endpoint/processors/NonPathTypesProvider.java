@@ -19,12 +19,15 @@ package io.micronaut.management.endpoint.processors;
 import java.util.List;
 
 /**
- * Defines a list of types which will not be used as path parameters
+ * Defines a list of types which will not be used as path parameters.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface NonPathTypesProvider {
 
+    /**
+     * @return The non-path types
+     */
     List<Class> nonPathTypes();
 }

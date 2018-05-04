@@ -48,12 +48,13 @@ public class BuildInfoSource implements PropertiesInfoSource {
     private final Supplier<Optional<PropertySource>> supplier;
 
     /**
-     * @param resourceResolver A {@link ResourceResolver}
+     * @param resourceResolver    A {@link ResourceResolver}
+     * @param buildPropertiesPath The build properties path
      */
     public BuildInfoSource(
-            ResourceResolver resourceResolver,
-            @Value("${endpoints.info.build.location:META-INF/build-info.properties}")
-            String buildPropertiesPath) {
+        ResourceResolver resourceResolver,
+        @Value("${endpoints.info.build.location:META-INF/build-info.properties}") String buildPropertiesPath) {
+
         this.resourceResolver = resourceResolver;
         this.supplier = SupplierUtil.memoized(this::retrieveBuildInfo);
         this.buildPropertiesPath = buildPropertiesPath;
