@@ -10,7 +10,7 @@ include::{testsjava}/env/DataSourceConfiguration.java[tags=eachProperty, indent=
 ----
 
 <1> The `@EachProperty` annotation defines the property name that should be handled.
-<2> The `@Argument` annotation can be used to inject the name of the sub-property that defines the name of the bean (and the bean qualifier)
+<2> The `@Parameter` annotation can be used to inject the name of the sub-property that defines the name of the bean (which is also the bean qualifier)
 <3> Each property of the bean is bound to configuration.
 
 The above `DataSourceConfiguration` defines a `url` property to configure one or many hypothetical data sources of some sort. The URLs themselves can be configured using any of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances evaluated to Micronaut:
