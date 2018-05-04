@@ -16,13 +16,10 @@
 package io.micronaut.retry.intercept
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.retry.event.RetryEvent
-import io.micronaut.retry.event.RetryEventListener
-import io.reactivex.Single
-import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
+import io.reactivex.Single
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 

@@ -36,7 +36,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
-@Executable(preprocess = true)
+@Executable(processOnStartup = true)
 @Repeatable(Schedules.class)
 public @interface Scheduled {
 

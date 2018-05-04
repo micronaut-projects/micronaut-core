@@ -16,7 +16,6 @@
 package io.micronaut.retry.intercept
 
 import io.micronaut.core.util.CollectionUtils
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.discovery.exceptions.DiscoveryException
 import io.micronaut.retry.intercept.SimpleRetry
 import spock.lang.Specification
