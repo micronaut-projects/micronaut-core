@@ -13,19 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 
 import java.lang.annotation.Annotation;
 
 /**
- * An interface for classes that bind an {@link Argument} from an {@link HttpRequest} driven by an annotation
+ * An interface for classes that bind an {@link io.micronaut.core.type.Argument} from an {@link HttpRequest} driven by
+ * an annotation.
  *
+ * @param <A> An annotation
+ * @param <T> A type
  * @author Graeme Rocher
  * @see CookieAnnotationBinder
  * @see ParameterAnnotationBinder
@@ -35,7 +38,7 @@ import java.lang.annotation.Annotation;
 public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends RequestArgumentBinder<T>, AnnotatedArgumentBinder<A, T, HttpRequest<?>> {
 
     /**
-     * Create a binder from an annotation type and another binder
+     * Create a binder from an annotation type and another binder.
      *
      * @param annotationType The annotation type
      * @param binder         The binder

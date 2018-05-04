@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
-import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
@@ -32,13 +32,18 @@ import io.micronaut.http.annotation.QueryValue;
 import java.util.Optional;
 
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link QueryValue}
- * to trigger binding from an HTTP request parameter
+ * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link QueryValue}
+ * to trigger binding from an HTTP request parameter.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<QueryValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<QueryValue, T> {
+
+    /**
+     * @param conversionService The conversion service
+     */
     public ParameterAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }

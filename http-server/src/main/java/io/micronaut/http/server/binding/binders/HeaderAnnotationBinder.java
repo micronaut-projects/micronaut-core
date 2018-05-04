@@ -13,29 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
-import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Header;
 
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Header} annotation
- * to trigger binding from an HTTP header
+ * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header}
+ * annotation to trigger binding from an HTTP header.
  *
+ * @param <T> A type
  * @author Graeme Rocher
- * @see HttpHeaders
+ * @see io.micronaut.http.HttpHeaders
  * @since 1.0
  */
 public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Header, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Header, T> {
 
+    /**
+     * @param conversionService The conversion service
+     */
     public HeaderAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }

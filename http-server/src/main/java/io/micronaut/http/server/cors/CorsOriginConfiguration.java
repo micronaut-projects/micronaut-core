@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
 import io.micronaut.http.HttpMethod;
@@ -22,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Stores configuration for CORS
+ * Stores configuration for CORS.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -31,14 +32,14 @@ import java.util.List;
 public class CorsOriginConfiguration {
 
     /**
-     * Constant to represent any value
+     * Constant to represent any value.
      */
-    public static List<String> ANY = Collections.singletonList("*");
+    public static final List<String> ANY = Collections.singletonList("*");
 
     /**
-     * Constant to represent any method
+     * Constant to represent any method.
      */
-    public static List<HttpMethod> ANY_METHOD = Collections.emptyList();
+    public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
@@ -55,7 +56,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed origins
+     * Sets the allowed origins.
      *
      * @param allowedOrigins The allow origins
      */
@@ -73,7 +74,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed methods
+     * Sets the allowed methods.
      *
      * @param allowedMethods The allowed methods
      */
@@ -91,7 +92,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed headers
+     * Sets the allowed headers.
      *
      * @param allowedHeaders The allowed headers
      */
@@ -109,7 +110,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the exposed headers
+     * Sets the exposed headers.
      *
      * @param exposedHeaders The exposed headers
      */
@@ -127,7 +128,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets whether to allow credentials
+     * Sets whether to allow credentials.
      *
      * @param allowCredentials The credentials
      */
@@ -143,7 +144,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the max age
+     * Sets the max age.
      *
      * @param maxAge The max age
      */

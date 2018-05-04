@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
-import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -26,14 +26,18 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.CookieValue;
 
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link CookieValue} annotation
- * to trigger binding from an HTTP {@link io.micronaut.http.cookie.Cookie}
+ * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link CookieValue}
+ * annotation to trigger binding from an HTTP {@link io.micronaut.http.cookie.Cookie}.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<CookieValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<CookieValue, T> {
 
+    /**
+     * @param conversionService The conversion service
+     */
     public CookieAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
