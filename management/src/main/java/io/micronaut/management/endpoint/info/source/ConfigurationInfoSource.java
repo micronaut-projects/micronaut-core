@@ -28,7 +28,6 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -61,9 +60,8 @@ public class ConfigurationInfoSource implements InfoSource {
 
     private MapPropertySource retrieveConfigurationInfo() {
         return new MapPropertySource(
-                "info",
-                environment.getProperty("info", Map.class)
-                           .orElse(Collections.emptyMap())
+            "info",
+            environment.getProperty("info", Map.class).orElse(Collections.emptyMap())
         );
     }
 }

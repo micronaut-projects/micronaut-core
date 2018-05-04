@@ -21,7 +21,6 @@ import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import org.reactivestreams.Publisher;
 
 import java.util.Collections;
 
@@ -47,12 +46,12 @@ public class BeansEndpoint {
     }
 
     /**
-     * @return A {@link Publisher} with the beans
+     * @return A {@link org.reactivestreams.Publisher} with the beans
      */
     @Read
     public Single getBeans() {
-        return Flowable.fromPublisher(
-                beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions())
-        ).first(Collections.emptyMap());
+        return Flowable
+            .fromPublisher(beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions()))
+            .first(Collections.emptyMap());
     }
 }

@@ -32,11 +32,11 @@ class EventListenerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'eventlistener',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
-            'micronaut.security.endpoints.login': true,
-            'micronaut.security.endpoints.logout': true,
+            'micronaut.security.endpoints.login.enabled': true,
+            'micronaut.security.endpoints.logout.enabled': true,
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
@@ -63,7 +63,7 @@ class EventListenerSpec extends Specification {
 
     def "accessing a secured endpoints, validates Basic auth token and triggers TokenValidatedEvent"() {
         when:
-        HttpRequest request = HttpRequest.GET("/health").basicAuth("user", "password")
+        HttpRequest request = HttpRequest.GET("/beans").basicAuth("user", "password")
         client.toBlocking().exchange(request)
 
         then:
