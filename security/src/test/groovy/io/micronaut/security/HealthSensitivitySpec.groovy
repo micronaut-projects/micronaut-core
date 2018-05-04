@@ -22,19 +22,24 @@ import javax.inject.Singleton
 class HealthSensitivitySpec extends Specification {
 
     @Unroll
-    void "sensitive: #sensitive security: #security authenticated: #authenticated => #expected"(boolean sensitive,
-                                                            boolean security,
-                                                            boolean authenticated,
-                                                            HealthLevelOfDetail expected) {
+    void "Populate Sensitive: #setSensitive sensitive: #sensitive security: #security authenticated: #authenticated => #expected"(boolean setSensitive,
+                                                                                                boolean sensitive,
+                                                                                                boolean security,
+                                                                                                boolean authenticated,
+                                                                                                HealthLevelOfDetail expected) {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        Map m = [
                 'spec.name': 'healthsensitivity',
                 'endpoints.health.enabled': true,
-                'endpoints.health.sensitive': sensitive,
                 'endpoints.health.disk-space.threshold': '9999GB',
-                'micronaut.security.enabled': security,
-
-        ])
+        ]
+        if (security) {
+            m['micronaut.security.enabled'] = security
+        }
+        if (setSensitive) {
+            m['endpoints.health.sensitive'] = sensitive
+        }
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m)
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
@@ -62,15 +67,14 @@ class HealthSensitivitySpec extends Specification {
         rxClient.close()
 
         where:
-        sensitive | security | authenticated || expected
-        true      | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true      | true     | false         || HealthLevelOfDetail.STATUS
-        false     | true     | false         || HealthLevelOfDetail.STATUS
-        false     | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true      | false    | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true      | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | false    | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        setSensitive | sensitive | security | authenticated || expected
+        true         | true      | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        true         | true      | true     | false         || HealthLevelOfDetail.STATUS
+        true         | false     | true     | false         || HealthLevelOfDetail.STATUS
+        true         | false     | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        true         | true      | false    | false         || HealthLevelOfDetail.STATUS
+        true         | false     | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        false        | false     | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
     }
 
     @Singleton

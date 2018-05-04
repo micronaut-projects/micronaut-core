@@ -63,7 +63,7 @@ class EventListenerSpec extends Specification {
 
     def "accessing a secured endpoints, validates Basic auth token and triggers TokenValidatedEvent"() {
         when:
-        HttpRequest request = HttpRequest.GET("/health").basicAuth("user", "password")
+        HttpRequest request = HttpRequest.GET("/beans").basicAuth("user", "password")
         client.toBlocking().exchange(request)
 
         then:
