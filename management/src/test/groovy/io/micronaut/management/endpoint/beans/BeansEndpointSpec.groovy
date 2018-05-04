@@ -40,8 +40,8 @@ class BeansEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[0] == "io.micronaut.context.BeanContext"
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[1] == "io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.context.BeanContext")
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector")
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "endpoint"
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
