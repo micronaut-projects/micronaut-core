@@ -207,7 +207,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cachePut.async();
                 if (async) {
                     ioExecutor.submit(() ->
-                            processCachePut(context, wrapper, cachePut, cacheOperation)
+                        processCachePut(context, wrapper, cachePut, cacheOperation)
                     );
                 } else {
                     processCachePut(context, wrapper, cachePut, cacheOperation);
@@ -221,12 +221,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cacheInvalidate.async();
                 if (async) {
                     ioExecutor.submit(() -> {
-                                try {
-                                    processCacheEvict(context, cacheInvalidate, cacheOperation, async);
-                                } catch (Exception e) {
-                                    throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
-                                }
+                            try {
+                                processCacheEvict(context, cacheInvalidate, cacheOperation, async);
+                            } catch (Exception e) {
+                                throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
                             }
+                        }
                     );
                 } else {
                     processCacheEvict(context, cacheInvalidate, cacheOperation, async);
@@ -313,7 +313,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @param context Contains information about method invocation
      * @return The operations to cause the return value to be cached within the given cache name.
      */
-    CachePut[] putOperations(MethodInvocationContext context) {
+    protected CachePut[] putOperations(MethodInvocationContext context) {
         if (context.hasStereotype(CachePut.class)) {
             return new CachePut[]{context.getAnnotation(CachePut.class)};
         } else if (context.hasStereotype(PutOperations.class)) {
@@ -329,7 +329,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @param context Extended version of {@link io.micronaut.aop.InvocationContext} for {@link MethodInterceptor} instances
      * @return The operations to cause the eviction of the given caches
      */
-    CacheInvalidate[] invalidateOperations(MethodInvocationContext context) {
+    protected CacheInvalidate[] invalidateOperations(MethodInvocationContext context) {
         if (context.hasStereotype(CacheInvalidate.class)) {
             return new CacheInvalidate[]{context.getAnnotation(CacheInvalidate.class)};
         } else if (context.hasStereotype(InvalidateOperations.class)) {
@@ -620,10 +620,10 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private void processCacheEvict(
-            MethodInvocationContext context,
-            CacheInvalidate cacheConfig,
-            CacheOperation cacheOperation,
-            boolean async) {
+        MethodInvocationContext context,
+        CacheInvalidate cacheConfig,
+        CacheOperation cacheOperation,
+        boolean async) {
 
         String[] cacheNames = cacheOperation.getCacheNames(cacheConfig);
         CacheKeyGenerator keyGenerator = cacheOperation.getKeyGenerator(cacheConfig);
