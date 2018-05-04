@@ -694,8 +694,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             BeanDefinitionVisitor beanWriter = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
 
-            // This method requires pre-processing. See Executable#preprocess()
-            boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "preprocess", Boolean.class).orElse(false);
+            // This method requires pre-processing. See Executable#processOnStartup()
+            boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false);
             if (preprocess) {
                 beanWriter.setRequiresMethodProcessing(true);
             }
