@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Contains classes specific to CORS support within Micronaut
+ * Contains classes specific to CORS support within Micronaut.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -23,7 +23,5 @@
 @Requires(property = "micronaut.server.cors.enabled", value = "true")
 package io.micronaut.http.server.cors;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

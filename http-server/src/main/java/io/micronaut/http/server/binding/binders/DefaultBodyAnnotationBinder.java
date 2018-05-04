@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -26,8 +27,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Binds a String body argument
+ * Binds a String body argument.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,6 +37,9 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
     protected final ConversionService<?> conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
     }

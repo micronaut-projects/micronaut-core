@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.http.annotation.Body;
 
 /**
- * A binder that binds from a parsed request body
+ * A binder that binds from a parsed request body.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */

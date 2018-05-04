@@ -13,20 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * Exceptions related to the HTTP server
+ * Exceptions related to the HTTP server.
+ *
  * @author graemerocher
  * @since 1.0
  */
 public class HttpServerException extends HttpException {
+
+    /**
+     * @param message The message
+     */
     public HttpServerException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public HttpServerException(String message, Throwable cause) {
         super(message, cause);
     }

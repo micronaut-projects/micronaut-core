@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding;
 
 import io.micronaut.core.bind.ArgumentBinderRegistry;
 import io.micronaut.http.HttpRequest;
 
 /**
- * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}
+ * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}.
  *
  * @author Graeme Rocher
  * @since 1.0

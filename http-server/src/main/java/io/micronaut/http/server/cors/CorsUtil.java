@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
@@ -24,7 +25,7 @@ import io.micronaut.http.HttpRequest;
 import java.util.Optional;
 
 /**
- * Utility methods for CORS
+ * Utility methods for CORS.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,6 +33,7 @@ import java.util.Optional;
 class CorsUtil {
 
     /**
+     * @param request The {@link HttpRequest} object
      * @return Return whether this request is a pre-flight request
      */
     static boolean isPreflightRequest(HttpRequest request) {

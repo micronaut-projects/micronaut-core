@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -28,8 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Responsible for converting a map of configuration to an instance
- * of {@link CorsOriginConfiguration}
+ * Responsible for converting a map of configuration to an instance of {@link CorsOriginConfiguration}.
  *
  * @author James Kleeh
  * @author Graeme Rocher

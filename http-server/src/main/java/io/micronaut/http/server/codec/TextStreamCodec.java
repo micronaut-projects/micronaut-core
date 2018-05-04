@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.codec;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -34,7 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 /**
- * A {@link MediaTypeCodec} that will encode {@link Event} objects in order to support Server Sent Events
+ * A {@link MediaTypeCodec} that will encode {@link Event} objects in order to support Server Sent Events.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,6 +55,11 @@ public class TextStreamCodec implements MediaTypeCodec {
     private final ByteBufferFactory byteBufferFactory;
     private MediaTypeCodecRegistry codecRegistry;
 
+    /**
+     * @param serverConfiguration   The HTTP server configuration
+     * @param byteBufferFactory     A byte buffer factory
+     * @param codecRegistryProvider A media type codec registry
+     */
     public TextStreamCodec(
         HttpServerConfiguration serverConfiguration,
         ByteBufferFactory byteBufferFactory,
@@ -93,6 +99,7 @@ public class TextStreamCodec implements MediaTypeCodec {
         return buffer.toByteArray();
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
         Event<Object> event;
@@ -133,6 +140,11 @@ public class TextStreamCodec implements MediaTypeCodec {
         return this.codecRegistry;
     }
 
+    /**
+     * @param eventData The byte buffer
+     * @param attribute The attribute
+     * @param value     The value
+     */
     protected void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
         if (value != null) {
             eventData.write(attribute)

@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
-
 /**
- * Thrown for an unrecoverable server exceptions
+ * Thrown for an unrecoverable server exceptions.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class InternalServerException extends HttpServerException {
+
+    /**
+     * @param message The message
+     */
     public InternalServerException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public InternalServerException(String message, Throwable cause) {
         super(message, cause);
     }
