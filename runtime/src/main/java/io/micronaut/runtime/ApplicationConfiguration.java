@@ -84,7 +84,7 @@ public class ApplicationConfiguration {
      * @param name Set the application name
      */
     public void setName(String name) {
-        if(name != null) {
+        if (name != null) {
             this.name = NameUtils.hyphenate(name);
         }
     }

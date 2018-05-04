@@ -38,7 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
     private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
-    private static final Logger LOG = LoggerFactory.getLogger(Condition.class);
+
+    static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
     @Override
     public boolean isEnabled(BeanContext context) {

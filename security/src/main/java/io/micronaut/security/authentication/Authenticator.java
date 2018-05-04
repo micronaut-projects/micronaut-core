@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @author Sergio del Amo
  * @author Graeme Rocher
- *
  * @since 1.0
  */
 @Singleton
@@ -70,6 +69,7 @@ public class Authenticator {
             UsernamePasswordCredentials credentials,
             Iterator<AuthenticationProvider> providerIterator,
             Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
+
         return providerFlowable.switchMap(authenticationProvider -> {
             Flowable<AuthenticationResponse> responseFlowable = Flowable.fromPublisher(authenticationProvider.authenticate(credentials));
             Flowable<AuthenticationResponse> authenticationAttemptFlowable = responseFlowable.switchMap(authenticationResponse -> {

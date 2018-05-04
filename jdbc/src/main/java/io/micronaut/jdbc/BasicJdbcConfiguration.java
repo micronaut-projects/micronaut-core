@@ -26,7 +26,7 @@ package io.micronaut.jdbc;
 public interface BasicJdbcConfiguration {
 
     /**
-     * The prefix used for data source configuration
+     * The prefix used for data source configuration.
      */
     String PREFIX = "datasources";
 

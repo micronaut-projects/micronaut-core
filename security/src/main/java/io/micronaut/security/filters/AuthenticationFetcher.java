@@ -31,6 +31,7 @@ public interface AuthenticationFetcher extends Ordered {
 
     /**
      * Attempts to read an {@link Authentication} from a {@link HttpRequest} being executed.
+     *
      * @param request {@link HttpRequest} being executed.
      * @return {@link Authentication} if found
      */

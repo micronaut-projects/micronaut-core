@@ -43,18 +43,18 @@ public class GitInfoSource implements PropertiesInfoSource {
     private static final String EXTENSION = ".properties";
     private static final String PREFIX = "classpath:";
 
-
     private final String gitPropertiesPath;
     private final ResourceResolver resourceResolver;
     private final Supplier<Optional<PropertySource>> supplier;
 
     /**
-     * @param resourceResolver A {@link ResourceResolver}
+     * @param resourceResolver  A {@link ResourceResolver}
+     * @param gitPropertiesPath The path for the git properties file
      */
     public GitInfoSource(
-            ResourceResolver resourceResolver,
-            @Value("${endpoints.info.git.location:git.properties}")
-            String gitPropertiesPath) {
+        ResourceResolver resourceResolver,
+        @Value("${endpoints.info.git.location:git.properties}") String gitPropertiesPath) {
+
         this.resourceResolver = resourceResolver;
         this.supplier = SupplierUtil.memoized(this::retrieveGitInfo);
         this.gitPropertiesPath = gitPropertiesPath;

@@ -66,3 +66,14 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |`@Requires(property='data-source.url')`
 |===
 
+=== Debugging Conditional Beans
+
+If you have multiple conditions and complex requirements it may become difficult to understand why a particular bean has not been loaded.
+
+To help resolve issues with conditional beans you can enable debug logging for the `io.micronaut.context.condition` package which will log the reasons why beans were not loaded.
+
+.logback.xml
+[source,xml]
+----
+<logger name="io.micronaut.context.condition" level="DEBUG"/>
+----
