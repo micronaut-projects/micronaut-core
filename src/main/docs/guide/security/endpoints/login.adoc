@@ -4,7 +4,8 @@ You can enable `LoginController` with configuration property:
 
 | Configuration Property | Default Value | Possible Values
 
-| `micronaut.security.endpoints.login` | false | true or false
+| `micronaut.security.endpoints.login.enabled` | false | true or false
+| `micronaut.security.endpoints.login.path` | `/login` | default path for `POST` requests.
 
 |===
 

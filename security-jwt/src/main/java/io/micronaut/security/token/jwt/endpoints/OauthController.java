@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License.e
  */
 
 package io.micronaut.security.token.jwt.endpoints;
@@ -25,7 +25,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
 import io.micronaut.security.authentication.Authentication;
-import io.micronaut.security.endpoints.SecurityEndpointsConfigurationProperties;
 import io.micronaut.security.token.jwt.generator.AccessRefreshTokenGenerator;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.jwt.validator.JwtTokenValidator;
@@ -48,13 +47,10 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller(OauthController.CONTROLLER_PATH)
-@Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".refresh")
+@Requires(property = OauthControllerConfigurationProperties.PREFIX + ".enabled")
+@Controller("${" + OauthControllerConfigurationProperties.PREFIX + ".path:/oauth/access_token}")
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class OauthController {
-
-    public static final String CONTROLLER_PATH = "/oauth";
-    public static final String ACCESS_TOKEN_PATH = "/access_token";
 
     private static final Logger LOG = LoggerFactory.getLogger(OauthController.class);
     protected final TokenValidator tokenValidator;
@@ -77,15 +73,14 @@ public class OauthController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post(OauthController.ACCESS_TOKEN_PATH)
-    public Single<HttpResponse<AccessRefreshToken>> token(TokenRefreshRequest tokenRefreshRequest) {
+    @Post("/")
+    public Single<HttpResponse<AccessRefreshToken>> index(TokenRefreshRequest tokenRefreshRequest) {
         if (!validateTokenRefreshRequest(tokenRefreshRequest)) {
             return Single.just(HttpResponse.status(HttpStatus.BAD_REQUEST));
         }
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
-
         }
 
         Flowable<Authentication> authenticationFlowable = Flowable.fromPublisher(tokenValidator.validateToken(tokenRefreshRequest.getRefreshToken()));

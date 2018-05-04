@@ -36,8 +36,8 @@ import javax.annotation.Nullable;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Controller("/")
-@Requires(property = SecurityEndpointsConfigurationProperties.PREFIX + ".logout")
+@Requires(property = LogoutControllerConfigurationProperties.PREFIX + ".enabled")
+@Controller("${" + LogoutControllerConfigurationProperties.PREFIX + ".path:/logout}")
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LogoutController {
 
@@ -61,8 +61,8 @@ public class LogoutController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post
-    public HttpResponse logout(HttpRequest<?> request, Authentication authentication) {
+    @Post("/")
+    public HttpResponse index(HttpRequest<?> request, Authentication authentication) {
         eventPublisher.publishEvent(new LogoutEvent(authentication));
         if (logoutHandler != null) {
             return logoutHandler.logout(request);
