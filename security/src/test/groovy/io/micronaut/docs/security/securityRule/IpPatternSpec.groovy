@@ -34,8 +34,8 @@ micronaut:
 
     @Shared
     Map<String, Object> config = [
-            'endpoints.health.enabled'                 : true,
-            'endpoints.health.sensitive'               : false,
+            'endpoints.beans.enabled'                 : true,
+            'endpoints.beans.sensitive'               : false,
     ] << flatten(ipPatternsMap)
 
     @Shared
@@ -48,7 +48,7 @@ micronaut:
 
     void "test accessing a resource from a whitelisted IP is successful"() {
         when:
-        client.toBlocking().exchange(HttpRequest.GET("/health"), String)
+        client.toBlocking().exchange(HttpRequest.GET("/beans"), String)
 
         then:
         noExceptionThrown()
