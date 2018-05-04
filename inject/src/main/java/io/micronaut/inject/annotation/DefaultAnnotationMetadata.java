@@ -47,11 +47,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Default implementation of {@link AnnotationMetadata}
+ * Default implementation of {@link AnnotationMetadata}.
+ *
+ * NOTE: Although required to be public This is an internal class and should not be referenced directly in user code
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement, Cloneable {
 
     static {
@@ -570,4 +573,12 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         }
     }
 
+    /**
+     * Flushes the annotation cache
+     */
+    @Internal
+    public void flushCache() {
+        annotationMap.clear();
+        declaredAnnotationMap.clear();
+    }
 }
