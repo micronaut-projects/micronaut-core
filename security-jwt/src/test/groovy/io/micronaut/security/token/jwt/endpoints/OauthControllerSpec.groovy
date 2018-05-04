@@ -17,6 +17,7 @@ import io.micronaut.security.token.jwt.render.BearerAccessRefreshToken
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
 import io.micronaut.security.token.jwt.validator.JwtTokenValidator
 import io.micronaut.security.token.validator.TokenValidator
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -78,8 +79,8 @@ class OauthControllerSpec extends Specification {
 
         when:
         TokenValidator tokenValidator = context.getBean(JwtTokenValidator.class)
-        Map<String, Object> newAccessTokenClaims = tokenValidator.validateToken(refreshRsp.body().accessToken).get().getAttributes()
-        Map<String, Object> originalAccessTokenClaims = tokenValidator.validateToken(originalAccessToken).get().getAttributes()
+        Map<String, Object> newAccessTokenClaims = Flowable.fromPublisher(tokenValidator.validateToken(refreshRsp.body().accessToken)).blockingFirst().getAttributes()
+        Map<String, Object> originalAccessTokenClaims = Flowable.fromPublisher(tokenValidator.validateToken(originalAccessToken)).blockingFirst().getAttributes()
         List<String> expectedClaims = [JwtClaims.SUBJECT,
                                        JwtClaims.ISSUED_AT,
                                        JwtClaims.EXPIRATION_TIME,
