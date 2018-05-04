@@ -72,6 +72,7 @@ import javax.annotation.Nonnull;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
+import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
@@ -224,9 +225,21 @@ public class DefaultBeanContext implements BeanContext {
                         //noinspection unchecked
                         ((DisposableBeanDefinition) def).dispose(this, bean);
                     } catch (Throwable e) {
-                        LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
+                        if(LOG.isErrorEnabled()) {
+                            LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
+                        }
                     }
-                } else if (bean instanceof LifeCycle) {
+                }
+                if(def instanceof Closeable) {
+                    try {
+                        ((Closeable)def).close();
+                    } catch (Throwable e) {
+                        if(LOG.isErrorEnabled()) {
+                            LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
+                        }
+                    }
+                }
+                if (bean instanceof LifeCycle) {
                     ((LifeCycle) bean).stop();
                 }
             });
