@@ -92,12 +92,15 @@ class HelpCommand implements ProfileCommand, Completer, ProjectContextAware, Pro
         } else {
             console.log '''
 Usage (optionals marked with *):'
-grails [environment]* [target] [arguments]*'
+mn [target] [arguments]*'
 
 '''
             console.addStatus("Examples:")
-            console.log('$ mn dev run-app')
-            console.log('$ mn create-app books')
+            console.log('$ mn create-service my-service')
+            console.log ''
+            console.addStatus("Language support for Groovy and/or Kotlin can be enabled with the corresponding feature::")
+            console.log('$ mn create-service my-groovy-service -features=groovy')
+            console.log('$ mn create-service my-kotlin-service -features=kotlin')
             console.log ''
             console.addStatus('Available Commands (type mn help \'command-name\' for more info):')
             console.addStatus("${'Command Name'.padRight(37)} Command Description")
