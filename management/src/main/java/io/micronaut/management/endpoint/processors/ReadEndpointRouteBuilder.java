@@ -24,6 +24,7 @@ import io.micronaut.management.endpoint.Read;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 
 /**
  * A processor that processes references to {@link Read} operations {@link io.micronaut.management.endpoint.Endpoint}
@@ -39,9 +40,13 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param beanContext The application context
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
+     * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
      */
-    public ReadEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
-        super(beanContext, uriNamingStrategy, conversionService);
+    public ReadEndpointRouteBuilder(ApplicationContext beanContext,
+                                    UriNamingStrategy uriNamingStrategy,
+                                    ConversionService<?> conversionService,
+                                    Collection<NonPathTypesProvider> nonPathTypesProviders) {
+        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders);
     }
 
     @Override
