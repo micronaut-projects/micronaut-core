@@ -27,22 +27,23 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.Secured;
-import io.micronaut.security.authentication.*;
+import io.micronaut.security.authentication.AuthenticationFailed;
+import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.authentication.Authenticator;
+import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.event.LoginFailedEvent;
 import io.micronaut.security.event.LoginSuccessfulEvent;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.reactivex.functions.Function;
 
 /**
- *
- * Handles login requests
+ * Handles login requests.
  *
  * @author Sergio del Amo
  * @author Graeme Rocher
- *
  * @since 1.0
  */
 @Controller("/")
@@ -55,9 +56,8 @@ public class LoginController {
     protected final ApplicationEventPublisher eventPublisher;
 
     /**
-     *
-     * @param authenticator {@link Authenticator} collaborator
-     * @param loginHandler A collaborator which helps to build HTTP response depending on success or failure.
+     * @param authenticator  {@link Authenticator} collaborator
+     * @param loginHandler   A collaborator which helps to build HTTP response depending on success or failure.
      * @param eventPublisher The application event publisher
      */
     public LoginController(Authenticator authenticator,
@@ -69,9 +69,8 @@ public class LoginController {
     }
 
     /**
-     *
      * @param usernamePasswordCredentials An instance of {@link UsernamePasswordCredentials} in the body payload
-     * @param request The {@link HttpRequest} being executed
+     * @param request                     The {@link HttpRequest} being executed
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})

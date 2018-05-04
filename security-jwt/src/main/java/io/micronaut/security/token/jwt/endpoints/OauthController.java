@@ -42,7 +42,7 @@ import java.util.Optional;
 
 /**
  *
- * A controller that handles token refresh
+ * A controller that handles token refresh.
  *
  * @author Sergio del Amo
  * @author Graeme Rocher
