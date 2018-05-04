@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
 import io.micronaut.core.bind.TypeArgumentBinder;
 import io.micronaut.http.HttpRequest;
 
 /**
- * A {@link TypeArgumentBinder} that binds from an {@link HttpRequest}
+ * A {@link TypeArgumentBinder} that binds from an {@link HttpRequest}.
  *
+ * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */

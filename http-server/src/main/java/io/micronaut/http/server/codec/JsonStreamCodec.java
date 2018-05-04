@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.codec;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -30,7 +31,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Allow encoding objects using {@link MediaType#APPLICATION_JSON_STREAM}
+ * Allow encoding objects using {@link MediaType#APPLICATION_JSON_STREAM}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +43,10 @@ public class JsonStreamCodec implements MediaTypeCodec {
     private final ByteBufferFactory byteBufferFactory;
     private MediaTypeCodecRegistry codecRegistry;
 
+    /**
+     * @param byteBufferFactory     A byte buffer factory
+     * @param codecRegistryProvider A media type codec registry
+     */
     public JsonStreamCodec(
         ByteBufferFactory byteBufferFactory,
         Provider<MediaTypeCodecRegistry> codecRegistryProvider) {

@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types;
 
 import io.micronaut.http.MutableHttpResponse;
 
 /**
- * A type that needs special handling that may
- * include modification of the response.
+ * A type that needs special handling that may include modification of the response.
  *
  * @author James Kleeh
  * @since 1.0
@@ -27,8 +27,7 @@ import io.micronaut.http.MutableHttpResponse;
 public interface CustomizableResponseType {
 
     /**
-     * Modify the response before it is written
-     * to the client.
+     * Modify the response before it is written to the client.
      *
      * @param response The response to modify
      */

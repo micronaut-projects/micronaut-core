@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types.files;
 
 import java.io.File;
 
 /**
- * A special type for handling a {@link File}
+ * A special type for handling a {@link File}.
  *
  * @author James Kleeh
  * @since 1.0
@@ -27,10 +28,16 @@ public class SystemFileCustomizableResponseType implements FileCustomizableRespo
 
     protected final File file;
 
+    /**
+     * @param file The file
+     */
     public SystemFileCustomizableResponseType(File file) {
         this.file = file;
     }
 
+    /**
+     * @return The file
+     */
     public File getFile() {
         return file;
     }
@@ -49,5 +56,4 @@ public class SystemFileCustomizableResponseType implements FileCustomizableRespo
     public long getLength() {
         return file.length();
     }
-
 }

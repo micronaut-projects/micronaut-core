@@ -13,19 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.exceptions;
 
 /**
- * An exception thrown on server startup
+ * An exception thrown on server startup.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class ServerStartupException extends HttpServerException {
+
+    /**
+     * @param message The message
+     */
     public ServerStartupException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public ServerStartupException(String message, Throwable cause) {
         super(message, cause);
     }
