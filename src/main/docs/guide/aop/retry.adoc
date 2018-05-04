@@ -63,9 +63,41 @@ In this case `@Retryable` advice will apply the retry policy to the reactive typ
 
 In a Microservice environment retry is useful, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
 
-The Circuit Breaker ap
+The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker] pattern is designed to resolve by essentially allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing any additional retry attempts.
 
+The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member that indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
+
+.Applying CircuitBreaker Advice
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=circuit, indent=0]
+    ...
+}
+----
+
+The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
 
 === Bean Creation Retry
+
+As mentioned previously, `@Retryable` advice is integrated right at the container level. This is useful as it is common problem in Microservices and environments like Docker where there may be a delay in services becoming available.
+
+The following snippets is taken from the Neo4j driver support and demonstrates how bean creation can be wrapped in retry support:
+
+[source,java]
+----
+@Factory // <1>
+public class Neo4jDriverFactory {
+    ...
+    @Retryable(ServiceUnavailableException.class) // <2>
+    @Bean(preDestroy = "close")
+    public Driver buildDriver() {
+        ...
+    }
+}
+----
+
+<1> A factory bean is created that defines methods that create beans
+<2> The `@Retryable` annotation is used try catch `ServiceUnavailableException` and retry creating the driver before failing startup.
+
 
 === Retry Events
