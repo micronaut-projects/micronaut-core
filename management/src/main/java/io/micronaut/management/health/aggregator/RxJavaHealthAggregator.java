@@ -19,6 +19,7 @@ package io.micronaut.management.health.aggregator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
+import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.reactivex.Flowable;
@@ -27,6 +28,7 @@ import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,12 +53,16 @@ import java.util.stream.Collectors;
 @Requires(beans = HealthEndpoint.class)
 public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
+    private final static String KEY_STATUS = "status";
+    private final static String KEY_DESCRIPTION = "description";
+    private final static String KEY_DETAILS = "details";
+
     @Override
-    public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators) {
+    public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
         Flowable<HealthResult> results = aggregateResults(indicators);
         Single<Map<String, Object>> result = results.toList().map(list -> {
             HealthStatus overallStatus = calculateOverallStatus(list);
-            return buildResult(overallStatus, aggregateDetails(list));
+            return buildResult(overallStatus, aggregateDetails(list), healthLevelOfDetail);
         });
         return result.toFlowable();
     }
@@ -102,7 +108,7 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
      */
     protected Object aggregateDetails(List<HealthResult> results) {
         Map<String, Object> details = new HashMap<>(results.size());
-        results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails())));
+        results.forEach(r -> details.put(r.getName(), buildResult(r.getStatus(), r.getDetails(), HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)));
         return details;
     }
 
@@ -112,12 +118,15 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
      * @return A {@link Map} with the results from the health status
      */
     @SuppressWarnings("MagicNumber")
-    protected Map<String, Object> buildResult(HealthStatus status, Object details) {
+    protected Map<String, Object> buildResult(HealthStatus status, Object details, HealthLevelOfDetail healthLevelOfDetail) {
+        if (healthLevelOfDetail == HealthLevelOfDetail.STATUS) {
+            return Collections.singletonMap(KEY_STATUS, status.getName());
+        }
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
-        healthStatus.put("status", status.getName());
-        status.getDescription().ifPresent(description -> healthStatus.put("description", description));
+        healthStatus.put(KEY_STATUS, status.getName());
+        status.getDescription().ifPresent(description -> healthStatus.put(KEY_DESCRIPTION, description));
         if (details != null) {
-            healthStatus.put("details", details);
+            healthStatus.put(KEY_DETAILS, details);
         }
         return healthStatus;
     }

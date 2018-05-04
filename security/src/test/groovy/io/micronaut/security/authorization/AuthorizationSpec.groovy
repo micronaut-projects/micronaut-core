@@ -16,8 +16,8 @@ class AuthorizationSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'authorization',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.interceptUrlMap': [
@@ -28,9 +28,9 @@ class AuthorizationSpec extends Specification {
     ], "test")
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    void "test /health is secured"() {
+    void "test /beans is secured"() {
         when:
-        client.toBlocking().exchange(HttpRequest.GET("/health"))
+        client.toBlocking().exchange(HttpRequest.GET("/beans"))
 
         then:
         HttpClientResponseException e = thrown(HttpClientResponseException)
