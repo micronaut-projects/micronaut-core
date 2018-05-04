@@ -67,7 +67,7 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     /**
      * Constructor.
      *
-     * @param abstractRoute The abstract route builder
+     * @param abstractRoute     The abstract route builder
      * @param conversionService The conversion service
      */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
@@ -305,13 +305,13 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             Object value = argumentValues.get(requiredArgument.getName());
             if (value != null) {
                 String name = resolveInputName(requiredArgument);
-                if(value instanceof UnresolvedArgument) {
+                if (value instanceof UnresolvedArgument) {
                     newVariables.put(name, value);
                 } else {
                     ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
                     Optional converted = conversionService.convert(value, conversionContext);
                     Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if(result != null) {
+                    if (result != null) {
                         newVariables.put(name, result);
                     }
                 }
@@ -327,10 +327,9 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     }
 
     /**
-     * @param argument The argument
+     * @param argument          The argument
      * @param conversionContext The conversion context
-     * @param result An optional result
-     *
+     * @param result            An optional result
      * @return The resolved value or an error
      */
     protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
@@ -348,8 +347,8 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     }
 
     /**
-     * @param newVariables The new variables
-     * @param requiredArguments  The required arguments
+     * @param newVariables      The new variables
+     * @param requiredArguments The required arguments
      * @return A RouteMatch
      */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
