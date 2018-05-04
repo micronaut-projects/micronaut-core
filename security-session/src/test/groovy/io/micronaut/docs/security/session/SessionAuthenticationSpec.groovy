@@ -18,8 +18,10 @@ micronaut:
   security:
     enabled: true
     endpoints:
-      login: true
-      logout: true
+      login:
+        enabled: true
+      logout:
+        enabled: true
     session:
       enabled: true
       loginFailureTargetUrl: /login/authFailed
@@ -30,8 +32,12 @@ micronaut:
             'security': [
                     'enabled': true,
                     'endpoints': [
-                            'login': true,
-                            'logout': true,
+                            'login': [
+                                    'enabled': true,
+                            ],
+                            'logout': [
+                                    'enabled': true,
+                            ],
                     ],
                     'session': [
                             'enabled': true,
