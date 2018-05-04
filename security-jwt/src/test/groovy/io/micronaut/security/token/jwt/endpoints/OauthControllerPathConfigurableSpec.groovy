@@ -7,6 +7,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.endpoints.LoginController
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -17,9 +18,8 @@ class OauthControllerPathConfigurableSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'refreshpathconfigurable',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
             'micronaut.security.enabled': true,
+            'micronaut.security.token.jwt.enabled': true,
             'micronaut.security.endpoints.oauth.enabled': true,
             'micronaut.security.endpoints.oauth.path': '/newtoken',
     ], 'test')
@@ -33,6 +33,9 @@ class OauthControllerPathConfigurableSpec extends Specification {
         given:
         TokenRefreshRequest creds = new TokenRefreshRequest('foo', 'XXXXXXXXXX')
 
+        expect:
+        embeddedServer.applicationContext.getBean(OauthController.class)
+
         when:
         client.toBlocking().exchange(HttpRequest.POST('/oauth/access_token', creds))
 
@@ -41,9 +44,10 @@ class OauthControllerPathConfigurableSpec extends Specification {
         e.status == HttpStatus.UNAUTHORIZED
 
         when:
-        HttpResponse response = client.toBlocking().exchange(HttpRequest.POST('/newtoken', creds))
+        client.toBlocking().exchange(HttpRequest.POST('/newtoken', creds))
 
         then:
-        response.status == HttpStatus.BAD_REQUEST
+        e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 }
