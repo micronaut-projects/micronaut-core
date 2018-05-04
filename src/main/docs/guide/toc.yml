@@ -30,7 +30,7 @@ config:
   propertySource: PropertySources
   valueAnnotation: Configuration Injection
   configurationProperties: Configuration Properties
-  customTypeConveter: Custom Type Converters
+  customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
   # validation: Validating Configuration
