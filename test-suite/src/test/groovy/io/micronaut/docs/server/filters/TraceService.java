@@ -19,7 +19,6 @@ package io.micronaut.docs.server.filters;
 import io.micronaut.http.HttpRequest;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.http.HttpRequest;
 import org.slf4j.*;
 
 import javax.inject.Singleton;

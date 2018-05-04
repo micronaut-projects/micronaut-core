@@ -16,18 +16,10 @@
 package io.micronaut.docs.server.body;
 
 // tag::imports[]
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import io.micronaut.http.annotation.Post;
-
 import javax.inject.Singleton;
 import javax.validation.constraints.Size;
 // end::imports[]

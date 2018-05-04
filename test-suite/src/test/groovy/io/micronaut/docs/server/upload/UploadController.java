@@ -16,26 +16,20 @@
 package io.micronaut.docs.server.upload;
 
 // tag::imports[]
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
-import java.util.Optional;
 // end::imports[]
 
 // tag::completedImports[]
 import io.micronaut.http.multipart.CompletedFileUpload;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 // end::completedImports[]
 /**
  * @author Graeme Rocher
