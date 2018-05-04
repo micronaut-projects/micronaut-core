@@ -23,6 +23,9 @@ import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.reactivex.Single;
 
+import javax.annotation.Nullable;
+import java.security.Principal;
+
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
  *
@@ -44,21 +47,28 @@ public class HealthEndpoint {
 
     private HealthAggregator healthAggregator;
     private HealthIndicator[] healthIndicators;
+    private HealthLevelOfDetailResolver healthLevelOfDetailResolver;
 
     /**
      * @param healthAggregator The {@link HealthAggregator}
      * @param healthIndicators The {@link HealthIndicator}
+     * @param healthLevelOfDetailResolver The {@link HealthLevelOfDetailResolver}
      */
-    public HealthEndpoint(HealthAggregator healthAggregator, HealthIndicator[] healthIndicators) {
+    public HealthEndpoint(HealthAggregator healthAggregator,
+                          HealthIndicator[] healthIndicators,
+                          HealthLevelOfDetailResolver healthLevelOfDetailResolver) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
+        this.healthLevelOfDetailResolver = healthLevelOfDetailResolver;
     }
 
     /**
      * @return The health information as a {@link Single}
      */
     @Read
-    Single getHealth() {
-        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators));
+    Single getHealth(@Nullable Principal principal) {
+
+        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators,
+                healthLevelOfDetailResolver.levelOfDetail(principal)));
     }
 }

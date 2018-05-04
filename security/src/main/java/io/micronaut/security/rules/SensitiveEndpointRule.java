@@ -46,6 +46,7 @@ public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProc
      */
     public static final Integer ORDER = 0;
 
+    private final List<String> ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES = Collections.singletonList("health");
     private final EndpointConfiguration[] endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;
     private Map<Method, Boolean> endpointMethods = new HashMap<>();
@@ -95,11 +96,11 @@ public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProc
                     .findFirst()
                     .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
 
-            boolean sensitive = configuration.isSensitive().orElseGet(() -> {
-                return beanDefinition
-                        .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
-                        .orElse(Endpoint.SENSITIVE);
-            });
+
+            boolean sensitive = ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES.contains(configuration.getId()) ? false :
+                    configuration.isSensitive().orElseGet(() -> beanDefinition
+                    .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
+                    .orElse(Endpoint.SENSITIVE));
 
             endpointMethods.put(method.getTargetMethod(), sensitive);
         });

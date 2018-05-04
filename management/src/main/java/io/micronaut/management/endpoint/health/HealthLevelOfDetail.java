@@ -14,25 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.validator;
+/**
+ *  <p>This class provides a set of common constants for health status  .</p>
+ *
+ * @author Sergio
+ * @since 1.0
+ */
 
-import io.micronaut.core.order.Ordered;
-import io.micronaut.security.authentication.Authentication;
-import org.reactivestreams.Publisher;
+package io.micronaut.management.endpoint.health;
 
 /**
- * Responsible for token validation and claims retrieval.
+ *
+ * <p>This class provides a set of common constants to indicate the level of detail to be included in the Health status response.</p>
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenValidator extends Ordered {
-
-    /**
-     * Validates the provided token and returns the authentication state.
-     *
-     * @param token The token string
-     * @return The {@link Authentication}
-     */
-    Publisher<Authentication> validateToken(String token);
+public enum HealthLevelOfDetail {
+    STATUS_DESCRIPTION_DETAILS,
+    STATUS
 }
