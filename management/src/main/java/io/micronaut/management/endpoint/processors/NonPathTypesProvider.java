@@ -14,25 +14,17 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.validator;
+package io.micronaut.management.endpoint.processors;
 
-import io.micronaut.core.order.Ordered;
-import io.micronaut.security.authentication.Authentication;
-import org.reactivestreams.Publisher;
+import java.util.List;
 
 /**
- * Responsible for token validation and claims retrieval.
+ * Defines a list of types which will not be used as path parameters
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenValidator extends Ordered {
+public interface NonPathTypesProvider {
 
-    /**
-     * Validates the provided token and returns the authentication state.
-     *
-     * @param token The token string
-     * @return The {@link Authentication}
-     */
-    Publisher<Authentication> validateToken(String token);
+    List<Class> nonPathTypes();
 }

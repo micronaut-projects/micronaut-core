@@ -38,7 +38,6 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
@@ -125,16 +124,15 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
 
             //no rule found for the given request, reject
             return rejectionHandler.reject(request, true);
-        }).switchIfEmpty(Flowable.just(securityRules).flatMap( securityRules -> {
+        }).switchIfEmpty(Flowable.just(securityRules).flatMap(securityRules -> {
             request.setAttribute(AUTHENTICATION, null);
             Optional<RouteMatch> routeMatch = getRouteMatch(request);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Failure to authenticate request. {} {}.", method, path);
             }
 
-
             for (SecurityRule rule: securityRules) {
-                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null),null);
+                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), null);
                 if (result == SecurityRuleResult.REJECTED) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());

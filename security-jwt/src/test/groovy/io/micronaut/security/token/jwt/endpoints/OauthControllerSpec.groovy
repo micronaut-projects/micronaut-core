@@ -11,9 +11,13 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
+import io.micronaut.security.token.jwt.generator.claims.JwtClaims
 import io.micronaut.security.token.jwt.render.AccessRefreshToken
 import io.micronaut.security.token.jwt.render.BearerAccessRefreshToken
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
+import io.micronaut.security.token.jwt.validator.JwtTokenValidator
+import io.micronaut.security.token.validator.TokenValidator
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -61,6 +65,7 @@ class OauthControllerSpec extends Specification {
         rsp.body().refreshToken
 
         when:
+        sleep(1_000) // Sleep for one second to give time for Claims issue date to be different
         final String originalAccessToken = rsp.body().accessToken
         final String refreshToken = rsp.body().refreshToken
         def tokenRefreshReq = new TokenRefreshRequest("refresh_token", refreshToken)
@@ -69,9 +74,28 @@ class OauthControllerSpec extends Specification {
         then:
         refreshRsp.status() == HttpStatus.OK
         refreshRsp.body().accessToken
-//
-//        and:
-//        refreshRsp.body().accessToken != originalAccessToken
+        and:
+        refreshRsp.body().accessToken != originalAccessToken
+
+        when:
+        TokenValidator tokenValidator = context.getBean(JwtTokenValidator.class)
+        Map<String, Object> newAccessTokenClaims = Flowable.fromPublisher(tokenValidator.validateToken(refreshRsp.body().accessToken)).blockingFirst().getAttributes()
+        Map<String, Object> originalAccessTokenClaims = Flowable.fromPublisher(tokenValidator.validateToken(originalAccessToken)).blockingFirst().getAttributes()
+        List<String> expectedClaims = [JwtClaims.SUBJECT,
+                                       JwtClaims.ISSUED_AT,
+                                       JwtClaims.EXPIRATION_TIME,
+                                       JwtClaims.NOT_BEFORE,
+                                       "roles"]
+        then:
+        expectedClaims.each { String claimName ->
+            assert newAccessTokenClaims.containsKey(claimName)
+            assert originalAccessTokenClaims.containsKey(claimName)
+        }
+        originalAccessTokenClaims.get(JwtClaims.SUBJECT) == newAccessTokenClaims.get(JwtClaims.SUBJECT)
+        originalAccessTokenClaims.get("roles") == newAccessTokenClaims.get("roles")
+        originalAccessTokenClaims.get(JwtClaims.ISSUED_AT) != newAccessTokenClaims.get(JwtClaims.ISSUED_AT)
+        originalAccessTokenClaims.get(JwtClaims.EXPIRATION_TIME) != newAccessTokenClaims.get(JwtClaims.EXPIRATION_TIME)
+        originalAccessTokenClaims.get(JwtClaims.NOT_BEFORE) != newAccessTokenClaims.get(JwtClaims.NOT_BEFORE)
     }
 
     def "verify validateTokenRefreshRequest"() {

@@ -16,6 +16,7 @@ ioc:
     title: Scopes
     builtInScopes: Built-In Scopes
     refreshable: Refreshable Scope
+    metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   configurations: Bean Configurations
@@ -29,7 +30,7 @@ config:
   propertySource: PropertySources
   valueAnnotation: Configuration Injection
   configurationProperties: Configuration Properties
-  customTypeConveter: Custom Type Converters
+  customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
   # validation: Validating Configuration

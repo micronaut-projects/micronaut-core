@@ -63,6 +63,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.*;
+import java.io.Closeable;
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -97,7 +99,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T> {
+public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinition.class);
 
     @SuppressWarnings("WeakerAccess")
@@ -1642,6 +1644,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             for (Argument argument : arguments) {
                 requiredComponents.add(argument.getType());
             }
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        if(annotationMetadata instanceof DefaultAnnotationMetadata) {
+            ((DefaultAnnotationMetadata)annotationMetadata).flushCache();
         }
     }
 
