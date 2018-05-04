@@ -32,8 +32,8 @@ class EventListenerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'eventlistener',
-            'endpoints.health.enabled': true,
-            'endpoints.health.sensitive': true,
+            'endpoints.beans.enabled': true,
+            'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.endpoints.logout.enabled': true,
