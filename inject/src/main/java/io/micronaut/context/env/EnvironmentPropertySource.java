@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 /**
- * Loads properties from environment variables via {@link System#getenv()}
+ * Loads properties from environment variables via {@link System#getenv()}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,15 +25,18 @@ package io.micronaut.context.env;
 public class EnvironmentPropertySource extends MapPropertySource {
 
     /**
-     * The position of the loader
+     * The position of the loader.
      */
     public static final int POSITION = SystemPropertiesPropertySource.POSITION - 100;
 
     /**
-     * Constant for Environment property source
+     * Constant for Environment property source.
      */
     public static final String NAME = "env";
 
+    /**
+     * Default constructor.
+     */
     public EnvironmentPropertySource() {
         super(NAME, System.getenv());
     }

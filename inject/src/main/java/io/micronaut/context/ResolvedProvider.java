@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import javax.inject.Provider;
 
 /**
- * A resolved provider
+ * A resolved provider.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -27,6 +29,9 @@ class ResolvedProvider<T> implements Provider<T> {
 
     private final T bean;
 
+    /**
+     * @param bean The bean
+     */
     ResolvedProvider(T bean) {
         this.bean = bean;
     }

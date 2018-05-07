@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.condition;
 
 import io.micronaut.context.BeanContext;
@@ -23,15 +24,16 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The ConditionContext passed to a {@link Condition}
+ * The ConditionContext passed to a {@link Condition}.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ConditionContext<T extends AnnotationMetadataProvider> {
 
     /**
-     * The component for which the condition is being evaluated
+     * The component for which the condition is being evaluated.
      *
      * @return Either a {@link io.micronaut.inject.BeanDefinition} or a {@link io.micronaut.inject.BeanConfiguration}
      */
@@ -43,7 +45,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> {
     BeanContext getBeanContext();
 
     /**
-     * Fail the condition with the given message
+     * Fail the condition with the given message.
      *
      * @param failure The failure
      * @return The {@link ConditionContext}
@@ -51,7 +53,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> {
     ConditionContext<T> fail(@Nonnull Failure failure);
 
     /**
-     * Fail the condition with the given message
+     * Fail the condition with the given message.
      *
      * @param failure The failure
      * @return The {@link ConditionContext}

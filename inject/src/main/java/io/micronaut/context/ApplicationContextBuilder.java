@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.env.PropertySource;
@@ -21,34 +22,39 @@ import javax.annotation.Nullable;
 import java.util.Map;
 
 /**
- * An interface for building an application context
+ * An interface for building an application context.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface ApplicationContextBuilder {
+
     /**
-     * Additional singletons to register prior to startup
+     * Additional singletons to register prior to startup.
+     *
      * @param beans The beans
      * @return This builder
      */
-    ApplicationContextBuilder singletons(Object...beans);
+    ApplicationContextBuilder singletons(Object... beans);
+
     /**
-     * The environments to use
+     * The environments to use.
+     *
      * @param environments The environments
      * @return This builder
      */
-    ApplicationContextBuilder environments(@Nullable String...environments);
+    ApplicationContextBuilder environments(@Nullable String... environments);
 
     /**
-     * The packages to include for package scanning
+     * The packages to include for package scanning.
+     *
      * @param packages The packages
      * @return This builder
      */
-    ApplicationContextBuilder packages(@Nullable String...packages);
+    ApplicationContextBuilder packages(@Nullable String... packages);
 
     /**
-     * Properties to override from the environment
+     * Properties to override from the environment.
      *
      * @param properties The properties
      * @return This builder
@@ -57,28 +63,31 @@ public interface ApplicationContextBuilder {
 
 
     /**
-     * Additional property sources
+     * Additional property sources.
      *
      * @param propertySources The property sources to include
      * @return This builder
      */
-    ApplicationContextBuilder propertySources(@Nullable PropertySource...propertySources);
+    ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
 
     /**
      * The main class used by this application.
+     *
      * @param mainClass The main class
      * @return This builder
      */
     ApplicationContextBuilder mainClass(Class mainClass);
 
     /**
-     * The class loader to be used
+     * The class loader to be used.
+     *
      * @param classLoader The classloader
      * @return This builder
      */
     ApplicationContextBuilder classLoader(ClassLoader classLoader);
+
     /**
-     * Builds the {@link ApplicationContext}, but does not start it
+     * Builds the {@link ApplicationContext}, but does not start it.
      *
      * @return The built, but not running {@link ApplicationContext}
      */
@@ -101,7 +110,7 @@ public interface ApplicationContextBuilder {
     ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
-     * Starts the {@link ApplicationContext}
+     * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}
      */

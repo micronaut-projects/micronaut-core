@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains interfaces related to annotation processing
+ * Contains interfaces related to annotation processing.
  *
  * @author graemerocher
  * @since 1.0

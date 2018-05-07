@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
@@ -25,7 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
- * Factory for {@link Bean} qualifiers
+ * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,7 +33,7 @@ import java.util.Optional;
 public class Qualifiers {
 
     /**
-     * Build a qualifier from other qualifiers
+     * Build a qualifier from other qualifiers.
      *
      * @param qualifiers The qualifiers
      * @param <T>        The component type
@@ -44,7 +44,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given name
+     * Build a qualifier for the given name.
      *
      * @param name The name
      * @param <T>  The component type
@@ -55,7 +55,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given annotation
+     * Build a qualifier for the given annotation.
      *
      * @param annotation The annotation
      * @param <T>        The component type
@@ -74,7 +74,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given annotation
+     * Build a qualifier for the given annotation.
      *
      * @param metadata The metadata
      * @param type     The annotation type
@@ -86,12 +86,12 @@ public class Qualifiers {
     }
 
     /**
-     * <p>Build a qualifier for the given annotation. This qualifier will match a candidate under the following circumstances:</p>
-     * <p>
+     * <p>Build a qualifier for the given annotation. This qualifier will match a candidate under the following
+     * circumstances:</p>
+     *
      * <ul>
      * <li>If the <tt>type</tt> parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
      * <li>If the <tt>type</tt> parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
-     * <p>
      * </ul>
      *
      * @param metadata The metadata
@@ -115,7 +115,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given annotation
+     * Build a qualifier for the given annotation.
      *
      * @param stereotype The stereotype
      * @param <T>        The component type
@@ -126,7 +126,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given generic type arguments
+     * Build a qualifier for the given generic type arguments.
      *
      * @param typeArguments The generic type arguments
      * @param <T>           The component type
@@ -137,7 +137,7 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given generic type arguments
+     * Build a qualifier for the given generic type arguments.
      *
      * @param typeArguments The generic type arguments
      * @param <T>           The component type

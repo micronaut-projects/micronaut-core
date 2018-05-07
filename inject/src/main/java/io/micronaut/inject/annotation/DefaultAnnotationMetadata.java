@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
- *
+ * <p>
  * NOTE: Although required to be public This is an internal class and should not be referenced directly in user code
  *
  * @author Graeme Rocher
@@ -70,7 +70,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 if (annotationClass == null) {
                     // all annotations will be on the same type
                     Optional<Class> aClass = ClassUtils.forName(annotationValue.getAnnotationName(), targetType.getClassLoader());
-                    if (!aClass.isPresent()) break;
+                    if (!aClass.isPresent()) {
+                        break;
+                    }
                     annotationClass = aClass.get();
                 }
                 Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, ConvertibleValues.of(annotationValue.getValues()));
@@ -96,7 +98,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     private Environment environment;
 
     /**
-     * Constructs empty annotation metadata
+     * Constructs empty annotation metadata.
      */
     @Internal
     protected DefaultAnnotationMetadata() {
@@ -105,7 +107,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * This constructor is designed to be used by compile time produced subclasses
+     * This constructor is designed to be used by compile time produced subclasses.
      *
      * @param declaredAnnotations     The directly declared annotations
      * @param declaredStereotypes     The directly declared stereotypes
@@ -130,7 +132,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * Configures annotation metadata for the environment. This is an internal method and should not be called directly
+     * Configures annotation metadata for the environment. This is an internal method and should not be called directly.
      *
      * @param context The context
      */
@@ -278,7 +280,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        if (annotationClass == null || annotationMap == null) return null;
+        if (annotationClass == null || annotationMap == null) {
+            return null;
+        }
         String annotationName = annotationClass.getName().intern();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
@@ -293,7 +297,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
-        if (annotationClass == null || declaredAnnotationMap == null) return null;
+        if (annotationClass == null || declaredAnnotationMap == null) {
+            return null;
+        }
         String annotationName = annotationClass.getName().intern();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
@@ -307,13 +313,16 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
 
     @Override
     public Annotation[] getAnnotations() {
-        if (annotationMap == null) return AnnotationUtil.ZERO_ANNOTATIONS;
+        if (annotationMap == null) {
+            return AnnotationUtil.ZERO_ANNOTATIONS;
+        }
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
                 annotations = this.allAnnotationArray;
                 if (annotations == null) {
-                    this.allAnnotationArray = annotations = initializeAnnotations(allAnnotations.keySet());
+                    annotations = initializeAnnotations(allAnnotations.keySet());
+                    this.allAnnotationArray = annotations;
                 }
             }
         }
@@ -322,13 +331,16 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
 
     @Override
     public Annotation[] getDeclaredAnnotations() {
-        if (declaredAnnotationMap == null) return AnnotationUtil.ZERO_ANNOTATIONS;
+        if (declaredAnnotationMap == null) {
+            return AnnotationUtil.ZERO_ANNOTATIONS;
+        }
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
                 annotations = this.declaredAnnotationArray;
                 if (annotations == null) {
-                    this.declaredAnnotationArray = annotations = initializeAnnotations(declaredAnnotations.keySet());
+                    annotations = initializeAnnotations(declaredAnnotations.keySet());
+                    this.declaredAnnotationArray = annotations;
                 }
             }
         }
@@ -338,16 +350,17 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     @Override
     protected AnnotationMetadata clone() throws CloneNotSupportedException {
         return new DefaultAnnotationMetadata(
-                declaredAnnotations != null ? new LinkedHashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new LinkedHashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new LinkedHashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new LinkedHashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new LinkedHashMap<>(annotationsByStereotype) : null
+            declaredAnnotations != null ? new LinkedHashMap<>(declaredAnnotations) : null,
+            declaredStereotypes != null ? new LinkedHashMap<>(declaredStereotypes) : null,
+            allStereotypes != null ? new LinkedHashMap<>(allStereotypes) : null,
+            allAnnotations != null ? new LinkedHashMap<>(allAnnotations) : null,
+            annotationsByStereotype != null ? new LinkedHashMap<>(annotationsByStereotype) : null
         );
     }
 
     /**
-     * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing values replaced
+     * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
      *
      * @param annotation The annotation
      * @param values     The values
@@ -361,10 +374,12 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing values replaced
+     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
      *
-     * @param stereotype The annotation
-     * @param values     The values
+     * @param parentAnnotations The parent annotations
+     * @param stereotype        The annotation
+     * @param values            The values
      */
     @SuppressWarnings("WeakerAccess")
     protected final void addStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
@@ -376,10 +391,12 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing values replaced
+     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
      *
-     * @param stereotype The annotation
-     * @param values     The values
+     * @param parentAnnotations The parent annotations
+     * @param stereotype        The annotation
+     * @param values            The values
      */
     @SuppressWarnings("WeakerAccess")
     protected final void addDeclaredStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
@@ -392,7 +409,8 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the data will be merged with existing values replaced
+     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
+     * data will be merged with existing values replaced.
      *
      * @param annotation The annotation
      * @param values     The values
@@ -405,7 +423,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         }
     }
 
-
+    /**
+     * Dump the values.
+     */
     @SuppressWarnings("unused")
     @Internal
     void dump() {
@@ -419,7 +439,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
                                Map<String, Map<CharSequence, Object>> declaredAnnotations, Map<String,
-            Map<CharSequence, Object>> allAnnotations,
+        Map<CharSequence, Object>> allAnnotations,
                                boolean isDeclared) {
         if (isDeclared && declaredAnnotations != null) {
             putValues(annotation, values, declaredAnnotations);
@@ -459,34 +479,42 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         }
     }
 
+    @SuppressWarnings("MagicNumber")
     private Map<String, Map<CharSequence, Object>> getAllStereotypes() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.allStereotypes;
         if (stereotypes == null) {
-            this.allStereotypes = stereotypes = new HashMap<>(3);
+            stereotypes = new HashMap<>(3);
+            this.allStereotypes = stereotypes;
         }
         return stereotypes;
     }
 
+    @SuppressWarnings("MagicNumber")
     private Map<String, Map<CharSequence, Object>> getDeclaredStereotypesInternal() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.declaredStereotypes;
         if (stereotypes == null) {
-            this.declaredStereotypes = stereotypes = new HashMap<>(3);
+            stereotypes = new HashMap<>(3);
+            this.declaredStereotypes = stereotypes;
         }
         return stereotypes;
     }
 
+    @SuppressWarnings("MagicNumber")
     private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
         Map<String, Map<CharSequence, Object>> annotations = this.allAnnotations;
         if (annotations == null) {
-            this.allAnnotations = annotations = new HashMap<>(3);
+            annotations = new HashMap<>(3);
+            this.allAnnotations = annotations;
         }
         return annotations;
     }
 
+    @SuppressWarnings("MagicNumber")
     private Map<String, Map<CharSequence, Object>> getDeclaredAnnotationsInternal() {
         Map<String, Map<CharSequence, Object>> annotations = this.declaredAnnotations;
         if (annotations == null) {
-            this.declaredAnnotations = annotations = new HashMap<>(3);
+            annotations = new HashMap<>(3);
+            this.declaredAnnotations = annotations;
         }
         return annotations;
     }
@@ -495,10 +523,12 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         return getAnnotationsByStereotypeInternal().computeIfAbsent(stereotype, s -> new HashSet<>());
     }
 
+    @SuppressWarnings("MagicNumber")
     private Map<String, Set<String>> getAnnotationsByStereotypeInternal() {
         Map<String, Set<String>> annotations = this.annotationsByStereotype;
         if (annotations == null) {
-            this.annotationsByStereotype = annotations = new HashMap<>(3);
+            annotations = new HashMap<>(3);
+            this.annotationsByStereotype = annotations;
         }
         return annotations;
     }
@@ -510,8 +540,9 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
                 loaded.ifPresent(aClass -> {
                     Annotation ann = getAnnotation(aClass);
-                    if (ann != null)
+                    if (ann != null) {
                         annotations.add(ann);
+                    }
                 });
             }
             return annotations.toArray(new Annotation[annotations.size()]);
@@ -521,42 +552,40 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     /**
-     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without mutating the existing.</p>
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
+     * mutating the existing.</p>
      *
      * <p>WARNING: for internal use only be the framework</p>
      *
      * @param annotationMetadata The metadata
-     * @param annotationName The annotation name
-     * @param member The member
-     * @param value The value
-     *
+     * @param annotationName     The annotation name
+     * @param member             The member
+     * @param value              The value
      * @return The metadata
      */
     @Internal
     public static AnnotationMetadata mutateMember(
-            AnnotationMetadata annotationMetadata,
-            String annotationName,
-            String member,
-            Object value) {
-        if(StringUtils.isEmpty(annotationName)) {
+        AnnotationMetadata annotationMetadata,
+        String annotationName,
+        String member,
+        Object value) {
+        if (StringUtils.isEmpty(annotationName)) {
             throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
         }
-        if(StringUtils.isEmpty(member)) {
+        if (StringUtils.isEmpty(member)) {
             throw new IllegalArgumentException("Argument [member] cannot be blank");
         }
-        if(value == null) {
+        if (value == null) {
             throw new IllegalArgumentException("Argument [value] cannot be null");
         }
-        if(!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
+        if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             return new DefaultAnnotationMetadata() {{
                 addDeclaredAnnotation(annotationName, Collections.singletonMap(
-                        member, value
+                    member, value
                 ));
             }};
-        }
-        else {
+        } else {
             DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
-
 
             try {
                 defaultMetadata = (DefaultAnnotationMetadata) defaultMetadata.clone();
@@ -565,16 +594,16 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 throw new IllegalStateException("Couldn't clone annotation metadata");
             }
             defaultMetadata
-                    .addDeclaredAnnotation(annotationName, Collections.singletonMap(
+                .addDeclaredAnnotation(annotationName, Collections.singletonMap(
                     member, value
-            ));
+                ));
 
             return defaultMetadata;
         }
     }
 
     /**
-     * Flushes the annotation cache
+     * Flushes the annotation cache.
      */
     @Internal
     public void flushCache() {

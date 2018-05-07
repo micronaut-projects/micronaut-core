@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import java.lang.annotation.Documented;
@@ -20,7 +21,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Allows restricting injection by type. Useful when injection lists of instances that need to be isolated by type
+ * Allows restricting injection by type. Useful when injection lists of instances that need to be isolated by type.
  *
  * @author Graeme Rocher
  * @since 1.0

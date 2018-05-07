@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 
 /**
- * An event fired prior to starting shutdown sequence
+ * An event fired prior to starting shutdown sequence.
  *
  * @author Graeme Rocher
  * @since 1.0

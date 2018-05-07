@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
@@ -32,7 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An abstract implementation that builds {@link AnnotationMetadata}
+ * An abstract implementation that builds {@link AnnotationMetadata}.
  *
  * @param <T> The element type
  * @param <A> The annotation type
@@ -42,7 +43,7 @@ import java.util.Set;
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     /**
-     * Build the meta data for the given element. If the element is a method the class metadata will be included
+     * Build the meta data for the given element. If the element is a method the class metadata will be included.
      *
      * @param element The element
      * @return The {@link AnnotationMetadata}
@@ -50,14 +51,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata build(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
         AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
-        if(metadata.isEmpty()) {
+        if (metadata.isEmpty()) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
         return metadata;
     }
 
     /**
-     * Build the meta data for the given method element excluding any class metadata
+     * Build the meta data for the given method element excluding any class metadata.
      *
      * @param element The element
      * @return The {@link AnnotationMetadata}
@@ -68,7 +69,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the meta data for the given method element excluding any class metadata
+     * Build the meta data for the given method element excluding any class metadata.
      *
      * @param parent  The parent element
      * @param element The element
@@ -80,7 +81,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Get the type of the given annotation
+     * Get the type of the given annotation.
      *
      * @param annotationMirror The annotation
      * @return The type
@@ -88,7 +89,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract T getTypeForAnnotation(A annotationMirror);
 
     /**
-     * Get the given type of the annotation
+     * Get the given type of the annotation.
      *
      * @param annotationMirror The annotation
      * @return The type
@@ -96,7 +97,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getAnnotationTypeName(A annotationMirror);
 
     /**
-     * Obtain the annotations for the given type
+     * Obtain the annotations for the given type.
      *
      * @param element The type element
      * @return The annotations
@@ -104,16 +105,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract List<? extends A> getAnnotationsForType(T element);
 
     /**
-     * Build the type hierarchy for the given element
+     * Build the type hierarchy for the given element.
      *
      * @param element                The element
-     * @param inheritTypeAnnotations
+     * @param inheritTypeAnnotations Whether to inherit type annotations
      * @return The type hierarchy
      */
     protected abstract List<T> buildHierarchy(T element, boolean inheritTypeAnnotations);
 
     /**
-     * Read the given member and value, applying conversions if necessary, and place the data in the given map
+     * Read the given member and value, applying conversions if necessary, and place the data in the given map.
      *
      * @param memberName       The member
      * @param annotationValue  The value
@@ -122,15 +123,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract void readAnnotationRawValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues);
 
     /**
-     * Read the given member and value, applying conversions if necessary, and place the data in the given map
+     * Read the given member and value, applying conversions if necessary, and place the data in the given map.
      *
      * @param memberName      The member
      * @param annotationValue The value
+     * @return The object
      */
     protected abstract Object readAnnotationValue(String memberName, Object annotationValue);
 
     /**
-     * Read the raw annotation values from the given annoatation
+     * Read the raw annotation values from the given annotation.
      *
      * @param annotationMirror The annotation
      * @return The values
@@ -138,7 +140,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract Map<? extends T, ?> readAnnotationRawValues(A annotationMirror);
 
     /**
-     * Resolve the annotations values from the given member for the given type
+     * Resolve the annotations values from the given member for the given type.
      *
      * @param member         The member
      * @param annotationType The type
@@ -147,13 +149,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract OptionalValues<?> getAnnotationValues(T member, Class<?> annotationType);
 
     /**
-     * Read the name of an annotation member
+     * Read the name of an annotation member.
      *
      * @param member The member
      * @return The name
      */
     protected abstract String getAnnotationMemberName(T member);
 
+    /**
+     * @param annotationMirror The annotation
+     * @return The annotation value
+     */
     protected AnnotationValue readNestedAnnotationValue(A annotationMirror) {
         AnnotationValue av;
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationMirror);
@@ -182,11 +188,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Populate the annotation data for the given annotation
+     * Populate the annotation data for the given annotation.
      *
      * @param annotationMirror The annotation
      * @param metadata         the metadata
      * @param isDeclared       Is the annotation a declared annotation
+     * @return The annotation values
      */
     protected Map<CharSequence, Object> populateAnnotationData(
         A annotationMirror,
@@ -211,8 +218,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         String aliasedMemberName = aliasMember.get().toString();
                         Object v = readAnnotationValue(aliasedMemberName, annotationValue);
                         if (v != null) {
-
-
                             if (isDeclared) {
                                 metadata.addDeclaredStereotype(
                                     parentAnnotations,
@@ -254,18 +259,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         for (T currentElement : hierarchy) {
             List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
 
-            if (annotationHierarchy.isEmpty()) continue;
+            if (annotationHierarchy.isEmpty()) {
+                continue;
+            }
             boolean isDeclared = currentElement == element;
 
             for (A annotationMirror : annotationHierarchy) {
                 String annotationName = getAnnotationTypeName(annotationMirror);
-                if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
+                if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                    continue;
+                }
 
                 Map<CharSequence, Object> annotationValues = populateAnnotationData(annotationMirror, annotationMetadata, isDeclared);
 
                 if (isDeclared) {
                     annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
-
                 } else {
                     annotationMetadata.addAnnotation(annotationName, annotationValues);
                 }
@@ -288,7 +296,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         return annotationMetadata;
     }
-
 
     private void buildStereotypeHierarchy(Set<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -22,7 +23,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * Prototype scope is a non-singleton scope that creates a new bean for every injection point
+ * Prototype scope is a non-singleton scope that creates a new bean for every injection point.
  *
  * @author Graeme Rocher
  * @since 1.0

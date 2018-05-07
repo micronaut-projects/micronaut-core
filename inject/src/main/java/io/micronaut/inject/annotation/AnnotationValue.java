@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A type for representation annotation values in order to support {@link java.lang.annotation.Repeatable} annotations
+ * A type for representation annotation values in order to support {@link java.lang.annotation.Repeatable} annotations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,12 +34,19 @@ public class AnnotationValue {
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
 
+    /**
+     * @param annotationName The annotation name
+     * @param values         The values
+     */
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.of(values);
         this.values = values;
     }
 
+    /**
+     * @param annotationName The annotation name
+     */
     @SuppressWarnings("unchecked")
     public AnnotationValue(String annotationName) {
         this.annotationName = annotationName;
@@ -47,6 +54,10 @@ public class AnnotationValue {
         this.values = Collections.EMPTY_MAP;
     }
 
+    /**
+     * @param annotationName    The annotation name
+     * @param convertibleValues The convertible values
+     */
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
         this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
@@ -67,7 +78,7 @@ public class AnnotationValue {
      */
     @SuppressWarnings("unchecked")
     public Map<CharSequence, Object> getValues() {
-        return (Map)convertibleValues.asMap();
+        return (Map) convertibleValues.asMap();
     }
 
     /**
@@ -84,36 +95,34 @@ public class AnnotationValue {
 
     @Override
     public boolean equals(Object obj) {
-        if ( this == obj ) {
+        if (this == obj) {
             return true;
         }
-        if ( obj == null ) {
+        if (obj == null) {
             return false;
         }
-        if ( !AnnotationValue.class.isInstance( obj ) ) {
+        if (!AnnotationValue.class.isInstance(obj)) {
             return false;
         }
 
-        AnnotationValue other = AnnotationValue.class.cast( obj );
+        AnnotationValue other = AnnotationValue.class.cast(obj);
 
         Map<CharSequence, Object> otherValues = other.values;
 
-        if ( values.size() != otherValues.size() ) {
+        if (values.size() != otherValues.size()) {
             return false;
         }
 
         // compare annotation member values
-        for ( Map.Entry<CharSequence, Object> member : values.entrySet() ) {
+        for (Map.Entry<CharSequence, Object> member : values.entrySet()) {
             Object value = member.getValue();
-            Object otherValue = otherValues.get( member.getKey() );
+            Object otherValue = otherValues.get(member.getKey());
 
-            if ( !AnnotationMetadataSupport.areEqual( value, otherValue ) ) {
+            if (!AnnotationMetadataSupport.areEqual(value, otherValue)) {
                 return false;
             }
         }
 
         return true;
     }
-
-
 }

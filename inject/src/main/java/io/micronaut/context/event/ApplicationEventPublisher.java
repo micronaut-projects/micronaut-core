@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 /**
- * <p>Interface for classes that publish events received by {@link ApplicationEventListener} instances</p>
+ * <p>Interface for classes that publish events received by {@link ApplicationEventListener} instances.</p>
  * <p>
  * <p>Note that this interface is designed for application level, non-blocking synchronous events for decoupling code
  * and is not a replacement for a messaging system</p>
@@ -27,7 +28,7 @@ package io.micronaut.context.event;
 public interface ApplicationEventPublisher {
 
     /**
-     * Publish the given event
+     * Publish the given event.
      *
      * @param event The event to publish
      */

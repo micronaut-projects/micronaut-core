@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import io.micronaut.core.bind.annotation.Bindable;
@@ -26,7 +27,7 @@ import java.lang.annotation.Target;
 
 /**
  * <p>Specifies that an argument to a bean constructor is user provided and a
- * {@link io.micronaut.inject.ParametrizedBeanFactory} should be generated</p>
+ * {@link io.micronaut.inject.ParametrizedBeanFactory} should be generated.</p>
  * <p>
  * <p>Should be applied only to constructor arguments and {@link Bean} factory methods</p>
  *

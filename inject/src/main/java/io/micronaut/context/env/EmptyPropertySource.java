@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.env;
 
+package io.micronaut.context.env;
 
 import java.util.Iterator;
 
 /**
- * <p>An {@link PropertySource} that is empty when instantiated. </p>
+ * <p>An {@link PropertySource} that is empty when instantiated.</p>
+ *
  * @author James Kleeh
  * @since 1.0
  */
@@ -27,10 +28,18 @@ public class EmptyPropertySource implements PropertySource {
 
     private final String name;
 
+    /**
+     * Default constructor. Creates an empty property source.
+     */
     public EmptyPropertySource() {
         this("empty");
     }
 
+    /**
+     * Creates a property source with a name.
+     *
+     * @param name The name
+     */
     public EmptyPropertySource(String name) {
         this.name = name;
     }

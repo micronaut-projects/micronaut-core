@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 /**
- * Extends {@link BeanDefinitionVisitor} and adds access to the proxied type name
+ * Extends {@link BeanDefinitionVisitor} and adds access to the proxied type name.
  *
  * @author Graeme Rocher
  * @since 1.0

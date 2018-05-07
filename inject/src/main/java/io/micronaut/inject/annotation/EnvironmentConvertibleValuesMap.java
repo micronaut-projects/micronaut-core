@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
@@ -27,16 +28,20 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Extended version of {@link ConvertibleValuesMap} that resolves placeholders based on the environment
+ * Extended version of {@link ConvertibleValuesMap} that resolves placeholders based on the environment.
  *
+ * @param <V> generic valu
  * @author graemerocher
  * @since 1.0
  */
-class
-EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
+class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
 
     private final Environment environment;
 
+    /**
+     * @param map         A map of values
+     * @param environment The environment
+     */
     EnvironmentConvertibleValuesMap(Map<? extends CharSequence, V> map, Environment environment) {
         super(map, environment);
         this.environment = environment;
@@ -55,19 +60,18 @@ EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
                 a[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
             return environment.convert(a, conversionContext);
-        } else if(value instanceof AnnotationValue[]) {
+        } else if (value instanceof AnnotationValue[]) {
             AnnotationValue[] annotationValues = (AnnotationValue[]) value;
             for (int i = 0; i < annotationValues.length; i++) {
                 AnnotationValue annotationValue = annotationValues[i];
                 annotationValues[i] = new AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
             }
             return environment.convert(annotationValues, conversionContext);
-        } else if(value instanceof AnnotationValue) {
+        } else if (value instanceof AnnotationValue) {
             AnnotationValue av = (AnnotationValue) value;
             av = new AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
             return environment.convert(av, conversionContext);
-        }
-        else {
+        } else {
             return super.get(name, conversionContext);
         }
     }
@@ -92,10 +96,11 @@ EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     }
 
     /**
-     * Creates a new {@link ConvertibleValues} for the values
+     * Creates a new {@link ConvertibleValues} for the values.
      *
-     * @param values A map of values
-     * @param <T>    The target generic type
+     * @param environment The environment
+     * @param values      A map of values
+     * @param <T>         The target generic type
      * @return The values
      */
     static <T> ConvertibleValues<T> of(Environment environment, Map<? extends CharSequence, T> values) {

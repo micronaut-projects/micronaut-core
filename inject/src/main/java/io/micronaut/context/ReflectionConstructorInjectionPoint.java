@@ -13,25 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Modifier;
 
 /**
- * An injection point for a constructor
+ * An injection point for a constructor.
  *
+ * @param <T> The constructor type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,10 +43,10 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
     private Constructor<T> constructor;
 
     /**
-     * @param beanDefinition The bean definition
-     * @param declaringType The declaring type
+     * @param beanDefinition     The bean definition
+     * @param declaringType      The declaring type
      * @param annotationMetadata The annotation metadata
-     * @param arguments      The arguments to the constructor
+     * @param arguments          The arguments to the constructor
      */
     ReflectionConstructorInjectionPoint(
         BeanDefinition beanDefinition,
@@ -61,7 +59,6 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
         this.declaringType = declaringType;
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
     }
-
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
@@ -77,7 +74,6 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
     public boolean requiresReflection() {
         return true;
     }
-
 
     @Override
     public Argument[] getArguments() {
@@ -95,19 +91,27 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
             synchronized (this) { // double check
                 constructor = this.constructor;
                 if (constructor == null) {
-                    this.constructor = constructor = ReflectionUtils.findConstructor(declaringType, Argument.toClassArray(arguments))
-                                                                    .orElseThrow(()->
-                                                                        new BeanInstantiationException(
-                                                                                declaringComponent,
-                                                                               "No constructor found for arguments: " + Argument.toString(arguments)
-                    )
-                                                                    );
+                    constructor = ReflectionUtils.findConstructor(declaringType, Argument.toClassArray(arguments))
+                        .orElseThrow(() ->
+                            new BeanInstantiationException(
+                                declaringComponent,
+                                "No constructor found for arguments: " + Argument.toString(arguments)
+                            )
+                        );
+                    this.constructor = constructor;
                 }
             }
         }
         return constructor;
     }
 
+    /**
+     * @param theConstructor The constructor
+     * @param argumentTypes  The argument types
+     * @param args           The arguments
+     * @param <T>            The constructor type
+     * @return The constructor instance
+     */
     static <T> T invokeConstructor(Constructor<T> theConstructor, Argument[] argumentTypes, Object... args) {
         theConstructor.setAccessible(true);
         if (argumentTypes.length == 0) {

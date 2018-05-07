@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.scope;
 
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
- * An interface for a registry of {@link CustomScope} instances
+ * An interface for a registry of {@link CustomScope} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,7 +28,7 @@ import java.util.Optional;
 public interface CustomScopeRegistry {
 
     /**
-     * Find a custom scope for the given annotation
+     * Find a custom scope for the given annotation.
      *
      * @param scopeAnnotation The scope annotation
      * @return The custom scope
