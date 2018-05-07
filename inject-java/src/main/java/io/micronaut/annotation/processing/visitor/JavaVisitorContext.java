@@ -16,10 +16,10 @@
 
 package io.micronaut.annotation.processing.visitor;
 
-import javax.lang.model.element.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.Messager;
+import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 
 /**
@@ -32,6 +32,9 @@ public class JavaVisitorContext implements VisitorContext {
 
     private final Messager messager;
 
+    /**
+     * @param messager The {@link Messager}
+     */
     public JavaVisitorContext(Messager messager) {
         this.messager = messager;
     }

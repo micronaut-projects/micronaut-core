@@ -31,6 +31,10 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
 
+    /**
+     * @param executableElement  The {@link ExecutableElement}
+     * @param annotationMetadata The annotation metadata
+     */
     JavaMethodElement(ExecutableElement executableElement, AnnotationMetadata annotationMetadata) {
         super(executableElement, annotationMetadata);
         this.executableElement = executableElement;

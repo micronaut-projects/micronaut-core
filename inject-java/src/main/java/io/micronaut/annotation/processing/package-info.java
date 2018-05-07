@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * This package contains the Annotation processors that power Micronaut
+ * This package contains the Annotation processors that power Micronaut.
  *
  * @author graemerocher
  * @since 1.0
