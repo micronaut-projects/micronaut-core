@@ -24,16 +24,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.reactivex.*;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.annotation.Error;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -104,11 +97,11 @@ public class PersonController {
     // end::regular[]
 
     // tag::localError[]
-    public HttpResponse<VndError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
-        VndError error = new VndError("Invalid JSON: " + jsonParseException.getMessage()) // <2>
+    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
+        JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 
-        return HttpResponse.<VndError>status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
+        return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
                 .body(error); // <3>
     }
     // end::localError[]
@@ -121,22 +114,22 @@ public class PersonController {
 
     // tag::globalError[]
     @Error // <1>
-    public HttpResponse<VndError> error(HttpRequest request, Throwable e) {
-        VndError error = new VndError("Bad Things Happened: " + e.getMessage()) // <2>
+    public HttpResponse<JsonError> error(HttpRequest request, Throwable e) {
+        JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 
-        return HttpResponse.<VndError>serverError()
+        return HttpResponse.<JsonError>serverError()
                 .body(error); // <3>
     }
     // end::globalError[]
 
     // tag::statusError[]
     @Error(status = HttpStatus.NOT_FOUND)
-    public HttpResponse<VndError> notFound(HttpRequest request) { // <1>
-        VndError error = new VndError("Page Not Found") // <2>
+    public HttpResponse<JsonError> notFound(HttpRequest request) { // <1>
+        JsonError error = new JsonError("Page Not Found") // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 
-        return HttpResponse.<VndError>notFound()
+        return HttpResponse.<JsonError>notFound()
                 .body(error); // <3>
     }
     // end::statusError[]

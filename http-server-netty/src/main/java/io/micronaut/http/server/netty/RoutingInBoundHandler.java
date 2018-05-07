@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.*;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
@@ -36,7 +37,6 @@ import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyHttpResponse;
@@ -258,7 +258,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    VndError error = newError(request, "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
+                    JsonError error = newError(request, "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
 
                     MutableHttpResponse<Object> defaultResponse = io.micronaut.http.HttpResponse.notAllowed(existingRoutes);
 
@@ -309,7 +309,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (statusRoute.isPresent()) {
                 route = statusRoute.get();
             } else {
-                VndError error = newError(request, "Unsupported Media Type: " + contentType);
+                JsonError error = newError(request, "Unsupported Media Type: " + contentType);
                 MutableHttpResponse<Object> res = io.micronaut.http.HttpResponse
                     .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                     .body(error);
@@ -329,15 +329,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
-        VndError error = newError(request, "Page Not Found");
+        JsonError error = newError(request, "Page Not Found");
         MutableHttpResponse<Object> res = io.micronaut.http.HttpResponse.notFound()
             .body(error);
         emitDefaultErrorResponse(ctx, request, res);
     }
 
-    private VndError newError(io.micronaut.http.HttpRequest<?> request, String message) {
+    private JsonError newError(io.micronaut.http.HttpRequest<?> request, String message) {
         URI uri = request.getUri();
-        return new VndError(message)
+        return new JsonError(message)
             .link(Link.SELF, Link.of(uri));
     }
 
@@ -1045,7 +1045,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         NettyHttpResponse error = (NettyHttpResponse) io.micronaut.http.HttpResponse.serverError()
-            .body(new VndError("Internal Server Error: " + cause.getMessage()));
+            .body(new JsonError("Internal Server Error: " + cause.getMessage()));
         emitDefaultErrorResponse(ctx, nettyHttpRequest, error);
     }
 

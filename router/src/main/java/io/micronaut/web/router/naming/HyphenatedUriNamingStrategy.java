@@ -32,7 +32,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Primary
-public class HyphenatedUriNamingsStrategy implements RouteBuilder.UriNamingStrategy {
+public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrategy {
     @Override
     public String resolveUri(Class type) {
         return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);

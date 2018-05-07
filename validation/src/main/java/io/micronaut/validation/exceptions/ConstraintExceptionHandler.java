@@ -21,9 +21,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.Resource;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 
 import javax.inject.Singleton;
@@ -44,10 +44,10 @@ import java.util.Set;
 @Produces
 @Singleton
 @Requires(classes = {ConstraintViolationException.class, ExceptionHandler.class})
-public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<VndError>> {
+public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintViolationException, HttpResponse<JsonError>> {
 
     @Override
-    public HttpResponse<VndError> handle(HttpRequest request, ConstraintViolationException exception) {
+    public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
 
         if (constraintViolations.size() == 1) {
@@ -68,11 +68,11 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
                 }
             }
             message.append(": ").append(violation.getMessage());
-            VndError error = new VndError(message.toString());
+            JsonError error = new JsonError(message.toString());
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
         } else {
-            VndError error = new VndError(HttpStatus.BAD_REQUEST.getReason());
+            JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
             List<Resource> errors = new ArrayList<>();
             for (ConstraintViolation<?> violation : constraintViolations) {
 
@@ -87,7 +87,7 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
                     message.append(node).append('.');
                 }
                 message.append(':').append(violation.getMessage());
-                errors.add(new VndError(message.toString()));
+                errors.add(new JsonError(message.toString()));
             }
             error.embedded(Resource.EMBEDDED, errors);
             error.link(Link.SELF, Link.of(request.getUri()));

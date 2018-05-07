@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateos.Link
-import io.micronaut.http.hateos.VndError
+import io.micronaut.http.hateos.JsonError
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
@@ -97,7 +97,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_VND_ERROR
+        response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
         result['_links'].self.href == '/json/string'
         result.message.startsWith('Invalid JSON')
     }
@@ -330,7 +330,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Error(JsonParseException)
         HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
             def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
-            def error = new VndError("Invalid JSON: ${jsonParseException.message}")
+            def error = new JsonError("Invalid JSON: ${jsonParseException.message}")
             error.link(Link.SELF, Link.of(request.getUri()))
             response.body(error)
             return response

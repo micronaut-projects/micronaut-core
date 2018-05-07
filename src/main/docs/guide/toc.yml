@@ -52,17 +52,17 @@ httpServer:
   title: The HTTP Server
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
-  producesAnnotation: Response Content-Type
-  consumesAnnotation: Accepted Request Content-Type
   routing: HTTP Routing
-  staticResources: Serving Static Resources
   binding: Simple Request Binding
   requestResponse: The HttpRequest and HttpResponse
+  producesAnnotation: Response Content-Type
+  consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
     jsonBinding: JSON Binding with Jackson
+  staticResources: Serving Static Resources
   contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data

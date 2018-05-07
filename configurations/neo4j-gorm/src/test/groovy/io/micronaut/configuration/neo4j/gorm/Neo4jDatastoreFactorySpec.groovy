@@ -17,14 +17,9 @@ package io.micronaut.configuration.neo4j.gorm
 
 import grails.gorm.annotation.Entity
 import grails.gorm.transactions.Rollback
-import io.micronaut.context.ApplicationContext
 import org.grails.datastore.mapping.validation.ValidationException
 import io.micronaut.configuration.neo4j.bolt.Neo4jBoltSettings
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.hateos.VndError
-import io.micronaut.validation.exceptions.ValidationExceptionHandler
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
