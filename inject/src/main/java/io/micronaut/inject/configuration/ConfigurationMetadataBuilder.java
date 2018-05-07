@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,10 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.naming.NameUtils;
 
 import javax.annotation.Nullable;
+import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -27,7 +29,8 @@ import java.util.List;
 /**
  * <p>A builder for producing metadata for the available {@link ConfigurationProperties}</p>
  * <p>
- * <p>This data can then be subsequently written to a format readable by IDEs (like spring-configuration-metadata.json for example).</p>
+ * <p>This data can then be subsequently written to a format readable by IDEs
+ * (like spring-configuration-metadata.json for example).</p>
  *
  * @param <T> The
  * @author Graeme Rocher
@@ -63,9 +66,9 @@ public abstract class ConfigurationMetadataBuilder<T> {
     public ConfigurationMetadata visitProperties(T type,
                                                  @Nullable String description) {
 
-        String path = buildTypePath(type);
+        String path = buildTypePath(type, type);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
-        configurationMetadata.name = path;
+        configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = getTypeString(type);
         configurationMetadata.description = description;
         this.configurations.add(configurationMetadata);
@@ -75,6 +78,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
     /**
      * Visit a configuration property
      *
+     * @param owningType The type that owns the property
      * @param declaringType The declaring type of the property
      * @param propertyType  The property type
      * @param name          The property name
@@ -82,7 +86,8 @@ public abstract class ConfigurationMetadataBuilder<T> {
      * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
      * @return This property metadata
      */
-    public PropertyMetadata visitProperty(T declaringType,
+    public PropertyMetadata visitProperty(T owningType,
+                                          T declaringType,
                                           String propertyType,
                                           String name,
                                           @Nullable String description,
@@ -91,7 +96,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = getTypeString(declaringType);
         metadata.name = name;
-        metadata.path = buildPropertyPath(declaringType, name);
+        metadata.path = NameUtils.hyphenate( buildPropertyPath(owningType,declaringType, name), true);
         metadata.type = propertyType;
         metadata.description = description;
         metadata.defaultValue = defaultValue;
@@ -102,10 +107,10 @@ public abstract class ConfigurationMetadataBuilder<T> {
     /**
      * Visit a configuration property on the last declared properties instance
      *
-     * @param propertyType  The property type
-     * @param name          The property name
-     * @param description   A description for the property
-     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
+     * @param propertyType The property type
+     * @param name         The property name
+     * @param description  A description for the property
+     * @param defaultValue The default value of the property (only used for constant values such as strings, numbers, enums etc.)
      * @return This property metadata or null if no existing configuration is active
      */
     public PropertyMetadata visitProperty(String propertyType,
@@ -113,12 +118,12 @@ public abstract class ConfigurationMetadataBuilder<T> {
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
 
-        if(!configurations.isEmpty()) {
+        if (!configurations.isEmpty()) {
             ConfigurationMetadata last = configurations.get(configurations.size() - 1);
             PropertyMetadata metadata = new PropertyMetadata();
             metadata.declaringType = last.type;
             metadata.name = name;
-            metadata.path = last.name + "." + name;
+            metadata.path = NameUtils.hyphenate( last.name + "." + name, true) ;
             metadata.type = propertyType;
             metadata.description = description;
             metadata.defaultValue = defaultValue;
@@ -153,19 +158,21 @@ public abstract class ConfigurationMetadataBuilder<T> {
      * <p>
      * <p>Inner classes hierarchies are also taken into account</p>
      *
+     *
+     * @param owningType
      * @param declaringType The declaring type
      * @param propertyName  The property name
      * @return The property path
      */
-    protected abstract String buildPropertyPath(T declaringType, String propertyName);
+    protected abstract String buildPropertyPath(T owningType, T declaringType, String propertyName);
 
     /**
-     * Variation of {@link #buildPropertyPath(Object, String)} for types
+     * Variation of {@link #buildPropertyPath(Object, Object, String)} for types
      *
      * @param declaringType The type
      * @return The type path
      */
-    protected abstract String buildTypePath(T declaringType);
+    protected abstract String buildTypePath(T owningType, T declaringType);
 
     /**
      * Convert the given type to a string
@@ -233,6 +240,6 @@ public abstract class ConfigurationMetadataBuilder<T> {
         out.write('"');
         out.write(name);
         out.write("\":");
-        out.write( quote(value) );
+        out.write(quote(value));
     }
 }

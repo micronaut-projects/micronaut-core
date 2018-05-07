@@ -1,0 +1,8 @@
+A Micronaut's controller action produces `application-json` by default.
+Nonetheless you can change the `Content-Type` of the response with the `@Produces` annotation.
+[source,java]
+----
+include::{testshttpservernetty}/produces/TestController.groovy[tags=clazz, indent=0]
+----
+
+<1> Annotate a controller's action with `@Produces` to change the response content type.

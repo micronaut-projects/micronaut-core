@@ -6,33 +6,35 @@ dependencies {
         compile project(":$proj")
     }
 
-    shadowCompile(group:"javax.validation", name:"validation-api", version:validationVersion)
-    shadowCompile(group:"com.fasterxml.jackson.core", name:"jackson-databind", version:jacksonVersion)
-    shadowCompile(group:"io.reactivex.rxjava2", name:"rxjava", version:rxJava2Version)
-    compile(group:"javax.validation", name:"validation-api", version:validationVersion)
-    compile(group:"com.fasterxml.jackson.core", name:"jackson-databind", version:jacksonVersion)
-    compile(group:"io.reactivex.rxjava2", name:"rxjava", version:rxJava2Version)
+    shadowCompile dependencyVersion("validation")
+    shadowCompile dependencyVersion("jackson")
+    shadowCompile dependencyVersion("rxjava2")
+
+    compile dependencyVersion("validation")
+    compile dependencyVersion("jackson")
+    compile dependencyVersion("rxjava2")
 
     shadowRuntime([
-            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jdk8", version:jacksonVersion],
-            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jsr310", version:jacksonVersion]
+        dependencyVersion('jackson.datatype'),
+        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
     runtime([
-            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jdk8", version:jacksonVersion],
-            [group:"com.fasterxml.jackson.datatype", name:"jackson-datatype-jsr310", version:jacksonVersion]
+        dependencyVersion('jackson.datatype'),
+        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
-    compileOnly "io.projectreactor:reactor-core:$reactorVersion"
-    compileOnly "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
-    compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
+    compileOnly dependencyVersion("reactor")
+    compileOnly dependencyVersion("rxjava1.interop")
+    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly project(":inject-java")
-    testCompile "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
-    testCompile "io.projectreactor:reactor-core:$reactorVersion"
+
+    testCompile dependencyVersion("rxjava1.interop")
+    testCompile dependencyVersion("reactor")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
 
-    testCompile "org.grails:grails-datastore-gorm:$gormVersion"
+    testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
 }
 
 shadowJar {
@@ -47,7 +49,7 @@ shadowJar {
         }
         exclude(project(":core"))
         exclude(dependency("com.fasterxml.*:.*:.*"))
-        exclude(dependency(group:'org.slf4j',name:'slf4j-api',version:slf4jVersion))
+        exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))

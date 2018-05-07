@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,9 @@
 package io.micronaut.docs.server.sse;
 
 // tag::imports[]
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.sse.Event;
 import io.reactivex.Flowable;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.sse.Event;
-import io.micronaut.http.annotation.Get;
 import org.reactivestreams.Publisher;
 // end::imports[]
 

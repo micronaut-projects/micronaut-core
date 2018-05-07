@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.annotation;
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Secondary;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Secondary;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback
+ * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback.
  *
  * @author graemerocher
  * @since 1.0
@@ -36,6 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Executable
 public @interface Fallback {
+
     /**
      * @return The exception types to include (defaults to all)
      */

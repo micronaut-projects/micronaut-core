@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.MongoClientOptions;
@@ -23,7 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
- * The default MongoDB configuration class
+ * The default MongoDB configuration class.
  *
  * @author graemerocher
  * @since 1.0
@@ -36,6 +37,10 @@ public class DefaultMongoConfiguration extends AbstractMongoConfiguration {
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "options")
     protected MongoClientOptions.Builder clientOptions = MongoClientOptions.builder();
 
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     */
     public DefaultMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }

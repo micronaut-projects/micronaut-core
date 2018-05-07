@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,10 @@ class ServerRedirectSpec extends Specification {
         expect:
         client.toBlocking().retrieve("/redirect/$type") == result
 
+        cleanup:
+        client.stop()
+        client.close()
+
         where:
         type        | result
         'permanent' | 'good'
@@ -64,6 +68,10 @@ class ServerRedirectSpec extends Specification {
 
         expect:
         client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book).blockingFirst().title == "The Stand"
+
+        cleanup:
+        client.stop()
+        client.close()
 
         where:
         type        | result

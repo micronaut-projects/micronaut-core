@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,12 +40,12 @@ public class DiscoveryClientCacheConfiguration extends CacheConfiguration implem
     /**
      * The prefix to use for all discovery client settings
      */
-    public static final String CACHE_NAME = "discoveryClient";
+    public static final String CACHE_NAME = "discovery-client";
 
     /**
      * Configuration property name for enabled discovery cache client
      */
-    public static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
+    public static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discovery-client.enabled";
 
     private boolean enabled = true;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Argument;
 
 /**
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
-public interface FunctionInvoker<I,O>  {
+public interface FunctionInvoker<I, O> {
 
     /**
-     * Invoke the given function definition for the given input and expected response type
+     * Invoke the given function definition for the given input and expected response type.
      *
      * @param definition The definition
-     * @param input The input
+     * @param input      The input
      * @param outputType The response type
      * @return The result
      */

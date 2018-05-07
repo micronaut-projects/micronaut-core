@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import java.util.Optional;
  * in adding SSL support to a server
  *
  * @param <T> The server specific type to be built
- *
  * @author James Kleeh
  * @since 1.0
  */
@@ -50,11 +49,10 @@ abstract public class SslBuilder<T> {
         try {
             Optional<KeyStore> store = getTrustStore();
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
-                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(store.orElse(null));
             return trustManagerFactory;
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             throw new SslConfigurationException(ex);
         }
     }
@@ -66,7 +64,7 @@ abstract public class SslBuilder<T> {
                 return Optional.empty();
             }
             trustStoreCache = load(trustStore.getType(),
-                    trustStore.getPath().get(), trustStore.getPassword());
+                trustStore.getPath().get(), trustStore.getPassword());
         }
         return Optional.of(trustStoreCache);
     }
@@ -75,7 +73,7 @@ abstract public class SslBuilder<T> {
         try {
             Optional<KeyStore> keyStore = getKeyStore();
             KeyManagerFactory keyManagerFactory = KeyManagerFactory
-                    .getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                .getInstance(KeyManagerFactory.getDefaultAlgorithm());
             Optional<String> password = ssl.getKey().getPassword();
             char[] keyPassword = password.map(String::toCharArray).orElse(null);
             if (keyPassword == null && ssl.getKeyStore().getPassword().isPresent()) {
@@ -83,8 +81,7 @@ abstract public class SslBuilder<T> {
             }
             keyManagerFactory.init(keyStore.orElse(null), keyPassword);
             return keyManagerFactory;
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             throw new SslConfigurationException(ex);
         }
     }
@@ -96,7 +93,7 @@ abstract public class SslBuilder<T> {
                 return Optional.empty();
             }
             keyStoreCache = load(keyStore.getType(),
-                    keyStore.getPath().get(), keyStore.getPassword());
+                keyStore.getPath().get(), keyStore.getPassword());
         }
         return Optional.of(keyStoreCache);
     }
@@ -116,5 +113,4 @@ abstract public class SslBuilder<T> {
             throw new SslConfigurationException("The resource " + resource + " could not be found");
         }
     }
-
 }

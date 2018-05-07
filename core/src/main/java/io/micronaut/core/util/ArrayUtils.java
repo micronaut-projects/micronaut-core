@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
@@ -21,20 +22,23 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Utility methods for working with arrays
+ * Utility methods for working with arrays.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ArrayUtils {
 
+    /**
+     * An empty object array.
+     */
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     /**
-     * Concatenate two arrays
+     * Concatenate two arrays.
      *
-     * @param a The first array
-     * @param b The second array
+     * @param a   The first array
+     * @param b   The second array
      * @param <T> The array type
      * @return The concatenated array
      */
@@ -42,11 +46,15 @@ public class ArrayUtils {
         int aLen = a.length;
         int bLen = b.length;
 
-        if(bLen == 0) return a;
-        if(aLen == 0) return b;
+        if (bLen == 0) {
+            return a;
+        }
+        if (aLen == 0) {
+            return b;
+        }
 
         @SuppressWarnings("unchecked")
-        T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen+bLen);
+        T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
         System.arraycopy(a, 0, c, 0, aLen);
         System.arraycopy(b, 0, c, aLen, bLen);
 
@@ -54,7 +62,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Whether the given array is empty
+     * Whether the given array is empty.
      *
      * @param array The array
      * @return True if it is
@@ -64,7 +72,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Whether the given array is not empty
+     * Whether the given array is not empty.
      *
      * @param array The array
      * @return True if it is
@@ -74,30 +82,29 @@ public class ArrayUtils {
     }
 
     /**
-     * Produce a string representation of the given array
+     * Produce a string representation of the given array.
+     *
      * @param array The array
      * @return The string representation
      */
-    public static String toString(@Nullable Object...array) {
+    public static String toString(@Nullable Object[] array) {
         String delimiter = ",";
         return toString(delimiter, array);
     }
 
     /**
-     * Produce a string representation of the given array
+     * Produce a string representation of the given array.
      *
      * @param delimiter The delimiter
-     * @param array The array
+     * @param array     The array
      * @return The string representation
      */
-    public static String toString(String delimiter,  @Nullable Object... array) {
-        if(isEmpty(array)) {
+    public static String toString(String delimiter, @Nullable Object[] array) {
+        if (isEmpty(array)) {
             return "";
-        }
-        else {
+        } else {
             List<Object> list = Arrays.asList(array);
             return CollectionUtils.toString(delimiter, list);
         }
     }
-
 }

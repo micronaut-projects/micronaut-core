@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.management.endpoint.health
 
 import io.micronaut.context.ApplicationContext
@@ -16,7 +31,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are available"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
+        ApplicationContext context = ApplicationContext.build("test").build()
         context.registerSingleton(Mock(DataSource))
         context.start()
 
@@ -32,10 +47,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the disk space bean can be disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource("test", ['endpoints.health.disk-space.enabled': false]) })
-
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.disk-space.enabled': false])
 
         expect:
         context.containsBean(HealthEndpoint)
@@ -49,10 +61,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test that jdbc bean can be disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource("test", ['endpoints.health.jdbc.enabled': false]) })
-
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.jdbc.enabled': false])
 
         expect:
         context.containsBean(HealthEndpoint)
@@ -66,9 +75,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are not available with health disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(new MapPropertySource("test", ['endpoints.health.enabled': false]))
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.enabled': false])
 
         expect:
         !context.containsBean(HealthEndpoint)
@@ -82,10 +89,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are not available with all disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource("test", ['endpoints.all.enabled': false]) })
-
-        context.start()
+        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': false])
 
         expect:
         !context.containsBean(HealthEndpoint)
@@ -99,8 +103,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are available with all disabled and health enabled"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource("test", ['endpoints.all.enabled': false, 'endpoints.health.enabled': true]) })
+        ApplicationContext context = ApplicationContext.run(['endpoints.all.enabled': false, 'endpoints.health.enabled': true])
 
         context.start()
 
@@ -150,7 +153,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test health endpoint with a high diskspace threshold"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.health.disk-space.threshold': '999GB'])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling;
 
 /**
- * The names of common task schedulers
+ * The names of common task schedulers.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface TaskExecutors {
+
     /**
-     * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks
+     * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks.
      */
     String IO = "io";
 
     /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks
+     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks.
      */
     String SCHEDULED = "scheduled";
 }

@@ -1,26 +1,21 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.function.executor;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.cli.CommandLine;
-import io.micronaut.function.LocalFunctionRegistry;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.CommandLine;
@@ -34,7 +29,7 @@ import java.io.IOException;
 import java.util.function.Function;
 
 /**
- * A super class that can be used to initialize a function
+ * A super class that can be used to initialize a function.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -45,7 +40,9 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     protected final boolean closeContext;
     private FunctionExitHandler functionExitHandler = new DefaultFunctionExitHandler();
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Constructor.
+     */
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
         this.applicationContext = applicationContext;
@@ -55,7 +52,8 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * Start a function for an existing {@link ApplicationContext}
+     * Start a function for an existing {@link ApplicationContext}.
+     *
      * @param applicationContext The application context
      */
     protected FunctionInitializer(ApplicationContext applicationContext) {
@@ -63,17 +61,18 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * Start a function for an existing {@link ApplicationContext}
+     * Start a function for an existing {@link ApplicationContext}.
+     *
      * @param applicationContext The application context
+     * @param inject inject this into the application flag
      */
     protected FunctionInitializer(ApplicationContext applicationContext, boolean inject) {
         this.applicationContext = applicationContext;
         this.closeContext = false;
-        if(inject) {
+        if (inject) {
             injectThis(applicationContext);
         }
     }
-
 
     @Override
     @Internal
@@ -83,9 +82,8 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
         }
     }
 
-
     /**
-     * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method
+     * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method.
      *
      * @param args     The arguments passed to main
      * @param supplier The function that executes this function
@@ -109,52 +107,64 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
-     * Start this environment
+     * Start this environment.
      *
-     * @param applicationContext
+     * @param applicationContext The application context
      */
     protected void startThis(ApplicationContext applicationContext) {
         startEnvironment(applicationContext);
     }
 
     /**
-     * Injects this instance
+     * Injects this instance.
+     *
      * @param applicationContext The {@link ApplicationContext}
      */
     protected void injectThis(ApplicationContext applicationContext) {
-        if(applicationContext != null) {
+        if (applicationContext != null) {
             applicationContext.inject(this);
         }
     }
 
-
     /**
-     * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type
+     * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type.
      */
     public class ParseContext {
         private final String data;
         private final boolean debug;
 
-        public ParseContext(String[] args) {
+        /**
+         * Constructor.
+         *
+         * @param args command line args
+         */
+        ParseContext(String[] args) {
             CommandLine commandLine = FunctionApplication.parseCommandLine(args);
             debug = commandLine.hasOption(FunctionApplication.DEBUG_OPTIONS);
             data = commandLine.hasOption(FunctionApplication.DATA_OPTION) ? commandLine.optionValue(FunctionApplication.DATA_OPTION).toString() : null;
         }
 
-        public <T> T get(Class<T> type) {
+        /**
+         * Get.
+         *
+         * @param type type
+         * @param <T> generic return type
+         * @return Type
+         */
+        public final <T> T get(Class<T> type) {
             if (data == null) {
                 functionExitHandler.exitWithNoData();
                 return null;
             } else {
                 if (ClassUtils.isJavaLangType(type)) {
                     return applicationContext
-                            .getConversionService()
-                            .convert(data, type).orElseThrow(() -> newIllegalArgument(type, data));
+                        .getConversionService()
+                        .convert(data, type).orElseThrow(() -> newIllegalArgument(type, data));
                 } else {
                     MediaTypeCodecRegistry codecRegistry = applicationContext.getBean(MediaTypeCodecRegistry.class);
                     return codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
-                            .map(codec -> codec.decode(type, data))
-                            .orElseThrow(() -> newIllegalArgument(type, data));
+                        .map(codec -> codec.decode(type, data))
+                        .orElseThrow(() -> newIllegalArgument(type, data));
                 }
             }
         }
@@ -162,6 +172,5 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
         private <T> IllegalArgumentException newIllegalArgument(Class<T> dataType, String data) {
             return new IllegalArgumentException("Passed data [" + data + "] cannot be converted to type: " + dataType);
         }
-
     }
 }

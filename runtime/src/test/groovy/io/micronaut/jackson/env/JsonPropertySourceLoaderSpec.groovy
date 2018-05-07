@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.jackson.env
 
@@ -107,7 +107,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
 }
 '''.bytes))
                 }
-                else {
+                else if(path.endsWith("application.json")) {
                     return Optional.of(new ByteArrayInputStream('''\
 { "hibernate":
     { "cache":
@@ -123,6 +123,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
 }     
 '''.bytes))
                 }
+                return Optional.empty()
             }
         }
 
@@ -132,10 +133,10 @@ class JsonPropertySourceLoaderSpec extends Specification {
 
         then:
         env.get("hibernate.cache.queries", Boolean).get() == false
-        env.get("dataSource.pooled", Boolean).get() == true
-        env.get("dataSource.password", String).get() == 'test'
-        env.get("dataSource.jmxExport", boolean).get() == true
-        env.get("dataSource.something", List).get() == [1,2]
+        env.get("data-source.pooled", Boolean).get() == true
+        env.get("data-source.password", String).get() == 'test'
+        env.get("data-source.jmx-export", boolean).get() == true
+        env.get("data-source.something", List).get() == [1,2]
 
 
 

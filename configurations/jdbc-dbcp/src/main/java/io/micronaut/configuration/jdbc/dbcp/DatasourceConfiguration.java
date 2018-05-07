@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.dbcp;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -37,12 +38,16 @@ import java.sql.SQLException;
  * @author James Kleeh
  * @since 1.0
  */
-@EachProperty(value = "datasources", primary = "default")
+@EachProperty(value = BasicJdbcConfiguration.PREFIX, primary = "default")
 public class DatasourceConfiguration extends BasicDataSource implements BasicJdbcConfiguration {
 
     private final CalculatedSettings calculatedSettings;
     private final String name;
 
+    /**
+     * Constructor.
+     * @param name name configured from properties
+     */
     public DatasourceConfiguration(@Parameter String name) {
         super();
         this.name = name;
@@ -50,9 +55,9 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     }
 
     /**
-     *  Apache DBCP uses the fields instead of using getters to create a
-     *  connection, so the following is required to populate the calculated
-     *  values into the fields.
+     * Apache DBCP uses the fields instead of using getters to create a
+     * connection, so the following is required to populate the calculated
+     * values into the fields.
      */
     @PostConstruct
     void postConstruct() {
@@ -73,11 +78,19 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
         }
     }
 
+    /**
+     * Before this bean is destroyed close the connection.
+     * @throws SQLException exception
+     */
     @PreDestroy
     void preDestroy() throws SQLException {
         this.close();
     }
 
+    /**
+     * Get the name of the bean.
+     * @return name
+     */
     public String getName() {
         return this.name;
     }
@@ -131,5 +144,4 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicJdb
     public String getConfiguredValidationQuery() {
         return super.getValidationQuery();
     }
-
 }

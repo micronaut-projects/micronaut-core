@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
-import java.util.*;
+import java.util.Map;
 
 /**
- * Simple class that provides a map interface over a bean
- *
+ * Simple class that provides a map interface over a bean.
+ * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -29,11 +30,12 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @return The bean type
      */
     Class<T> getBeanType();
+
     /**
-     * Creates a {@link BeanMap} for the given bean
+     * Creates a {@link BeanMap} for the given bean.
      *
      * @param bean The bean
-     * @param <B>
+     * @param <B> type Generic
      * @return The bean map
      */
     static <B> BeanMap<B> of(B bean) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
      * @return Resolves the service ID to use
      */
     public Optional<String> getServiceId() {
-        if(applicationConfiguration != null) {
+        if (applicationConfiguration != null) {
             return applicationConfiguration.getName();
         }
         return Optional.empty();
@@ -85,7 +85,10 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
      * @param defaultZone The default zone
      */
     public void setDefaultZone(List<URL> defaultZone) {
-        this.defaultZone = defaultZone.stream().map(uriMapper()).map(uri-> ServiceInstance.builder(getServiceID(), uri).build())
+        this.defaultZone = defaultZone
+            .stream()
+            .map(uriMapper())
+            .map(uri -> ServiceInstance.builder(getServiceID(), uri).build())
             .collect(Collectors.toList());
     }
 
@@ -101,22 +104,23 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
 
     /**
      * Configures Discovery servers in other zones
+     *
      * @param zones The zones
      */
     public void setZones(Map<String, List<URL>> zones) {
-        if(zones != null) {
+        if (zones != null) {
             this.otherZones = zones.entrySet()
-                    .stream()
-                    .flatMap((Function<Map.Entry<String, List<URL>>, Stream<ServiceInstance>>) entry ->
-                            entry.getValue()
-                                    .stream()
-                                    .map(uriMapper())
-                                    .map(uri ->
-                                            ServiceInstance.builder(getServiceID(), uri)
-                                                    .zone(entry.getKey())
-                                                    .build()
-                                    ))
-                    .collect(Collectors.toList());
+                .stream()
+                .flatMap((Function<Map.Entry<String, List<URL>>, Stream<ServiceInstance>>) entry ->
+                    entry.getValue()
+                        .stream()
+                        .map(uriMapper())
+                        .map(uri ->
+                            ServiceInstance.builder(getServiceID(), uri)
+                                .zone(entry.getKey())
+                                .build()
+                        ))
+                .collect(Collectors.toList());
         }
     }
 
@@ -137,7 +141,8 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     /**
      * @return The Discovery server instance host name. Defaults to 'localhost'.
      **/
-    @Nonnull public String getHost() {
+    @Nonnull
+    public String getHost() {
         return host;
     }
 
@@ -145,7 +150,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
      * @param host The Discovery server host name
      */
     public void setHost(String host) {
-        if(StringUtils.isNotEmpty(host)) {
+        if (StringUtils.isNotEmpty(host)) {
             this.host = host;
         }
     }
@@ -179,11 +184,11 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     @Override
     public String toString() {
         return "DiscoveryClientConfiguration{" +
-                "defaultZone=" + defaultZone +
-                ", host='" + host + '\'' +
-                ", port=" + port +
-                ", secure=" + secure +
-                "} ";
+            "defaultZone=" + defaultZone +
+            ", host='" + host + '\'' +
+            ", port=" + port +
+            ", secure=" + secure +
+            "} ";
     }
 
     /**

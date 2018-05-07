@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.inject.requires
 
@@ -21,6 +21,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.BeanFactory
 
 /**
@@ -28,6 +29,42 @@ import io.micronaut.inject.BeanFactory
  * @since 1.0
  */
 class RequiresSpec extends AbstractTypeElementSpec{
+
+    void "test requires property not equals"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(property="foo", notEquals="bar")
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        ApplicationContext applicationContext = ApplicationContext.build().build()
+        applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
+        applicationContext.environment.start()
+
+        then:
+        beanDefinition.isEnabled(applicationContext)
+
+        when:
+        applicationContext = ApplicationContext.build().build()
+        applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
+        applicationContext.environment.start()
+
+        then:
+        !beanDefinition.isEnabled(applicationContext)
+
+        when:
+        applicationContext = ApplicationContext.build().build()
+        applicationContext.environment.start()
+
+        then:
+        beanDefinition.isEnabled(applicationContext)
+    }
 
     void "test requires classes with classes present"() {
         when:
@@ -79,16 +116,51 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"test")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"test"))
-            it.start()
-        })
+        context.environment.start()
 
         context.registerSingleton(String.class, "foo")
 
         then:
         beanDefinition.isEnabled(context)
+    }
+
+    void "test requires missing beans with no bean present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingBeans=String.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        beanDefinition.isEnabled(new DefaultBeanContext())
+    }
+
+    void "test requires missing beans with bean present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(missingBeans=String.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = new DefaultBeanContext()
+        context.registerSingleton(String.class, "foo")
+
+        then:
+        !beanDefinition.isEnabled(context)
     }
 
     void "test requires beans with no bean present"() {
@@ -128,6 +200,28 @@ class MyBean {
         beanDefinition.isEnabled(context)
     }
 
+
+    void "test requires class with inner class"() {
+        when:
+        BeanDefinitionReference beanDefinition = buildBeanDefinitionReference('test.MyBean', '''
+package test;
+
+import io.micronaut.inject.requires.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(beans=Outer.Inner.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = new DefaultBeanContext()
+        context.registerSingleton(new Outer.Inner())
+
+        then:
+        beanDefinition.isEnabled(context)
+    }
+
     void "test requires environment with environment present"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
@@ -141,7 +235,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo")
+        def context = ApplicationContext.build("foo").build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -160,7 +254,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build()
+        def context = ApplicationContext.build().build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -179,7 +273,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo")
+        def context = ApplicationContext.build("foo").build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -198,7 +292,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build()
+        def context = ApplicationContext.build().build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -218,11 +312,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':true)
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':true))
-            it.start()
-        })
+
+        context.environment.start()
 
 
         then:
@@ -246,9 +339,9 @@ class MyBean {
 
         def context = ApplicationContext
                 .build()
-                .environment( {
-            it.start()
-        })
+                .build()
+
+        context.environment.start()
 
 
         then:
@@ -271,12 +364,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"test")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"test"))
-            it.start()
-        })
 
+        context.environment.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -297,9 +388,9 @@ class MyBean {
 
         def context = ApplicationContext
                 .build()
-                .environment( {
-            it.start()
-        })
+                .build()
+
+        context.environment.start()
 
 
         then:
@@ -320,11 +411,10 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
+                .build('foo.bar':"blah")
                 .build()
-                .environment( {
-            it.addPropertySource(PropertySource.of('foo.bar':"blah"))
-            it.start()
-        })
+
+        context.environment.start()
 
 
         then:

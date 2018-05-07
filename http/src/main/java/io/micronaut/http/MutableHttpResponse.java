@@ -1,26 +1,24 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.cookie.Cookie;
 
 import javax.annotation.Nullable;
 import java.nio.charset.Charset;
-import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -65,7 +63,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
 
     @Override
     default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
-        return (MutableHttpResponse<B>) MutableHttpMessage.super.header(name,value);
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.header(name, value);
     }
 
     @Override
@@ -81,7 +79,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     default MutableHttpResponse<B> characterEncoding(CharSequence encoding) {
         if (encoding != null) {
             getContentType().ifPresent(mediaType ->
-                    contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())))
+                contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())))
             );
         }
         return this;
@@ -110,6 +108,11 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     @Override
     default MutableHttpResponse<B> contentType(MediaType mediaType) {
         return (MutableHttpResponse<B>) MutableHttpMessage.super.contentType(mediaType);
+    }
+
+    @Override
+    default MutableHttpResponse<B> contentEncoding(CharSequence encoding) {
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentEncoding(encoding);
     }
 
     /**
@@ -141,7 +144,6 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
         return status(HttpStatus.valueOf(status), message);
     }
 
-
     /**
      * Sets the response status
      *
@@ -150,6 +152,4 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     default MutableHttpResponse<B> status(HttpStatus status) {
         return status(status, null);
     }
-
-
 }

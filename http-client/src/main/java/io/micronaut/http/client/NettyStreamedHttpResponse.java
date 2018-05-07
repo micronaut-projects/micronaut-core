@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,7 @@
  */
 package io.micronaut.http.client;
 
-import com.typesafe.netty.http.StreamedHttpResponse;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -88,6 +81,11 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
         return attributes;
     }
 
+    /**
+     * Sets the body
+     *
+     * @param body The body
+     */
     public void setBody(B body) {
         this.body = body;
     }

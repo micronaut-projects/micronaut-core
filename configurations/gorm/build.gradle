@@ -1,8 +1,0 @@
-dependencies {
-    compile "org.codehaus.groovy:groovy:$groovyVersion"
-    compileOnly project(":inject-java")
-    compile project(":inject")
-    compile project(":spring")
-
-    compile "org.grails:grails-datastore-gorm:$gormVersion"
-}

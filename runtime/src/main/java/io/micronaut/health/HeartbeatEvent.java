@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.event.AbstractServerApplicationEvent;
-
-import java.util.Optional;
 
 /**
- * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration} that
+ * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,13 +29,17 @@ public class HeartbeatEvent extends AbstractServiceInstanceEvent {
 
     private final HealthStatus status;
 
+    /**
+     * @param source The service instance
+     * @param status The status of health indicator
+     */
     public HeartbeatEvent(ServiceInstance source, HealthStatus status) {
         super(source);
         this.status = status;
     }
 
     /**
-     * This method will return the {@link HealthStatus} if the server is configured to calculate the status
+     * This method will return the {@link HealthStatus} if the server is configured to calculate the status.
      *
      * @return The current health status
      */

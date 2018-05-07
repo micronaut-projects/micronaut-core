@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt.health;
 
 import io.micronaut.context.annotation.Requires;
@@ -22,7 +23,11 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import org.neo4j.driver.v1.*;
+import org.neo4j.driver.v1.AccessMode;
+import org.neo4j.driver.v1.Driver;
+import org.neo4j.driver.v1.Record;
+import org.neo4j.driver.v1.Session;
+import org.neo4j.driver.v1.StatementResultCursor;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -30,7 +35,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A Health Indicator for Neo4j
+ * A Health Indicator for Neo4j.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,6 +47,10 @@ public class Neo4jHealthIndicator implements HealthIndicator {
     public static final String NAME = "neo4j";
     private final Driver boltDriver;
 
+    /**
+     * Constructor.
+     * @param boltDriver driver
+     */
     public Neo4jHealthIndicator(Driver boltDriver) {
         this.boltDriver = boltDriver;
     }
@@ -53,23 +62,21 @@ public class Neo4jHealthIndicator implements HealthIndicator {
 
             Single<HealthResult> healthResultSingle = Single.create(emitter -> {
                 CompletionStage<StatementResultCursor> query =
-                        session.runAsync("MATCH (n) RETURN COUNT(n) AS total");
+                    session.runAsync("MATCH (n) RETURN COUNT(n) AS total");
 
                 query.whenComplete((cursor, throwable) -> {
-                    if(throwable != null) {
+                    if (throwable != null) {
                         emitter.onSuccess(buildErrorResult(throwable));
-                    }
-                    else {
+                    } else {
                         CompletionStage<Record> record = cursor.nextAsync();
                         record.whenComplete((record1, throwable1) -> {
                             try {
-                                if(throwable1 != null) {
+                                if (throwable1 != null) {
                                     emitter.onSuccess(buildErrorResult(throwable1));
-                                }
-                                else {
+                                } else {
                                     HealthResult.Builder status = HealthResult.builder(NAME, HealthStatus.UP);
                                     status.details(Collections.singletonMap(
-                                            "nodes", record1.get("total").asInt()
+                                        "nodes", record1.get("total").asInt()
                                     ));
                                     emitter.onSuccess(status.build());
                                 }
@@ -84,7 +91,7 @@ public class Neo4jHealthIndicator implements HealthIndicator {
             });
 
             return healthResultSingle.toFlowable().subscribeOn(Schedulers.io());
-        }catch (Throwable e) {
+        } catch (Throwable e) {
             return Flowable.just(buildErrorResult(e));
         }
     }

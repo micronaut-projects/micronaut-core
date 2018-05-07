@@ -1,5 +1,5 @@
-package io.micronaut.configurations.aws;/*
- * Copyright 2018 original authors
+/*
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@ package io.micronaut.configurations.aws;/*
  * limitations under the License.
  */
 
+package io.micronaut.configurations.aws;
+
 import com.amazonaws.ClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS client
+ * Configuration options for AWS client.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,5 +30,12 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 public class AWSClientConfiguration extends AWSConfiguration {
 
     @ConfigurationBuilder
-    public ClientConfiguration clientConfiguration = new ClientConfiguration();
+    protected ClientConfiguration clientConfiguration = new ClientConfiguration();
+
+    /**
+     * @return The AWS client configuration
+     */
+    public ClientConfiguration getClientConfiguration() {
+        return clientConfiguration;
+    }
 }

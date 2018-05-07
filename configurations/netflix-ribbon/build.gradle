@@ -3,7 +3,7 @@ dependencies {
     compile project(":inject")
     compile project(":configurations:netflix-archaius")
     compile project(":http-client")
-    compile "com.github.akarnokd:rxjava2-interop:0.12.1"
+    compile dependencyVersion("rxjava1.interop")
     compile 'com.netflix.ribbon:ribbon-loadbalancer:2.2.4', {
         exclude group:'com.netflix.ribbon', module:'ribbon-core'
         exclude group:'com.netflix.archaius', module:'archaius-core'

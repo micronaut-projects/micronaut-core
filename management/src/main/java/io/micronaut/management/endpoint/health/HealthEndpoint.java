@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.health;
 
-import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.health.aggregator.HealthAggregator;
-import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
-import org.reactivestreams.Publisher;
+import io.reactivex.Single;
+
+import javax.annotation.Nullable;
+import java.security.Principal;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -33,20 +35,40 @@ import org.reactivestreams.Publisher;
 @Endpoint(HealthEndpoint.NAME)
 public class HealthEndpoint {
 
-
+    /**
+     * Constant for health.
+     */
     public static final String NAME = "health";
+
+    /**
+     * Prefix for health endpoint.
+     */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     private HealthAggregator healthAggregator;
     private HealthIndicator[] healthIndicators;
+    private HealthLevelOfDetailResolver healthLevelOfDetailResolver;
 
-    public HealthEndpoint(HealthAggregator healthAggregator, HealthIndicator[] healthIndicators) {
+    /**
+     * @param healthAggregator The {@link HealthAggregator}
+     * @param healthIndicators The {@link HealthIndicator}
+     * @param healthLevelOfDetailResolver The {@link HealthLevelOfDetailResolver}
+     */
+    public HealthEndpoint(HealthAggregator healthAggregator,
+                          HealthIndicator[] healthIndicators,
+                          HealthLevelOfDetailResolver healthLevelOfDetailResolver) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
+        this.healthLevelOfDetailResolver = healthLevelOfDetailResolver;
     }
 
+    /**
+     * @return The health information as a {@link Single}
+     */
     @Read
-    Publisher getHealth() {
-        return healthAggregator.aggregate(healthIndicators);
+    Single getHealth(@Nullable Principal principal) {
+
+        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators,
+                healthLevelOfDetailResolver.levelOfDetail(principal)));
     }
 }

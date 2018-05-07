@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
-import io.micronaut.context.annotation.Type;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.function.client.aop.FunctionClientAdvice;
-import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.retry.annotation.Recoverable;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * The {@link FunctionClient} annotation allows applying introduction advise to an interface such that methods

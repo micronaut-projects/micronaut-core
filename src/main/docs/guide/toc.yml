@@ -1,4 +1,10 @@
 introduction: Introduction
+quickStart:
+  title: Quick Start
+  creatingServer: Creating a Server Application
+  ideSetup: Setting up an IDE
+  creatingClient: Creating a Client
+  deployingApp: Deploying the Application
 ioc:
   title: Inversion of Control
   beans: Defining Beans
@@ -10,6 +16,7 @@ ioc:
     title: Scopes
     builtInScopes: Built-In Scopes
     refreshable: Refreshable Scope
+    metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   configurations: Bean Configurations
@@ -23,6 +30,7 @@ config:
   propertySource: PropertySources
   valueAnnotation: Configuration Injection
   configurationProperties: Configuration Properties
+  customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
   # validation: Validating Configuration
@@ -30,11 +38,22 @@ aop:
   title: Aspect Oriented Programming
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
+  validation:
+    title: Validation Advice
   caching: 
-    title: Cache Advice      
+    title: Cache Advice
+  retry:
+    title: Retry Advice
+  scheduling:
+    title: Scheduled Tasks
+  springAop:
+    title: Bridging Spring AOP
 httpServer:
   title: The HTTP Server
-  runningServer: Running the Embedded Server 
+  runningServer: Running the Embedded Server
+  runningSpecificPort: Running Server on a Specific Port
+  producesAnnotation: Response Content-Type
+  consumesAnnotation: Accepted Request Content-Type
   routing: HTTP Routing
   staticResources: Serving Static Resources
   binding: Simple Request Binding
@@ -59,11 +78,42 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
-  clientFilter: HTTP Client Filter
+  lowLevelHttpClient: Using the Low-Level HTTP Client
+  clientAnnotation:
+    title: Compile-Time HTTP Clients with @Client
+    clientParameters: Customizing Parameter Binding
+    clientHeaders: Customizing Request Headers
+    clientRetry: Retry and Circuit Breaker
+    clientFallback: Client Fallbacks
+    clientConfiguration: Configuring HTTP Clients
+  multipartRequest: Multipart Request Handling
+  clientFilter: HTTP Client Filters
 cloud:
-  title: Cloud Deployment
+  title: Cloud Ready Features
   configurationSharing: Configuration Sharing
-  serviceDiscovery: Service Discovery
+  serviceDiscovery:
+    title: Service Discovery
+    serviceDiscoveryConsul: Consul Support
+    serviceDiscoveryEureka: Eureka Support
+    serviceDiscoveryKubernetes: Kubernetes Support
+    serviceDiscoveryRoute53: AWS Route 53 Support
+  clientSideLoadBalancing:
+    title: Client Side Load Balancing
+    netflixRibbon: Netflix Ribbon Support
+  distributedTracing:
+    title: Distributed Tracing
+    zipkin: Tracing with Zipkin
+    jaeger: Tracing with Jaeger
+  serverlessFunctions:
+    title: Serverless Function Support
+    lambdaFunctions: AWS Lambda Function Support
+dataAccess:
+  title: Configurations for Data Access
+  sqlSupport: Configuring a SQL Data Source
+  hibernateSupport: Configuring Hibernate
+  mongoSupport: Configuring MongoDB
+  neo4jSupport: Configuring Neo4j
+  redisSupport: Configuring Redis
 languageSupport:
   title: Language Support
   groovy: Micronaut for Groovy
@@ -78,8 +128,42 @@ management:
   providedEndpoints:
     title: Built-In Endpoints
     beansEndpoint: The Beans Endpoint
+    infoEndpoint: The Info Endpoint
     healthEndpoint: The Health Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     stopEndpoint: The Server Stop Endpoint
+security:
+  title: Security
+  session: Session Authentication
+  token:
+    title: Token Authentication
+    basicAuth: Basic Auth
+    jwt:
+      title: JSON Web Token
+      reader:
+        title: Reading JWT Token
+        bearerToken: Bearer Token Reader
+        cookieToken: Cookie Token Reader
+      jwtGenerator:
+        title: JWT Token Generation
+        jwtGeneratorSignature: JWT Signature
+        jwtGeneratorEncryption: Encrypted JWTs
+      jwtValidation: JWT Token Validation
+  securityRule:
+    title: Security Rules
+    ipPattern: IP Pattern Rule
+    secured: Secured Annotation
+    interceptUrlMap: Intercept URL Map
+    builtInEndpointsAccess: Built-In Endpoints Security
+  render:
+    title: Token Render
+  endpoints:
+    title: Built-In Security Controllers
+    login:
+      title: Login Controller
+      authenticationProviders: Authentication Providers
+    logout: Logout Controller
+    refresh: Refresh Controller
+  securityEvents: Security Events
 

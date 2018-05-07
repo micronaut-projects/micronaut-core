@@ -1,0 +1,26 @@
+The application created in the previous section contains a "main class" located in `src/main/java` that looks like the following:
+
+[source,java]
+----
+package hello.world;
+
+import io.micronaut.runtime.Micronaut;
+
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.run(Application.class);
+    }
+}
+----
+
+This is the class that is run when running the application via Gradle or via deployment. You can also run the main class directly within your IDE if it is configured correctly.
+
+To import project into IntelliJ IDEA by opening the `build.gradle` file or import the project into Eclipse if you have https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip].
+
+
+For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
+
+image::intellij-annotation-processors.png[Intellij Settings,1024,768]
+
+Once you have enabled annotation processing in IntelliJ you can run the application and tests directly within the IDE without the need of an external build tool such as Gradle or Maven.

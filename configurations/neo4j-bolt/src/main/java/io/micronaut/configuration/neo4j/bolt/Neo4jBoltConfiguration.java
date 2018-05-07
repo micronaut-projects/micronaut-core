@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt;
 
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -36,29 +37,32 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Configuration for Bolt Neo4j driver
+ * Configuration for Bolt Neo4j driver.
  *
  * @author graemerocher
  * @since 1.0
  */
 @ConfigurationProperties(Neo4jBoltSettings.PREFIX)
 public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
-
-    private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
+    private static final int RETRY_COUNT_INIT = 3;
 
     @ConfigurationBuilder(prefixes = "with", allowZeroArgs = true)
     protected Config.ConfigBuilder config = Config.build();
 
+    private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
     private AuthToken authToken;
     private String username;
     private String password;
-    private int retryCount = 3;
+    private int retryCount = RETRY_COUNT_INIT;
     private Duration retryDelay = Duration.of(1, ChronoUnit.SECONDS);
     private Neo4jEmbeddedSettings embeddedSettings = new Neo4jEmbeddedSettings();
 
+    /**
+     * Constructor.
+     */
     public Neo4jBoltConfiguration() {
         config.withLogging(name -> new Logger() {
-            org.slf4j.Logger logger = LoggerFactory.getLogger(name);
+            private org.slf4j.Logger logger = LoggerFactory.getLogger(name);
 
             @Override
             public void error(String message, Throwable cause) {
@@ -103,7 +107,14 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * Set a {@link List} of Neo4J {@link URI}
+     * @return The Neo4j URIs
+     */
+    public List<URI> getUris() {
+        return uris;
+    }
+
+    /**
+     * Set a {@link List} of Neo4J {@link URI}.
      *
      * @param uris The list of URIs
      */
@@ -114,7 +125,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * Set a single {@link URI}
+     * Set a single {@link URI}.
      *
      * @param uri A single Neo4j URI
      */
@@ -149,15 +160,9 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
      * @param retryDelay The delay between retry attempts
      */
     public void setRetryDelay(Duration retryDelay) {
-        if (retryDelay != null)
+        if (retryDelay != null) {
             this.retryDelay = retryDelay;
-    }
-
-    /**
-     * @return The Neo4j URIs
-     */
-    public List<URI> getUris() {
-        return uris;
+        }
     }
 
     /**
@@ -188,6 +193,14 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
+     * @param authToken The {@link AuthToken}
+     */
+    @Inject
+    public void setAuthToken(@Nullable AuthToken authToken) {
+        this.authToken = authToken;
+    }
+
+    /**
      * @param username The username
      */
     public void setUsername(String username) {
@@ -212,11 +225,10 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * @param authToken The {@link AuthToken}
+     * @return The settings for the embedded Neo4j server
      */
-    @Inject
-    public void setAuthToken(@Nullable AuthToken authToken) {
-        this.authToken = authToken;
+    public Neo4jEmbeddedSettings getEmbeddedSettings() {
+        return embeddedSettings;
     }
 
     /**
@@ -228,14 +240,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
-     * @return The settings for the embedded Neo4j server
-     */
-    public Neo4jEmbeddedSettings getEmbeddedSettings() {
-        return embeddedSettings;
-    }
-
-    /**
-     * The configuration settings for the embedded Neo4j
+     * The configuration settings for the embedded Neo4j.
      */
     @ConfigurationProperties("embedded")
     public static class Neo4jEmbeddedSettings implements Toggleable {

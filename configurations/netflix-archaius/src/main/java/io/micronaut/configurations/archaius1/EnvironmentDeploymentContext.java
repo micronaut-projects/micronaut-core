@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.archaius1;
 
 import com.netflix.config.ConfigurationBasedDeploymentContext;
@@ -29,40 +30,41 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 /**
- * A {@link com.netflix.config.DeploymentContext} that bridges to the current {@link Environment}
+ * A {@link com.netflix.config.DeploymentContext} that bridges to the current {@link Environment}.
  *
  * @author Graeme Rocher
- *
  * @since 1.0
  */
 @Context
-public class EnvironmentDeploymentContext implements DeploymentContext, ApplicationEventListener<ServiceStartedEvent>, Closeable{
+public class EnvironmentDeploymentContext implements DeploymentContext, ApplicationEventListener<ServiceStartedEvent>, Closeable {
 
     private final Environment environment;
     private ServiceInstance instance;
     private Map<ContextKey, String> customSettings = new ConcurrentHashMap<>();
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public EnvironmentDeploymentContext(EnvironmentConfiguration environment) {
         this.environment = environment.getEnvironment();
-        if(!ConfigurationManager.isConfigurationInstalled()) {
+        if (!ConfigurationManager.isConfigurationInstalled()) {
             ConfigurationManager.install(environment);
         }
     }
 
     @Override
     public String getDeploymentEnvironment() {
-        if(customSettings.containsKey(ContextKey.environment)) {
+        if (customSettings.containsKey(ContextKey.environment)) {
             return customSettings.get(ContextKey.environment);
         }
         Set<String> activeNames = environment.getActiveNames();
-        if(!activeNames.isEmpty()) {
+        if (!activeNames.isEmpty()) {
             return activeNames.iterator().next();
         }
         return Environment.DEFAULT_NAME;
@@ -75,10 +77,9 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getDeploymentDatacenter() {
-        if(customSettings.containsKey(ContextKey.datacenter)) {
+        if (customSettings.containsKey(ContextKey.datacenter)) {
             return customSettings.get(ContextKey.datacenter);
-        }
-        else if(instance != null) {
+        } else if (instance != null) {
             return instance.getZone().orElse(null);
         }
         return null;
@@ -91,10 +92,9 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getApplicationId() {
-        if(customSettings.containsKey(ContextKey.appId)) {
+        if (customSettings.containsKey(ContextKey.appId)) {
             return customSettings.get(ContextKey.appId);
-        }
-        else if(instance != null) {
+        } else if (instance != null) {
             return instance.getId();
         }
         return Environment.DEFAULT_NAME;
@@ -112,10 +112,9 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getDeploymentServerId() {
-        if(customSettings.containsKey(ContextKey.serverId)) {
+        if (customSettings.containsKey(ContextKey.serverId)) {
             return customSettings.get(ContextKey.serverId);
-        }
-        else if(instance != null) {
+        } else if (instance != null) {
             return instance.getInstanceId().orElse(null);
         }
         return null;
@@ -129,13 +128,22 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     @Override
     public String getValue(ContextKey key) {
         switch (key) {
-            case appId: return getApplicationId();
-            case zone: return getZone();
-            case environment: return getDeploymentEnvironment();
-            case stack: return getDeploymentStack();
-            case region: return getDeploymentRegion();
-            case serverId: return getDeploymentServerId();
-            case datacenter: return getDeploymentDatacenter();
+            case appId:
+                return getApplicationId();
+            case zone:
+                return getZone();
+            case environment:
+                return getDeploymentEnvironment();
+            case stack:
+                return getDeploymentStack();
+            case region:
+                return getDeploymentRegion();
+            case serverId:
+                return getDeploymentServerId();
+            case datacenter:
+                return getDeploymentDatacenter();
+            default:
+                break;
         }
         return null;
     }
@@ -144,12 +152,16 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     public void setValue(ContextKey key, String value) {
         switch (key) {
             case datacenter:
-                setDeploymentDatacenter(value); break;
+                setDeploymentDatacenter(value);
+                break;
             case region:
-                setDeploymentRegion(value); break;
+                setDeploymentRegion(value);
+                break;
             case stack:
-                setDeploymentStack(value); break;
-        }
+                setDeploymentStack(value);
+                break;
+            default:
+                break;        }
     }
 
     @Override
@@ -159,20 +171,21 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getDeploymentRegion() {
-        if(customSettings.containsKey(ContextKey.region)) {
+        if (customSettings.containsKey(ContextKey.region)) {
             return customSettings.get(ContextKey.region);
-        }
-        else if(instance != null) {
+        } else if (instance != null) {
             return instance.getRegion().orElse(null);
         }
         return null;
     }
 
+    /**
+     * @return The availability zone
+     */
     public String getZone() {
-        if(customSettings.containsKey(ContextKey.zone)) {
+        if (customSettings.containsKey(ContextKey.zone)) {
             return customSettings.get(ContextKey.zone);
-        }
-        else if(instance != null) {
+        } else if (instance != null) {
             return instance.getZone().orElse(null);
         }
         return null;
@@ -187,7 +200,7 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     public void onApplicationEvent(ServiceStartedEvent event) {
         this.instance = event.getSource();
         ConfigurationManager.setDeploymentContext(
-                this
+            this
         );
     }
 
@@ -203,10 +216,9 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     }
 
     private void setContextValue(ContextKey key, String env) {
-        if(env == null) {
+        if (env == null) {
             customSettings.remove(key);
-        }
-        else {
+        } else {
             customSettings.put(key, env);
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
-import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
-import io.micronaut.context.BeanContext;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
@@ -37,85 +35,79 @@ import java.util.Optional;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
- *
+ * <p>
  * <ul>
  *     <li>If a reference starts with '/' then we attempt to look up the {@link EmbeddedServer}</li>
  *     <li>If the reference contains a '/' assume it is a URL and try to create a URL reference to it</li>
  *     <li>Otherwise delegate to the {@link DiscoveryClient} to attempt to resolve the URIs</li>
  * </ul>
  *
- *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
+
     private final Map<String, ServiceInstanceList> serviceInstanceLists;
     private final BeanContext beanContext;
 
     /**
      * The default server loadbalance resolver
      *
-     * @param beanContext The bean context
+     * @param beanContext          The bean context
      * @param serviceInstanceLists Any other providers
      */
     public DefaultLoadBalancerResolver(
-            BeanContext beanContext,
-            ServiceInstanceList...serviceInstanceLists) {
+        BeanContext beanContext,
+        ServiceInstanceList... serviceInstanceLists) {
         this.beanContext = beanContext;
-        if(ArrayUtils.isNotEmpty(serviceInstanceLists)) {
+        if (ArrayUtils.isNotEmpty(serviceInstanceLists)) {
             this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.length);
             for (ServiceInstanceList provider : serviceInstanceLists) {
                 this.serviceInstanceLists.put(provider.getID(), provider);
             }
-        }
-        else {
+        } else {
             this.serviceInstanceLists = Collections.emptyMap();
         }
     }
 
     @Override
     public Optional<? extends LoadBalancer> resolve(String... serviceReferences) {
-        if(ArrayUtils.isEmpty(serviceReferences) || StringUtils.isEmpty(serviceReferences[0])) {
+        if (ArrayUtils.isEmpty(serviceReferences) || StringUtils.isEmpty(serviceReferences[0])) {
             return Optional.empty();
         }
         String reference = serviceReferences[0];
 
-
-        if(reference.startsWith("/")) {
+        if (reference.startsWith("/")) {
             // current server reference
-            if(beanContext.containsBean(EmbeddedServer.class)) {
+            if (beanContext.containsBean(EmbeddedServer.class)) {
                 EmbeddedServer embeddedServer = beanContext.getBean(EmbeddedServer.class);
                 URL url = embeddedServer.getURL();
                 return Optional.of(LoadBalancer.fixed(url));
-            }
-            else {
+            } else {
                 return Optional.empty();
             }
-        }
-        else if(reference.indexOf('/') > -1) {
+        } else if (reference.indexOf('/') > -1) {
             try {
                 URL url = new URL(reference);
                 return Optional.of(LoadBalancer.fixed(url));
             } catch (MalformedURLException e) {
                 return Optional.empty();
             }
-        }
-        else {
+        } else {
+            reference = NameUtils.hyphenate(reference);
             return resolveLoadBalancerForServiceID(reference);
         }
     }
 
     protected Optional<? extends LoadBalancer> resolveLoadBalancerForServiceID(String serviceID) {
-        if(serviceInstanceLists.containsKey(serviceID)) {
+        if (serviceInstanceLists.containsKey(serviceID)) {
             ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
             LoadBalancer loadBalancer = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList);
             return Optional.ofNullable(loadBalancer);
-        }
-        else {
+        } else {
             LoadBalancer loadBalancer = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceID);
             return Optional.of(loadBalancer);
         }
     }
-
 }

@@ -7,7 +7,7 @@ shadowJar {
         exclude(project(":inject"))
         exclude(project(":core"))
 
-        exclude(dependency(group:'org.slf4j',name:'slf4j-api',version:slf4jVersion))
+        exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))
@@ -30,19 +30,19 @@ dependencies {
 
     compileOnly project(":aop")
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    compileOnly 'javax.validation:validation-api:2.0.0.Final'
+    compileOnly dependencyVersion("validation")
 
     testCompile project(":aop")
     testCompile project(":runtime")
-    testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+    testCompile dependencyVersion("rxjava2")
     testCompile "org.hibernate:hibernate-core:5.1.5.Final"
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
-    testCompile 'org.mongodb:mongo-java-driver:3.6.1'
+    testCompile dependencyVersion("mongodb")
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 

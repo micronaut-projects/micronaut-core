@@ -1,39 +1,38 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.server.netty;
 
-import com.typesafe.netty.http.StreamedHttpMessage;
+import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
-import io.micronaut.core.async.processor.SingleSubscriberProcessor;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.server.HttpServerConfiguration;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes
+ * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberProcessor<ByteBufHolder,T> implements HttpContentProcessor<T> {
+public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberProcessor<ByteBufHolder, T> implements HttpContentProcessor<T> {
 
     protected final NettyHttpRequest nettyHttpRequest;
     protected final long advertisedLength;
@@ -41,6 +40,10 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
 
+    /**
+     * @param nettyHttpRequest The {@link NettyHttpRequest}
+     * @param configuration    The {@link HttpServerConfiguration}
+     */
     public AbstractHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.advertisedLength = nettyHttpRequest.getContentLength();
@@ -49,7 +52,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     }
 
     /**
-     * Called after verifying the data of the message
+     * Called after verifying the data of the message.
      *
      * @param message The message
      */
@@ -65,15 +68,13 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
-        if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
+        if ((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
             fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
-        }
-        else {
+        } else {
             long serverMax = configuration.getMultipart().getMaxFileSize();
-            if( receivedLength > serverMax ) {
+            if (receivedLength > serverMax) {
                 fireExceedsLength(receivedLength, serverMax);
-            }
-            else {
+            } else {
                 onData(message);
             }
         }

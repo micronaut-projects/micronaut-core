@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.configuration.hibernate.gorm
 
@@ -22,6 +22,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.PropertySource
+import org.grails.datastore.mapping.validation.ValidationException
 import org.grails.orm.hibernate.cfg.Settings
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -41,13 +42,33 @@ import javax.sql.DataSource
  */
 class GormConfigSpec extends Specification {
 
-    void "test gorm config configures gorm"() {
+    void "test beans for custom data source"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment
-                .addPackage(getClass().getPackage())
-                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop']))
-        applicationContext.start()
+        ApplicationContext applicationContext = ApplicationContext.build(
+                [(Settings.SETTING_DB_CREATE):'create-drop',
+                 'dataSource.url':'jdbc:h2:mem:someOtherDb',
+                 'dataSource.properties.initialSize':25]
+                )
+                .mainClass(GormConfigSpec)
+                .start()
+
+
+        DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource.targetDataSource
+
+        expect:
+        dataSource.poolProperties.url == 'jdbc:h2:mem:someOtherDb'
+        dataSource.poolProperties.initialSize == 25
+
+        cleanup:
+        applicationContext.close()
+    }
+
+
+    void "test gorm configured correctly"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.build([(Settings.SETTING_DB_CREATE):'create-drop'])
+                                                                  .mainClass(GormConfigSpec)
+                                                                  .start()
 
         when:
         TransactionService transactionService = applicationContext.getBean(TransactionService)
@@ -71,7 +92,7 @@ class GormConfigSpec extends Specification {
         applicationContext.stop()
     }
 
-    void "test gorm config configures gorm again"() {
+    void "test gorm configured correctly again"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
@@ -90,6 +111,23 @@ class GormConfigSpec extends Specification {
         applicationContext.containsBean(DataSource)
         count == 0
 
+        when:
+        Book.withNewSession {
+            new Book(title: "").save()
+        }
+
+        then:
+        def e = thrown(ValidationException)
+
+        when:
+        count = transactionService.withTransaction {
+            new Book(title: "the stand").save()
+            Book.count
+        }
+
+        then:
+        count == 1
+
         cleanup:
         applicationContext.stop()
     }
@@ -98,13 +136,17 @@ class GormConfigSpec extends Specification {
 @Entity
 class Book {
     String title
+
+    static constraints = {
+        title blank:false
+    }
 }
 
 @Service(Book)
 @Singleton
 abstract class BookService {
 
-    @Value('${dataSource.dbCreate}')
+    @Value('${data-source.db-create}')
     String dbCreate
 
     abstract List<Book> list()

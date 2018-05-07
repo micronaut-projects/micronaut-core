@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.event;
 
-import io.micronaut.context.event.ApplicationEvent;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.retry.RetryState;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
 
 /**
  * An event fired when the Circuit is {@link io.micronaut.retry.CircuitState#OPEN} and
- * requests are no longer being accepted
+ * requests are no longer being accepted.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class CircuitOpenEvent extends ApplicationEvent {
+
     private final RetryState retryState;
     private final Throwable throwable;
 
+    /**
+     * @param source     A compile time produced invocation of a method call
+     * @param retryState Encapsulate the current state of {@link io.micronaut.retry.annotation.Retryable} operation.
+     * @param throwable  The cause
+     */
     public CircuitOpenEvent(
-            ExecutableMethod<?,?> source,
-            RetryState retryState,
-            Throwable throwable) {
+        ExecutableMethod<?, ?> source,
+        RetryState retryState,
+        Throwable throwable) {
+
         super(source);
         this.retryState = retryState;
         this.throwable = throwable;
@@ -60,7 +65,7 @@ public class CircuitOpenEvent extends ApplicationEvent {
      * @return The method that represents the circuit
      */
     @Override
-    public ExecutableMethod<?,?> getSource() {
+    public ExecutableMethod<?, ?> getSource() {
         return (ExecutableMethod<?, ?>) super.getSource();
     }
 }

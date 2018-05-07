@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router.resource;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Stores configuration for the loading of static resources
+ * Stores configuration for the loading of static resources.
  *
  * @author James Kleeh
  * @since 1.0
@@ -36,7 +37,7 @@ import java.util.Optional;
 public class StaticResourceConfiguration implements Toggleable {
 
     /**
-     * The prefix for static resources configuration
+     * The prefix for static resources configuration.
      */
     public static final String PREFIX = "router.static.resources";
 
@@ -46,6 +47,9 @@ public class StaticResourceConfiguration implements Toggleable {
 
     private final ResourceResolver resourceResolver;
 
+    /**
+     * @param resourceResolver The {@linkplain ResourceResolver}
+     */
     public StaticResourceConfiguration(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
     }

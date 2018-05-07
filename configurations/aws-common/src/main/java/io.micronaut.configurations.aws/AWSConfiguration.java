@@ -1,5 +1,5 @@
-package io.micronaut.configurations.aws;/*
- * Copyright 2018 original authors
+/*
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@ package io.micronaut.configurations.aws;/*
  * limitations under the License.
  */
 
+package io.micronaut.configurations.aws;
+
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Configuration options for AWS
+ * Configuration options for AWS.
  *
  * @author graemerocher
  * @since 1.0
@@ -26,7 +28,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 public class AWSConfiguration {
 
     /**
-     * Prefix for all AWS settings
+     * Prefix for all AWS settings.
      */
     public static final String PREFIX = "aws";
 }

@@ -1,11 +1,13 @@
 dependencies {
-    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compile dependencyVersion("groovy")
     compileOnly project(":inject-groovy")
+    compileOnly project(":inject-java")
     compile project(":runtime-groovy")
     compile project(":inject")
     compile project(":spring")
+    compile project(":configurations:gorm-common")
     testCompile project(":inject-groovy")
-    compile "org.grails:grails-datastore-gorm-hibernate5:$gormVersion"
+    compile dependencyModuleVersion("gorm", "grails-datastore-gorm-hibernate5")
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
 }

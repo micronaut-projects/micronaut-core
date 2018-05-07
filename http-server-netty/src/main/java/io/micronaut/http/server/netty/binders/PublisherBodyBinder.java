@@ -1,35 +1,24 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.binders;
 
-import com.typesafe.netty.http.StreamedHttpRequest;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
-import io.netty.buffer.ByteBufHolder;
-import io.micronaut.context.BeanLocator;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
@@ -46,6 +35,7 @@ import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
+import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
@@ -53,7 +43,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * A {@link Body} argument binder for a reactive streams {@link Publisher}
+ * A {@link io.micronaut.http.annotation.Body} argument binder for a reactive streams {@link Publisher}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -64,6 +54,11 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
 
+    /**
+     * @param conversionService       The conversion service
+     * @param beanLocator             The bean locator
+     * @param httpServerConfiguration The Http server configuration
+     */
     public PublisherBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
         super(conversionService);
         this.beanLocator = beanLocator;
@@ -82,13 +77,14 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
                 Optional<MediaType> contentType = source.getContentType();
-                HttpContentProcessor<?> processor = contentType.flatMap(type ->
-                        beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                new ConsumesMediaTypeQualifier<>(type))
-                ).map(factory ->
-                        factory.build(nettyHttpRequest)
-                ).orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
-                return ()-> Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
+                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                HttpContentProcessor<?> processor = contentType
+                    .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
+                    .map(factory -> factory.build(nettyHttpRequest))
+                    .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+
+                //noinspection unchecked
+                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
@@ -97,20 +93,18 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
                     @Override
                     protected void doOnNext(Object message) {
-                        ArgumentConversionContext<?> conversionContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                        if(message instanceof ByteBufHolder) {
-                            message = ((ByteBufHolder)message).content();
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
+                        if (message instanceof ByteBufHolder) {
+                            message = ((ByteBufHolder) message).content();
                         }
                         Optional<?> converted = conversionService.convert(message, conversionContext);
-                        if(converted.isPresent()) {
+                        if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
-                        }
-                        else {
+                        } else {
                             Optional<ConversionError> lastError = conversionContext.getLastError();
-                            if(lastError.isPresent()) {
+                            if (lastError.isPresent()) {
                                 subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
-                            }
-                            else {
+                            } else {
                                 subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
                             }
                         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanContext;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
-import org.reactivestreams.Publisher;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
+
+import java.util.Collections;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -33,13 +36,22 @@ public class BeansEndpoint {
     private BeanContext beanContext;
     private BeanDefinitionDataCollector beanDefinitionDataCollector;
 
+    /**
+     * @param beanContext                 The {@link BeanContext}
+     * @param beanDefinitionDataCollector The {@link BeanDefinitionDataCollector}
+     */
     public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector beanDefinitionDataCollector) {
         this.beanContext = beanContext;
         this.beanDefinitionDataCollector = beanDefinitionDataCollector;
     }
 
+    /**
+     * @return A {@link org.reactivestreams.Publisher} with the beans
+     */
     @Read
-    public Publisher getBeans() {
-        return beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions());
+    public Single getBeans() {
+        return Flowable
+            .fromPublisher(beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions()))
+            .first(Collections.emptyMap());
     }
 }

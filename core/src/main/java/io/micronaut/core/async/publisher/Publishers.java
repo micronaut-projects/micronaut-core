@@ -1,33 +1,34 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.async.subscriber.Emitter;
 import io.micronaut.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -44,29 +45,30 @@ public class Publishers {
 
     static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
     static final List<Class<?>> singleTypes = new ArrayList<>(3);
+
     static {
         ClassLoader classLoader = Publishers.class.getClassLoader();
         Publishers.singleTypes.add(CompletableFuturePublisher.class);
         Publishers.singleTypes.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
-                "io.reactivex.Observable",
-                "reactor.core.publisher.Flux"
+            "io.reactivex.Observable",
+            "reactor.core.publisher.Flux"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(Publishers.reactiveTypes::add);
         }
-        for (String name : Arrays.asList("io.reactivex.Single","reactor.core.publisher.Mono", "io.reactivex.Maybe")) {
+        for (String name : Arrays.asList("io.reactivex.Single", "reactor.core.publisher.Mono", "io.reactivex.Maybe")) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.singleTypes.add(aClass1);
                 Publishers.reactiveTypes.add(aClass1);
             });
-
         }
     }
+
     /**
-     * Build a {@link Publisher} from a {@link CompletableFuture}
+     * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param futureSupplier The supplier of the {@link CompletableFuture}
      * @param <T>
@@ -77,9 +79,10 @@ public class Publishers {
     }
 
     /**
-     * A {@link Publisher} that emits a fixed single value
+     * A {@link Publisher} that emits a fixed single value.
+     *
      * @param value The value to emit
-     * @param <T> The value type
+     * @param <T>   The value type
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> just(T value) {
@@ -87,24 +90,26 @@ public class Publishers {
     }
 
     /**
-     * A {@link Publisher} that emits a fixed single value
+     * A {@link Publisher} that emits a fixed single value.
+     *
      * @param error The error to emit
-     * @param <T> The value type
+     * @param <T>   The value type
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> just(Throwable error) {
         return new JustThrowPublisher<>(error);
     }
+
     /**
-     * Map the result from a publisher using the given mapper
+     * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
-     * @param mapper The mapper
-     * @param <T> The generic type
-     * @param <R> The result type
+     * @param mapper    The mapper
+     * @param <T>       The generic type
+     * @param <R>       The result type
      * @return The mapped publisher
      */
-    public static <T,R> Publisher<R> map(Publisher<T> publisher, Function<T,R> mapper) {
+    public static <T, R> Publisher<R> map(Publisher<T> publisher, Function<T, R> mapper) {
         return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -115,7 +120,7 @@ public class Publishers {
             protected void doOnNext(T message) {
                 try {
                     R result = Objects.requireNonNull(mapper.apply(message),
-                            "The mapper returned a null value.");
+                        "The mapper returned a null value.");
                     actual.onNext(result);
                 } catch (Throwable e) {
                     onError(e);
@@ -135,13 +140,12 @@ public class Publishers {
         });
     }
 
-
     /**
-     * Map the result from a publisher using the given mapper
+     * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
-     * @param consumer The mapper
-     * @param <T> The generic type
+     * @param consumer  The mapper
+     * @param <T>       The generic type
      * @return The mapped publisher
      */
     public static <T> Publisher<T> then(Publisher<T> publisher, Consumer<T> consumer) {
@@ -159,7 +163,6 @@ public class Publishers {
                 } catch (Throwable e) {
                     onError(e);
                 }
-
             }
 
             @Override
@@ -173,12 +176,13 @@ public class Publishers {
             }
         });
     }
+
     /**
-     * Allow executing logic on completion of a Publisher
+     * Allow executing logic on completion of a Publisher.
      *
      * @param publisher The publisher
-     * @param future The runnable
-     * @param <T> The generic type
+     * @param future    The runnable
+     * @param <T>       The generic type
      * @return The mapped publisher
      */
     public static <T> Publisher<T> onComplete(Publisher<T> publisher, Supplier<CompletableFuture<Void>> future) {
@@ -206,10 +210,9 @@ public class Publishers {
             @Override
             protected void doOnComplete() {
                 future.get().whenComplete((aVoid, throwable) -> {
-                    if(throwable != null) {
+                    if (throwable != null) {
                         actual.onError(throwable);
-                    }
-                    else {
+                    } else {
                         actual.onComplete();
                     }
                 });
@@ -218,7 +221,8 @@ public class Publishers {
     }
 
     /**
-     * Is the given type a Publisher or convertible to a publisher
+     * Is the given type a Publisher or convertible to a publisher.
+     *
      * @param type The type to check
      * @return True if it is
      */
@@ -236,7 +240,23 @@ public class Publishers {
     }
 
     /**
-     * Does the given reactive type emit a single result
+     * Is the given object a Publisher or convertible to a publisher.
+     * @param object The object
+     * @return True if it is
+     */
+    public static boolean isConvertibleToPublisher(Object object) {
+        if(object == null) {
+            return false;
+        }
+        if(object instanceof Publisher) {
+            return true;
+        } else {
+            return isConvertibleToPublisher(object.getClass());
+        }
+    }
+
+    /**
+     * Does the given reactive type emit a single result.
      *
      * @param type The type
      * @return True it does
@@ -261,9 +281,12 @@ public class Publishers {
         public void subscribe(Subscriber<? super T> subscriber) {
             subscriber.onSubscribe(new Subscription() {
                 boolean done;
+
                 @Override
                 public void request(long n) {
-                    if(done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onNext(value);
                     subscriber.onComplete();
@@ -289,9 +312,12 @@ public class Publishers {
         public void subscribe(Subscriber<? super T> subscriber) {
             subscriber.onSubscribe(new Subscription() {
                 boolean done;
+
                 @Override
                 public void request(long n) {
-                    if(done) return;
+                    if (done) {
+                        return;
+                    }
                     done = true;
                     subscriber.onError(error);
                 }

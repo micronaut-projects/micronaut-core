@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
@@ -63,8 +64,8 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     private EurekaRegistrationConfiguration registration;
 
     public EurekaConfiguration(
-            ApplicationConfiguration applicationConfiguration,
-            Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
+        ApplicationConfiguration applicationConfiguration,
+        Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
         this.registration = eurekaRegistrationConfiguration.orElse(null);
         setPort(8761);
@@ -74,7 +75,8 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * @return The default discovery configuration
      */
     @Override
-    @Nonnull public EurekaDiscoveryConfiguration getDiscovery() {
+    @Nonnull
+    public EurekaDiscoveryConfiguration getDiscovery() {
         return discovery;
     }
 
@@ -82,7 +84,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * @param discovery The discovery configuration
      */
     public void setDiscovery(EurekaDiscoveryConfiguration discovery) {
-        if(discovery != null) {
+        if (discovery != null) {
             this.discovery = discovery;
         }
     }
@@ -91,7 +93,8 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * @return The default registration configuration
      */
     @Override
-    @Nullable public EurekaRegistrationConfiguration getRegistration() {
+    @Nullable
+    public EurekaRegistrationConfiguration getRegistration() {
         return registration;
     }
 
@@ -133,44 +136,47 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
          * Configuration name property for Eureka IP address
          */
         public static final String IP_ADDRESS =
-                EurekaConfiguration.PREFIX + '.' +
+            EurekaConfiguration.PREFIX + '.' +
                 RegistrationConfiguration.PREFIX + '.' +
-                "ipAddr";
+                "ip-addr";
 
         @ConfigurationBuilder
         InstanceInfo instanceInfo;
 
-        @ConfigurationBuilder(configurationPrefix = "leaseInfo")
+        @ConfigurationBuilder(configurationPrefix = "lease-info")
         LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
 
         private final boolean explicitInstanceId;
 
         public EurekaRegistrationConfiguration(
-                EmbeddedServer embeddedServer,
-                @Value("${" + ApplicationConfiguration.APPLICATION_NAME + "}") String applicationName,
-                @Value("${" +EurekaRegistrationConfiguration.IP_ADDRESS + "}") Optional<String> ipAddress,
-                @Value("${" +ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID + "}") Optional<String> instanceId,
-                Optional<DataCenterInfo> dataCenterInfo) {
-            this.explicitInstanceId = instanceId.isPresent();
-            if(ipAddress.isPresent()) {
+            EmbeddedServer embeddedServer,
+            ApplicationConfiguration applicationConfiguration,
+            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") @Nullable String  ipAddress,
+            @Nullable DataCenterInfo dataCenterInfo) {
+            String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
+            String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
+            this.explicitInstanceId = instanceId != null;
+            if (ipAddress != null) {
                 this.instanceInfo = new InstanceInfo(
-                        embeddedServer.getHost(),
-                        embeddedServer.getPort(),
-                        ipAddress.get(),
-                        applicationName,
-                        instanceId.orElse(applicationName));
+                    embeddedServer.getHost(),
+                    embeddedServer.getPort(),
+                    ipAddress,
+                    applicationName,
+                    explicitInstanceId ? instanceId : applicationName
+                );
 
-            }
-            else {
-
+            } else {
                 this.instanceInfo = new InstanceInfo(
-                        embeddedServer.getHost(),
-                        embeddedServer.getPort(),
-                        applicationName,
-                        instanceId.orElse(applicationName));
+                    embeddedServer.getHost(),
+                    embeddedServer.getPort(),
+                    applicationName,
+                    explicitInstanceId ? instanceId : applicationName
+                );
             }
 
-            dataCenterInfo.ifPresent(dci -> this.instanceInfo.setDataCenterInfo(dci));
+            if(dataCenterInfo != null) {
+                this.instanceInfo.setDataCenterInfo(dataCenterInfo);
+            }
         }
 
         /**

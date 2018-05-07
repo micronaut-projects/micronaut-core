@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 package io.micronaut.ast.groovy.utils;
 
 import groovy.lang.GroovyClassLoader;
-import org.codehaus.groovy.control.CompilerConfiguration;
 import io.micronaut.core.annotation.Internal;
+import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,20 +54,18 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
     }
 
     public void addClass(String name, byte[] code) {
-        if(name != null && code != null) {
+        if (name != null && code != null) {
             generatedClasses.put(name, code);
         }
     }
 
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
-        if(loadedClasses.containsKey(name)) {
+        if (loadedClasses.containsKey(name)) {
             return loadedClasses.get(name);
-        }
-        else if(generatedClasses.containsKey(name)) {
+        } else if (generatedClasses.containsKey(name)) {
             return loadedClasses.computeIfAbsent(name, className -> defineClass(className, generatedClasses.get(className)));
-        }
-        else {
+        } else {
             return super.loadClass(name);
         }
     }

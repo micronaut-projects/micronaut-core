@@ -16,26 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package io.micronaut.core.util;
 
 /**
  * <p>PathMatcher implementation for Ant-style path patterns.
  * Examples are provided below.</p>
- *
+ * <p>
  * <p>Part of this mapping code has been kindly borrowed from
  * <a href="http://ant.apache.org">Apache Ant</a>.
- *
+ * <p>
  * <p>The mapping matches URLs using the following rules:<br>
  * <ul>
  * <li>? matches one character</li>
  * <li>* matches zero or more characters</li>
  * <li>** matches zero or more 'directories' in a path</li>
  * </ul>
- *
+ * <p>
  * <p>Some examples:<br>
  * <ul>
  * <li><code>com/t?st.jsp</code> - matches <code>com/test.jsp</code> but also
- * <code>com/tast.jsp</code> or <code>com/txst.jsp</code></li>
+ * <code>com/tast.jsp</code> or <code>com/txst.jsp</code>
+ * </li>
  * <li><code>com/*.jsp</code> - matches all <code>.jsp</code> files in the
  * <code>com</code> directory</li>
  * <li><code>com/&#42;&#42;/test.jsp</code> - matches all <code>test.jsp</code>
@@ -47,9 +49,9 @@ package io.micronaut.core.util;
  * <code>org/apache/shiro/testing/servlet/bla.jsp</code> and
  * <code>org/servlet/bla.jsp</code></li>
  * </ul>
- *
+ * <p>
  * <p><b>N.B.</b>: This class was forked from Apache Shiro with modifications.</p>
- *
+ * <p>
  * <p>As per the Apache 2.0 license, the original copyright notice and all author and copyright information have
  * remained in tact.</p>
  *
@@ -58,12 +60,11 @@ package io.micronaut.core.util;
 public class AntPathMatcher implements PathMatcher {
 
     /**
-     * Default path separator: "/"
+     * Default path separator: "/".
      */
     public static final String DEFAULT_PATH_SEPARATOR = "/";
 
     private String pathSeparator = DEFAULT_PATH_SEPARATOR;
-
 
     /**
      * Set the path separator to use for pattern parsing.
@@ -72,7 +73,6 @@ public class AntPathMatcher implements PathMatcher {
     public void setPathSeparator(String pathSeparator) {
         this.pathSeparator = (pathSeparator != null ? pathSeparator : DEFAULT_PATH_SEPARATOR);
     }
-
 
     public boolean isPattern(String path) {
         return (path.indexOf('*') != -1 || path.indexOf('?') != -1);
@@ -91,7 +91,7 @@ public class AntPathMatcher implements PathMatcher {
      * @param fullMatch whether a full pattern match is required
      *                  (else a pattern match as far as the given base path goes is sufficient)
      * @return <code>true</code> if the supplied <code>path</code> matched,
-     *         <code>false</code> if it didn't
+     * <code>false</code> if it didn't
      */
     protected boolean doMatch(String pattern, String path, boolean fullMatch) {
         if (path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
@@ -123,13 +123,13 @@ public class AntPathMatcher implements PathMatcher {
             // Path is exhausted, only match if rest of pattern is * or **'s
             if (pattIdxStart > pattIdxEnd) {
                 return (pattern.endsWith(this.pathSeparator) ?
-                        path.endsWith(this.pathSeparator) : !path.endsWith(this.pathSeparator));
+                    path.endsWith(this.pathSeparator) : !path.endsWith(this.pathSeparator));
             }
             if (!fullMatch) {
                 return true;
             }
             if (pattIdxStart == pattIdxEnd && pattDirs[pattIdxStart].equals("*") &&
-                    path.endsWith(this.pathSeparator)) {
+                path.endsWith(this.pathSeparator)) {
                 return true;
             }
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
@@ -228,7 +228,7 @@ public class AntPathMatcher implements PathMatcher {
      * @param str     string which must be matched against the pattern.
      *                Must not be <code>null</code>.
      * @return <code>true</code> if the string matches against the
-     *         pattern, or <code>false</code> otherwise.
+     * pattern, or <code>false</code> otherwise.
      */
     private boolean matchStrings(String pattern, String str) {
         char[] patArr = pattern.toCharArray();
@@ -409,5 +409,4 @@ public class AntPathMatcher implements PathMatcher {
 
         return buffer.toString();
     }
-
 }

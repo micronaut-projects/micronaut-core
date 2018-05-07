@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
 import javax.inject.Singleton;
@@ -21,7 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry of {@link NettyCustomizableResponseTypeHandler} instances
+ * Registry of {@link NettyCustomizableResponseTypeHandler} instances.
  *
  * @author James Kleeh
  * @since 1.0
@@ -32,17 +33,22 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
     private NettyCustomizableResponseTypeHandler[] handlers;
     private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
 
-    public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler...typeHandlers) {
+    /**
+     * @param typeHandlers The Netty customizable response type handlers
+     */
+    public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler... typeHandlers) {
         this.handlers = typeHandlers;
     }
 
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
-        return Optional.ofNullable(handlerCache.computeIfAbsent(type,  (clazz) -> {
-            return Arrays.stream(handlers)
+        return Optional
+            .ofNullable(handlerCache.computeIfAbsent(type, (clazz) ->
+                Arrays
+                    .stream(handlers)
                     .filter(handler -> handler.supports(clazz))
                     .findFirst()
-                    .orElse(null);
-        }));
+                    .orElse(null))
+            );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariDataSource;
@@ -20,9 +21,8 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 
-
 /**
- * Creates a Hikari data source for each configuration bean
+ * Creates a Hikari data source for each configuration bean.
  *
  * @author James Kleeh
  * @since 1.0
@@ -30,6 +30,10 @@ import io.micronaut.context.annotation.Factory;
 @Factory
 public class DatasourceFactory {
 
+    /**
+     * @param datasourceConfiguration A {@link DatasourceConfiguration}
+     * @return A {@link HikariDataSource}
+     */
     @EachBean(DatasourceConfiguration.class)
     @Bean(preDestroy = "close")
     public HikariDataSource dataSource(DatasourceConfiguration datasourceConfiguration) {

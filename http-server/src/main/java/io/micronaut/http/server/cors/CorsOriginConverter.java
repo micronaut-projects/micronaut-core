@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
-import io.micronaut.http.HttpMethod;
-import io.micronaut.core.convert.*;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
@@ -28,8 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Responsible for converting a map of configuration to an instance
- * of {@link CorsOriginConfiguration}
+ * Responsible for converting a map of configuration to an instance of {@link CorsOriginConfiguration}.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -52,23 +52,29 @@ public class CorsOriginConverter implements TypeConverter<Object, CorsOriginConf
             Map mapConfig = (Map) object;
             ConvertibleValues<Object> convertibleValues = new ConvertibleValuesMap<>(mapConfig);
 
-            convertibleValues.get(ALLOWED_ORIGINS, Argument.of(List.class, String.class))
-                    .ifPresent(configuration::setAllowedOrigins);
+            convertibleValues
+                .get(ALLOWED_ORIGINS, Argument.of(List.class, String.class))
+                .ifPresent(configuration::setAllowedOrigins);
 
-            convertibleValues.get(ALLOWED_METHODS, Argument.of(List.class, HttpMethod.class))
-                             .ifPresent(configuration::setAllowedMethods);
+            convertibleValues
+                .get(ALLOWED_METHODS, Argument.of(List.class, HttpMethod.class))
+                .ifPresent(configuration::setAllowedMethods);
 
-            convertibleValues.get(ALLOWED_HEADERS, Argument.of(List.class, String.class))
-                             .ifPresent(configuration::setAllowedHeaders);
+            convertibleValues
+                .get(ALLOWED_HEADERS, Argument.of(List.class, String.class))
+                .ifPresent(configuration::setAllowedHeaders);
 
-            convertibleValues.get(EXPOSED_HEADERS, Argument.of(List.class, String.class))
-                            .ifPresent(configuration::setExposedHeaders);
+            convertibleValues
+                .get(EXPOSED_HEADERS, Argument.of(List.class, String.class))
+                .ifPresent(configuration::setExposedHeaders);
 
-            convertibleValues.get(ALLOW_CREDENTIALS, Boolean.class)
-                    .ifPresent(configuration::setAllowCredentials);
+            convertibleValues
+                .get(ALLOW_CREDENTIALS, Boolean.class)
+                .ifPresent(configuration::setAllowCredentials);
 
-            convertibleValues.get(MAX_AGE, Long.class)
-                    .ifPresent(configuration::setMaxAge);
+            convertibleValues
+                .get(MAX_AGE, Long.class)
+                .ifPresent(configuration::setMaxAge);
         }
         return Optional.of(configuration);
     }

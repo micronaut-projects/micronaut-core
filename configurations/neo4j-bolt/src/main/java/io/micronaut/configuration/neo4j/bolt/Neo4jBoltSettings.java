@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.neo4j.bolt;
 
 /**
@@ -21,16 +22,15 @@ package io.micronaut.configuration.neo4j.bolt;
  */
 public interface Neo4jBoltSettings {
     /**
-     * The prefix to use for all Neo4j settings
+     * The prefix to use for all Neo4j settings.
      */
     String PREFIX = "neo4j";
     /**
-     * Default Neo4j URI
+     * Default Neo4j URI.
      */
     String DEFAULT_URI = "bolt://localhost:7687";
     /**
-     * The default embedded data location
+     * The default embedded data location.
      */
     String DEFAULT_LOCATION = "data/neo4j";
-
 }

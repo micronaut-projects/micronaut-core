@@ -11,5 +11,16 @@ include::{testsjava}/env/DataSourceFactory.java[tags=eachBean, indent=0]
 <2> The link:{api}/io/micronaut/context/annotation/EachBean.html[@EachBean] annotation is used to indicate that a new `DataSource` bean should be created for each `DataSourceConfiguration` defined in the previous section.
 <3> The `DataSourceConfiguration` instance is injected as a method argument and used to drive the configuration of each `javax.sql.DataSource`
 
+Note that `@EachBean` requires that the parent bean has a `@Named` qualifier, since the qualifier is inherited by each bean created by `@EachBean`.
 
+In other words try retrieve the `DataSource` created by `test.datasource.one` you can do:
+
+.Using a Qualifier
+[source,java]
+----
+DataSource firstDataSource = applicationContext.getBean(
+        DataSource.class,
+        Qualifiers.byName("one")
+);
+----
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,18 @@ package io.micronaut.configuration.neo4j.gorm
 import grails.gorm.annotation.Entity
 import grails.neo4j.Neo4jEntity
 import groovy.transform.CompileStatic
-import org.grails.datastore.gorm.neo4j.Neo4jDatastore
-import org.grails.datastore.gorm.neo4j.Neo4jDatastoreTransactionManager
-import org.neo4j.driver.v1.Driver
+import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter
 import io.micronaut.configuration.neo4j.bolt.condition.RequiresNeo4j
 import io.micronaut.configuration.neo4j.gorm.configuration.GormPropertyResolverAdapter
-import io.micronaut.configuration.gorm.event.ConfigurableEventPublisherAdapter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
+import org.grails.datastore.gorm.neo4j.Neo4jDatastore
+import org.grails.datastore.gorm.neo4j.Neo4jDatastoreTransactionManager
+import org.neo4j.driver.v1.Driver
 
 import javax.inject.Singleton
 import java.util.stream.Stream
@@ -51,18 +51,21 @@ class Neo4jDatastoreFactory {
     Neo4jDatastore neo4jDatastore(Driver driver, ApplicationContext applicationContext) {
         Environment environment = applicationContext.getEnvironment()
         Stream<Class> entities = environment.scan(Entity)
-                                            .filter({ Class  c -> Neo4jEntity.isAssignableFrom(c) })
+            .filter({ Class c -> Neo4jEntity.isAssignableFrom(c) })
         Class[] classes = entities.toArray() as Class[]
         Neo4jDatastore datastore = new Neo4jDatastore(
-                driver,
-                new GormPropertyResolverAdapter(applicationContext, applicationContext),
-                new ConfigurableEventPublisherAdapter(applicationContext),
-                classes
+            driver,
+            new GormPropertyResolverAdapter(applicationContext, applicationContext),
+            new ConfigurableEventPublisherAdapter(applicationContext),
+            classes
         )
-        for(o in datastore.getServices()) {
-            applicationContext.registerSingleton(o)
+        for (o in datastore.getServices()) {
+            applicationContext.registerSingleton(
+                    o,
+                    false
+            )
         }
-        for(o in datastore.getServices()) {
+        for (o in datastore.getServices()) {
             applicationContext.inject(o)
         }
         return datastore

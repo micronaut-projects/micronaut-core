@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -33,35 +34,25 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.sse.Event;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.sse.Event;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.*;
-import java.util.function.Function;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * Abstract implementation of the {@link RouteMatch} interface
+ * Abstract implementation of the {@link RouteMatch} interface.
  *
+ * @param <R> Route Match
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -73,6 +64,12 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
     protected final List<MediaType> acceptedMediaTypes;
 
+    /**
+     * Constructor.
+     *
+     * @param abstractRoute     The abstract route builder
+     * @param conversionService The conversion service
+     */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
         this.executableMethod = abstractRoute.targetMethod;
@@ -92,7 +89,7 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         return ann.map(annotation -> {
             Optional<String> value = AnnotationUtil.findValueOfType(annotation, String.class);
             return value.map(s -> {
-                if(StringUtils.isEmpty(s)) {
+                if (StringUtils.isEmpty(s)) {
                     return requiredArgument.getName();
                 }
                 return s;
@@ -103,10 +100,9 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     @Override
     public List<MediaType> getProduces() {
         Optional<Argument<?>> firstTypeVariable = executableMethod.getReturnType().getFirstTypeVariable();
-        if(firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
+        if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
             return Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
-        }
-        else {
+        } else {
             return abstractRoute.getProduces();
         }
     }
@@ -120,12 +116,11 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     @Override
     public Optional<Argument<?>> getBodyArgument() {
         String bodyArgument = abstractRoute.bodyArgument;
-        if(bodyArgument != null) {
+        if (bodyArgument != null) {
             return Optional.ofNullable(requiredInputs.get(bodyArgument));
-        }
-        else {
+        } else {
             for (Argument argument : getArguments()) {
-                if(argument.getAnnotation(Body.class) != null) {
+                if (argument.getAnnotation(Body.class) != null) {
                     return Optional.of(argument);
                 }
             }
@@ -149,13 +144,13 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> variables = getVariables();
         for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
-            if( value == null || value instanceof UnresolvedArgument)
+            if (value == null || value instanceof UnresolvedArgument) {
                 return false;
-
+            }
         }
 
         Optional<Argument<?>> bodyArgument = getBodyArgument();
-        if(bodyArgument.isPresent()) {
+        if (bodyArgument.isPresent()) {
             Object value = variables.get(bodyArgument.get().getName());
             return value != null && !(value instanceof UnresolvedArgument);
         }
@@ -196,7 +191,6 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     public ReturnType<R> getReturnType() {
         return executableMethod.getReturnType();
     }
-
 
     @Override
     public R invoke(Object... arguments) {
@@ -251,46 +245,41 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
                     value = argumentValues.get(name);
                 }
 
-                if(value instanceof UnresolvedArgument) {
+                if (value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
 
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         Object resolved = bindingResult.get();
-                        if(resolved instanceof ConversionError) {
+                        if (resolved instanceof ConversionError) {
                             ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);
-                        }
-                        else {
+                        } else {
                             ConversionContext conversionContext = ConversionContext.of(argument);
                             Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
-                    }
-                    else {
-                        if(argument.getDeclaredAnnotation(Nullable.class) != null) {
-                            argumentList.add(null); continue;
-                        }
-                        else {
+                    } else {
+                        if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                            argumentList.add(null);
+                            continue;
+                        } else {
 
                             List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
-                            if(!conversionErrors.isEmpty()) {
+                            if (!conversionErrors.isEmpty()) {
                                 // should support multiple errors
                                 ConversionError conversionError = conversionErrors.iterator().next();
                                 throw new ConversionErrorException(argument, conversionError);
-                            }
-                            else {
+                            } else {
                                 throw new UnsatisfiedRouteException(argument);
                             }
                         }
 
                     }
-                }
-                else if(value instanceof ConversionError) {
+                } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
-                }
-                else if (value == DefaultRouteBuilder.NO_VALUE) {
+                } else if (value == DefaultRouteBuilder.NO_VALUE) {
                     throw new UnsatisfiedRouteException(argument);
                 } else {
                     ConversionContext conversionContext = ConversionContext.of(argument);
@@ -300,20 +289,6 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             }
 
             return executableMethod.invoke(argumentList.toArray());
-        }
-    }
-
-    protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
-        if (!result.isPresent()) {
-            Optional<ConversionError> lastError = conversionContext.getLastError();
-            if (!lastError.isPresent() && argument.getDeclaredAnnotation(Nullable.class) != null) {
-                return null;
-            }
-            throw lastError.map(conversionError ->
-                    (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
-            );
-        } else {
-            return result.get();
         }
     }
 
@@ -327,30 +302,54 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> oldVariables = getVariables();
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
         for (Argument requiredArgument : getArguments()) {
-            String name = requiredArgument.getName();
-            Object value = argumentValues.get(name);
-            if(value != null) {
-                if(value instanceof UnresolvedArgument) {
-                    newVariables.put(resolveInputName(requiredArgument), value);
-                }
-                else {
+            Object value = argumentValues.get(requiredArgument.getName());
+            if (value != null) {
+                String name = resolveInputName(requiredArgument);
+                if (value instanceof UnresolvedArgument) {
+                    newVariables.put(name, value);
+                } else {
                     ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
                     Optional converted = conversionService.convert(value, conversionContext);
                     Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if(result != null) {
-                        newVariables.put(resolveInputName(requiredArgument), result);
+                    if (result != null) {
+                        newVariables.put(name, result);
                     }
                 }
             }
         }
         Set<String> argumentNames = argumentValues.keySet();
         List<Argument> requiredArguments = getRequiredArguments()
-                .stream()
-                .filter(arg -> !argumentNames.contains(arg.getName()))
-                .collect(Collectors.toList());
+            .stream()
+            .filter(arg -> !argumentNames.contains(arg.getName()))
+            .collect(Collectors.toList());
 
         return newFulfilled(newVariables, requiredArguments);
     }
 
+    /**
+     * @param argument          The argument
+     * @param conversionContext The conversion context
+     * @param result            An optional result
+     * @return The resolved value or an error
+     */
+    protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
+        if (!result.isPresent()) {
+            Optional<ConversionError> lastError = conversionContext.getLastError();
+            if (!lastError.isPresent() && argument.getDeclaredAnnotation(Nullable.class) != null) {
+                return null;
+            }
+            throw lastError.map(conversionError ->
+                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+            );
+        } else {
+            return result.get();
+        }
+    }
+
+    /**
+     * @param newVariables      The new variables
+     * @param requiredArguments The required arguments
+     * @return A RouteMatch
+     */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 }

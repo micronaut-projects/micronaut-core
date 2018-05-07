@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.annotation;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.retry.intercept.DefaultRetryInterceptor;
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
@@ -30,10 +29,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * AOP Advice that can be applied to any method
+ * AOP Advice that can be applied to any method.
  *
  * @author graemerocher
  * @since 1.0
@@ -44,10 +41,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Around
 @Type(DefaultRetryInterceptor.class)
 public @interface Retryable {
+
+    int MAX_INTEGRAL_DIGITS = 4;
+
     /**
      * @return The exception types to include (defaults to all)
      */
     Class<? extends Throwable>[] value() default {};
+
     /**
      * @return The exception types to include (defaults to all)
      */
@@ -62,7 +63,7 @@ public @interface Retryable {
     /**
      * @return The maximum number of retry attempts
      */
-    @Digits(integer = 4, fraction = 0)
+    @Digits(integer = MAX_INTEGRAL_DIGITS, fraction = 0)
     String attempts() default "3";
 
     /**

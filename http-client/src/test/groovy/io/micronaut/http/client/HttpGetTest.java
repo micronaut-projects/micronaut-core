@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,7 @@ public class HttpGetTest {
         assertTrue(body.isPresent());
         assertEquals(body.get(), "success");
 
+        client.stop();
         applicationContext.stop();
     }
 
@@ -83,6 +84,7 @@ public class HttpGetTest {
         assertEquals(list.size(), 1);
         assertTrue(list.get(0) instanceof HttpGetSpec.Book);
 
+        client.stop();
         applicationContext.stop();
     }
 }
