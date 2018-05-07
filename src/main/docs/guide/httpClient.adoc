@@ -1,1 +1,3 @@
-Micronaut's HTTP client is a critical part of
+A critical component of any Microservice architecture is the client communication between Microservices. With that in mind Micronaut features a built in HTTP client that has both a low-level API and a higher level AOP-driven API.
+
+Since the higher level API is built on the low-level HTTP client, we will first introduce the low-level client.
