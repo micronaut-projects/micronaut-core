@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import static javax.lang.model.type.TypeKind.ARRAY;
@@ -43,7 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Utility methods for dealing with generic type signatures
+ * Utility methods for dealing with generic type signatures.
  *
  * @author Graeme Rocher
  */
@@ -54,6 +55,11 @@ public class GenericUtils {
     private final Types typeUtils;
     private final ModelUtils modelUtils;
 
+    /**
+     * @param elementUtils The {@link Elements}
+     * @param typeUtils    The {@link Types}
+     * @param modelUtils   The {@link ModelUtils}
+     */
     GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
@@ -61,9 +67,9 @@ public class GenericUtils {
     }
 
     /**
-     * Finds the generic type for the given interface for the given class element
+     * Finds the generic type for the given interface for the given class element.
      * <p>
-     * For example, for <code>class AProvider implements Provider<A></code>
+     * For example, for <code>class AProvider implements Provider</code>
      * element = AProvider
      * interfaceType = interface javax.inject.Provider.class
      * return A
@@ -72,12 +78,12 @@ public class GenericUtils {
      * @param interfaceType The interface
      * @return The generic type or null
      */
-    TypeMirror interfaceGenericTypeFor(TypeElement element, Class interfaceType) {
+    protected TypeMirror interfaceGenericTypeFor(TypeElement element, Class interfaceType) {
         return interfaceGenericTypeFor(element, interfaceType.getName());
     }
 
     /**
-     * Finds the generic type for the given interface for the given class element
+     * Finds the generic type for the given interface for the given class element.
      * <p>
      * For example, for <code>class AProvider implements Provider&lt;A&gt;</code>
      * element = AProvider
@@ -88,13 +94,13 @@ public class GenericUtils {
      * @param interfaceName The interface
      * @return The generic type or null
      */
-    TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
+    protected TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
         List<? extends TypeMirror> typeMirrors = interfaceGenericTypesFor(element, interfaceName);
         return typeMirrors.isEmpty() ? null : typeMirrors.get(0);
     }
 
     /**
-     * Finds the generic types for the given interface for the given class element
+     * Finds the generic types for the given interface for the given class element.
      *
      * @param element       The class element
      * @param interfaceName The interface
@@ -112,12 +118,13 @@ public class GenericUtils {
     }
 
     /**
-     * Return the first type argument for the given type mirror. For example for Optional&lt;String&gt; this will return {@code String}
+     * Return the first type argument for the given type mirror. For example for Optional&lt;String&gt; this will
+     * return {@code String}.
      *
      * @param type The type
      * @return The first argument.
      */
-    Optional<TypeMirror> getFirstTypeArgument(TypeMirror type) {
+    protected Optional<TypeMirror> getFirstTypeArgument(TypeMirror type) {
         TypeMirror typeMirror = null;
 
         if (type instanceof DeclaredType) {
@@ -131,13 +138,13 @@ public class GenericUtils {
     }
 
     /**
-     * Resolve the generic type arguments for the given type mirror and bound type arguments
+     * Resolve the generic type arguments for the given type mirror and bound type arguments.
      *
-     * @param type The type mirror
+     * @param type       The type mirror
      * @param boundTypes The bound types (such as those declared on the class)
      * @return A map of generic type arguments
      */
-    Map<String, Object> resolveGenericTypes(TypeMirror type, Map<String, Object> boundTypes) {
+    protected Map<String, Object> resolveGenericTypes(TypeMirror type, Map<String, Object> boundTypes) {
         if (type.getKind().isPrimitive() || type.getKind() == VOID || type.getKind() == ARRAY) {
             return Collections.emptyMap();
         }
@@ -155,15 +162,14 @@ public class GenericUtils {
     }
 
     /**
+     * Resolve the generic type arguments for the given type mirror and bound type arguments.
      *
-     * Resolve the generic type arguments for the given type mirror and bound type arguments
-     *
-     * @param type The declaring type
+     * @param type        The declaring type
      * @param typeElement The type element
-     * @param boundTypes The bound types
+     * @param boundTypes  The bound types
      * @return A map of generic type arguments
      */
-    Map<String, Object> resolveGenericTypes(DeclaredType type, TypeElement typeElement, Map<String, Object> boundTypes) {
+    protected Map<String, Object> resolveGenericTypes(DeclaredType type, TypeElement typeElement, Map<String, Object> boundTypes) {
         List<? extends TypeMirror> typeArguments = type.getTypeArguments();
         Map<String, Object> resolvedParameters = new LinkedHashMap<>();
         List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
@@ -214,25 +220,30 @@ public class GenericUtils {
                         } else {
                             resolvedParameters.put(parameterName, Object.class);
                         }
+                    default:
+                        // no-op
                 }
             }
         }
         return resolvedParameters;
     }
 
-
-    Object resolveTypeReference(TypeMirror mirror) {
+    /**
+     * @param mirror The {@link TypeMirror}
+     * @return The resolved type reference
+     */
+    protected Object resolveTypeReference(TypeMirror mirror) {
         return resolveTypeReference(mirror, Collections.emptyMap());
     }
 
     /**
-     * Resolve a type reference to use for the given type mirror taking into account generic type variables
+     * Resolve a type reference to use for the given type mirror taking into account generic type variables.
      *
-     * @param mirror The mirror
+     * @param mirror     The mirror
      * @param boundTypes The already bound types for any type variable
      * @return A type reference
      */
-    Object resolveTypeReference(TypeMirror mirror, Map<String, Object> boundTypes) {
+    protected Object resolveTypeReference(TypeMirror mirror, Map<String, Object> boundTypes) {
         TypeKind kind = mirror.getKind();
         switch (kind) {
             case TYPEVAR:
@@ -287,12 +298,13 @@ public class GenericUtils {
     }
 
     /**
-     * Resolve the first type argument to a parameterized type
-     * @param element The type element
+     * Resolve the first type argument to a parameterized type.
+     *
+     * @param element      The type element
      * @param typeVariable The type variable
      * @return The declaring type
      */
-    DeclaredType resolveTypeVariable(Element element, TypeVariable typeVariable) {
+    protected DeclaredType resolveTypeVariable(Element element, TypeVariable typeVariable) {
         Element enclosing = element.getEnclosingElement();
 
         while (enclosing instanceof Parameterizable) {
@@ -315,12 +327,12 @@ public class GenericUtils {
     }
 
     /**
-     * Resolve bound types for the given declared type
+     * Resolve bound types for the given declared type.
      *
      * @param type The declaring type
      * @return The type bounds
      */
-    Map<String, Object> resolveBoundTypes(DeclaredType type) {
+    protected Map<String, Object> resolveBoundTypes(DeclaredType type) {
         Map<String, Object> boundTypes = new LinkedHashMap<>(2);
         TypeElement element = (TypeElement) type.asElement();
 
@@ -341,27 +353,27 @@ public class GenericUtils {
         List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
         if (nestedArguments.isEmpty()) {
             resolvedParameters.put(
-                    parameterName,
-                    resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters)
+                parameterName,
+                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters)
             );
         } else {
             resolvedParameters.put(
-                    parameterName,
-                    Collections.singletonMap(
-                            resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
-                            resolveGenericTypes(declaredType, boundTypes)
-                    )
+                parameterName,
+                Collections.singletonMap(
+                    resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                    resolveGenericTypes(declaredType, boundTypes)
+                )
             );
         }
     }
 
     private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         resolvedParameters.put(
-                parameterName,
-                Collections.singletonMap(
-                        resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
-                        resolveGenericTypes(mirror, boundTypes)
-                )
+            parameterName,
+            Collections.singletonMap(
+                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                resolveGenericTypes(mirror, boundTypes)
+            )
         );
     }
 }

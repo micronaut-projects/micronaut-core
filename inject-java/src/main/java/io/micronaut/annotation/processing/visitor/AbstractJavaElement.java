@@ -18,15 +18,9 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.value.OptionalValues;
 
-import javax.annotation.Nullable;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
-import java.lang.annotation.Annotation;
-import java.util.*;
 
 /**
  * An abstract class for other elements to extend from.
@@ -39,6 +33,10 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
     private final Element element;
     private final AnnotationMetadata annotationMetadata;
 
+    /**
+     * @param element            The {@link Element}
+     * @param annotationMetadata The Annotation metadata
+     */
     AbstractJavaElement(Element element, AnnotationMetadata annotationMetadata) {
         this.element = element;
         this.annotationMetadata = annotationMetadata;

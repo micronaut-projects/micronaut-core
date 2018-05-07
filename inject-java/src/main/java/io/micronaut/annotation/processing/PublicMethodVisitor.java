@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import javax.lang.model.element.Element;
@@ -30,7 +31,6 @@ import javax.lang.model.type.NullType;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
-import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.type.UnionType;
 import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.AbstractTypeVisitor8;
@@ -39,9 +39,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * An adapter that implements all methods of the {@link TypeVisitor} interface. Subclasses can selectively override
+ * An adapter that implements all methods of the {@link javax.lang.model.type.TypeVisitor} interface. Subclasses can
+ * selectively override.
  *
- * @author Graeme Rocher
+ * @param <R> The return type of the visitor's method
+ * @param <P> The type of the additional parameter to the visitor's methods.
+ * @author graemerocher
+ * @see javax.lang.model.util.AbstractTypeVisitor8
  * @since 1.0
  */
 public abstract class PublicMethodVisitor<R, P> extends AbstractTypeVisitor8<R, P> {
@@ -108,11 +112,20 @@ public abstract class PublicMethodVisitor<R, P> extends AbstractTypeVisitor8<R, 
         return null;
     }
 
+    /**
+     * @param executableElement The {@link ExecutableElement}
+     * @return Whether the element is public and final
+     */
     protected boolean isAcceptable(ExecutableElement executableElement) {
         Set<Modifier> modifiers = executableElement.getModifiers();
         return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL);
     }
 
+    /**
+     * @param type   The {@link DeclaredType}
+     * @param method The {@link ExecutableElement}
+     * @param p      The additional type
+     */
     protected abstract void accept(DeclaredType type, ExecutableElement method, P p);
 
     @Override
