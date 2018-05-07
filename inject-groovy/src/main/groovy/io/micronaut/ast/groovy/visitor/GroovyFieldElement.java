@@ -33,6 +33,10 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     private final Variable variable;
 
+    /**
+     * @param variable           The {@link Variable}
+     * @param annotationMetadata The annotation medatada
+     */
     GroovyFieldElement(Variable variable, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.variable = variable;
