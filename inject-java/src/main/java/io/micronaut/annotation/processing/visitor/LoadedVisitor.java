@@ -20,7 +20,6 @@ import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -48,6 +47,13 @@ public class LoadedVisitor {
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
 
+    /**
+     * @param visitor               The {@link TypeElementVisitor}
+     * @param visitorContext        The visitor context
+     * @param genericUtils          The generic utils
+     * @param processingEnvironment The {@link ProcessEnvironment}
+     * @param annotationUtils       The annotation utils
+     */
     public LoadedVisitor(TypeElementVisitor visitor,
                          JavaVisitorContext visitorContext,
                          GenericUtils genericUtils,
@@ -57,7 +63,7 @@ public class LoadedVisitor {
         this.visitor = visitor;
         this.annotationUtils = annotationUtils;
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(visitor.getClass().getName());
-        List<? extends  TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
+        List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
         classAnnotation = generics.get(0).toString();
         elementAnnotation = generics.get(1).toString();
     }
@@ -95,7 +101,7 @@ public class LoadedVisitor {
     /**
      * Invoke the underlying visitor for the given element.
      *
-     * @param element The element to visit
+     * @param element            The element to visit
      * @param annotationMetadata The annotation data for the node
      */
     public void visit(Element element, AnnotationMetadata annotationMetadata) {
