@@ -43,7 +43,7 @@ import io.micronaut.cli.io.support.Resource
  */
 interface ProfileRepository {
 
-    String DEFAULT_PROFILE_NAME = 'base'
+    String DEFAULT_PROFILE_NAME = 'service'
 
     /**
      * Obtains a named {@link Profile}
