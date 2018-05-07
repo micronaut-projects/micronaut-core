@@ -45,7 +45,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveJson", requestBody)
+                HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -67,7 +67,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveJson", requestBody)
+                HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -88,7 +88,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveJson", requestBody)
+                HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
@@ -119,7 +119,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -140,7 +140,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -167,7 +167,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -193,7 +193,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -219,7 +219,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -246,7 +246,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveBytes", requestBody)
+                HttpRequest.POST("/upload/receive-bytes", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -267,7 +267,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePlain", requestBody)
+                HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -296,7 +296,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveCompletedFileUpload", requestBody)
+                HttpRequest.POST("/upload/receive-completed-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String

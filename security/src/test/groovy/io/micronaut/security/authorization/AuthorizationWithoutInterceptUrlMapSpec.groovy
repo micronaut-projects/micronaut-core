@@ -24,7 +24,7 @@ class AuthorizationWithoutInterceptUrlMapSpec extends Specification  {
 
     void "test accessing a non sensitive endpoint without authentication"() {
         when:
-        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/nonSensitive"), String)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/non-sensitive"), String)
 
         then:
         response.body() == "Not logged in"

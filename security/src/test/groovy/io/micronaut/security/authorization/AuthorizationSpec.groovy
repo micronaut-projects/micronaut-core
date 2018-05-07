@@ -152,7 +152,7 @@ class AuthorizationSpec extends Specification {
 
     void "test accessing a non sensitive endpoint without authentication"() {
         when:
-        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/nonSensitive"), String)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/non-sensitive"), String)
 
         then:
         response.body() == "Not logged in"
@@ -160,7 +160,7 @@ class AuthorizationSpec extends Specification {
 
     void "test accessing a non sensitive endpoint with authentication"() {
         when:
-        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/nonSensitive")
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/non-sensitive")
                 .basicAuth("valid", "password"), String)
 
         then:

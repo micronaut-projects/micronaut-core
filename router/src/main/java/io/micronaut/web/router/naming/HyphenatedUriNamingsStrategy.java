@@ -17,6 +17,9 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.naming.conventions.TypeConvention;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.RouteBuilder;
 
 import javax.inject.Singleton;
@@ -29,5 +32,20 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Primary
-public class CamelCaseUriNamingsStrategy implements RouteBuilder.UriNamingStrategy {
+public class HyphenatedUriNamingsStrategy implements RouteBuilder.UriNamingStrategy {
+    @Override
+    public String resolveUri(Class type) {
+        return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
+    }
+
+    @Override
+    public String resolveUri(String property) {
+        if (StringUtils.isEmpty(property)) {
+            return "/";
+        }
+        if (property.charAt(0) != '/') {
+            return '/' + NameUtils.hyphenate(property, true);
+        }
+        return property;
+    }
 }

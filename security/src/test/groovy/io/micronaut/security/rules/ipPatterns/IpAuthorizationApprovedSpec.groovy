@@ -32,7 +32,7 @@ class IpAuthorizationApprovedSpec extends Specification {
 
     void "test accessing a non sensitive endpoint without authentication"() {
         when:
-        HttpResponse<String> response = get("/nonSensitive")
+        HttpResponse<String> response = get("/non-sensitive")
 
         then:
         response.body() == "Not logged in"

@@ -149,7 +149,7 @@ class StreamRequestSpec extends Specification {
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojoFlowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
             @Override
             void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
                 while(i < 5) {
@@ -179,7 +179,7 @@ class StreamRequestSpec extends Specification {
 
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojoFlowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
             @Override
             void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
                 while(i < 5) {

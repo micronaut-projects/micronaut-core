@@ -38,7 +38,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     void "test 500 server error"() {
         given:
         def response = rxClient.exchange(
-                HttpRequest.GET('/errors/serverError')
+                HttpRequest.GET('/errors/server-error')
 
         ).onErrorReturn({ t -> t.response.getBody(VndError); return t.response } ).blockingFirst()
 
@@ -74,7 +74,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     void "test 405 error"() {
         when:
         def response = rxClient.exchange(
-                HttpRequest.POST('/errors/serverError', 'blah')
+                HttpRequest.POST('/errors/server-error', 'blah')
 
         ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
 
@@ -88,7 +88,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
         then:
         json.message == 'Method [POST] not allowed. Allowed methods: [GET]'
-        json._links.self.href == '/errors/serverError'
+        json._links.self.href == '/errors/server-error'
 
 
     }

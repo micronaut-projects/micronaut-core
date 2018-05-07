@@ -58,7 +58,7 @@ class MessageControllerSpec extends Specification {
         given:
         String body = "My Text"
         String response = httpClient.toBlocking().retrieve(
-                HttpRequest.POST('/receive/echoFlow', body)
+                HttpRequest.POST('/receive/echo-flow', body)
                         .contentType(MediaType.TEXT_PLAIN_TYPE),
                 String
         )
