@@ -65,15 +65,17 @@ include::{testsuite}/server/routes/IssuesControllerTest.java[tags=test, indent=4
 <2> The tests sends a request to the URI `/issues/12`
 <3> And then asserts the response is "Issue # 12"
 
-If you invoke the previous endpoint without the required URI variable or with an invalid type, Micronaut responds with the appropriate HTTP failure codes as illustrated in the next Spock test.
+If you invoke the previous endpoint without the required URI variable or with an invalid type, Micronaut responds with the appropriate HTTP failure codes as illustrated in the following Spock tests that use the <<httpClient,HTTP client>>.
 
-.Testing Missing URI Variables
+.Testing for Response Errors
 [source,java]
 ----
-include::{testsuite}/server/routes/IssuesControllerSpec.groovy[indent=0]
+include::{testsuite}/server/routes/IssuesControllerSpec.groovy[indent=0,tags=badrequest]
+
+include::{testsuite}/server/routes/IssuesControllerSpec.groovy[indent=0,tags=notfound]
 ----
 
-Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}`.
+Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}` and by annotating the `number` parameter with `@Nullable`.
 
 The following table provides some examples of URI templates and what they match:
 

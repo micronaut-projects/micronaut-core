@@ -32,6 +32,7 @@ class IssuesControllerSpec extends Specification{
     @AutoCleanup
     HttpClient client = HttpClient.create(embeddedServer.URL)
 
+    // tag::badrequest[]
     void "/issues/show/{number} with an invalid Integer number responds 400"() {
         when:
         client.toBlocking().exchange("/issues/hello")
@@ -40,7 +41,9 @@ class IssuesControllerSpec extends Specification{
         HttpClientResponseException e = thrown(HttpClientResponseException)
         e.status.code == 400
     }
+    // end::badrequest[]
 
+    // tag::notfound[]
     void "/issues/show/{number} without number responds 404"() {
         when:
         client.toBlocking().exchange("/issues/")
@@ -49,4 +52,5 @@ class IssuesControllerSpec extends Specification{
         HttpClientResponseException e = thrown(HttpClientResponseException)
         e.status.code == 404
     }
+    // end::notfound[]
 }
