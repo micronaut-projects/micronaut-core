@@ -1,0 +1,92 @@
+==== Obtaining a HttpClient
+
+There are a few ways by which you can obtain a reference to a api:http.client.HttpClient[]. The most common way is using the api:http.client.Client[] annotation. For example:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client("https://api.twitter.com/1.1") @Inject RxHttpClient httpClient;
+----
+
+The above example will inject a client that targets the Twitter API.
+
+The api:http.client.Client[] annotation is also a custom scope that will manage the creation of api:http.client.HttpClient[] instances and ensure they are shutdown when the application shuts down.
+
+The value you pass to the api:http.client.Client[] annotation can be one of the following:
+
+* A absolute URI. Example `https://api.twitter.com/1.1`
+* A relative URI, in which case the server targeted will be the current server (useful for testing)
+* A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
+
+Another way to create an `HttpClient` is with the `create` static method of the api:http.client.RxHttpClient[], however this approach is not recommended as you will have to ensure you manually shutdown the client and of course no dependency injection will occur for the created client.
+
+==== Performing an HTTP GET
+
+Generally there are two methods of interest when working with the `HttpClient`. The first method is called `retrieve`, which will execute an HTTP request and return the body in whichever type you request (by default a `String`) as an RxJava rx:Flowable[].
+
+The `retrieve` method accepts an api:http.HttpRequest[] object or a `String` URI to the endpoint you wish to request.
+
+The following example shows are you use retrieve to executing an HTTP `GET` and receive the response body as a `String`:
+
+.Using retrieve
+[source,java]
+----
+TODO - example showing:
+String val = client.retrieve("/foo/bar").blockingFirst()
+----
+
+WARNING: For documentation and illustration purposes we are using RxJava's `blockingFirst()` method, however this should never be done in an actual production application.
+
+==== Customizing the HTTP Request
+
+The previous example specifies a URI to request, but often you want to pass more information along, such as HTTP headers and so on. For that you should construct an `HttpRequest` instance using one of the static methods of the api:http.HttpRequest[] interface. For example:
+
+.Passing an HttpRequest to retrieve
+[source,java]
+----
+TODO - example showing:
+import static HttpRequest.*;
+String val = client.retrieve(
+    GET("/foo/bar")
+    .header("X-My-Header", "foo")
+).blockingFirst()
+----
+
+==== Reading JSON Responses
+
+Typically with Microservices a message encoding format is used such as JSON. Micronaut's HTTP client leverages Jackson for JSON parsing hence whatever type Jackson can decode can passed as a second argument to `retrieve`:
+
+.Decoding the response body to a Map
+[source,java]
+----
+TODO - example showing:
+Map json = client.retrieve(
+    "/foo/bar", Map.class
+).blockingFirst()
+----
+
+The above examples decodes the response into a jdk:java.util.Map[], representing the JSON. Whilst this can be desirably, more often than not you will want to decode objects into Plain Old Java Objects (POJOs). To do that simply pass the type instead:
+
+.Decoding the response body to a POJO
+[source,java]
+----
+TODO - example showing:
+Book book = client.retrieve(
+    "/foo/bar", Book.class
+).blockingFirst()
+----
+
+==== Receiving the Full HTTP Response
+
+Sometimes, receiving just the object is not enough and you need information about the response. In this case, instead of `retrieve` you should use the `exchange` method:
+
+.Recieving the Full HTTP Response
+[source,java]
+----
+TODO - example showing:
+HttpResponse<Book> response = client.exchange(
+    "/foo/bar", Book.class
+).blockingFirst()
+----
+
+The above example recieves the full api:http.HttpResponse[] object from which you can obtain headers and other useful information.

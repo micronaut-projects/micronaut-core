@@ -1,0 +1,71 @@
+All the examples up until now have used the same HTTP method i.e `GET`. The api:http.HttpRequest[] interface has factory methods for all the different HTTP methods. The following table summarizes the available methods:
+
+.HttpRequest Factory Methods
+|===
+|Method |Description|Allows Body
+
+| api:http.HttpRequest.GET(java.lang.String)[]
+| Constructs an HTTP `GET` request
+| `false`
+
+| api:http.HttpRequest.OPTIONS(java.lang.String)[]
+| Constructs an HTTP `OPTIONS` request
+| `false`
+
+| api:http.HttpRequest.HEAD(java.lang.String)[]
+| Constructs an HTTP `HEAD` request
+| `false`
+
+| api:http.HttpRequest.POST(java.lang.String,T)[]
+| Constructs an HTTP `POST` request
+| `true`
+
+| api:http.HttpRequest.PUT(java.lang.String,T)[]
+| Constructs an HTTP `PUT` request
+| `true`
+
+| api:http.HttpRequest.PATCH(java.lang.String,T)[]
+| Constructs an HTTP `PATCH` request
+| `true`
+
+| api:http.HttpRequest.DELETE(java.lang.String)[]
+| Constructs an HTTP `DELETE` request
+| `true`
+
+|===
+
+A `create` method also exists to construct a request for any api:http.HttpMethod[] type. Since the `POST`, `PUT` and `PATCH` methods require a body, a second argument which is the body object is required.
+
+The following example demonstrates how to send a simply `String` body:
+
+.Sending a `String` body
+[source,java]
+----
+TODO - example showing:
+import static HttpRequest.*;
+HttpResponse<?> response = client.exchange(
+    POST("/foo/bar", "My Body") <1>
+    .contentType(MediaType.TEXT_PLAIN) <2>
+).blockingFirst()
+----
+
+<1> The `POST` method is used with the first argument being the URI and the second argument the body
+<2> The content type is set to `text/plain` (the default content type is `application/json`)
+
+==== Sending JSON
+
+The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it:
+
+.Sending a JSON body
+[source,java]
+----
+TODO - example showing:
+import static HttpRequest.*;
+
+Book book = new Book("The Stand")
+client.exchange(
+    POST("/foo/bar", book)
+).subscribe(response ->
+    // handle response
+)
+----
