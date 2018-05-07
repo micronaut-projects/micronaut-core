@@ -30,6 +30,10 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     private final MethodNode methodNode;
 
+    /**
+     * @param methodNode         The {@link MethodNode}
+     * @param annotationMetadata The annotation metadata
+     */
     GroovyMethodElement(MethodNode methodNode, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.methodNode = methodNode;

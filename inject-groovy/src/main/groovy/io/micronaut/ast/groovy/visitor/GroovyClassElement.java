@@ -32,6 +32,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     private final ClassNode classNode;
 
+    /**
+     * @param classNode          The {@link ClassNode}
+     * @param annotationMetadata The annotation metadata
+     */
     GroovyClassElement(ClassNode classNode, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.classNode = classNode;
