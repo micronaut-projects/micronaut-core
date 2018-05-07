@@ -78,15 +78,19 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
-  lowLevelHttpClient: Using the Low-Level HTTP Client
+  lowLevelHttpClient:
+    title: Using the Low-Level HTTP Client
+    clientBasics: Sending your first HTTP request
+    clientPostRequests: Posting a Request Body
+    clientConfiguration: Configuring HTTP clients
+    clientStreaming: Streaming JSON over HTTP
+    clientUploads: Multipart Client Uploads
   clientAnnotation:
     title: Compile-Time HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
     clientHeaders: Customizing Request Headers
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    clientConfiguration: Configuring HTTP Clients
-  multipartRequest: Multipart Request Handling
   clientFilter: HTTP Client Filters
 cloud:
   title: Cloud Ready Features
