@@ -160,7 +160,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/objectToObject', json), String
+                HttpRequest.POST('/json/object-to-object', json), String
         ).blockingFirst()
 
 
@@ -184,7 +184,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/arrayToArray', json), String
+                HttpRequest.POST('/json/array-to-array', json), String
         ).blockingFirst()
 
         then:
@@ -220,7 +220,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/futureMap', json), String
+                HttpRequest.POST('/json/future-map', json), String
         ).blockingFirst()
 
         then:
@@ -231,7 +231,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/futureObject', json), String
+                HttpRequest.POST('/json/future-object', json), String
         ).blockingFirst()
 
         then:
@@ -243,7 +243,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/publisherObject', json), String
+                HttpRequest.POST('/json/publisher-object', json), String
         ).blockingFirst()
 
         then:

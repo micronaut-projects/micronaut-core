@@ -63,7 +63,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.POST | '/parameter/saveAgain?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.POST | '/parameter/save-again?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
@@ -73,7 +73,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
 

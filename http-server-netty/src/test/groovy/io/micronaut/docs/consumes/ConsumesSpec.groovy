@@ -45,7 +45,7 @@ class ConsumesSpec extends Specification {
         noExceptionThrown()
 
         when:
-        request = HttpRequest.POST("/test/multipleConsumes", book)
+        request = HttpRequest.POST("/test/multiple-consumes", book)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                 .accept(MediaType.APPLICATION_JSON_TYPE)
         rxClient.toBlocking().exchange(request)
@@ -54,7 +54,7 @@ class ConsumesSpec extends Specification {
         noExceptionThrown()
 
         when:
-        request = HttpRequest.POST("/test/multipleConsumes", book)
+        request = HttpRequest.POST("/test/multiple-consumes", book)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON_TYPE)
         rxClient.toBlocking().exchange(request)

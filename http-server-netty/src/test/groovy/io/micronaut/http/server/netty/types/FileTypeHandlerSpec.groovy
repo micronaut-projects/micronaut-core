@@ -74,7 +74,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        rxClient.exchange('/test/notFound', String).blockingFirst()
+        rxClient.exchange('/test/not-found', String).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -104,7 +104,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test/differentName', String).blockingFirst()
+        def response = rxClient.exchange('/test/different-name', String).blockingFirst()
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code

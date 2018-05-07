@@ -148,7 +148,7 @@ class MultipartFileUploadSpec extends Specification {
                 .build()
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                HttpRequest.POST("/multipart/complete-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -177,7 +177,7 @@ class MultipartFileUploadSpec extends Specification {
                 .build()
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                HttpRequest.POST("/multipart/complete-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -207,7 +207,7 @@ class MultipartFileUploadSpec extends Specification {
                 .build()
 
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/multipart/completeFileUpload", requestBody)
+                HttpRequest.POST("/multipart/complete-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
