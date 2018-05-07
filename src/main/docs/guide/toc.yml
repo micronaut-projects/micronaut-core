@@ -114,6 +114,7 @@ dataAccess:
   mongoSupport: Configuring MongoDB
   neo4jSupport: Configuring Neo4j
   redisSupport: Configuring Redis
+  cassandraSupport: Configuring Cassandra
 languageSupport:
   title: Language Support
   groovy: Micronaut for Groovy
