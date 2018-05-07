@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import javax.lang.model.element.ExecutableElement;
@@ -26,9 +27,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Utility visitor that only visits public abstract methods that have not been implemented by the given type
+ * Utility visitor that only visits public abstract methods that have not been implemented by the given type.
  *
+ * @param <R> The return type of the visitor's method
+ * @param <P> The type of the additional parameter to the visitor's methods.
  * @author graemerocher
+ * @see javax.lang.model.util.AbstractTypeVisitor8
  * @since 1.0
  */
 public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisitor<R, P> {
@@ -39,6 +43,11 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
 
     private Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
 
+    /**
+     * @param classElement The {@link TypeElement}
+     * @param modelUtils   The {@link ModelUtils}
+     * @param elementUtils The {@link Elements}
+     */
     PublicAbstractMethodVisitor(TypeElement classElement, ModelUtils modelUtils, Elements elementUtils) {
         this.classElement = classElement;
         this.modelUtils = modelUtils;

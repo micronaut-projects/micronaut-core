@@ -31,6 +31,10 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final VariableElement variableElement;
 
+    /**
+     * @param variableElement    The {@link VariableElement}
+     * @param annotationMetadata The annotation metadata
+     */
     JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata) {
         super(variableElement, annotationMetadata);
         this.variableElement = variableElement;
