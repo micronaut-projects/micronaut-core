@@ -23,7 +23,6 @@ import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
@@ -38,6 +37,9 @@ public class GroovyVisitorContext implements VisitorContext {
     private final ErrorCollector errorCollector;
     private final SourceUnit sourceUnit;
 
+    /**
+     * @param sourceUnit The {@link SourceUnit}
+     */
     public GroovyVisitorContext(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
@@ -59,8 +61,8 @@ public class GroovyVisitorContext implements VisitorContext {
     private SyntaxErrorMessage buildErrorMessage(String message, Element element) {
         ASTNode expr = (ASTNode) element.getNativeType();
         return new SyntaxErrorMessage(
-                new SyntaxException(message + '\n', expr.getLineNumber(), expr.getColumnNumber(),
-                        expr.getLastLineNumber(), expr.getLastColumnNumber()), sourceUnit);
+            new SyntaxException(message + '\n', expr.getLineNumber(), expr.getColumnNumber(),
+                expr.getLastLineNumber(), expr.getLastColumnNumber()), sourceUnit);
     }
 
 }
