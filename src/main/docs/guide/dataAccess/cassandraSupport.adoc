@@ -1,0 +1,17 @@
+Micronaut supports Cassandra configuration by using the https://docs.datastax.com/en/developer/java-driver/[Datastax Java Driver].
+Configuration values can be supplied a property source such as below. The property name is derived from the builder methods in
+https://docs.datastax.com/en/drivers/java/3.1/com/datastax/driver/core/Cluster.Builder.html[Cluster.Builder] (without the prefix).
+
+.Supply Single Configuration
+[source,groovy]
+----
+include::configurations/cassandra/src/test/groovy/io/micronaut/configuration/cassandra/CassandraConfigurationSpec.groovy[tags=single, indent=0]
+----
+
+Multiple cluster instances can be configured like follows:
+
+.Supply Multiple Configuration
+[source,groovy]
+----
+include::configurations/cassandra/src/test/groovy/io/micronaut/configuration/cassandra/CassandraConfigurationSpec.groovy[tags=multiple, indent=0]
+----
