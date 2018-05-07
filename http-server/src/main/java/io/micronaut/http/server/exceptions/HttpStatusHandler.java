@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
+import io.micronaut.http.hateos.JsonError;
 
 import javax.inject.Singleton;
 
@@ -42,7 +42,7 @@ public class HttpStatusHandler implements ExceptionHandler<HttpStatusException, 
 
         Object body = exception.getBody()
             .orElseGet(() -> {
-                VndError error = new VndError(exception.getMessage());
+                JsonError error = new JsonError(exception.getMessage());
                 error.link(Link.SELF, Link.of(request.getUri()));
 
                 return error;

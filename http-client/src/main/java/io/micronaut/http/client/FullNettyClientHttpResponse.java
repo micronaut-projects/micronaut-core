@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -158,6 +159,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
+            }
+            if(!convertedBodies.isEmpty()) {
+                for (Map.Entry<Argument, Optional> entry : convertedBodies.entrySet()) {
+                    Argument existing = entry.getKey();
+                    if(type.getType().isAssignableFrom(existing.getType())) {
+                        return entry.getValue();
+                    }
+                }
             }
             return Optional.empty();
         }

@@ -21,7 +21,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.hateos.VndError
+import io.micronaut.http.hateos.JsonError
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Get
 
@@ -40,12 +40,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/errors/server-error')
 
-        ).onErrorReturn({ t -> t.response.getBody(VndError); return t.response } ).blockingFirst()
+        ).onErrorReturn({ t -> t.response.getBody(JsonError); return t.response } ).blockingFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
-        response.getBody(VndError).get().message == 'Internal Server Error: bad'
+        response.getBody(JsonError).get().message == 'Internal Server Error: bad'
 
 
     }

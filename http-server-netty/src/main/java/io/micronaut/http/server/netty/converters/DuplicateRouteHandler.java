@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
@@ -40,7 +40,7 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
 
     @Override
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
-        VndError error = new VndError(exception.getMessage());
+        JsonError error = new JsonError(exception.getMessage());
         error.link(Link.SELF, Link.of(request.getUri()));
         return HttpResponse.badRequest(error);
     }

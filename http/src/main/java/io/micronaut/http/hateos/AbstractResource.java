@@ -47,7 +47,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param ref  The reference
      * @param link The link
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable Link link) {
         if (StringUtils.isNotEmpty(ref) && link != null) {
@@ -62,7 +62,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param ref  The reference
      * @param link The link
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable String link) {
         if (StringUtils.isNotEmpty(ref) && link != null) {
@@ -77,7 +77,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param ref      The reference
      * @param resource The resource
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, Resource resource) {
         if (StringUtils.isNotEmpty(ref) && resource != null) {
@@ -92,7 +92,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param ref      The reference
      * @param resource The resource
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, Resource... resource) {
         if (StringUtils.isNotEmpty(ref) && resource != null) {
@@ -107,7 +107,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param ref          The reference
      * @param resourceList The resources
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, List<Resource> resourceList) {
         if (StringUtils.isNotEmpty(ref) && resourceList != null) {
