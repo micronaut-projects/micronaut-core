@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 /**
- * Loads properties from system properties
+ * Loads properties from system properties.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,15 +25,18 @@ package io.micronaut.context.env;
 public class SystemPropertiesPropertySource extends MapPropertySource {
 
     /**
-     * Constant for System property source
+     * Constant for System property source.
      */
     public static final String NAME = "system";
 
     /**
-     * The position of the loader
+     * The position of the loader.
      */
     public static final int POSITION = -100;
 
+    /**
+     * Default constructor.
+     */
     public SystemPropertiesPropertySource() {
         super(NAME, System.getProperties());
     }

@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.annotation;
 
-import io.micronaut.context.env.Environment;
+package io.micronaut.context.annotation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -23,7 +22,7 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * <p>An annotation that can be used on either the main class or a test to provide additional hard coded
- * property values to the {@link Environment}</p>
+ * property values to the {@link io.micronaut.context.env.Environment}.</p>
  * <p>
  * <p>These properties are added at a high priority level and override all properties except CLI properties</p>
  *

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
@@ -27,7 +28,7 @@ import java.lang.reflect.Method;
 import java.util.Objects;
 
 /**
- * An abstract {@link Executable} for a method
+ * An abstract {@link Executable} for a method.
  *
  * @author graemerocher
  * @since 1.0
@@ -43,6 +44,11 @@ abstract class AbstractExecutable implements Executable {
     private Argument[] arguments;
     private Method method;
 
+    /**
+     * @param declaringType The declaring type
+     * @param methodName    The method name
+     * @param arguments     The arguments
+     */
     AbstractExecutable(Class declaringType, String methodName, Argument[] arguments) {
         Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         Objects.requireNonNull(methodName, "Method name cannot be null");
@@ -51,13 +57,11 @@ abstract class AbstractExecutable implements Executable {
         this.declaringType = declaringType;
         this.methodName = methodName;
 
-        if( ArrayUtils.isNotEmpty(arguments) ) {
+        if (ArrayUtils.isNotEmpty(arguments)) {
             this.arguments = arguments;
+        } else {
+            this.arguments = Argument.ZERO_ARGUMENTS;
         }
-        else {
-            this.arguments= Argument.ZERO_ARGUMENTS;
-        }
-
     }
 
     @Override
@@ -68,15 +72,16 @@ abstract class AbstractExecutable implements Executable {
     }
 
     /**
-     * Soft resolves the target {@link Method} avoiding reflection until as late as possible
+     * Soft resolves the target {@link Method} avoiding reflection until as late as possible.
+     *
      * @return The method
      * @throws NoSuchMethodError if the method doesn't exist
      */
     public final Method getTargetMethod() {
         Method method = initialize();
-        if(method == null) {
-            if(LOG.isWarnEnabled()) {
-                if(LOG.isWarnEnabled()) {
+        if (method == null) {
+            if (LOG.isWarnEnabled()) {
+                if (LOG.isWarnEnabled()) {
                     LOG.warn("Type [{}] previously declared a method [{}] which has been removed or changed. It is recommended you re-compile the class or library against the latest version to remove this warning.", declaringType, methodName);
                 }
             }
@@ -85,23 +90,20 @@ abstract class AbstractExecutable implements Executable {
         return method;
     }
 
-
     private Method initialize() {
-        if(method == null) {
+        if (method == null) {
             Method method = ReflectionUtils.getMethod(declaringType, methodName, argTypes).orElse(null);
-            if(method != null) {
+            if (method != null) {
 
                 // instrument the arguments with annotation data from the method
                 method.setAccessible(true);
                 this.method = method;
                 return method;
-            }
-            else {
+            } else {
                 return null;
             }
 
-        }
-        else {
+        } else {
             return method;
         }
     }

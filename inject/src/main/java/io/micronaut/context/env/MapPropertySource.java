@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import java.util.Iterator;
 import java.util.Map;
 
 /**
- * A {@link PropertySource} that uses a map
+ * A {@link PropertySource} that uses a map.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,6 +30,12 @@ public class MapPropertySource implements PropertySource {
     private final String name;
     private final Map map;
 
+    /**
+     * Creates a map property source.
+     *
+     * @param name The name of the property source
+     * @param map  The map
+     */
     public MapPropertySource(String name, Map map) {
         this.name = name;
         this.map = map;
@@ -62,9 +69,10 @@ public class MapPropertySource implements PropertySource {
     }
 
     /**
-     * Create a new {@link MapPropertySource} from the given map
+     * Create a new {@link MapPropertySource} from the given map.
      *
-     * @param map The map
+     * @param name The name of the property source
+     * @param map  The map
      * @return The map property source
      */
     public static MapPropertySource of(String name, Map<String, Object> map) {

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.processing;
 
 import javax.lang.model.element.Name;
@@ -20,7 +21,7 @@ import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 
 /**
- * Utility methods for Java model handling
+ * Utility methods for Java model handling.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,7 +29,7 @@ import javax.lang.model.element.TypeElement;
 public class JavaModelUtils {
 
     /**
-     * Get the class name for the given type element. Handles {@link NestingKind}
+     * Get the class name for the given type element. Handles {@link NestingKind}.
      *
      * @param typeElement The type element
      * @return The class name

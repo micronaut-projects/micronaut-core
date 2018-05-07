@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains interfaces for defining type visitors that work across languages
+ * Contains interfaces for defining type visitors that work across languages.
  *
  * @author graemerocher
  * @since 1.0

@@ -13,11 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
@@ -92,40 +96,33 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The default context implementations
+ * The default context implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("MagicNumber")
 public class DefaultBeanContext implements BeanContext {
 
-    private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
+    private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
+
+    final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(30);
 
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
 
-    private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
-                                                                                        .maximumSize(30)
-                                                                                        .build();
-    private final Cache<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = Caffeine.newBuilder()
-                                                                                                .maximumSize(30)
-                                                                                                .build();
-    private final Cache<Class, Collection<BeanDefinition>> beanCandidateCache = Caffeine.newBuilder()
-                                                                                        .maximumSize(30)
-                                                                                        .build();
-
-    final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(30);
+    private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder().maximumSize(30).build();
+    private final Cache<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = Caffeine.newBuilder().maximumSize(30).build();
+    private final Cache<Class, Collection<BeanDefinition>> beanCandidateCache = Caffeine.newBuilder().maximumSize(30).build();
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
@@ -133,14 +130,14 @@ public class DefaultBeanContext implements BeanContext {
     private final ResourceLoader resourceLoader;
 
     /**
-     * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class
+     * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
      */
     public DefaultBeanContext() {
         this(BeanContext.class.getClassLoader());
     }
 
     /**
-     * Construct a new bean context with the given class loader
+     * Construct a new bean context with the given class loader.
      *
      * @param classLoader The class loader
      */
@@ -149,7 +146,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Construct a new bean context with the given class loader
+     * Construct a new bean context with the given class loader.
      *
      * @param resourceLoader The resource loader
      */
@@ -164,7 +161,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * The start method will read all bean definition classes found on the classpath and initialize any pre-required state
+     * The start method will read all bean definition classes found on the classpath and initialize any pre-required
+     * state.
      */
     @Override
     public synchronized BeanContext start() {
@@ -194,7 +192,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
+     * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded
+     * singletons.
      */
     @Override
     public BeanContext stop() {
@@ -225,16 +224,16 @@ public class DefaultBeanContext implements BeanContext {
                         //noinspection unchecked
                         ((DisposableBeanDefinition) def).dispose(this, bean);
                     } catch (Throwable e) {
-                        if(LOG.isErrorEnabled()) {
+                        if (LOG.isErrorEnabled()) {
                             LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
                         }
                     }
                 }
-                if(def instanceof Closeable) {
+                if (def instanceof Closeable) {
                     try {
-                        ((Closeable)def).close();
+                        ((Closeable) def).close();
                     } catch (Throwable e) {
-                        if(LOG.isErrorEnabled()) {
+                        if (LOG.isErrorEnabled()) {
                             LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
                         }
                     }
@@ -251,7 +250,7 @@ public class DefaultBeanContext implements BeanContext {
     @Nonnull
     public AnnotatedElement resolveElement(Class<?> type) {
         Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
-        if(candidate.isPresent()) {
+        if (candidate.isPresent()) {
             return candidate.get();
         }
         return type;
@@ -261,7 +260,7 @@ public class DefaultBeanContext implements BeanContext {
     @Nonnull
     public AnnotationMetadata resolveMetadata(Class<?> type) {
         Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
-        if(candidate.isPresent()) {
+        if (candidate.isPresent()) {
             return candidate.get();
         }
         return AnnotationMetadata.EMPTY_METADATA;
@@ -379,7 +378,6 @@ public class DefaultBeanContext implements BeanContext {
         return Optional.empty();
     }
 
-
     @Override
     public <T> BeanContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier, boolean inject) {
         if (singleton == null) {
@@ -495,7 +493,16 @@ public class DefaultBeanContext implements BeanContext {
         return streamOfType(null, beanType, qualifier);
     }
 
-    <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    /**
+     * Obtains a stream of beans of the given type and qualifier.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean concrete type
+     * @return A stream
+     */
+    protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return getBeansOfTypeInternal(resolutionContext, beanType, qualifier).stream();
     }
 
@@ -543,6 +550,15 @@ public class DefaultBeanContext implements BeanContext {
         throw new NoSuchBeanException(beanType);
     }
 
+    /**
+     * @param resolutionContext The bean resolution context
+     * @param definition        The bean definition
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param args              The argument values
+     * @param <T>               the bean generic type
+     * @return The instance
+     */
     protected <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, Object... args) {
         Map<String, Object> argumentValues;
         if (definition instanceof ParametrizedBeanFactory) {
@@ -605,12 +621,20 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             );
-
         }
         return bean;
     }
 
-    <T> T createBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    /**
+     * Creates a bean.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean generic type
+     * @return The instance
+     */
+    protected <T> T createBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, true, false);
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> candidate = concreteCandidate.get();
@@ -626,7 +650,16 @@ public class DefaultBeanContext implements BeanContext {
         throw new NoSuchBeanException(beanType);
     }
 
-    <T> T inject(BeanResolutionContext resolutionContext, BeanDefinition requestingBeanDefinition, T instance) {
+    /**
+     * Injects a bean.
+     *
+     * @param resolutionContext        The bean resolution context
+     * @param requestingBeanDefinition The requesting bean definition
+     * @param instance                 The instance
+     * @param <T>                      The instance type
+     * @return The instance
+     */
+    protected <T> T inject(BeanResolutionContext resolutionContext, BeanDefinition requestingBeanDefinition, T instance) {
         @SuppressWarnings("unchecked") Class<T> beanType = (Class<T>) instance.getClass();
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, null, false, true);
         if (concreteCandidate.isPresent()) {
@@ -640,16 +673,40 @@ public class DefaultBeanContext implements BeanContext {
         return instance;
     }
 
-
-    <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
+    /**
+     * Get all beans of the given type.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param <T>               The bean type parameter
+     * @return The found beans
+     */
+    protected <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeansOfTypeInternal(resolutionContext, beanType, null);
     }
 
-    <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    /**
+     * Get all beans of the given type and qualifier.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found beans
+     */
+    protected <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return getBeansOfTypeInternal(resolutionContext, beanType, qualifier);
     }
 
-    <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType) {
+    /**
+     * Get provided beans of the given type.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param <T>               The bean type parameter
+     * @return The found beans
+     */
+    protected <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeanProvider(resolutionContext, beanType, null);
     }
 
@@ -683,7 +740,6 @@ public class DefaultBeanContext implements BeanContext {
             }
             return findConcreteCandidateNoCache((Class) beanType, qualifier, true, false, false);
         });
-
     }
 
     @SuppressWarnings("unchecked")
@@ -733,15 +789,40 @@ public class DefaultBeanContext implements BeanContext {
         return (Collection<BeanDefinition<?>>) Collections.EMPTY_MAP;
     }
 
-
+    /**
+     * Get a bean of the given type.
+     *
+     * @param resolutionContext The bean context resolution
+     * @param beanType          The bean type
+     * @param <T>               The bean type parameter
+     * @return The found bean
+     */
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeanInternal(resolutionContext, beanType, null, true, true);
     }
 
+    /**
+     * Get a bean of the given type and qualifier.
+     *
+     * @param resolutionContext The bean context resolution
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean
+     */
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return getBeanInternal(resolutionContext, beanType, qualifier, true, true);
     }
 
+    /**
+     * Find an optional bean of the given type and qualifier.
+     *
+     * @param resolutionContext The bean context resolution
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean wrapped as an {@link Optional}
+     */
     public <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         // allow injection the bean context
         if (thisInterfaces.contains(beanType)) {
@@ -782,14 +863,23 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Invalidates the bean caches
+     * Invalidates the bean caches.
      */
-    void invalidateCaches() {
+    protected void invalidateCaches() {
         beanCandidateCache.invalidateAll();
         initializedObjectsByType.invalidateAll();
     }
 
-    <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    /**
+     * Get a bean provider.
+     *
+     * @param resolutionContext The bean resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The bean provider
+     */
+    protected <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         @SuppressWarnings("unchecked") BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
         if (beanRegistration != null) {
             return new ResolvedProvider<>(beanRegistration.bean);
@@ -805,7 +895,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Resolves the {@link BeanDefinitionReference} class instances. Default implementation uses ServiceLoader pattern
+     * Resolves the {@link BeanDefinitionReference} class instances. Default implementation uses ServiceLoader pattern.
      *
      * @return The bean definition classes
      */
@@ -814,7 +904,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Resolves the {@link BeanConfiguration} class instances. Default implementation uses ServiceLoader pattern
+     * Resolves the {@link BeanConfiguration} class instances. Default implementation uses ServiceLoader pattern.
      *
      * @return The bean definition classes
      */
@@ -823,7 +913,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Initialize the context with the given {@link Context} scope beans
+     * Initialize the context with the given {@link io.micronaut.context.annotation.Context} scope beans.
      *
      * @param contextScopeBeans The context scope beans
      * @param processedBeans    The beans that require {@link ExecutableMethodProcessor} handling
@@ -835,14 +925,13 @@ public class DefaultBeanContext implements BeanContext {
                 BeanDefinition beanDefinition = contextScopeBean.load(this);
                 if (beanDefinition.isEnabled(this)) {
 
-                    if(beanDefinition.isIterable()) {
+                    if (beanDefinition.isIterable()) {
                         Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
                         for (BeanDefinition beanCandidate : beanCandidates) {
                             createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanCandidate, beanCandidate.getBeanType(), null);
                         }
 
-                    }
-                    else {
+                    } else {
 
                         createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
                     }
@@ -902,7 +991,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Find bean candidates for the given type
+     * Find bean candidates for the given type.
      *
      * @param beanType The bean type
      * @param filter   A bean definition to filter out
@@ -953,7 +1042,7 @@ public class DefaultBeanContext implements BeanContext {
                     replacedTypes.add(aClass);
                 });
             }
-            if(!replacedTypes.isEmpty()) {
+            if (!replacedTypes.isEmpty()) {
                 candidates.removeIf(definition -> replacedTypes.contains(definition.getBeanType()));
             }
 
@@ -970,7 +1059,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Find bean candidates for the given type
+     * Find bean candidates for the given type.
      *
      * @param instance The bean instance
      * @param <T>      The bean generic type
@@ -1002,7 +1091,7 @@ public class DefaultBeanContext implements BeanContext {
                     candidates = candidates
                         .stream()
                         .filter(candidate ->
-                                !(candidate instanceof NoInjectionBeanDefinition) &&
+                            !(candidate instanceof NoInjectionBeanDefinition) &&
                                 candidate.getBeanType() == instance.getClass()
                         )
                         .collect(Collectors.toList());
@@ -1023,7 +1112,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Registers an active configuration
+     * Registers an active configuration.
      *
      * @param configuration The configuration to register
      */
@@ -1032,7 +1121,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Execution the creation of a bean
+     * Execution the creation of a bean.
      *
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
@@ -1142,7 +1231,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Fall back method to attempt to find a candidate for the given definitions
+     * Fall back method to attempt to find a candidate for the given definitions.
      *
      * @param beanType   The bean type
      * @param qualifier  The qualifier
@@ -1255,7 +1344,6 @@ public class DefaultBeanContext implements BeanContext {
                             throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
                         }
                         return createBean;
-
                     }
 
                     @Override
@@ -1312,14 +1400,14 @@ public class DefaultBeanContext implements BeanContext {
         return bean;
     }
 
-    /*
-     * Find a concrete candidate for the given qualifier
+    /**
+     * Find a concrete candidate for the given qualifier.
      *
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     * @param throwNonUnique Whether to throw an exception if the bean is not found
+     * @param beanType        The bean type
+     * @param qualifier       The qualifier
+     * @param throwNonUnique  Whether to throw an exception if the bean is not found
      * @param includeProvided Whether to include provided resolution
-     * @param <T> The bean generic type
+     * @param <T>             The bean generic type
      * @return The concrete bean definition candidate
      */
     @SuppressWarnings("unchecked")
@@ -1533,11 +1621,11 @@ public class DefaultBeanContext implements BeanContext {
             } else {
                 Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
                 if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
-                    if(AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
                         AbstractBeanContextConditional.LOG.debug(
-                                "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
-                                beanDefinitionReference.getName(),
-                                beanConfiguration);
+                            "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
+                            beanDefinitionReference.getName(),
+                            beanConfiguration);
                     }
                     continue;
                 }
@@ -1556,7 +1644,6 @@ public class DefaultBeanContext implements BeanContext {
 
         initializeContext(contextScopeBeans, processedBeans);
     }
-
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
@@ -1635,7 +1722,9 @@ public class DefaultBeanContext implements BeanContext {
                 .collect(Collectors.toList());
             if (!reduced.isEmpty()) {
                 for (BeanDefinition<T> definition : reduced) {
-                    if (processedDefinitions.contains(definition)) continue;
+                    if (processedDefinitions.contains(definition)) {
+                        continue;
+                    }
                     if (definition.isSingleton()) {
                         allCandidatesAreSingleton = true;
                     }
@@ -1727,10 +1816,17 @@ public class DefaultBeanContext implements BeanContext {
         beansOfTypeList.add(bean);
     }
 
-    private static abstract class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<R> {
+    /**
+     * @param <T> The type
+     * @param <R> The return type
+     */
+    private abstract static class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<R> {
         protected final ExecutableMethod<T, R> method;
 
-        public AbstractExecutionHandle(ExecutableMethod<T, R> method) {
+        /**
+         * @param method The method
+         */
+        AbstractExecutionHandle(ExecutableMethod<T, R> method) {
             this.method = method;
         }
 
@@ -1760,9 +1856,18 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    /**
+     * @param <T> The targe type
+     * @param <R> The return type
+     */
     private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
+
         private final T target;
 
+        /**
+         * @param target The target type
+         * @param method The method
+         */
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
             super(method);
             this.target = target;
@@ -1785,12 +1890,22 @@ public class DefaultBeanContext implements BeanContext {
 
     }
 
+    /**
+     * @param <T>
+     * @param <R>
+     */
     private static final class BeanExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
         private final BeanContext beanContext;
         private final Class<T> beanType;
         private final Qualifier<T> qualifier;
 
-        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
+        /**
+         * @param beanContext The bean context
+         * @param beanType    The bean type
+         * @param qualifier   The qualifier
+         * @param method      The method
+         */
+        BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
             super(method);
             this.beanContext = beanContext;
             this.beanType = beanType;
@@ -1811,13 +1926,21 @@ public class DefaultBeanContext implements BeanContext {
         public R invoke(Object... arguments) {
             return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
         }
-
     }
 
+    /**
+     * Class used as a bean key.
+     *
+     * @param <T> The bean type
+     */
     static final class BeanKey<T> implements BeanIdentifier {
         private final Class beanType;
         private final Qualifier qualifier;
 
+        /**
+         * @param beanType  The bean type
+         * @param qualifier The qualifier
+         */
         BeanKey(Class<T> beanType, Qualifier<T> qualifier) {
             this.beanType = beanType;
             this.qualifier = qualifier;
@@ -1845,12 +1968,18 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             BeanKey that = (BeanKey) o;
 
-            if (!beanType.equals(that.beanType)) return false;
+            if (!beanType.equals(that.beanType)) {
+                return false;
+            }
             return qualifier != null ? qualifier.equals(that.qualifier) : that.qualifier == null;
         }
 
@@ -1870,10 +1999,16 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    /**
+     * @param <T> The bean type
+     */
     private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
 
-        public NoInjectionBeanDefinition(Class singletonClass) {
+        /**
+         * @param singletonClass The singleton class
+         */
+        NoInjectionBeanDefinition(Class singletonClass) {
             this.singletonClass = singletonClass;
         }
 
@@ -1976,8 +2111,12 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             NoInjectionBeanDefinition that = (NoInjectionBeanDefinition) o;
 

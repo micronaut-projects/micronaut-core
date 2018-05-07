@@ -13,30 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.service.ServiceDescriptorGenerator;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import java.io.*;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Optional;
+import java.io.IOException;
+import java.io.OutputStream;
 
 /**
- * Writes configuration classes for configuration packages using ASM
+ * Writes configuration classes for configuration packages using ASM.
  *
  * @author Graeme Rocher
  * @see BeanConfiguration
@@ -47,13 +40,17 @@ import java.util.Optional;
 public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     /**
-     * Suffix for generated configuration classes
+     * Suffix for generated configuration classes.
      */
     public static final String CLASS_SUFFIX = "$BeanConfiguration";
     private final String packageName;
     private final String configurationClassName;
     private final String configurationClassInternalName;
 
+    /**
+     * @param packageName        The package name
+     * @param annotationMetadata The annotation metadata
+     */
     public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
         super(packageName + '.' + CLASS_SUFFIX, annotationMetadata);
         this.packageName = packageName;
@@ -73,7 +70,6 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         }
         classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName);
     }
-
 
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);

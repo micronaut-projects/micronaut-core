@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
- * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}
+ * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}.
  *
+ * @param <T> The bean type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional {
 
     /**
-     * @return Whether the bean definition is the {@link Primary}
+     * @return Whether the bean definition is the {@link io.micronaut.context.annotation.Primary}
      */
     boolean isPrimary();
 
@@ -47,11 +45,12 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
     }
 
     /**
-     * By default, when the {@link BeanContext} is started, the {@link BeanDefinition#getExecutableMethods()} are not
-     * processed by registered {@link ExecutableMethodProcessor} instances unless this method returns true.
+     * By default, when the {@link io.micronaut.context.BeanContext} is started, the
+     * {@link BeanDefinition#getExecutableMethods()} are not processed by registered
+     * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.
      *
      * @return Whether the bean definition requires method processing
-     * @see Executable#processOnStartup()
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
      */
     default boolean requiresMethodProcessing() {
         return false;

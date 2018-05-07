@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -21,21 +22,37 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 
 /**
- * Represents a circular dependency failure
+ * Represents a circular dependency failure.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class CircularDependencyException extends DependencyInjectionException {
 
+    /**
+     * @param resolutionContext The resolution context
+     * @param argument          The argument
+     * @param message           The message
+     */
     public CircularDependencyException(BeanResolutionContext resolutionContext, Argument argument, String message) {
         super(resolutionContext, argument, message, true);
     }
 
+    /**
+     * @param resolutionContext   The resolution context
+     * @param fieldInjectionPoint The field injection point
+     * @param message             The message
+     */
     public CircularDependencyException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message) {
         super(resolutionContext, fieldInjectionPoint, message, true);
     }
 
+    /**
+     * @param resolutionContext    The resolution context
+     * @param methodInjectionPoint The method injection point
+     * @param argument             The argument
+     * @param message              The message
+     */
     public CircularDependencyException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message) {
         super(resolutionContext, methodInjectionPoint, argument, message, true);
     }

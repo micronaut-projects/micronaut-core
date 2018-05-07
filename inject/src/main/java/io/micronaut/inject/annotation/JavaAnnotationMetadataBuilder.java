@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
-
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -43,7 +42,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * A {@link AnnotationMetadata} for builder for Java to be used at compile time
+ * A {@link io.micronaut.core.annotation.AnnotationMetadata} for builder for Java to be used at compile time.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -52,6 +51,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     private final Elements elementUtils;
 
+    /**
+     * @param elementUtils Element utils
+     */
     public JavaAnnotationMetadataBuilder(Elements elementUtils) {
         this.elementUtils = elementUtils;
     }
@@ -237,7 +239,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     /**
-     * Checks if a method has an annotation
+     * Checks if a method has an annotation.
      *
      * @param method The method
      * @param ann    The annotation to look for
@@ -253,15 +255,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return false;
     }
 
+    /**
+     * Meta annotation value visitor class.
+     */
     private class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
         private final Map<CharSequence, Object> annotationValues;
         private final String memberName;
 
-        public MetadataAnnotationValueVisitor(Map<CharSequence, Object> annotationValues, String member) {
+        /**
+         * @param annotationValues A map of annotation values
+         * @param member           A member
+         */
+        MetadataAnnotationValueVisitor(Map<CharSequence, Object> annotationValues, String member) {
             this.annotationValues = annotationValues;
             this.memberName = member;
         }
-
 
         @Override
         public Object visitBoolean(boolean b, Object o) {
@@ -319,9 +327,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitType(TypeMirror t, Object o) {
-            if(t instanceof DeclaredType) {
+            if (t instanceof DeclaredType) {
                 Element typeElement = ((DeclaredType) t).asElement();
-                if(typeElement instanceof TypeElement) {
+                if (typeElement instanceof TypeElement) {
                     String className = JavaModelUtils.getClassName((TypeElement) typeElement);
                     annotationValues.put(memberName, className);
                 }
@@ -354,6 +362,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             return null;
         }
 
+        /**
+         * Array value visitor class.
+         */
         @SuppressWarnings("unchecked")
         private class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
 
@@ -434,9 +445,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             @Override
             public Object visitType(TypeMirror t, Object o) {
                 arrayType = String.class;
-                if(t instanceof DeclaredType) {
+                if (t instanceof DeclaredType) {
                     Element typeElement = ((DeclaredType) t).asElement();
-                    if(typeElement instanceof TypeElement) {
+                    if (typeElement instanceof TypeElement) {
                         values.add(JavaModelUtils.getClassName((TypeElement) typeElement));
                     }
                 }

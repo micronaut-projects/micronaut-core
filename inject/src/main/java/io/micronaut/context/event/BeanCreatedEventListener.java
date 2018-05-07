@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import java.util.EventListener;
@@ -22,6 +23,7 @@ import java.util.EventListener;
  * <p>
  * <p>Allows customization of the created beans.</p>
  *
+ * @param <T> The event type
  * @author Graeme Rocher
  * @see BeanCreatedEvent
  * @since 1.0
@@ -29,7 +31,8 @@ import java.util.EventListener;
 public interface BeanCreatedEventListener<T> extends EventListener {
 
     /**
-     * Fired when a bean is created and all {@link javax.annotation.PostConstruct} initialization hooks have been called
+     * Fired when a bean is created and all {@link javax.annotation.PostConstruct} initialization hooks have been
+     * called.
      *
      * @param event The bean created event
      * @return The bean or a replacement bean of the same type

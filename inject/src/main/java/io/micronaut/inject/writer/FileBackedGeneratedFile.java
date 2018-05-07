@@ -13,13 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.Writer;
 import java.nio.file.Files;
 
 /**
- * A {@link GeneratedFile} backed by a {@link File}
+ * A {@link GeneratedFile} backed by a {@link File}.
  *
  * @author graemerocher
  * @since 1.0
@@ -27,7 +37,10 @@ import java.nio.file.Files;
 class FileBackedGeneratedFile implements GeneratedFile {
     private final File file;
 
-    public FileBackedGeneratedFile(File file) {
+    /**
+     * @param file The file
+     */
+    FileBackedGeneratedFile(File file) {
         this.file = file;
     }
 
@@ -56,7 +69,7 @@ class FileBackedGeneratedFile implements GeneratedFile {
 
     @Override
     public CharSequence getTextContent() throws IOException {
-        if(file.exists()) {
+        if (file.exists()) {
             return new String(Files.readAllBytes(file.toPath()));
         }
         return null;

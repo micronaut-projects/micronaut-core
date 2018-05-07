@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -23,19 +24,26 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 import javax.annotation.Nullable;
 
 /**
- * A {@link ConstructorInjectionPoint} that invokes a method without relying on reflection
+ * A {@link ConstructorInjectionPoint} that invokes a method without relying on reflection.
  *
  * @author graemerocher
  * @since 1.0
  */
-class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint
-{
+class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
+
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring bean type
+     * @param methodName         The method name
+     * @param arguments          The arguments
+     * @param annotationMetadata The annotation metadata
+     */
     DefaultMethodConstructorInjectionPoint(
-            BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata) {
+        BeanDefinition declaringBean,
+        Class<?> declaringType,
+        String methodName,
+        @Nullable Argument[] arguments,
+        @Nullable AnnotationMetadata annotationMetadata) {
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }
 
