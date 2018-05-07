@@ -1,32 +1,38 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * Default implementation of the {@link ConversionContext} interface
+ * Default implementation of the {@link ConversionContext} interface.
  *
+ * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -44,13 +50,18 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     }
 
     @Override
+    public Argument[] getTypeParameters() {
+        return argument.getTypeParameters();
+    }
+
+    @Override
     public Map<String, Argument<?>> getTypeVariables() {
         return argument.getTypeVariables();
     }
 
     @Override
     public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[] { argument };
+        return new AnnotatedElement[]{argument};
     }
 
     @Override
@@ -65,14 +76,14 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
 
     @Override
     public void reject(Exception exception) {
-        if(exception != null) {
-            conversionErrors.add(()-> exception);
+        if (exception != null) {
+            conversionErrors.add(() -> exception);
         }
     }
 
     @Override
     public void reject(Object value, Exception exception) {
-        if(exception != null) {
+        if (exception != null) {
             conversionErrors.add(new ConversionError() {
                 @Override
                 public Optional<Object> getOriginalValue() {
@@ -89,8 +100,8 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
 
     @Override
     public Optional<ConversionError> getLastError() {
-        if( !conversionErrors.isEmpty()) {
-            return Optional.of(conversionErrors.get(conversionErrors.size()-1));
+        if (!conversionErrors.isEmpty()) {
+            return Optional.of(conversionErrors.get(conversionErrors.size() - 1));
         }
         return Optional.empty();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,20 @@
 package io.micronaut.docs.server.upload;
 
 // tag::imports[]
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
+import java.io.File;
 // end::imports[]
 
 // tag::completedImports[]
-import io.micronaut.http.server.netty.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedFileUpload;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Optional;
+import java.nio.file.*;
 // end::completedImports[]
 /**
  * @author Graeme Rocher
@@ -48,28 +42,28 @@ public class UploadController {
 
     // tag::upload[]
     @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public Single<HttpResponse<String>> upload(StreamingFileUpload file, Optional<String> anotherAttribute) { // <2>
-        Publisher<Boolean> uploadPublisher = file.transferTo(file.getFilename()); // <3>
+    public Single<HttpResponse<String>> upload(StreamingFileUpload file) throws IOException { // <2>
+        File tempFile = File.createTempFile(file.getFilename(), "temp");
+        Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
         return Single.fromPublisher(uploadPublisher)  // <4>
-                    .map(success -> {
-                        if (success) {
-                            return HttpResponse.ok("Uploaded");
-                        } else {
-                            return HttpResponse.<String>status(HttpStatus.CONFLICT)
-                                               .body("Upload Failed");
-                        }
-                    });
+            .map(success -> {
+                if (success) {
+                    return HttpResponse.ok("Uploaded");
+                } else {
+                    return HttpResponse.<String>status(HttpStatus.CONFLICT)
+                                       .body("Upload Failed");
+                }
+            });
     }
     // end::upload[]
 
     // tag::completedUpload[]
     @Post(value = "/completed", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
-    public HttpResponse<String> uploadCompleted(CompletedFileUpload file, Optional<String> anotherAttribute) { // <2>
-
+    public HttpResponse<String> uploadCompleted(CompletedFileUpload file) { // <2>
         try {
-            Path path = Paths.get(file.getFilename()); //<3>
-            Files.write(path, file.getBytes());
-
+            File tempFile = File.createTempFile(file.getFilename(), "temp"); //<3>
+            Path path = Paths.get(tempFile.getAbsolutePath());
+            Files.write(path, file.getBytes()); //<3>
             return HttpResponse.ok("Uploaded");
         } catch (IOException exception) {
             return HttpResponse.badRequest("Upload Failed");
@@ -80,11 +74,10 @@ public class UploadController {
     // tag::bytesUpload[]
     @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
     public HttpResponse<String> uploadBytes(byte[] file, String fileName) { // <2>
-
         try {
-            Path path = Paths.get(fileName);
+            File tempFile = File.createTempFile(fileName, "temp");
+            Path path = Paths.get(tempFile.getAbsolutePath());
             Files.write(path, file); // <3>
-
             return HttpResponse.ok("Uploaded");
         } catch (IOException exception) {
             return HttpResponse.badRequest("Upload Failed");

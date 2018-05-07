@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,10 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import org.objectweb.asm.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import org.objectweb.asm.Type;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -42,11 +41,12 @@ class ConfigBuilderState {
 
     /**
      * Constructs a config builder
-     * @param type The builder type
-     * @param name The name of the field or method
-     * @param isMethod Is the configuration builder resolver a method
+     *
+     * @param type               The builder type
+     * @param name               The name of the field or method
+     * @param isMethod           Is the configuration builder resolver a method
      * @param annotationMetadata The annotation metadata
-     * @param metadataBuilder The metadata builder
+     * @param metadataBuilder    The metadata builder
      */
     ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
         this.type = AbstractClassFileWriter.getTypeReference(type);

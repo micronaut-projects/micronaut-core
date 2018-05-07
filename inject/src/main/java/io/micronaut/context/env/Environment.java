@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +15,22 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.annotation.Annotation;
-import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -59,6 +59,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The cloud environment
      */
     String CLOUD = "cloud";
+
     /**
      * The default bootstrap name
      */
@@ -68,10 +69,22 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The default bootstrap name
      */
     String CLOUD_PLATFORM_PROPERTY = "micronaut.cloud.platform";
+
+    /**
+     * The property that stores additional environments
+     */
+    String ENVIRONMENTS_PROPERTY = "micronaut.environments";
+
+    /**
+     * The environment key that stores additional environments
+     */
+    String ENVIRONMENTS_ENV = "MICRONAUT_ENVIRONMENTS";
+
     /**
      * The default bootstrap config name
      */
     String BOOTSTRAP_NAME = "bootstrap";
+
     /**
      * The default application name
      */
@@ -98,7 +111,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String BARE_METAL = "baremetal";
 
     /**
-     *  cloud provider IBM cloud
+     * cloud provider IBM cloud
      */
     String IBM = "ibm";
 
@@ -111,6 +124,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @return The active property sources
      */
     Collection<PropertySource> getPropertySources();
+
     /**
      * Adds a property source to this environment
      *
@@ -133,7 +147,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param names The names of the configuration
      * @return This environment
      */
-    Environment addConfigurationExcludes(String...names);
+    Environment addConfigurationExcludes(String... names);
 
     /**
      * Exclude configurations by name
@@ -141,7 +155,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param names The names of the configuration
      * @return This environment
      */
-    Environment addConfigurationIncludes(String...names);
+    Environment addConfigurationIncludes(String... names);
 
     /**
      * @return The application packages
@@ -152,6 +166,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @return The placeholder resolver
      */
     PropertyPlaceholderResolver getPlaceholderResolver();
+
     /**
      * Refresh the environment from the list of {@link PropertySource} instances and return a diff of the changes
      *
@@ -161,11 +176,12 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
 
     /**
      * Add a property source for the given map
+     *
      * @param values The values
      * @return This environment
      */
     default Environment addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
-        if(StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
+        if (StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
             return addPropertySource(PropertySource.of(name, values));
         }
         return this;
@@ -195,6 +211,19 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     }
 
     /**
+     * Scan the current environment for classes annotated with the given annotation. Use with care, repeated
+     * invocations should be avoided for performance reasons.
+     *
+     * @param annotation The annotation to scan
+     * @param packages The packages to scan
+     * @return The classes
+     */
+    default Stream<Class> scan(Class<? extends Annotation> annotation, String...packages) {
+        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(getClassLoader());
+        return scanner.scan(annotation, Arrays.asList(packages));
+    }
+
+    /**
      * @return The class loader for the environment
      */
     default ClassLoader getClassLoader() {
@@ -219,9 +248,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      */
     boolean isActive(BeanConfiguration configuration);
 
-
     /**
      * Obtains the {@link PropertySourceLoader} instances
+     *
      * @return A collection of {@link PropertySourceLoader}
      */
     Collection<PropertySourceLoader> getPropertySourceLoaders();

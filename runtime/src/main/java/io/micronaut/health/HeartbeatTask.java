@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
-
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.event.ServiceStartedEvent;
-import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -35,8 +29,7 @@ import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- *
- * A scheduled task that sends a periodic heartbeat whilst the server is active
+ * A scheduled task that sends a periodic heartbeat whilst the server is active.
  *
  * @author graemerocher
  * @since 1.0
@@ -53,16 +46,24 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     private final HeartbeatConfiguration configuration;
     private final CurrentHealthStatus currentHealthStatus;
 
+    /**
+     * @param eventPublisher      To publish the events related to heartbeat
+     * @param configuration       The configurations for heartbeat
+     * @param currentHealthStatus The current status of health indicator
+     */
     public HeartbeatTask(ApplicationEventPublisher eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.currentHealthStatus = currentHealthStatus;
     }
 
-    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initialDelay:5s}")
+    /**
+     * Publish the heartbeat event with current health status.
+     */
+    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
     public void pulsate() {
         ServiceInstance instance = eventReference.get();
-        if(instance != null) {
+        if (instance != null) {
             eventPublisher.publishEvent(new HeartbeatEvent(instance, currentHealthStatus.current()));
         }
     }

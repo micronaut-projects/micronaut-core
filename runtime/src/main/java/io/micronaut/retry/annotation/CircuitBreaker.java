@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
@@ -27,8 +28,6 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Variation of {@link Retryable} that implements the Circuit Breaker pattern. Has higher overhead than
@@ -43,6 +42,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Around
 @Type(DefaultRetryInterceptor.class)
 public @interface CircuitBreaker {
+
+    int MAX_RETRY_ATTEMPTS = 4;
 
     /**
      * @return The exception types to include (defaults to all)
@@ -59,7 +60,7 @@ public @interface CircuitBreaker {
     /**
      * @return The maximum number of retry attempts
      */
-    @Digits(integer = 4, fraction = 0)
+    @Digits(integer = MAX_RETRY_ATTEMPTS, fraction = 0)
     @AliasFor(annotation = Retryable.class, member = "attempts")
     String attempts() default "3";
 
@@ -70,14 +71,15 @@ public @interface CircuitBreaker {
     String delay() default "500ms";
 
     /**
-     * @return The multiplier to use to calculate the delay between retries
+     * @return The multiplier to use to calculate the delay between retries.
      */
     @Digits(integer = 2, fraction = 2)
     @AliasFor(annotation = Retryable.class, member = "multiplier")
     String multiplier() default "0";
 
     /**
-     * The maximum overall delay for an operation to complete until the Circuit state is set to {@link io.micronaut.retry.CircuitState#OPEN}
+     * The maximum overall delay for an operation to complete until the Circuit state is set to
+     * {@link io.micronaut.retry.CircuitState#OPEN}.
      *
      * @return The maximum overall delay
      */
@@ -85,7 +87,8 @@ public @interface CircuitBreaker {
     String maxDelay() default "5s";
 
     /**
-     * Sets the {@link java.time.Duration} of time before resetting the circuit to {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry
+     * Sets the {@link java.time.Duration} of time before resetting the circuit to
+     * {@link io.micronaut.retry.CircuitState#HALF_OPEN} allowing a single retry.
      *
      * @return The {@link java.time.Duration} of time before reset
      */

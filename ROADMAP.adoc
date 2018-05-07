@@ -27,9 +27,9 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 
 We still need auto-configurations for the following:
 
-* Apache Kafka
-* Cassandra
-* RabbitMQ
+* Apache Kafka (ivan)
+* Cassandra (nero)
+* RabbitMQ (ben)
 
 ### Security / JWT Token Solution
 
@@ -48,7 +48,6 @@ Tasks to complete:
 We need endpoints for managing and/or exposing information about:
 
 - logging
-- info
 
 These should be built on the `Endpoint` API.
 
@@ -65,10 +64,8 @@ WebSocket Support must be implemented
 ### HTTP Client
 
 * Connection Pooling
-* multi part requests / file uploads - Zak/Puneet
 * Server Sent Events
 * CONTINUE request handling
-* Reactive Streams Publisher as request body to allow streaming
 
 #### Distributed Tracing
 
@@ -76,14 +73,29 @@ Built in distributed tracing should be activated by default and allow integratio
 
 #### Metrics
 
-Built in metrics support on-top of Micro Meter
+Built in metrics support on-top of Micro Meter (jack)
 
 #### File Upload Features
 
-* Add a CompletedFileUpload class that waits until the upload is finished and has similar methods to FileUpload. (zak)
-* Rename FileUpload to StreamFileUpload to denote it is designed to be streamed (zak)
 * Add support for @Size on blocking types that receive multipart data. Should override the global setting
+* Support multiple form data parts with the same name
 
+
+### CLI
+
+#### Profiles
+  - Function/Lambda (serverless)
+
+#### Features
+  - Http Client
+  - Tracing
+  - Mongodb
+  - GORM
+  
+#### Commands
+  - Create Controller
+  - Create Test
+  - Create Job (@Scheduled)
 
 ## POST 1.0 Items
 
@@ -114,3 +126,5 @@ An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client.
 - Rate limiting
 - Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
 - Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
+
+

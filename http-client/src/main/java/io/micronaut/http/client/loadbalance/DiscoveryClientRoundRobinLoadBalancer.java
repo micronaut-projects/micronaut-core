@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.reactivestreams.Publisher;
 /**
  * <p>A {@link LoadBalancer} that uses the {@link DiscoveryClient} and a {@link ServiceInstance} ID to automatically
  * load balance between discovered clients in a non-blocking manner</p>
- *
+ * <p>
  * <p>Note that the when {@link DiscoveryClient} caching is enabled then this load balancer may not always have the latest
  * server list from the {@link DiscoveryClient} (the default TTL is 30 seconds)</p>
  *
@@ -53,5 +53,4 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     public Publisher<ServiceInstance> select(Object discriminator) {
         return Publishers.map(discoveryClient.getInstances(serviceID), this::getNextAvailable);
     }
-
 }

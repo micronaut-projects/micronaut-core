@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -27,17 +28,26 @@ import com.zaxxer.hikari.HikariDataSource;
  */
 public class HikariUrlDataSource extends HikariDataSource {
 
+    /**
+     * Constructor.
+     * @param configuration hikari configuration
+     */
     public HikariUrlDataSource(HikariConfig configuration) {
         super(configuration);
     }
 
     /**
      * Used by the JDBC health indicator when an exception occurs.
+     * @return jdbc url
      */
     public String getUrl() {
         return getJdbcUrl();
     }
 
+    /**
+     * Setter.
+     * @param url url of connection
+     */
     public void setUrl(String url) {
         setJdbcUrl(url);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,11 +47,12 @@ public interface MethodInjectionPoint extends CallableInjectionPoint, Executable
      * @return Is this method a post construct method
      */
     boolean isPostConstructMethod();
+
     /**
      * Invokes the method
      *
      * @param args The arguments. Should match the types of getArguments()
      * @return The new value
      */
-    Object invoke(Object instance, Object...args);
+    Object invoke(Object instance, Object... args);
 }

@@ -33,4 +33,47 @@ public class JdbcBookService implements BookService {
 }
 ----
 
-If you have multiple beans that need to fullfill a given requirement before loading then you may want to consider a bean configuration group, as explained in the next section.
+If you have multiple beans that need to fulfill a given requirement before loading then you may want to consider a bean configuration group, as explained in the next section.
+
+=== Configuration Requirements
+
+The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
+
+
+.Using @Requires
+|===
+|Requirement | Example
+
+|Require the presence of one ore more classes
+|`@Requires(classes=javax.servlet.Servlet)`
+
+|Require the presence one or more beans
+|`@Requires(beans=javax.sql.DataSource)`
+
+|Require the absence of one or more beans
+|`@Requires(missingBeans=javax.sql.DataSource)`
+
+|Require the presence of an environment variable
+|`@Requires(env='TRAVIS')`
+
+|Require the presence of another configuration package
+|`@Requires(configuration='foo.bar')`
+
+|Require particular SDK version
+|`@Requires(sdk=Sdk.JAVA, value="1.8")`
+
+|Require a property with an optional value
+|`@Requires(property='data-source.url')`
+|===
+
+=== Debugging Conditional Beans
+
+If you have multiple conditions and complex requirements it may become difficult to understand why a particular bean has not been loaded.
+
+To help resolve issues with conditional beans you can enable debug logging for the `io.micronaut.context.condition` package which will log the reasons why beans were not loaded.
+
+.logback.xml
+[source,xml]
+----
+<logger name="io.micronaut.context.condition" level="DEBUG"/>
+----

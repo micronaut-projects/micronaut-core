@@ -1,8 +1,20 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
@@ -13,9 +25,6 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * An uninitialized and unloaded component definition with basic information available regarding its requirements
@@ -53,8 +62,9 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public Class getBeanType() {
         if (isPresent()) {
-            return GenericTypeUtils.resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
-                    .orElse(null);
+            return GenericTypeUtils
+                .resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
+                .orElse(null);
         }
         return null;
     }
@@ -62,11 +72,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public String getReplacesBeanTypeName() {
         return null; // no replacement semantics by default
-    }
-
-    @Override
-    public String getReplacesBeanDefinitionName() {
-        return null; // no replacement
     }
 
     /**
@@ -88,7 +93,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public BeanDefinition load(BeanContext context) {
         BeanDefinition definition = load();
-        ((AbstractBeanDefinition)definition).configure(context);
+        ((AbstractBeanDefinition) definition).configure(context);
         return definition;
     }
 
@@ -104,7 +109,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
 
     @Override
     public boolean isPresent() {
-        if(present == null) {
+        if (present == null) {
             loadType();
         }
         return present;
@@ -134,7 +139,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     public int hashCode() {
         return beanDefinitionTypeName.hashCode();
     }
-
 
     private void loadType() {
         if (present == null && beanDefinition == null) {

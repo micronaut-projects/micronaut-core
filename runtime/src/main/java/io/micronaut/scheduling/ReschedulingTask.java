@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,29 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling;
 
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
-import io.micronaut.scheduling.exceptions.TaskExecutionException;
 
 import java.time.Duration;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
- * Wraps a {@link Runnable} and re-schedules the tasks
+ * Wraps a {@link Runnable} and re-schedules the tasks.
+ *
+ * @param <V> The result type returned by this Future
  *
  * @author graemerocher
  * @since 1.0
  */
 class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
+
     private final Callable<V> task;
     private final TaskScheduler taskScheduler;
     private final Supplier<Duration> nextTime;
     private ScheduledFuture<?> currentFuture;
     private AtomicBoolean cancelled = new AtomicBoolean(false);
 
+    /**
+     * @param task          The task
+     * @param taskScheduler To schedule the task for next time
+     * @param nextTime      The next time
+     */
     ReschedulingTask(Callable<V> task, TaskScheduler taskScheduler, Supplier<Duration> nextTime) {
         this.task = task;
         this.taskScheduler = taskScheduler;
@@ -49,11 +62,10 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
             return task.call();
         } finally {
             synchronized (this) {
-                if(!cancelled.get()) {
+                if (!cancelled.get()) {
                     this.currentFuture =
-                            taskScheduler.schedule(nextTime.get(), (Callable<V>) this);
+                        taskScheduler.schedule(nextTime.get(), (Callable<V>) this);
                 }
-
             }
         }
     }
@@ -94,7 +106,6 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
             current = this.currentFuture;
         }
         return current.cancel(mayInterruptIfRunning);
-
     }
 
     @Override
@@ -126,6 +137,6 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
             cancelled.set(true);
             current = this.currentFuture;
         }
-        return (V) current.get(timeout,unit);
+        return (V) current.get(timeout, unit);
     }
 }

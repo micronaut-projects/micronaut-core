@@ -66,10 +66,10 @@ publishing {
                 password = p
             }
             if(isBuildSnapshot) {
-                url  "https://repo.grails.org/grails/libs-snapshots-local"
+                url  "https://repo.micronaut.io/artifactory/libs-snapshots-local"
             }
             else {
-                url "https://repo.grails.org/grails/libs-releases-local"
+                url "https://repo.micronaut.io/artifactory/libs-releases-local"
             }
         }
     }
@@ -168,8 +168,8 @@ bintray {
     publications = ['maven']
     publish = true
     pkg {
-        repo = 'grails-core'
-        userOrg = 'grails'
+        repo = 'micronaut-core'
+        userOrg = 'micronaut-projects'
         name = project.name
         desc = "${project.title} - ${project.projectDesc}".toString()
         websiteUrl = projectUrl

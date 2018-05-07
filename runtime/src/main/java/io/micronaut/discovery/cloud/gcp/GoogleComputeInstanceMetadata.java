@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.context.env.ComputePlatform;
@@ -24,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform
+ * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -32,14 +33,11 @@ import java.util.Map;
  */
 public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
 
-    // anything non-standard goes in here
-    Map<String, String> metadata;
-
-    // quick way to lookup tags
-    private Map<String, String> tags = Collections.emptyMap();
-
     //network interfaces to get ip addresses
     List<NetworkInterface> interfaces = Collections.emptyList();
+
+    // anything non-standard goes in here
+    Map<String, String> metadata;
 
     String name;
     String availabilityZone;
@@ -53,7 +51,6 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String account;
     String imageId;
 
-
     // should we keep these broken out or require people to look in the interfaces?
     String publicIpV4;
     String publicIpV6;
@@ -61,6 +58,9 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String privateIpV6;
 
     boolean cached = false;
+
+    // quick way to lookup tags
+    private Map<String, String> tags = Collections.emptyMap();
 
     @Override
     public String getImageId() {
@@ -73,7 +73,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public Map<String,String> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
@@ -114,8 +114,8 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
 
     @Override
     public String getRegion() {
-        if (availabilityZone !=null) {
-            return availabilityZone.substring(0,availabilityZone.length()-2);
+        if (availabilityZone != null) {
+            return availabilityZone.substring(0, availabilityZone.length() - 2);
         }
         return region;
     }

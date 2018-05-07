@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -249,10 +249,10 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         @Override
         public String toString() {
             return "ConsulDiscoveryConfiguration{" +
-                    "tags=" + tags +
-                    ", datacenters=" + datacenters +
-                    ", passing=" + passing +
-                    '}';
+                "tags=" + tags +
+                ", datacenters=" + datacenters +
+                ", passing=" + passing +
+                '}';
         }
     }
 
@@ -443,32 +443,32 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
             @Override
             public String toString() {
                 return "CheckConfiguration{" +
-                        "method=" + method +
-                        ", headers=" + headers +
-                        ", deregisterCriticalServiceAfter=" + deregisterCriticalServiceAfter +
-                        ", notes='" + notes + '\'' +
-                        ", id='" + id + '\'' +
-                        ", tlsSkipVerify=" + tlsSkipVerify +
-                        ", enabled=" + enabled +
-                        '}';
+                    "method=" + method +
+                    ", headers=" + headers +
+                    ", deregisterCriticalServiceAfter=" + deregisterCriticalServiceAfter +
+                    ", notes='" + notes + '\'' +
+                    ", id='" + id + '\'' +
+                    ", tlsSkipVerify=" + tlsSkipVerify +
+                    ", enabled=" + enabled +
+                    '}';
             }
         }
 
         @Override
         public String toString() {
             return "ConsulRegistrationConfiguration{" +
-                    "tags=" + tags +
-                    ", check=" + check +
-                    '}';
+                "tags=" + tags +
+                ", check=" + check +
+                '}';
         }
     }
 
     @Override
     public String toString() {
         return "ConsulConfiguration{" +
-                "aslToken='" + aslToken + '\'' +
-                ", registration=" + registration +
-                ", discovery=" + discovery +
-                "} " + super.toString();
+            "aslToken='" + aslToken + '\'' +
+            ", registration=" + registration +
+            ", discovery=" + discovery +
+            "} " + super.toString();
     }
 }

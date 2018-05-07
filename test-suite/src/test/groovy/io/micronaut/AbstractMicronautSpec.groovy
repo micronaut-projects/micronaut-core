@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,34 +15,32 @@
  */
 package io.micronaut
 
-import okhttp3.OkHttpClient
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.util.concurrent.TimeUnit
-
 /**
  * @author Graeme Rocher
  * @since 1.0
- */
+ */ 
 abstract class AbstractMicronautSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
 
 
     @Shared File uploadDir = File.createTempDir()
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName]
     )
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
     @Shared int serverPort = embeddedServer.getPort()
     @Shared URL server = embeddedServer.getURL()
-    @Shared OkHttpClient client = new OkHttpClient()
-            .newBuilder()
-            .readTimeout(1, TimeUnit.MINUTES)
-            .build()
+
+    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
 
     Collection<String> configurationNames() {
         ['io.micronaut.configuration.jackson','io.micronaut.web.router']

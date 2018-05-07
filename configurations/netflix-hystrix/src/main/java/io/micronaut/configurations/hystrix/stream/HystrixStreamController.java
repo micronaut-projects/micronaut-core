@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.hystrix.stream;
 
 import com.netflix.hystrix.HystrixCollapserMetrics;
 import com.netflix.hystrix.HystrixCommandMetrics;
 import com.netflix.hystrix.HystrixThreadPoolMetrics;
 import com.netflix.hystrix.serial.SerialHystrixDashboardData;
+import io.micronaut.configurations.hystrix.HystrixConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.http.MediaType;
@@ -28,20 +30,13 @@ import io.micronaut.http.sse.Event;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.configurations.hystrix.HystrixConfiguration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.sse.Event;
 
 import javax.inject.Inject;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A controller that produces a hystrix event stream as Server Sent events
+ * A controller that produces a hystrix event stream as Server Sent events.
  *
  * @author graemerocher
  * @since 1.0
@@ -53,34 +48,45 @@ public class HystrixStreamController {
 
     private final Duration interval;
 
+    /**
+     * Constructor.
+     * @param interval interval value injected
+     */
     @Inject
     public HystrixStreamController(@Value("${hystrix.stream.interval:1s}") Duration interval) {
         this.interval = interval;
     }
 
+    /**
+     * Constructor.
+     */
     public HystrixStreamController() {
         this(Duration.ofSeconds(1));
     }
 
+    /**
+     * Hystrix stream endpoint.
+     * @return hystrix stream as an event
+     */
     @Get(uri = "/", produces = MediaType.TEXT_EVENT_STREAM)
     public Flowable<Event<String>> hystrixStream() {
         return Flowable.interval(interval.toMillis(), TimeUnit.MILLISECONDS)
-                       .subscribeOn(Schedulers.io())
-                       .flatMap( num -> Flowable.create(eventEmitter -> {
-                           try {
-                               for (HystrixCommandMetrics commandMetrics : HystrixCommandMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(commandMetrics)));
-                               }
-                               for (HystrixThreadPoolMetrics threadPoolMetrics : HystrixThreadPoolMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(threadPoolMetrics)));
-                               }
-                               for (HystrixCollapserMetrics collapserMetrics : HystrixCollapserMetrics.getInstances()) {
-                                   eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(collapserMetrics)));
-                               }
-                           } catch (Exception e) {
-                               eventEmitter.onError(e);
-                           }
+            .subscribeOn(Schedulers.io())
+            .flatMap(num -> Flowable.create(eventEmitter -> {
+                try {
+                    for (HystrixCommandMetrics commandMetrics : HystrixCommandMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(commandMetrics)));
+                    }
+                    for (HystrixThreadPoolMetrics threadPoolMetrics : HystrixThreadPoolMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(threadPoolMetrics)));
+                    }
+                    for (HystrixCollapserMetrics collapserMetrics : HystrixCollapserMetrics.getInstances()) {
+                        eventEmitter.onNext(Event.of(SerialHystrixDashboardData.toJsonString(collapserMetrics)));
+                    }
+                } catch (Exception e) {
+                    eventEmitter.onError(e);
+                }
 
-                       }, BackpressureStrategy.BUFFER)) ;
+            }, BackpressureStrategy.BUFFER));
     }
 }

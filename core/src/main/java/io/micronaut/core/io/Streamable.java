@@ -1,28 +1,31 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.io;
 
-
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Interface for types that can be written to an {@link java.io.OutputStream}
+ * Interface for types that can be written to an {@link java.io.OutputStream}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,26 +33,28 @@ import java.nio.charset.StandardCharsets;
 public interface Streamable {
 
     /**
-     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
+     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default.
      *
      * @param outputStream The output stream
-     * @param charset The charset to use. Defaults to {@link StandardCharsets#UTF_8}
+     * @param charset      The charset to use. Defaults to {@link StandardCharsets#UTF_8}
      * @throws IOException if an error occurred while outputting data to the writer
      */
     void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException;
 
     /**
-     * Write this {@link Writable} to the given {@link File}
+     * Write this {@link Writable} to the given {@link File}.
+     *
      * @param file The file
      * @throws IOException if an error occurred while outputting data to the writer
      */
     default void writeTo(File file) throws IOException {
-        try(FileOutputStream outputStream = new FileOutputStream(file)) {
+        try (FileOutputStream outputStream = new FileOutputStream(file)) {
             writeTo(outputStream);
         }
     }
+
     /**
-     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
+     * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default.
      *
      * @param outputStream The output stream
      * @throws IOException if an error occurred while outputting data to the writer

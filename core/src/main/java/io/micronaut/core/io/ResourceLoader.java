@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.core.io;
 
 import java.io.InputStream;
@@ -6,7 +22,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Basic abstraction over resource loading
+ * Basic abstraction over resource loading.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -14,7 +30,7 @@ import java.util.stream.Stream;
 public interface ResourceLoader {
 
     /**
-     * Obtains a resource as a stream
+     * Obtains a resource as a stream.
      *
      * @param path The path
      * @return An optional resource
@@ -22,7 +38,7 @@ public interface ResourceLoader {
     Optional<InputStream> getResourceAsStream(String path);
 
     /**
-     * Obtains the URL to a given resource
+     * Obtains the URL to a given resource.
      *
      * @param path The path
      * @return An optional resource
@@ -30,7 +46,7 @@ public interface ResourceLoader {
     Optional<URL> getResource(String path);
 
     /**
-     * Obtains all resources with the given name
+     * Obtains all resources with the given name.
      *
      * @param name The name of the resource
      * @return A stream of URLs

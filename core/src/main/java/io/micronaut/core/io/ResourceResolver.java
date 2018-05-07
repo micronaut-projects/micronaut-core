@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io;
 
 import io.micronaut.core.io.file.FileSystemResourceLoader;
@@ -40,34 +41,34 @@ public class ResourceResolver {
 
     public ResourceResolver() {
         this(new ResourceLoader[]{
-                ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
-                FileSystemResourceLoader.defaultLoader()});
+            ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
+            FileSystemResourceLoader.defaultLoader()});
     }
 
     /**
      * Searches resource loaders for one that matches or is a subclass
-     * of the specified type
+     * of the specified type.
      *
      * @param resolverType The type of resolver to retrieve
      * @return An optional resource loader
      */
     public <T extends ResourceLoader> Optional<T> getLoader(Class<T> resolverType) {
         return Arrays.stream(resourceLoaders)
-                .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
-                .map(rl -> (T) rl)
-                .findFirst();
+            .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
+            .map(rl -> (T) rl)
+            .findFirst();
     }
 
     /**
-     * Searches resource loaders for one that supports the given prefix
+     * Searches resource loaders for one that supports the given prefix.
      *
      * @param prefix The prefix the loader should support. (classpath:, file:, etc)
      * @return An optional resource loader
      */
     public Optional<ResourceLoader> getSupportingLoader(String prefix) {
         return Arrays.stream(resourceLoaders)
-                .filter(rl -> rl.supportsPrefix(prefix))
-                .findFirst();
+            .filter(rl -> rl.supportsPrefix(prefix))
+            .findFirst();
     }
 
     /**
@@ -129,5 +130,4 @@ public class ResourceResolver {
             return Stream.empty();
         }
     }
-
 }

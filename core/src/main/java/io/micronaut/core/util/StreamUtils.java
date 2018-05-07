@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.util;
 
-import java.util.Comparator;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -23,7 +24,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 /**
- * Utility methods for working with streams
+ * Utility methods for working with streams.
  *
  * @author James Kleeh
  * @since 1.0
@@ -36,9 +37,9 @@ public class StreamUtils {
      *
      * @param comparator The comparator to order the items in the stream
      * @param downstream Which collector to use to combine the results
-     * @param <T> The type of objects being streamed
-     * @param <A> The mutable accumulation type of the reduction operation
-     * @param <D> The result type of the reduction operation
+     * @param <T>        The type of objects being streamed
+     * @param <A>        The mutable accumulation type of the reduction operation
+     * @param <D>        The result type of the reduction operation
      * @return A new collector to provide the desired result
      */
     public static <T, A, D> Collector<T, ?, D> maxAll(Comparator<? super T> comparator,
@@ -46,18 +47,27 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
-            if(!acc.hasAny) {
+            if (!acc.hasAny) {
                 downstreamAccumulator.accept(acc.acc, t);
                 acc.obj = t;
                 acc.hasAny = true;
@@ -67,8 +77,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp >= 0)
+                if (cmp >= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {
@@ -98,9 +109,9 @@ public class StreamUtils {
      *
      * @param comparator The comparator to order the items in the stream
      * @param downstream Which collector to use to combine the results
-     * @param <T> The type of objects being streamed
-     * @param <A> The mutable accumulation type of the reduction operation
-     * @param <D> The result type of the reduction operation
+     * @param <T>        The type of objects being streamed
+     * @param <A>        The mutable accumulation type of the reduction operation
+     * @param <D>        The result type of the reduction operation
      * @return A new collector to provide the desired result
      */
     public static <T, A, D> Collector<T, ?, D> minAll(Comparator<? super T> comparator,
@@ -108,18 +119,27 @@ public class StreamUtils {
         Supplier<A> downstreamSupplier = downstream.supplier();
         BiConsumer<A, ? super T> downstreamAccumulator = downstream.accumulator();
         BinaryOperator<A> downstreamCombiner = downstream.combiner();
+
+        /**
+         * Container used to hold the accumulator and object
+         */
         class Container {
             A acc;
             T obj;
             boolean hasAny;
 
+            /**
+             * Constructor.
+             * @param acc accumulator
+             */
             Container(A acc) {
                 this.acc = acc;
             }
         }
+
         Supplier<Container> supplier = () -> new Container(downstreamSupplier.get());
         BiConsumer<Container, T> accumulator = (acc, t) -> {
-            if(!acc.hasAny) {
+            if (!acc.hasAny) {
                 downstreamAccumulator.accept(acc.acc, t);
                 acc.obj = t;
                 acc.hasAny = true;
@@ -129,8 +149,9 @@ public class StreamUtils {
                     acc.acc = downstreamSupplier.get();
                     acc.obj = t;
                 }
-                if (cmp <= 0)
+                if (cmp <= 0) {
                     downstreamAccumulator.accept(acc.acc, t);
+                }
             }
         };
         BinaryOperator<Container> combiner = (acc1, acc2) -> {
@@ -152,5 +173,16 @@ public class StreamUtils {
         };
         Function<Container, D> finisher = acc -> downstream.finisher().apply(acc.acc);
         return Collector.of(supplier, accumulator, combiner, finisher);
+    }
+
+    public static <T, A extends Collection<T>> Collector<T, A, Collection<T>> toImmutableCollection(Supplier<A> collectionFactory) {
+        return Collector.of(collectionFactory, Collection::add, (left, right) -> {
+            left.addAll(right);
+            return left;
+        }, Collections::unmodifiableCollection);
+    }
+
+    public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
+        return toImmutableCollection(ArrayList::new);
     }
 }

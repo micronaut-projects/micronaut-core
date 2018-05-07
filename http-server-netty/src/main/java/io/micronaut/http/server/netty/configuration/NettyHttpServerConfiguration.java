@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 
 import javax.inject.Inject;
@@ -29,7 +28,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Allows configuring Netty within {@link NettyHttpServer}
+ * Allows configuring Netty within {@link io.micronaut.http.server.netty.NettyHttpServer}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,9 +41,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected Worker worker;
     protected Parent parent;
 
+    /**
+     * Default empty constructor.
+     */
     public NettyHttpServerConfiguration() {
     }
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
     @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
@@ -52,7 +57,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty child channel options.
-     * @see ServerBootstrap#childOptions()
+     * @see io.netty.bootstrap.ServerBootstrap#childOptions()
      */
     public Map<ChannelOption, Object> getChildOptions() {
         return childOptions;
@@ -60,7 +65,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty channel options.
-     * @see ServerBootstrap#options()
+     * @see io.netty.bootstrap.ServerBootstrap#options()
      */
     public Map<ChannelOption, Object> getOptions() {
         return options;
@@ -81,20 +86,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Configuration for Netty worker
+     * Configuration for Netty worker.
      */
     @ConfigurationProperties("worker")
     public static class Worker extends EventLoopConfig {
     }
 
     /**
-     * Configuration for Netty parent
+     * Configuration for Netty parent.
      */
     @ConfigurationProperties("parent")
     public static class Parent extends EventLoopConfig {
     }
 
-    public static abstract class EventLoopConfig {
+    /**
+     * Abstract class for configuring the Netty event loop.
+     */
+    public abstract static class EventLoopConfig {
         protected int threads;
         protected Integer ioRatio;
         protected String executor;

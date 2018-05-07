@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.util.Toggleable;
 
 import java.util.Optional;
 
 /**
- * The default {@link Endpoint} configuration
+ * The default {@link Endpoint} configuration.
  *
  * @author James Kleeh
  * @since 1.0
@@ -30,25 +30,25 @@ import java.util.Optional;
 public class EndpointDefaultConfiguration {
 
     /**
-     * The prefix for endpoints settings
+     * The prefix for endpoints settings.
      */
     public static final String PREFIX = "endpoints.all";
 
-    protected Boolean enabled;
-    protected Boolean sensitive;
+    protected Optional<Boolean> enabled = Optional.empty();
+    protected Optional<Boolean> sensitive = Optional.empty();
 
     /**
      * @return Whether the endpoint is enabled
      */
     public Optional<Boolean> isEnabled() {
-        return Optional.ofNullable(enabled);
+        return enabled;
     }
 
     /**
      * @return Does the endpoint expose sensitive information
      */
     public Optional<Boolean> isSensitive() {
-        return Optional.ofNullable(sensitive);
+        return sensitive;
     }
 
 }

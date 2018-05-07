@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.loadbalancer.Server;
@@ -20,7 +21,7 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.health.HealthStatus;
 
 /**
- * Adapts the {@link ServiceInstance} interface to Ribbon's {@link Server} class
+ * Adapts the {@link ServiceInstance} interface to Ribbon's {@link Server} class.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,6 +29,10 @@ import io.micronaut.health.HealthStatus;
 public class RibbonServer extends Server {
     private final ServiceInstance instance;
 
+    /**
+     * Consructor.
+     * @param instance serviceInstance
+     */
     public RibbonServer(ServiceInstance instance) {
         super(instance.getId());
 

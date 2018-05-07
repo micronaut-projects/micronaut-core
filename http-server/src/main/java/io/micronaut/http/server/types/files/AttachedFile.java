@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types.files;
 
 import io.micronaut.http.HttpHeaders;
@@ -21,24 +22,30 @@ import io.micronaut.http.MutableHttpResponse;
 import java.io.File;
 
 /**
- * Used as the return value of a route execution to indicate
- * the given file should be downloaded by the client instead of
- * displayed.
+ * Used as the return value of a route execution to indicate the given file should be downloaded by the client
+ * instead of displayed.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class AttachedFile extends SystemFileCustomizableResponseType {
 
-    private static final String headerValue = "attachment; filename=\"%s\"";
+    private static final String HEADER_VALUE = "attachment; filename=\"%s\"";
 
     private final String filename;
     private final String attachmentName;
 
+    /**
+     * @param file The file
+     */
     public AttachedFile(File file) {
         this(file, file.getName());
     }
 
+    /**
+     * @param file     The file
+     * @param filename The filename
+     */
     public AttachedFile(File file, String filename) {
         super(file);
         this.filename = file.getName();
@@ -47,7 +54,7 @@ public class AttachedFile extends SystemFileCustomizableResponseType {
 
     @Override
     public void process(MutableHttpResponse response) {
-        response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(headerValue, attachmentName));
+        response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(HEADER_VALUE, attachmentName));
     }
 
     @Override

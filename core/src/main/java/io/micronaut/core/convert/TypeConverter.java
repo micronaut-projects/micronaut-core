@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.core.convert;
 
 import java.util.Optional;
@@ -5,11 +21,11 @@ import java.util.function.Function;
 
 /**
  * <p>A type converter for converting from one type to another.</p>
- *
+ * <p>
  * <p>Implementations should be stateless, simple and thread safe. Type converters are often best defined as Java lambdas.
  * You should NOT perform any overly complex, blocking or slow conversions in implementations of this interface.
  * </p>
- *
+ * <p>
  * <p>If dependency injection is required, carefully consider what you inject. Databases and I/O bound interfaces are not good candidates.</p>
  *
  * @param <S> The source type
@@ -20,7 +36,7 @@ import java.util.function.Function;
 public interface TypeConverter<S, T> {
 
     /**
-     * Converts from the given source object type to the target type
+     * Converts from the given source object type to the target type.
      *
      * @param object     The object type
      * @param targetType The target type being converted to
@@ -36,24 +52,22 @@ public interface TypeConverter<S, T> {
      *
      * @param object     The object type
      * @param targetType The target type being converted to
-     * @param context The {@link ConversionContext}
-     *
+     * @param context    The {@link ConversionContext}
      * @return The converted type or empty if the conversion is not possible
      */
     Optional<T> convert(S object, Class<T> targetType, ConversionContext context);
 
     /**
-     * Creates a new {@link TypeConverter} for the give source type, target type and conversion function
+     * Creates a new {@link TypeConverter} for the give source type, target type and conversion function.
      *
      * @param sourceType The source type
      * @param targetType The target type
-     * @param converter The converter function
-     * @param <ST> The source generic type
-     * @param <TT> The target generic type
+     * @param converter  The converter function
+     * @param <ST>       The source generic type
+     * @param <TT>       The target generic type
      * @return The converter instance
      */
     static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
         return (object, targetType1, context) -> Optional.ofNullable(converter.apply(object));
     }
 }
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation.exceptions;
 
 import io.micronaut.context.annotation.Requires;
@@ -22,19 +23,13 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import org.grails.datastore.mapping.validation.ValidationException;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 
 import javax.inject.Singleton;
 
 /**
- * Default Exception handler for GORM validation errors
+ * Default Exception handler for GORM validation errors.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,12 +37,13 @@ import javax.inject.Singleton;
 @Singleton
 @Requires(classes = ValidationException.class)
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<VndError>> {
+
     @Override
     public HttpResponse<VndError> handle(HttpRequest request, ValidationException exception) {
         Errors errors = exception.getErrors();
         VndError error = new VndError(exception.getMessage());
         FieldError fieldError = errors.getFieldError();
-        if(fieldError != null) {
+        if (fieldError != null) {
             error.path(fieldError.getField());
         }
         error.link(Link.SELF, Link.of(request.getUri()));

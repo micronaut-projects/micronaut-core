@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -24,7 +25,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.time.Duration;
 
 /**
- * Configuration for computing metadata for {@link io.micronaut.context.env.ComputePlatform#GOOGLE_COMPUTE}
+ * Configuration for computing metadata for {@link io.micronaut.context.env.ComputePlatform#GOOGLE_COMPUTE}.
  *
  * @author graemerocher
  * @since 1.0
@@ -34,7 +35,7 @@ import java.time.Duration;
 public class GoogleComputeMetadataConfiguration implements Toggleable {
 
     /**
-     * Prefix for Google Compute configuration
+     * Prefix for Google Compute configuration.
      */
     public static final String PREFIX = ApplicationConfiguration.PREFIX + "." + Environment.GOOGLE_COMPUTE + ".metadata";
 

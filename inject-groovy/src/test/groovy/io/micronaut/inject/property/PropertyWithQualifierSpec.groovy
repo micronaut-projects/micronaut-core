@@ -1,11 +1,30 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.inject.property
 
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.core.annotation.Blocking
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.One
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.qualifiers.One
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -15,7 +34,39 @@ import javax.inject.Singleton
 /**
  * Created by graemerocher on 15/05/2017.
  */
-class PropertyWithQualifierSpec extends Specification {
+class PropertyWithQualifierSpec extends AbstractBeanDefinitionSpec {
+
+    void "test compile property with qualifier"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.property.MyBean', '''
+package io.micronaut.inject.property;
+
+import io.micronaut.inject.qualifiers.*
+
+@javax.inject.Singleton
+class MyBean  {
+    @javax.inject.Inject
+    @One
+    AnotherBean injected
+}
+
+@javax.inject.Singleton
+@One
+class AnotherBean implements SomeInterface{
+    
+}
+interface SomeInterface {
+
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].name == "injected"
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(One)
+
+    }
 
     void "test that a property with a qualifier is injected correctly"() {
         given:

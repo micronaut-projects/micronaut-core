@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive.health;
 
 import com.mongodb.reactivestreams.client.MongoClient;
@@ -33,10 +34,14 @@ import java.util.Collections;
  */
 @Singleton
 @Requires(beans = MongoClient.class)
-class MongoHealthIndicator implements HealthIndicator {
+public class MongoHealthIndicator implements HealthIndicator {
 
     private final MongoClient[] mongoClients;
 
+    /**
+     * Constructor.
+     * @param mongoClients array of mongo clients
+     */
     public MongoHealthIndicator(MongoClient[] mongoClients) {
         this.mongoClients = mongoClients;
     }
@@ -47,21 +52,21 @@ class MongoHealthIndicator implements HealthIndicator {
         return mongoClients.flatMap((Function<MongoClient, Publisher<HealthResult>>) mongoClient -> {
             String name = "mongodb (" + mongoClient.getSettings().getApplicationName() + ")";
             return Flowable.fromPublisher(mongoClient.listDatabaseNames())
-                           .toList()
-                           .map(strings -> {
-                               HealthResult.Builder builder = HealthResult.builder(name);
-                               builder.status(HealthStatus.UP);
-                               builder.details(Collections.singletonMap(
-                                       "databases", strings
-                               ));
-                               return builder.build();
-                           }).onErrorReturn(throwable -> {
-                               HealthResult.Builder builder = HealthResult.builder(name);
-                               builder.status(HealthStatus.DOWN);
-                               builder.exception(throwable);
-                               return builder.build();
+                .toList()
+                .map(strings -> {
+                    HealthResult.Builder builder = HealthResult.builder(name);
+                    builder.status(HealthStatus.UP);
+                    builder.details(Collections.singletonMap(
+                        "databases", strings
+                    ));
+                    return builder.build();
+                }).onErrorReturn(throwable -> {
+                    HealthResult.Builder builder = HealthResult.builder(name);
+                    builder.status(HealthStatus.DOWN);
+                    builder.exception(throwable);
+                    return builder.build();
 
-                           }).toFlowable();
+                }).toFlowable();
         });
     }
 }

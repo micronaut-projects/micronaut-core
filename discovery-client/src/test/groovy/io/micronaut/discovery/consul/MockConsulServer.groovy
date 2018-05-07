@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 
 import javax.annotation.Nullable
 import javax.inject.Singleton
@@ -80,11 +81,11 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     @Get("/kv/{key}")
-    Publisher<List<KeyValue>> readValues(String key) {
+    Mono<List<KeyValue>> readValues(String key) {
         key = URLDecoder.decode(key, "UTF-8")
         Map<String, List<KeyValue>> found = keyvalues.findAll { entry -> entry.key.startsWith(key)}
         if(found) {
-            return Flowable.just(found.values().stream().flatMap({ values -> values.stream() })
+            return Mono.just(found.values().stream().flatMap({ values -> values.stream() })
                                    .collect(Collectors.toList()))
         }
         else {
@@ -94,15 +95,15 @@ class MockConsulServer implements ConsulOperations {
 
                 List<KeyValue> values = keyvalues.get(prefix)
                 if(values) {
-                    return Publishers.just(values.findAll({it.key.startsWith(key.substring(1))}))
+                    return Mono.just(values.findAll({it.key.startsWith(key.substring(1))}))
                 }
             }
         }
-        return Flowable.just(Collections.emptyList())
+        return Mono.just(Collections.emptyList())
     }
 
     @Override
-    Publisher<List<KeyValue>> readValues(String key,
+    Mono<List<KeyValue>> readValues(String key,
                                          @Nullable @Parameter("dc") String datacenter,
                                          @Nullable Boolean raw, @Nullable String seperator) {
         return readValues(key)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
 import javax.inject.Singleton;
@@ -26,13 +26,14 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Serializer for {@link ConvertibleValues}
+ * Serializer for {@link ConvertibleValues}.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
 public class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
+
     @Override
     public boolean isEmpty(SerializerProvider provider, ConvertibleValues<?> value) {
         return value.isEmpty();
@@ -45,7 +46,7 @@ public class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValue
         for (Map.Entry<String, ?> entry : value) {
             String fieldName = entry.getKey();
             Object v = entry.getValue();
-            if(v != null) {
+            if (v != null) {
                 gen.writeFieldName(fieldName);
                 gen.writeObject(v);
             }
@@ -53,4 +54,3 @@ public class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValue
         gen.writeEndObject();
     }
 }
-

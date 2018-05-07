@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive
 
 import com.mongodb.MongoClient
@@ -22,12 +23,14 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.reactivex.Flowable
 import org.bson.Document
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoConfigurationSpec extends Specification {
 
     void "test a basic blocking driver connection"() {

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty.binding
 
 import com.fasterxml.jackson.core.JsonParseException
@@ -34,7 +49,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "No!! Invalid JSON"
+        e.message == """Invalid JSON: Unexpected end-of-input
+ at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -70,7 +86,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "No!! Invalid JSON"
+        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (number, String, array, object, 'true', 'false' or 'null')
+ at [Source: UNKNOWN; line: 1, column: 11]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -230,7 +247,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         ).blockingFirst()
 
         then:
-        response.body() == "Foo(Fred, 10)".toString()
+        response.body() == "[Foo(Fred, 10)]".toString()
     }
 
     @Controller(produces = io.micronaut.http.MediaType.APPLICATION_JSON)

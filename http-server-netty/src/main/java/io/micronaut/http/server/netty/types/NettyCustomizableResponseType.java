@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.types;
 
-import io.netty.channel.ChannelHandlerContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.CustomizableResponseType;
+import io.netty.channel.ChannelHandlerContext;
 
 /**
- * A special type that allows writing data in Netty
+ * A special type that allows writing data in Netty.
  *
  * @author James Kleeh
  * @since 1.0
@@ -29,13 +30,11 @@ import io.micronaut.http.server.types.CustomizableResponseType;
 public interface NettyCustomizableResponseType extends CustomizableResponseType {
 
     /**
-     * Write this instance to Netty
+     * Write this instance to Netty.
      *
-     * @param request The request
+     * @param request  The request
      * @param response The response
-     * @param context The Netty {@link ChannelHandlerContext}
+     * @param context  The Netty {@link ChannelHandlerContext}
      */
-    void write(HttpRequest<?> request,
-               MutableHttpResponse<?> response,
-               ChannelHandlerContext context);
+    void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-import java.util.function.Consumer;
-
 /**
  * @author graemerocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class ServiceEntry extends AbstractServiceEntry {
+
     @JsonCreator
     public ServiceEntry(@JsonProperty("Service") String name, @JsonProperty("ID") String id) {
         super(name);
@@ -36,6 +35,7 @@ public class ServiceEntry extends AbstractServiceEntry {
 
     /**
      * Creates a copy from another entry
+     *
      * @param entry The entry
      */
     public ServiceEntry(AbstractServiceEntry entry) {

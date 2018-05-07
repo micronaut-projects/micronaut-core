@@ -1,29 +1,35 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.session;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 
+import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * A {@link Session} that is help in-memory
+ * A {@link Session} that is help in-memory.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,34 +38,51 @@ public class InMemorySession implements Session {
 
     protected final Map<CharSequence, Object> attributeMap = new LinkedHashMap<>();
     protected final MutableConvertibleValues<Object> attributes = MutableConvertibleValues.of(attributeMap);
+    protected Instant lastAccessTime = Instant.now();
+
     private final String id;
     private final Instant creationTime;
     private Duration maxInactiveInterval;
-    protected Instant lastAccessTime = Instant.now();
-    private boolean isNew =true;
+    private boolean isNew = true;
 
+    /**
+     * Constructor.
+     *
+     * @param id The session id
+     * @param maxInactiveInterval The max inactive interval
+     */
     protected InMemorySession(String id, Duration maxInactiveInterval) {
         this(id, Instant.now(), maxInactiveInterval);
     }
 
+    /**
+     * Constructor.
+     *
+     * @param id The session id
+     * @param creationTime The creation time
+     * @param maxInactiveInterval The max inactive interval
+     */
     protected InMemorySession(String id, Instant creationTime, Duration maxInactiveInterval) {
         this.id = id;
         this.creationTime = creationTime;
         this.maxInactiveInterval = maxInactiveInterval;
     }
+
     @Override
+    @Nonnull
     public String getId() {
         return id;
     }
 
     @Override
+    @Nonnull
     public Instant getLastAccessedTime() {
         return lastAccessTime;
     }
 
     @Override
     public Session setMaxInactiveInterval(Duration duration) {
-        if(duration != null) {
+        if (duration != null) {
             maxInactiveInterval = duration;
         }
         return this;
@@ -67,7 +90,7 @@ public class InMemorySession implements Session {
 
     @Override
     public Session setLastAccessedTime(Instant instant) {
-        if(instant != null) {
+        if (instant != null) {
             this.lastAccessTime = instant;
         }
         return this;
@@ -84,6 +107,7 @@ public class InMemorySession implements Session {
     }
 
     @Override
+    @Nonnull
     public Instant getCreationTime() {
         return creationTime;
     }
@@ -113,13 +137,15 @@ public class InMemorySession implements Session {
         return attributes.values();
     }
 
-
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return attributes.get(name, conversionContext);
     }
 
-    void setNew(boolean aNew) {
+    /**
+     * @param aNew Set is new
+     */
+    public void setNew(boolean aNew) {
         isNew = aNew;
     }
 }

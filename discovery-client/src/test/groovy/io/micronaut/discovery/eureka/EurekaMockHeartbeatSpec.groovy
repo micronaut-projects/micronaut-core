@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,12 @@
 package io.micronaut.discovery.eureka
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.eureka.client.v2.EurekaClient
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
+import io.micronaut.core.naming.NameUtils
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -60,12 +58,12 @@ class EurekaMockHeartbeatSpec extends Specification {
         then: "The application is registered"
         conditions.eventually {
             Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
-            MockEurekaServer.instances[serviceId].size() == 1
+            MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].size() == 1
 
-            InstanceInfo instanceInfo = MockEurekaServer.instances[serviceId].values().first()
+            InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
             instanceInfo.status == InstanceInfo.Status.UP
             // heart beat received
-            MockEurekaServer.heartbeats[serviceId].values().first()
+            MockEurekaServer.heartbeats[NameUtils.hyphenate(serviceId)].values().first()
         }
 
         when: "The application is stopped"
@@ -73,7 +71,7 @@ class EurekaMockHeartbeatSpec extends Specification {
 
         then: "The application is de-registered"
         conditions.eventually {
-            MockEurekaServer.instances[serviceId].size() == 0
+            MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].size() == 0
         }
 
         cleanup:

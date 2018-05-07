@@ -1,31 +1,30 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Default implementation of {@link ArgumentValue}
+ * Default implementation of {@link ArgumentValue}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -56,6 +55,11 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
+    public Argument[] getTypeParameters() {
+        return argument.getTypeParameters();
+    }
+
+    @Override
     public Map<String, Argument<?>> getTypeVariables() {
         return argument.getTypeVariables();
     }
@@ -64,7 +68,6 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     public Annotation getQualifier() {
         return argument.getQualifier();
     }
-
 
     @Override
     public V getValue() {
@@ -100,5 +103,4 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     public int typeHashCode() {
         return argument.typeHashCode();
     }
-
 }

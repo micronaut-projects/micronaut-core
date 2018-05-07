@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import static io.micronaut.discovery.CompositeDiscoveryClient.SETTINGS_CACHE_ENABLED;
-
 /**
- * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled
+ * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Primary
 @Singleton
-public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient{
+public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
+
+    /**
+     * Create a default composite discovery for the discovery clients.
+     *
+     * @param discoveryClients The Discovery clients used for service discovery
+     */
     @Inject
     public DefaultCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);

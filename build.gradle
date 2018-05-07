@@ -17,10 +17,150 @@ plugins {
 }
 
 repositories {
+    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
     maven { url "https://repo.grails.org/grails/core" }
 }
 
 version project.projectVersion
+
+ext {
+    distInstallDir = file("$buildDir/dist-tmp")
+    homeBinDir = file("bin")
+    homeLibDir = file("lib")
+    homeSrcDir = file("src")
+}
+
+ext {
+
+    dependencyVersions = [
+            groovy: [
+                    version:groovyVersion,
+                    group:'org.codehaus.groovy',
+                    name: 'groovy',
+                    modules:['groovy-test','groovy-ant','groovy-json','groovy-jmx']
+            ],
+            gorm: [
+                    version:gormVersion,
+                    group:'org.grails',
+                    name: 'grails-datastore-core',
+                    modules:['grails-datastore-gorm','grails-datastore-gorm-hibernate5']
+            ],
+            jackson: [
+                version: jacksonVersion,
+                group:'com.fasterxml.jackson.core',
+                name:'jackson-databind'
+            ],
+            'jackson.modules': [
+                    version: jacksonVersion,
+                    group:'com.fasterxml.jackson.module',
+                    name:'jackson-module-afterburner'
+            ],
+            'jackson.datatype': [
+                    version: jacksonVersion,
+                    group:'com.fasterxml.jackson.datatype',
+                    name:'jackson-datatype-jdk8',
+                    modules:['jackson-datatype-jsr310']
+            ],
+            mongodb:[
+                version: mongoVersion,
+                group:'org.mongodb',
+                name:'mongo-java-driver',
+                modules:['mongodb-driver-async']
+            ],
+            neo4j: [
+                version: neo4jVersion,
+                group:'org.neo4j.test',
+                name:'neo4j-harness'
+            ],
+            'neo4j.bolt': [
+                version: '1.5.1',
+                group:'org.neo4j.driver',
+                name:'neo4j-java-driver'
+            ],
+            netty: [
+                version: nettyVersion,
+                group:'io.netty',
+                name:'netty-codec-http',
+                modules:['netty-handler','netty-handler-proxy']
+            ],
+            lettuce: [
+                version: lettuceVersion,
+                group:'io.lettuce',
+                name:'lettuce-core'
+
+            ],
+            spring: [
+                version: springVersion,
+                group:'org.springframework',
+                name: 'spring-core',
+                modules:['spring-context', 'spring-tx', 'spring-orm']
+            ],
+            snakeyaml: [
+                version: yamlVersion,
+                group:'org.yaml',
+                name: 'snakeyaml'
+            ],
+            slf4j: [
+                version: slf4jVersion,
+                group:'org.slf4j',
+                name: 'slf4j-api',
+                modules: ['slf4j-simple']
+            ],
+            spock: [
+                version: spockVersion,
+                group:'org.spockframework',
+                name: 'spock-core'
+            ],
+            rxjava1: [
+                version: rxJava1Version,
+                group:'io.reactivex',
+                name: 'rxjava'
+            ],
+            'rxjava1.interop': [
+                    version: rxJavaInteropVersion,
+                    group:'com.github.akarnokd',
+                    name: 'rxjava2-interop'
+            ],
+            rxjava2: [
+                version: rxJava2Version,
+                group:'io.reactivex.rxjava2',
+                name: 'rxjava'
+            ],
+            reactor:[
+                version: reactorVersion,
+                group:'io.projectreactor',
+                name: 'reactor-core'
+            ],
+            validation: [
+                version: validationVersion,
+                group:'javax.validation',
+                name: 'validation-api'
+            ],
+            hystrix: [
+                    version: hystrixVersion,
+                    group:'com.netflix.hystrix',
+                    name: 'hystrix-core',
+                    modules:['hystrix-serialization']
+            ]
+
+    ]
+
+    dependencyVersion = { String name ->
+        def dep = dependencyVersions[name]
+        if(dep == null) {
+            throw new IllegalArgumentException("No core dependency defined for name: $name")
+        }
+        return "$dep.group:$dep.name:$dep.version".toString()
+    }
+    dependencyModuleVersion = { String name, String module ->
+        def dep = dependencyVersions[name]
+        if(dep == null) {
+            throw new IllegalArgumentException("No core dependency defined for name: $name")
+        }
+        return "$dep.group:$module:$dep.version".toString()
+    }
+
+}
 
 subprojects { subproject ->
 
@@ -46,6 +186,7 @@ subprojects { subproject ->
 
 
     repositories {
+        maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
         maven { url "https://repo.grails.org/grails/core" }
     }
     
@@ -65,7 +206,7 @@ subprojects { subproject ->
             
             checkstyle {
                 toolVersion = 8.2
-                configFile = new File(project.rootDir, 'checkstyle/oracle.xml')
+                configFile = new File(project.rootDir, 'config/checkstyle/checkstyle.xml')
                 ignoreFailures = false
 
                 // TODO - We need to turn these down once
@@ -104,13 +245,14 @@ subprojects { subproject ->
     }
 
     dependencies {
-        compile "org.slf4j:slf4j-api:$slf4jVersion"
-//        shadowCompile group:"org.slf4j", name:"slf4j-api", version:slf4jVersion
+        if (subproject.name != "bom") {
+            compile dependencyVersion("slf4j")
+        }
 
-        compileOnly([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
-        testCompile([group:'com.github.ben-manes.caffeine',name:'caffeine', version:caffeineVersion])
-        testCompile "org.codehaus.groovy:groovy:$groovyVersion"
-        testCompile("org.spockframework:spock-core:${spockVersion}") {
+        compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testCompile dependencyVersion("groovy")
+        testCompile(dependencyVersion("spock")) {
             exclude module:'groovy-all'
         }
         testCompile "cglib:cglib-nodep:2.2.2"

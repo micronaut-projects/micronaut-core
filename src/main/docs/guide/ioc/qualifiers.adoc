@@ -42,3 +42,49 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 ----
 include::{testsdir}/qualifiers/annotation/Vehicle.groovy[tags=constructor, indent=0]
 ----
+
+=== Primary and Secondary Beans
+
+api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean that should be selected in the case of multiple possible interface implementations.
+
+Consider the following example:
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/ColorPicker.groovy[tags=clazz, indent=0]
+----
+
+Given a common interface called `ColorPicker` that is implemented by multiple classes.
+
+.The Primary Bean
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=clazz, indent=0]
+----
+
+The `Green` bean is a `ColorPicker`, but is annotated with `@Primary`.
+
+.Another Bean of the Same Type
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=clazz, indent=0]
+----
+
+The `Blue` bean is also a `ColorPicker` and hence you have two possible candidates when injecting the `ColorPicker` interface. Since `Green` is the primary it will always be favoured.
+
+
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/TestController.groovy[tags=clazz, indent=0]
+----
+
+<1> Although there are two `ColorPicker` beans, `Green` gets injected due to the `@Primary` annotation.
+
+If multiple possible candidates are present and no `@Primary` is defined then a api:context.exceptions.NonUniqueBeanException[] will be thrown.
+
+In addition to `@Primary`, there is also a api:context.annotation.Secondary[] annotation which causes the opposite effect and allows de-prioritizing a bean.

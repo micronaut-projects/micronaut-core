@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.session;
 
 /**
- * Settings for session configuration
+ * Settings for session configuration.
  */
 public interface SessionSettings {
+
     /**
-     * The prefix to use for all config
+     * The prefix to use for all session configuration.
      */
     String PREFIX = "micronaut.session";
 
     /**
-     * The prefix to use for all config
+     * The property name for HTTP session configuration.
      */
-    String HTTP = PREFIX +  ".http";
+    String HTTP = PREFIX + ".http";
+
+    /**
+     * The property name for HTTP session cookie configuration.
+     */
     String HTTP_COOKIE_STRATEGY = HTTP + ".cookie";
+
+    /**
+     * The property name for HTTP session header configuration.
+     */
     String HTTP_HEADER_STRATEGY = HTTP + ".header";
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configurations.ribbon;
 
 import com.netflix.client.VipAddressResolver;
@@ -21,6 +22,7 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.client.config.IClientConfigKey;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 
@@ -32,7 +34,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Abstract implementation of the {@link IClientConfig} interface
+ * Abstract implementation of the {@link IClientConfig} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractRibbonClientConfig implements IClientConfig {
 
     /**
-     * The prefix to use for all Ribbon settings
+     * The prefix to use for all Ribbon settings.
      */
     public static final String PREFIX = "ribbon";
 
@@ -48,17 +50,22 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     private Map<IClientConfigKey, Object> customSettings = new ConcurrentHashMap<>();
     private VipAddressResolver resolver = null;
 
+    /**
+     * Constructor.
+     * @param environment environment
+     */
     public AbstractRibbonClientConfig(Environment environment) {
         this.environment = environment;
     }
 
     /**
-     * Sets an optional {@link VipAddressResolver}
+     * Sets an optional {@link VipAddressResolver}.
+     *
      * @param resolver The {@link VipAddressResolver}
      */
     @Inject
     public void setVipAddressResolver(Optional<VipAddressResolver> resolver) {
-        if(resolver.isPresent()) {
+        if (resolver.isPresent()) {
             this.resolver = resolver.get();
         }
     }
@@ -188,11 +195,10 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
      */
     @Override
     public <T> IClientConfig set(IClientConfigKey<T> key, T value) {
-        if(key != null) {
-            if(value == null) {
+        if (key != null) {
+            if (value == null) {
                 customSettings.remove(key);
-            }
-            else {
+            } else {
                 customSettings.put(key, value);
             }
         }
@@ -211,18 +217,33 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
         return getVipAddressResolver().resolve(deploymentContextBasedVipAddressesMacro, this);
     }
 
+    /**
+     * Get a property based on the parameters.
+     * @param key key
+     * @param type type
+     * @param defaultValue defaultValue
+     * @param <T> type of config key
+     * @return The property
+     */
     protected <T> T get(IClientConfigKey<T> key, Class<T> type, T defaultValue) {
-        if(key == null) return null;
-        if(customSettings.containsKey(key)) {
-            return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
+        if (key == null) {
+            return null;
         }
-        else {
+        if (customSettings.containsKey(key)) {
+            return ConversionService.SHARED.convert(customSettings.get(key), type).orElse(defaultValue);
+        } else {
             return environment.getProperty(qualifyKey(key), type, defaultValue);
         }
     }
 
+    /**
+     * Return the namespace + key.
+     * @param key key
+     * @return concatenated result
+     */
     protected String qualifyKey(IClientConfigKey key) {
-        return getNameSpace() + "." + key.key();
+        String property = NameUtils.hyphenate(key.key());
+        return getNameSpace() + "." + property;
     }
 
     private VipAddressResolver getVipAddressResolver() {

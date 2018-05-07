@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
@@ -23,11 +24,20 @@ import io.micronaut.http.filter.HttpFilter;
 
 import javax.inject.Singleton;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
- * <p>The default {@link Router} implementation. This implementation does not perform any additional caching of route discovery</p>
+ * <p>The default {@link Router} implementation. This implementation does not perform any additional caching of
+ * route discovery.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,8 +49,9 @@ public class DefaultRouter implements Router {
     private final StatusRoute[] routesByStatus = new StatusRoute[HttpStatus.values().length];
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
+
     /**
-     * Construct a new router for the given route builders
+     * Construct a new router for the given route builders.
      *
      * @param builders The builders
      */
@@ -54,7 +65,6 @@ public class DefaultRouter implements Router {
         List<UriRoute> headRoutes = new ArrayList<>();
         List<UriRoute> connectRoutes = new ArrayList<>();
         List<UriRoute> traceRoutes = new ArrayList<>();
-
 
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
@@ -87,6 +97,8 @@ public class DefaultRouter implements Router {
                     case TRACE:
                         traceRoutes.add(route);
                         break;
+                    default:
+                        // no-op
                 }
             }
 
@@ -128,40 +140,40 @@ public class DefaultRouter implements Router {
                 case TRACE:
                     routesByMethod[method.ordinal()] = finalizeRoutes(traceRoutes);
                     break;
+                default:
+                    // no-op
             }
         }
-    }
-
-    private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
-        Collections.sort(routes);
-        Collections.reverse(routes);
-        return routes.toArray(new UriRoute[routes.size()]);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri) {
         UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
-        return Arrays.stream(routes)
-                .map((route -> route.match(uri.toString())))
-                .filter(Optional::isPresent)
-                .map(Optional::get);
+        return Arrays
+            .stream(routes)
+            .map((route -> route.match(uri.toString())))
+            .filter(Optional::isPresent)
+            .map(Optional::get);
     }
 
     @Override
     public Stream<UriRoute> uriRoutes() {
-        return Arrays.stream(routesByMethod)
-                .flatMap(Arrays::stream);
+        return Arrays
+            .stream(routesByMethod)
+            .flatMap(Arrays::stream);
     }
 
     @Override
     public <T> Optional<UriRouteMatch<T>> route(HttpMethod httpMethod, CharSequence uri) {
         UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
-        Optional<UriRouteMatch> result = Arrays.stream(routes)
-                .map((route -> route.match(uri.toString())))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .findFirst();
+        Optional<UriRouteMatch> result = Arrays
+            .stream(routes)
+            .map((route -> route.match(uri.toString())))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .findFirst();
+
         UriRouteMatch match = result.orElse(null);
         return Optional.ofNullable(match);
     }
@@ -169,7 +181,7 @@ public class DefaultRouter implements Router {
     @Override
     public <T> Optional<RouteMatch<T>> route(HttpStatus status) {
         StatusRoute routesByStatus = this.routesByStatus[status.ordinal()];
-        if(routesByStatus == null) {
+        if (routesByStatus == null) {
             return Optional.empty();
         }
         return routesByStatus.match(status);
@@ -179,7 +191,7 @@ public class DefaultRouter implements Router {
     public <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error) {
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<T>> match = errorRoute.match(originatingClass, error);
-             if(match.isPresent()) {
+            if (match.isPresent()) {
                 return match;
             }
         }
@@ -195,23 +207,20 @@ public class DefaultRouter implements Router {
             Optional<HttpFilter> match = filterRoute.match(method, uri);
             match.ifPresent(httpFilters::add);
         }
-        if(!httpFilters.isEmpty()) {
-
+        if (!httpFilters.isEmpty()) {
             OrderUtil.sort(httpFilters);
             return Collections.unmodifiableList(httpFilters);
-        }
-        else {
+        } else {
             return Collections.emptyList();
         }
     }
 
-
     @Override
     public <T> Optional<RouteMatch<T>> route(Throwable error) {
         for (ErrorRoute errorRoute : errorRoutes) {
-            if(errorRoute.originatingType() == null) {
+            if (errorRoute.originatingType() == null) {
                 Optional<RouteMatch<T>> match = errorRoute.match(error);
-                if(match.isPresent()) {
+                if (match.isPresent()) {
                     return match;
                 }
             }
@@ -222,13 +231,18 @@ public class DefaultRouter implements Router {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri) {
-        return Arrays.stream(routesByMethod)
-                .filter(Objects::nonNull)
-                .flatMap(Arrays::stream)
-                .map(route -> route.match(uri.toString()))
-                .filter(Optional::isPresent)
-                .map(Optional::get);
+        return Arrays
+            .stream(routesByMethod)
+            .filter(Objects::nonNull)
+            .flatMap(Arrays::stream)
+            .map(route -> route.match(uri.toString()))
+            .filter(Optional::isPresent)
+            .map(Optional::get);
     }
 
-
+    private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
+        Collections.sort(routes);
+        Collections.reverse(routes);
+        return routes.toArray(new UriRoute[routes.size()]);
+    }
 }

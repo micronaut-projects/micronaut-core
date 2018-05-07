@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
-import com.typesafe.netty.http.DefaultStreamedHttpRequest;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -179,23 +179,21 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
-    HttpRequest getNettyRequest(Publisher<HttpContent> bodyPublisher) {
-        HttpRequest request;
-        if(bodyPublisher != null) {
-            request = new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString(), bodyPublisher);
-        }
-        else {
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString());
-        }
-        request.headers().setAll(headers.getNettyHeaders());
-        return request;
-    }
-
-    HttpRequest getNettyRequest(ByteBuf content) {
+    HttpRequest getFullRequest(ByteBuf content) {
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
-                                                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
+        req.headers().setAll(headers.getNettyHeaders());
+        return req;
+    }
+
+
+    HttpRequest getStreamedRequest(Publisher<HttpContent> publisher) {
+        String uriStr = resolveUriPath();
+        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
+        HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().setAll(headers.getNettyHeaders());
         return req;
     }

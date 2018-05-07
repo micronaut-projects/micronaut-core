@@ -1,0 +1,32 @@
+Validation advice is one of the most common advice types you are likely to want to incorporate into your application.
+
+Validation advice is built on `javax.validation` and the http://hibernate.org/validator[Hibernate Validator] project.
+
+To get started first add the Hibernate Validator configuration to your application:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:hibernate-validator"
+----
+
+Then simply add the api:validation.Validated[] annotation to any class that requires validation. For example, consider this trivial service that retrieves books by title:
+
+.BookService.java
+[source,java]
+----
+include::{testsuite}/aop/validation/BookService.java[tags=imports, indent=0]
+
+include::{testsuite}/aop/validation/BookService.java[tags=class, indent=0]
+----
+
+<1> The api:validation.Validated[] annotation is defined at the class level
+<2> The `javax.validation.NotBlank` constraint is used to ensure parameters passed cannot be blank
+
+You can verify the behaviour of the class by writing a test. The following test is written in Groovy and Spock:
+
+.Testing Validation
+[source,groovy]
+----
+include::{testsuite}/aop/validation/BookServiceSpec.groovy[tags=test, indent=0]
+----
