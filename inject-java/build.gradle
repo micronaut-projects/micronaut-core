@@ -26,9 +26,8 @@ tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowR
 dependencies {
     shadowCompile project(":inject")
     compile project(":inject")
+    compile project(":aop")
 
-
-    compileOnly project(":aop")
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly dependencyVersion("validation")
 
