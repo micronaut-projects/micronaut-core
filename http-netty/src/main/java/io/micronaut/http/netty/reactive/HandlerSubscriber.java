@@ -1,5 +1,13 @@
 package io.micronaut.http.netty.reactive;
 
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.CANCELLED;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.COMPLETE;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.INACTIVE;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION_OR_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -10,23 +18,38 @@ import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.*;
-
 /**
  * Subscriber that publishes received messages to the handler pipeline.
+ *
+ * @param <T> The subscriber type
+ * @author Graeme Rocher
+ * @since 1.0
  */
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
     static final long DEFAULT_LOW_WATERMARK = 4;
     static final long DEFAULT_HIGH_WATERMARK = 16;
 
+    private final EventExecutor executor;
+    private final long demandLowWatermark;
+    private final long demandHighWatermark;
+
+    private final AtomicBoolean hasSubscription = new AtomicBoolean();
+
+    private volatile Subscription subscription;
+    private volatile ChannelHandlerContext ctx;
+
+    private State state = NO_SUBSCRIPTION_OR_CONTEXT;
+    private long outstandingDemand = 0;
+    private ChannelFuture lastWriteFuture;
+
     /**
      * Create a new handler subscriber.
-     *
+     * <p>
      * The supplied executor must be the same event loop as the event loop that this handler is eventually registered
      * with, if not, an exception will be thrown when the handler is registered.
      *
-     * @param executor The executor to execute asynchronous events from the publisher on.
+     * @param executor            The executor to execute asynchronous events from the publisher on.
      * @param demandLowWatermark  The low watermark for demand. When demand drops below this, more will be requested.
      * @param demandHighWatermark The high watermark for demand. This is the maximum that will be requested.
      */
@@ -38,7 +61,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
 
     /**
      * Create a new handler subscriber with the default low and high watermarks.
-     *
+     * <p>
      * The supplied executor must be the same event loop as the event loop that this handler is eventually registered
      * with, if not, an exception will be thrown when the handler is registered.
      *
@@ -65,10 +88,9 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         doClose();
     }
 
-    private final EventExecutor executor;
-    private final long demandLowWatermark;
-    private final long demandHighWatermark;
-
+    /**
+     * The state.
+     */
     enum State {
         NO_SUBSCRIPTION_OR_CONTEXT,
         NO_SUBSCRIPTION,
@@ -78,15 +100,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         CANCELLED,
         COMPLETE
     }
-
-    private final AtomicBoolean hasSubscription = new AtomicBoolean();
-
-    private volatile Subscription subscription;
-    private volatile ChannelHandlerContext ctx;
-
-    private State state = NO_SUBSCRIPTION_OR_CONTEXT;
-    private long outstandingDemand = 0;
-    private ChannelFuture lastWriteFuture;
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
@@ -167,6 +180,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 subscription.cancel();
                 state = CANCELLED;
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -198,6 +213,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
             case CANCELLED:
                 subscription.cancel();
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -258,6 +275,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                         ctx.close();
                         state = COMPLETE;
                         break;
+                    default:
+                        // no-op
                 }
             }
         });

@@ -2,8 +2,14 @@ package io.micronaut.http.netty.stream;
 
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -11,20 +17,23 @@ import org.reactivestreams.Subscriber;
 import java.util.LinkedList;
 import java.util.Queue;
 
+/**
+ * Base class for Http Streams handlers.
+ *
+ * @param <In>  The input Http Message
+ * @param <Out> The output Http Message
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessage> extends ChannelDuplexHandler {
 
     private final Queue<Outgoing> outgoing = new LinkedList<>();
     private final Class<In> inClass;
     private final Class<Out> outClass;
 
-    public HttpStreamsHandler(Class<In> inClass, Class<Out> outClass) {
-        this.inClass = inClass;
-        this.outClass = outClass;
-    }
-
     /**
      * The incoming message that is currently being streamed out to a subscriber.
-     *
+     * <p>
      * This is tracked so that if its subscriber cancels, we can go into a mode where we ignore the rest of the body.
      * Since subscribers may cancel as many times as they like, including well after they've received all their content,
      * we need to track what the current message that's being streamed out is so that we can ignore it if it's not
@@ -34,7 +43,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * Ignore the remaining reads for the incoming message.
-     *
+     * <p>
      * This is used in conjunction with currentlyStreamedMessage, as well as in situations where we have received the
      * full body, but still might be expecting a last http content message.
      */
@@ -42,61 +51,95 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * Whether a LastHttpContent message needs to be written once the incoming publisher completes.
-     *
+     * <p>
      * Since the publisher may itself publish a LastHttpContent message, we need to track this fact, because if it
      * doesn't, then we need to write one ourselves.
      */
     private boolean sendLastHttpContent;
 
     /**
+     * @param inClass  The in class
+     * @param outClass The out class
+     */
+    HttpStreamsHandler(Class<In> inClass, Class<Out> outClass) {
+        this.inClass = inClass;
+        this.outClass = outClass;
+    }
+
+    /**
      * Whether the given incoming message has a body.
+     *
+     * @param in The incoming message
+     * @return Whether the incoming message has body
      */
     protected abstract boolean hasBody(In in);
 
     /**
      * Create an empty incoming message. This must be of type FullHttpMessage, and is invoked when we've determined
      * that an incoming message can't have a body, so we send it on as a FullHttpMessage.
+     *
+     * @param in The incoming message
+     * @return An empty incoming message
      */
     protected abstract In createEmptyMessage(In in);
 
     /**
      * Create a streamed incoming message with the given stream.
+     *
+     * @param in     The incoming message
+     * @param stream The publisher for the Http Content
+     * @return An streamed incoming message
      */
     protected abstract In createStreamedMessage(In in, Publisher<HttpContent> stream);
 
     /**
      * Invoked when an incoming message is first received.
-     *
+     * <p>
      * Overridden by sub classes for state tracking.
+     *
+     * @param ctx The channel handler context
      */
-    protected void receivedInMessage(ChannelHandlerContext ctx) {}
+    protected void receivedInMessage(ChannelHandlerContext ctx) {
+    }
 
     /**
      * Invoked when an incoming message is fully consumed.
-     *
+     * <p>
      * Overridden by sub classes for state tracking.
+     *
+     * @param ctx The channel handler context
      */
-    protected void consumedInMessage(ChannelHandlerContext ctx) {}
+    protected void consumedInMessage(ChannelHandlerContext ctx) {
+    }
 
     /**
      * Invoked when an outgoing message is first received.
-     *
+     * <p>
      * Overridden by sub classes for state tracking.
+     *
+     * @param ctx The channel handler context
      */
-    protected void receivedOutMessage(ChannelHandlerContext ctx) {}
+    protected void receivedOutMessage(ChannelHandlerContext ctx) {
+    }
 
     /**
      * Invoked when an outgoing message is fully sent.
-     *
+     * <p>
      * Overridden by sub classes for state tracking.
+     *
+     * @param ctx The channel handler context
      */
-    protected void sentOutMessage(ChannelHandlerContext ctx) {}
+    protected void sentOutMessage(ChannelHandlerContext ctx) {
+    }
 
     /**
      * Subscribe the given subscriber to the given streamed message.
-     *
+     * <p>
      * Provided so that the client subclass can intercept this to hold off sending the body of an expect 100 continue
      * request.
+     *
+     * @param msg        The streamed Http message
+     * @param subscriber The subscriber for the Http Content
      */
     protected void subscribeSubscriberToStream(StreamedHttpMessage msg, Subscriber<HttpContent> subscriber) {
         msg.subscribe(subscriber);
@@ -104,10 +147,13 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * Invoked every time a read of the incoming body is requested by the subscriber.
-     *
+     * <p>
      * Provided so that the server subclass can intercept this to send a 100 continue response.
+     *
+     * @param ctx The channel handler context
      */
-    protected void bodyRequested(ChannelHandlerContext ctx) {}
+    protected void bodyRequested(ChannelHandlerContext ctx) {
+    }
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -174,7 +220,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (content instanceof LastHttpContent) {
 
                 if (content.content().readableBytes() > 0 ||
-                        !((LastHttpContent) content).trailingHeaders().isEmpty()) {
+                    !((LastHttpContent) content).trailingHeaders().isEmpty()) {
                     // It has data or trailing headers, send them
                     ctx.fireChannelRead(content);
                 } else {
@@ -234,6 +280,10 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         }
     }
 
+    /**
+     * @param ctx The channel handler context
+     * @param out The output stream
+     */
     protected void unbufferedWrite(final ChannelHandlerContext ctx, final Outgoing out) {
 
         if (out.message instanceof FullHttpMessage) {
@@ -278,11 +328,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (sendLastHttpContent) {
             ChannelPromise promise = outgoing.peek().promise;
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener(
-                    (ChannelFutureListener) channelFuture -> executeInEventLoop(ctx, () -> {
-                        outgoing.remove();
-                        sentOutMessage(ctx);
-                        flushNext(ctx);
-                    })
+                (ChannelFutureListener) channelFuture -> executeInEventLoop(ctx, () -> {
+                    outgoing.remove();
+                    sentOutMessage(ctx);
+                    flushNext(ctx);
+                })
             );
         } else {
             outgoing.remove().promise.setSuccess();
@@ -319,11 +369,18 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         }
     }
 
+    /**
+     * The outgoing class.
+     */
     class Outgoing {
         final Out message;
         final ChannelPromise promise;
 
-        public Outgoing(Out message, ChannelPromise promise) {
+        /**
+         * @param message The output message
+         * @param promise The channel promise
+         */
+        Outgoing(Out message, ChannelPromise promise) {
             this.message = message;
             this.promise = promise;
         }

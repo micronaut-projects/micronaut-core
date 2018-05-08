@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.buffer;
 
 import io.micronaut.core.annotation.Internal;
@@ -27,7 +28,7 @@ import javax.inject.Singleton;
 import java.util.function.Function;
 
 /**
- * A {@link ByteBufferFactory} implementation for Netty
+ * A {@link ByteBufferFactory} implementation for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,7 +38,7 @@ import java.util.function.Function;
 public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
 
     /**
-     * Default Netty ByteBuffer Factory
+     * Default Netty ByteBuffer Factory.
      */
     public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
 
@@ -53,10 +54,16 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
         });
     }
 
+    /**
+     * Default constructor.
+     */
     public NettyByteBufferFactory() {
         this.allocator = ByteBufAllocator.DEFAULT;
     }
 
+    /**
+     * @param allocator The {@link ByteBufAllocator}
+     */
     public NettyByteBufferFactory(ByteBufAllocator allocator) {
         this.allocator = allocator;
     }

@@ -4,11 +4,20 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
 
+/**
+ * Delegate for HTTP Request.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class DelegateHttpRequest extends DelegateHttpMessage implements HttpRequest {
 
     protected final HttpRequest request;
 
-    public DelegateHttpRequest(HttpRequest request) {
+    /**
+     * @param request The Http request
+     */
+    DelegateHttpRequest(HttpRequest request) {
         super(request);
         this.request = request;
     }
