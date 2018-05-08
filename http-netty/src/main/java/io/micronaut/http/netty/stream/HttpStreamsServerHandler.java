@@ -73,7 +73,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     /**
      * Default constructor.
      */
-    HttpStreamsServerHandler() {
+    public HttpStreamsServerHandler() {
         this(Collections.emptyList());
     }
 
