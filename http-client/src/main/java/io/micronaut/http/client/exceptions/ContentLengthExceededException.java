@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.exceptions;
 
 /**
@@ -21,10 +22,17 @@ package io.micronaut.http.client.exceptions;
  */
 public class ContentLengthExceededException extends HttpClientException {
 
+    /**
+     * @param maxLength      The maximum length
+     * @param receivedLength The received length
+     */
     public ContentLengthExceededException(long maxLength, long receivedLength) {
         super("The received length [" + receivedLength + "] exceeds the maximum content length [" + maxLength + "]");
     }
 
+    /**
+     * @param maxLength The maximum length
+     */
     public ContentLengthExceededException(long maxLength) {
         super("The received length exceeds the maximum content length [" + maxLength + "]");
     }

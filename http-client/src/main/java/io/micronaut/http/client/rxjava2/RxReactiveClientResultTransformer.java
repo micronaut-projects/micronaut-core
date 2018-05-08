@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.rxjava2;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import io.reactivex.Maybe;
 import javax.inject.Singleton;
 
 /**
- * Adds custom support for {@link Maybe} to handle NOT_FOUND results
+ * Adds custom support for {@link Maybe} to handle NOT_FOUND results.
  *
  * @author graemerocher
  * @since 1.0

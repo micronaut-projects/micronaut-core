@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
@@ -39,13 +40,13 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}
+ * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}.
  *
+ * @param <B> The response type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -63,11 +64,19 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
     private final B body;
 
+    /**
+     * @param fullHttpResponse       The full Http response
+     * @param mediaTypeCodecRegistry The media type codec registry
+     * @param byteBufferFactory      The byte buffer factory
+     * @param bodyType               The body type
+     * @param errorStatus            The error status
+     */
     FullNettyClientHttpResponse(
         FullHttpResponse fullHttpResponse,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
         Argument<B> bodyType, boolean errorStatus) {
+
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
@@ -109,14 +118,18 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
-        if (type == null) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
         return getBody(Argument.of(type));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        if (type == null) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
 
         if (type.getType() == ByteBuffer.class) {
             return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
@@ -135,7 +148,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                             return convertByteBuf(bytebuf, argument);
                         }
                         Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
-                        if(!converted.isPresent()) {
+                        if (!converted.isPresent()) {
                             ByteBuf content = nettyHttpResponse.content();
                             return convertByteBuf(content, type);
                         }
@@ -160,10 +173,10 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
             }
-            if(!convertedBodies.isEmpty()) {
+            if (!convertedBodies.isEmpty()) {
                 for (Map.Entry<Argument, Optional> entry : convertedBodies.entrySet()) {
                     Argument existing = entry.getKey();
-                    if(type.getType().isAssignableFrom(existing.getType())) {
+                    if (type.getType().isAssignableFrom(existing.getType())) {
                         return entry.getValue();
                     }
                 }

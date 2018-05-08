@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Blocking;
@@ -21,11 +22,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import org.reactivestreams.Publisher;
 
 /**
  * A blocking HTTP client interface that features a subset of the operations provided by {@link HttpClient} and
- * is designed primarily for testing purposes
+ * is designed primarily for testing purposes.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,12 +34,14 @@ import org.reactivestreams.Publisher;
 public interface BlockingHttpClient {
 
     /**
-     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type</p>
+     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.</p>
      * <p>
-     * <p>This method will send a {@code Content-Length} header and except a content length header the response and is designed for simple non-streaming exchanges of data</p>
+     * <p>This method will send a {@code Content-Length} header and except a content length header the response and
+     * is designed for simple non-streaming exchanges of data</p>
      * <p>
-     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed {@link HttpRequest}</p>
+     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
+     * {@link HttpRequest}</p>
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -50,7 +52,8 @@ public interface BlockingHttpClient {
     <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType);
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher}.
      *
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
@@ -62,8 +65,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -76,8 +79,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -102,8 +105,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -117,8 +120,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
      *
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
@@ -130,8 +133,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
      *
      * @param uri The URI
      * @return A string result or null if a 404 is returned
@@ -142,7 +145,8 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform a GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher}.
      *
      * @param uri The URI of the GET request
      * @param <O> The response body type
@@ -153,10 +157,12 @@ public interface BlockingHttpClient {
     }
 
     /**
-     * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform a GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher}.
      *
-     * @param uri The URI of the GET request
-     * @param <O> The response body type
+     * @param uri      The URI of the GET request
+     * @param <O>      The response body type
+     * @param bodyType The body type
      * @return The full {@link HttpResponse} object
      */
     default <O> HttpResponse<O> exchange(String uri, Class<O> bodyType) {
