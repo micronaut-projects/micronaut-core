@@ -26,31 +26,44 @@ Generally there are two methods of interest when working with the `HttpClient`. 
 
 The `retrieve` method accepts an api:http.HttpRequest[] object or a `String` URI to the endpoint you wish to request.
 
-The following example shows are you use retrieve to executing an HTTP `GET` and receive the response body as a `String`:
+The following example shows how to use `retrieve` to execute an HTTP `GET` and receive the response body as a `String`:
 
 .Using retrieve
 [source,java]
 ----
-TODO - example showing:
-String val = client.retrieve("/foo/bar").blockingFirst()
+include::{testsclient}/basics/HelloControllerTest.java[tags=simple, indent=0]
 ----
 
-WARNING: For documentation and illustration purposes we are using RxJava's `blockingFirst()` method, however this should never be done in an actual production application.
+Note that in this example, for illustration purposes we are calling `toBlocking()` to return a blocking version of the client. However, in production code you should not do this and instead rely on the non-blocking nature of the Micronaut HTTP server.
+
+For example the following `@Controller` method calls another endpoint in a non-blocking manner:
+
+
+.Using the HTTP client without blocking
+[source,java]
+----
+include::{testsclient}/basics/HelloController.java[tags=imports, indent=0]
+
+include::{testsclient}/basics/HelloController.java[tags=nonblocking, indent=0]
+----
+
+<1> The method `hello` returns a rx:Maybe[] which may or may not emit an item. If an item is not emitted a 404 is returned.
+<2> The `retrieve` method is called which returns a rx:Flowable[] which has a `firstElement` method that returns the first emitted item or nothing
+
+TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which will limit the throughput and scalability of your application).
 
 ==== Customizing the HTTP Request
 
-The previous example specifies a URI to request, but often you want to pass more information along, such as HTTP headers and so on. For that you should construct an `HttpRequest` instance using one of the static methods of the api:http.HttpRequest[] interface. For example:
+The previous example demonstrated using the static methods of the api:http.HttpRequest[] interface to construct a api:http.MutableHttpRequest[] instance. Like the name suggests a `MutableHttpRequest` can be mutated including the ability to add headers, customize the request body and so on. For example:
 
 .Passing an HttpRequest to retrieve
 [source,java]
 ----
-TODO - example showing:
-import static HttpRequest.*;
-String val = client.retrieve(
-    GET("/foo/bar")
-    .header("X-My-Header", "foo")
-).blockingFirst()
+include::{testsclient}/basics/HelloControllerTest.java[tags=headers, indent=0]
 ----
+
+The above example adds an additional header called `X-My-Header` to the request before it is sent. The api:http.MutableHttpRequest[] interface has a bunch more convenience methods that make it easy to modify the request in common ways.
+
 
 ==== Reading JSON Responses
 
