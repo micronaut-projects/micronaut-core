@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -32,10 +33,18 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     protected final AtomicInteger index = new AtomicInteger(0);
 
-    abstract public String getServiceID();
+    /**
+     * @return The service ID
+     */
+    public abstract String getServiceID();
 
+    /**
+     * @param serviceInstances A list of service instances
+     * @return The next available instance or a {@link NoAvailableServiceException} if none
+     */
     protected ServiceInstance getNextAvailable(List<ServiceInstance> serviceInstances) {
-        List<ServiceInstance> availableServices = serviceInstances.stream().filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
+        List<ServiceInstance> availableServices = serviceInstances.stream()
+            .filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
             .collect(Collectors.toList());
         int len = availableServices.size();
         if (len == 0) {

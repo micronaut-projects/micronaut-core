@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
@@ -31,21 +32,19 @@ class BytePart extends AbstractFilePart {
     private final byte[] data;
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
+     * @param name     Parameter name to bind in the multipart request
      * @param filename Name of the file
-     * @param data The content to copy in {@link FileUpload}
+     * @param data     The content to copy in {@link FileUpload}
      */
     BytePart(String name, String filename, byte[] data) {
         this(name, filename, null, data);
     }
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
-     * @param filename Name of the file
+     * @param name        Parameter name to bind in the multipart request
+     * @param filename    Name of the file
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
-     * @param data The content to copy in {@link FileUpload}
+     * @param data        The content to copy in {@link FileUpload}
      */
     BytePart(String name, String filename, MediaType contentType, byte[] data) {
         super(name, filename, contentType);
@@ -53,7 +52,7 @@ class BytePart extends AbstractFilePart {
     }
 
     /**
-     * Copy the byte data into {@link FileUpload} object
+     * Copy the byte data into {@link FileUpload} object.
      *
      * @see AbstractFilePart#setContent(FileUpload)
      */
@@ -63,7 +62,6 @@ class BytePart extends AbstractFilePart {
     }
 
     /**
-     *
      * @see AbstractFilePart#getLength()
      */
     @Override

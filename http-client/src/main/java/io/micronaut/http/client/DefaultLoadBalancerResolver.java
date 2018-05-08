@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
@@ -35,11 +35,11 @@ import java.util.Optional;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
- * <p>
+ *
  * <ul>
- *     <li>If a reference starts with '/' then we attempt to look up the {@link EmbeddedServer}</li>
- *     <li>If the reference contains a '/' assume it is a URL and try to create a URL reference to it</li>
- *     <li>Otherwise delegate to the {@link DiscoveryClient} to attempt to resolve the URIs</li>
+ * <li>If a reference starts with '/' then we attempt to look up the {@link EmbeddedServer}</li>
+ * <li>If the reference contains a '/' assume it is a URL and try to create a URL reference to it</li>
+ * <li>Otherwise delegate to the {@link io.micronaut.discovery.DiscoveryClient} to attempt to resolve the URIs</li>
  * </ul>
  *
  * @author Graeme Rocher
@@ -52,7 +52,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     private final BeanContext beanContext;
 
     /**
-     * The default server loadbalance resolver
+     * The default server loadbalance resolver.
      *
      * @param beanContext          The bean context
      * @param serviceInstanceLists Any other providers
@@ -100,6 +100,10 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         }
     }
 
+    /**
+     * @param serviceID The service Id
+     * @return An {@link Optional} with the load balancer
+     */
     protected Optional<? extends LoadBalancer> resolveLoadBalancerForServiceID(String serviceID) {
         if (serviceInstanceLists.containsKey(serviceID)) {
             ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);

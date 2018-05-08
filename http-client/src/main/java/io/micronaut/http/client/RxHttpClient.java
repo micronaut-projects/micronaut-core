@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -24,7 +25,7 @@ import io.reactivex.Flowable;
 import java.net.URL;
 
 /**
- * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface
+ * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface.
  *
  * @author graemerocher
  * @since 1.0
