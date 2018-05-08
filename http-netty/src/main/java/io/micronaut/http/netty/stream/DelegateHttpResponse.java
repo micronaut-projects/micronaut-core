@@ -4,11 +4,20 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
+/**
+ * Delegate for HTTP Response.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class DelegateHttpResponse extends DelegateHttpMessage implements HttpResponse {
 
     protected final HttpResponse response;
 
-    public DelegateHttpResponse(HttpResponse response) {
+    /**
+     * @param response The Http response
+     */
+    DelegateHttpResponse(HttpResponse response) {
         super(response);
         this.response = response;
     }

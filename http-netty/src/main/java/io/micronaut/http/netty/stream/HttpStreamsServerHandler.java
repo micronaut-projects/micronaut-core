@@ -3,8 +3,18 @@ package io.micronaut.http.netty.stream;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
@@ -18,18 +28,18 @@ import java.util.NoSuchElementException;
  * Handler that reads {@link HttpRequest} messages followed by {@link HttpContent} messages and produces
  * {@link StreamedHttpRequest} messages, and converts written {@link StreamedHttpResponse} messages into
  * {@link HttpResponse} messages followed by {@link HttpContent} messages.
- *
+ * <p>
  * This allows request and response bodies to be handled using reactive streams.
- *
+ * <p>
  * There are two types of messages that this handler will send down the chain, {@link StreamedHttpRequest},
  * and {@link FullHttpRequest}. If {@link io.netty.channel.ChannelOption#AUTO_READ} is false for the channel,
  * then any {@link StreamedHttpRequest} messages <em>must</em> be subscribed to consume the body, otherwise
  * it's possible that no read will be done of the messages.
- *
+ * <p>
  * There are three types of messages that this handler accepts for writing, {@link StreamedHttpResponse},
- * {@link WebSocketHttpResponse} and {@link FullHttpResponse}. Writing any other messages may potentially
- * lead to HTTP message mangling.
- *
+ * {@link WebSocketHttpResponse} and {@link io.netty.handler.codec.http.FullHttpResponse}. Writing any other messages
+ * may potentially lead to HTTP message mangling.
+ * <p>
  * As long as messages are returned in the order that they arrive, this handler implicitly supports HTTP
  * pipelining.
  */
@@ -44,13 +54,16 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
     private final List<ChannelHandler> dependentHandlers;
 
-    public HttpStreamsServerHandler() {
+    /**
+     * Default constructor.
+     */
+    HttpStreamsServerHandler() {
         this(Collections.emptyList());
     }
 
     /**
      * Create a new handler that is depended on by the given handlers.
-     *
+     * <p>
      * The list of dependent handlers will be removed from the chain when this handler is removed from the chain,
      * for example, when the connection is upgraded to use websockets. This is useful, for example, for removing
      * the reactive streams publisher/subscriber from the chain in that event.
@@ -145,7 +158,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             // According to RFC 7230 a server MUST NOT send a Content-Length or a Transfer-Encoding when the status
             // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
             if (!HttpUtil.isContentLengthSet(out.message) && !HttpUtil.isTransferEncodingChunked(out.message)
-                    && canHaveBody(out.message)) {
+                && canHaveBody(out.message)) {
                 HttpUtil.setKeepAlive(out.message, false);
                 close = true;
             }
@@ -158,8 +171,8 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
         // responses do not include a message body
         return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
-                status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
-                status == HttpResponseStatus.NOT_MODIFIED);
+            status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
+            status == HttpResponseStatus.NOT_MODIFIED);
     }
 
     @Override
@@ -176,8 +189,8 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
         if (handshaker == null) {
             HttpResponse res = new DefaultFullHttpResponse(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.UPGRADE_REQUIRED);
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.UPGRADE_REQUIRED);
             res.headers().set(HttpHeaderNames.SEC_WEBSOCKET_VERSION, WebSocketVersion.V13.toHttpHeaderValue());
             HttpUtil.setContentLength(res, 0);
             super.unbufferedWrite(ctx, new Outgoing(res, out.promise));
@@ -220,7 +233,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         super.handlerRemoved(ctx);
-        for (ChannelHandler dependent: dependentHandlers) {
+        for (ChannelHandler dependent : dependentHandlers) {
             try {
                 ctx.pipeline().remove(dependent);
             } catch (NoSuchElementException e) {

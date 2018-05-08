@@ -6,9 +6,18 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 
+/**
+ * Delegate for Empty HTTP Response.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class EmptyHttpResponse extends DelegateHttpResponse implements FullHttpResponse {
 
-    public EmptyHttpResponse(HttpResponse response) {
+    /**
+     * @param response The Http response
+     */
+    EmptyHttpResponse(HttpResponse response) {
         super(response);
     }
 

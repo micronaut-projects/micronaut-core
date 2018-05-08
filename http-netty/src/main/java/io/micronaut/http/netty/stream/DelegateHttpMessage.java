@@ -3,10 +3,19 @@ package io.micronaut.http.netty.stream;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.*;
 
+/**
+ * Delegate for HTTP Message.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class DelegateHttpMessage implements HttpMessage {
     protected final HttpMessage message;
 
-    public DelegateHttpMessage(HttpMessage message) {
+    /**
+     * @param message The Http message
+     */
+    DelegateHttpMessage(HttpMessage message) {
         this.message = message;
     }
 

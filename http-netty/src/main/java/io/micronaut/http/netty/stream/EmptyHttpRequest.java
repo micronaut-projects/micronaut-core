@@ -2,13 +2,28 @@ package io.micronaut.http.netty.stream;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 
+/**
+ * Delegate for Empty HTTP Response.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 class EmptyHttpRequest extends DelegateHttpRequest implements FullHttpRequest {
 
-    public EmptyHttpRequest(HttpRequest request) {
+    /**
+     * @param request The Http request
+     */
+    EmptyHttpRequest(HttpRequest request) {
         super(request);
     }
 

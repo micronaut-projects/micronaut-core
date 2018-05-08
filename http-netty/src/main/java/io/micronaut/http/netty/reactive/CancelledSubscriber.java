@@ -5,6 +5,10 @@ import org.reactivestreams.Subscription;
 
 /**
  * A cancelled subscriber.
+ *
+ * @param <T> The subscriber type
+ * @author Graeme Rocher
+ * @since 1.0
  */
 public final class CancelledSubscriber<T> implements Subscriber<T> {
 

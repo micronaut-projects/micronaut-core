@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -32,7 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Delegates to {@link Cookie}
+ * Delegates to {@link Cookie}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +43,11 @@ public class NettyCookies implements Cookies {
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
 
+    /**
+     * @param path              The path
+     * @param nettyHeaders      The Netty HTTP headers
+     * @param conversionService The conversion service
+     */
     public NettyCookies(String path, HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.conversionService = conversionService;
         String value = nettyHeaders.get(HttpHeaderNames.COOKIE);

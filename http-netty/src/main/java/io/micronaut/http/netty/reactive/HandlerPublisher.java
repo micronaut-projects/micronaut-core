@@ -1,55 +1,93 @@
+
 package io.micronaut.http.netty.reactive;
+
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.BUFFERING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DEMANDING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DONE;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DRAINING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.IDLE;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_ERROR;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_OR_CONTEXT;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
-import io.netty.channel.ChannelPipeline;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.TypeParameterMatcher;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
-import java.util.*;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Publisher for a Netty Handler.
- *
+ * <p>
  * This publisher supports only one subscriber.
- *
+ * <p>
  * All interactions with the subscriber are done from the handlers executor, hence, they provide the same happens before
  * semantics that Netty provides.
- *
+ * <p>
  * The handler publishes all messages that match the type as specified by the passed in class. Any non matching messages
  * are forwarded to the next handler.
- *
+ * <p>
  * The publisher will signal complete if it receives a channel inactive event.
- *
+ * <p>
  * The publisher will release any messages that it drops (for example, messages that are buffered when the subscriber
  * cancels), but other than that, it does not release any messages.  It is up to the subscriber to release messages.
- *
+ * <p>
  * If the subscriber cancels, the publisher will send a close event up the channel pipeline.
- *
+ * <p>
  * All errors will short circuit the buffer, and cause publisher to immediately call the subscribers onError method,
  * dropping the buffer.
- *
+ * <p>
  * The publisher can be subscribed to or placed in a handler chain in any order.
+ *
+ * @param <T> The publisher type
+ * @author Graeme Rocher
+ * @since 1.0
  */
 public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publisher<T> {
+
+    /**
+     * Used for buffering a completion signal.
+     */
+    private static final Object COMPLETE = new Object() {
+        @Override
+        public String toString() {
+            return "COMPLETE";
+        }
+    };
 
     private final EventExecutor executor;
     private final TypeParameterMatcher matcher;
 
+    private final Queue<Object> buffer = new LinkedList<>();
+
+    /**
+     * Whether a subscriber has been provided. This is used to detect whether two subscribers are subscribing
+     * simultaneously.
+     */
+    private final AtomicBoolean hasSubscriber = new AtomicBoolean();
+
+    private State state = NO_SUBSCRIBER_OR_CONTEXT;
+
+    private volatile Subscriber<? super T> subscriber;
+    private ChannelHandlerContext ctx;
+    private long outstandingDemand = 0;
+    private Throwable noSubscriberError;
+
     /**
      * Create a handler publisher.
-     *
+     * <p>
      * The supplied executor must be the same event loop as the event loop that this handler is eventually registered
      * with, if not, an exception will be thrown when the handler is registered.
      *
-     * @param executor The executor to execute asynchronous events from the subscriber on.
+     * @param executor              The executor to execute asynchronous events from the subscriber on.
      * @param subscriberMessageType The type of message this publisher accepts.
      */
     public HandlerPublisher(EventExecutor executor, Class<? extends T> subscriberMessageType) {
@@ -57,12 +95,41 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         this.matcher = TypeParameterMatcher.get(subscriberMessageType);
     }
 
+    @Override
+    public void subscribe(final Subscriber<? super T> subscriber) {
+        if (subscriber == null) {
+            throw new NullPointerException("Null subscriber");
+        }
+
+        if (!hasSubscriber.compareAndSet(false, true)) {
+            // Must call onSubscribe first.
+            subscriber.onSubscribe(new Subscription() {
+                @Override
+                public void request(long n) {
+                }
+
+                @Override
+                public void cancel() {
+                }
+            });
+            subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
+        } else {
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    provideSubscriber(subscriber);
+                }
+            });
+        }
+    }
+
     /**
      * Returns {@code true} if the given message should be handled. If {@code false} it will be passed to the next
-     * {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
+     * {@link io.netty.channel.ChannelInboundHandler} in the {@link io.netty.channel.ChannelPipeline}.
      *
      * @param msg The message to check.
      * @return True if the message should be accepted.
+     * @throws Exception if there is a problem with the message
      */
     protected boolean acceptInboundMessage(Object msg) throws Exception {
         return matcher.match(msg);
@@ -70,7 +137,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     /**
      * Override to handle when a subscriber cancels the subscription.
-     *
+     * <p>
      * By default, this method will simply close the channel.
      */
     protected void cancelled() {
@@ -79,13 +146,16 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     /**
      * Override to intercept when demand is requested.
-     *
+     * <p>
      * By default, a channel read is invoked.
      */
     protected void requestDemand() {
         ctx.read();
     }
 
+    /**
+     * The state.
+     */
     enum State {
         /**
          * Initial state. There's no subscriber, and no context.
@@ -133,48 +203,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         DONE
     }
 
-    private final Queue<Object> buffer = new LinkedList<>();
-
-    /**
-     * Whether a subscriber has been provided. This is used to detect whether two subscribers are subscribing
-     * simultaneously.
-     */
-    private final AtomicBoolean hasSubscriber = new AtomicBoolean();
-
-    private State state = NO_SUBSCRIBER_OR_CONTEXT;
-
-    private volatile Subscriber<? super T> subscriber;
-    private ChannelHandlerContext ctx;
-    private long outstandingDemand = 0;
-    private Throwable noSubscriberError;
-
-    @Override
-    public void subscribe(final Subscriber<? super T> subscriber) {
-        if (subscriber == null) {
-            throw new NullPointerException("Null subscriber");
-        }
-
-        if (!hasSubscriber.compareAndSet(false, true)) {
-            // Must call onSubscribe first.
-            subscriber.onSubscribe(new Subscription() {
-                @Override
-                public void request(long n) {
-                }
-                @Override
-                public void cancel() {
-                }
-            });
-            subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
-        } else {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    provideSubscriber(subscriber);
-                }
-            });
-        }
-    }
-
     private void provideSubscriber(Subscriber<? super T> subscriber) {
         this.subscriber = subscriber;
         switch (state) {
@@ -198,6 +226,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 subscriber.onSubscribe(new ChannelSubscription());
                 subscriber.onError(noSubscriberError);
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -217,7 +247,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void provideChannelContext(ChannelHandlerContext ctx) {
-        switch(state) {
+        switch (state) {
             case NO_SUBSCRIBER_OR_CONTEXT:
                 verifyRegisteredWithRightExecutor(ctx);
                 this.ctx = ctx;
@@ -272,7 +302,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 }
                 break;
             default:
-
+                // no-op
         }
     }
 
@@ -324,6 +354,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             case DRAINING:
                 state = DONE;
                 break;
+            default:
+                // no-op
         }
         cleanup();
         subscriber = null;
@@ -351,6 +383,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 case NO_CONTEXT:
                 case NO_SUBSCRIBER_OR_CONTEXT:
                     throw new IllegalStateException("Message received before added to the channel context");
+                default:
+                    // no-op
             }
         } else {
             ctx.fireChannelRead(message);
@@ -412,6 +446,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 // Ignore, we're already going to complete the stream with an error
                 // when the subscriber subscribes.
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -431,6 +467,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 cleanup();
                 subscriber.onError(cause);
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -443,6 +481,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         }
     }
 
+    /**
+     * A channel subscrition.
+     */
     private class ChannelSubscription implements Subscription {
         @Override
         public void request(final long demand) {
@@ -464,14 +505,4 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             });
         }
     }
-
-    /**
-     * Used for buffering a completion signal.
-     */
-    private static final Object COMPLETE = new Object() {
-        @Override
-        public String toString() {
-            return "COMPLETE";
-        }
-    };
 }
