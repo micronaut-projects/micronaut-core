@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -49,6 +50,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -427,7 +429,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             } else if (ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
             }
-            HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
+            HttpClientConfiguration configuration;
+            Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
+                    HttpClientConfiguration.class,
+                    Qualifiers.byName(clientId[0])
+            );
+            configuration = clientSpecificConfig.orElseGet(()->beanContext.getBean(clientAnn.configuration()));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;

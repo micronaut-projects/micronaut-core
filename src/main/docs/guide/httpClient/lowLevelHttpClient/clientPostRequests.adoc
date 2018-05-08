@@ -43,10 +43,12 @@ The following example demonstrates how to send a simply `String` body:
 ----
 TODO - example showing:
 import static HttpRequest.*;
-HttpResponse<?> response = client.exchange(
+client.exchange(
     POST("/foo/bar", "My Body") <1>
     .contentType(MediaType.TEXT_PLAIN) <2>
-).blockingFirst()
+).subscribe(response ->
+     // handle response
+)
 ----
 
 <1> The `POST` method is used with the first argument being the URI and the second argument the body
@@ -54,7 +56,20 @@ HttpResponse<?> response = client.exchange(
 
 ==== Sending JSON
 
-The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it:
+The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it.
+
+For example, given a class `Book` that looks like the following:
+
+.Example POJO
+[source,java]
+----
+TODO - example showing:
+class Book {
+..
+}
+----
+
+If you create an instance and pass it to the `POST` method:
 
 .Sending a JSON body
 [source,java]
@@ -65,6 +80,55 @@ import static HttpRequest.*;
 Book book = new Book("The Stand")
 client.exchange(
     POST("/foo/bar", book)
+).subscribe(response ->
+    // handle response
+)
+----
+
+Then the following JSON will be sent as the body of the request:
+
+.Resulting JSON
+[source,json]
+----
+{"title":"The Stand"}
+----
+
+The JSON itself can be customized however you want using https://github.com/FasterXML/jackson-annotations[Jackson Annotations].
+
+==== Using a URI Template
+
+If some of the properties of the object need to be in the URI being posted to you can use a URI template. For example:
+
+.Sending a JSON body with a URI template
+[source,java]
+----
+TODO - example showing:
+import static HttpRequest.*;
+
+Book book = new Book("The Stand")
+client.exchange(
+    POST("/book/{title}", book)
+).subscribe(response ->
+    // handle response
+)
+----
+
+In the above case the `title` property of the passed object will be included in the URI being posted to.
+
+==== Sending Form Data
+
+You can also encode a POJO or a map as regular form data instead of JSON. Just send the content type on the post request:
+
+.Sending a Form Data
+[source,java]
+----
+TODO - example showing:
+import static HttpRequest.*;
+
+Book book = new Book("The Stand")
+client.exchange(
+    POST("/foo/bar", book)
+        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
 ).subscribe(response ->
     // handle response
 )

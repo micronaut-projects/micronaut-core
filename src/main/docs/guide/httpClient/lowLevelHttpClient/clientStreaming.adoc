@@ -1,0 +1,34 @@
+Micronaut's HTTP client includes support for streaming data over HTTP via the api:http.client.RxStreamingHttpClient[] interface which includes methods specific to HTTP streaming including:
+
+.HTTP Streaming Methods
+|===
+|Method |Description
+
+| `dataStream(HttpRequest<I> request)`
+| Returns a stream of data as a rx:Flowable[] of api:core.io.buffer.ByteBuffer[]
+
+| `exchangeStream(HttpRequest<I> request)`
+| Returns the api:http.HttpResponse[] wrapping a rx:Flowable[] of api:core.io.buffer.ByteBuffer[]
+
+| `jsonStream(HttpRequest<I> request)`
+| Returns a non-blocking stream of JSON objects
+
+|===
+
+In ordering to do JSON streaming you should on the server side declare a controller method that returns a `application/x-json-stream` of JSON objects. For example:
+
+.Streaming JSON on the Server
+[source,java]
+----
+TODO: Example of JSON streaming server
+----
+
+NOTE: The server does not have to be written in Micronaut, any server that supports JSON streaming will do.
+
+Then on the client simply subscribe to the stream using `jsonStream` and every time the server emits a JSON object the client will decode and consume it:
+
+.Streaming JSON on the Client
+[source,java]
+----
+TODO: Example showing JSON streaming on client
+----
