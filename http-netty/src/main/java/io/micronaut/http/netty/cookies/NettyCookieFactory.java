@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieFactory;
 
 /**
- * A {@link CookieFactory} for constructing {@link Cookie} instances for Netty
+ * A {@link CookieFactory} for constructing {@link Cookie} instances for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0

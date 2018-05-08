@@ -202,8 +202,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
  */
+
 /**
- * NOTICE: Classes in this package are forked from https://github.com/playframework/netty-reactive-streams
+ * NOTICE: Classes in this package are forked from https://github.com/playframework/netty-reactive-streams.
  *
  * @author graemerocher
  * @since 1.0

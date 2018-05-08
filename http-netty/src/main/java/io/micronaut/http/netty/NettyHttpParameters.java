@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -31,7 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Implementation of {@link HttpParameters} for Netty
+ * Implementation of {@link HttpParameters} for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,6 +42,10 @@ public class NettyHttpParameters implements HttpParameters {
 
     private final ConvertibleMultiValues<String> values;
 
+    /**
+     * @param parameters        The parameters
+     * @param conversionService The conversion service
+     */
     public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
         LinkedHashMap<CharSequence, List<String>> values = new LinkedHashMap<>(parameters.size());
         this.values = new ConvertibleMultiValuesMap<>(values, conversionService);
@@ -48,7 +53,6 @@ public class NettyHttpParameters implements HttpParameters {
             values.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
         }
     }
-
 
     @Override
     public Set<String> names() {

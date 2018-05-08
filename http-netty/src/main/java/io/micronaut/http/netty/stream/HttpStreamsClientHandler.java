@@ -1,9 +1,32 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -13,19 +36,22 @@ import org.reactivestreams.Subscription;
  * Handler that converts written {@link StreamedHttpRequest} messages into {@link HttpRequest} messages
  * followed by {@link HttpContent} messages and reads {@link HttpResponse} messages followed by
  * {@link HttpContent} messages and produces {@link StreamedHttpResponse} messages.
- *
+ * <p>
  * This allows request and response bodies to be handled using reactive streams.
- *
+ * <p>
  * There are two types of messages that this handler accepts for writing, {@link StreamedHttpRequest} and
- * {@link FullHttpRequest}. Writing any other messages may potentially lead to HTTP message mangling.
- *
+ * {@link io.netty.handler.codec.http.FullHttpRequest}. Writing any other messages may potentially lead to HTTP message mangling.
+ * <p>
  * There are two types of messages that this handler will send down the chain, {@link StreamedHttpResponse},
  * and {@link FullHttpResponse}. If {@link io.netty.channel.ChannelOption#AUTO_READ} is false for the channel,
  * then any {@link StreamedHttpResponse} messages <em>must</em> be subscribed to consume the body, otherwise
  * it's possible that no read will be done of the messages.
- *
+ * <p>
  * As long as messages are returned in the order that they arrive, this handler implicitly supports HTTP
  * pipelining.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
  */
 public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, HttpRequest> {
 
@@ -36,18 +62,21 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
     private StreamedHttpMessage awaiting100ContinueMessage;
     private boolean ignoreResponseBody = false;
 
+    /**
+     * Default constructor.
+     */
     public HttpStreamsClientHandler() {
         super(HttpResponse.class, HttpRequest.class);
     }
 
     @Override
     protected boolean hasBody(HttpResponse response) {
-        if (response.status().code() >= 100 && response.status().code() < 200) {
+        if (response.status().code() >= HttpStatus.CONTINUE.getCode() && response.status().code() < HttpStatus.OK.getCode()) {
             return false;
         }
 
         if (response.status().equals(HttpResponseStatus.NO_CONTENT) ||
-                response.status().equals(HttpResponseStatus.NOT_MODIFIED)) {
+            response.status().equals(HttpResponseStatus.NOT_MODIFIED)) {
             return false;
         }
 
@@ -131,6 +160,7 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
                 awaiting100Continue.onSubscribe(new Subscription() {
                     public void request(long n) {
                     }
+
                     public void cancel() {
                     }
                 });
