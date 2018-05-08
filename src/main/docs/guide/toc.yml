@@ -93,7 +93,7 @@ httpClient:
     clientFallback: Client Fallbacks
   clientFilter: HTTP Client Filters
 cloud:
-  title: Cloud Ready Features
+  title: Cloud Native Features
   configurationSharing: Configuration Sharing
   serviceDiscovery:
     title: Service Discovery
