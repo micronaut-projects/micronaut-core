@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -34,8 +33,20 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Headers;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.Client;
 import io.micronaut.http.client.DefaultHttpClient;
@@ -59,6 +70,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -99,9 +111,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
-     * @param beanContext context to resolve beans
+     *
+     * @param beanContext          context to resolve beans
      * @param loadBalancerResolver load balancer resolver
-     * @param transformers transformation classes
+     * @param transformers         transformation classes
      */
     public HttpClientIntroductionAdvice(
         BeanContext beanContext,
@@ -115,6 +128,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Interceptor to apply headers, cookies, parameter and body arguements.
+     *
      * @param context The context
      * @return httpClient or future
      */
@@ -386,8 +400,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Resolve the template for the client annotation.
+     *
      * @param clientAnnotation client annotation reference
-     * @param templateString template to be applied
+     * @param templateString   template to be applied
      * @return resolved template contents
      */
     private String resolveTemplate(Client clientAnnotation, String templateString) {
@@ -407,7 +422,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Gets the client registration for the http request.
-     * @param context application contextx
+     *
+     * @param context   application contextx
      * @param clientAnn client annotation
      * @return client registration
      */
@@ -431,10 +447,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             HttpClientConfiguration configuration;
             Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
-                    HttpClientConfiguration.class,
-                    Qualifiers.byName(clientId[0])
+                HttpClientConfiguration.class,
+                Qualifiers.byName(clientId[0])
             );
-            configuration = clientSpecificConfig.orElseGet(()->beanContext.getBean(clientAnn.configuration()));
+            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(clientAnn.configuration()));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
@@ -479,6 +495,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Cleanup method to prevent resource leaking.
+     *
      * @throws IOException
      */
     @Override
@@ -499,7 +516,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         /**
          * Constructor for client registration.
-         * @param httpClient http client for outgoing connection
+         *
+         * @param httpClient  http client for outgoing connection
          * @param contextPath application context path
          */
         ClientRegistration(HttpClient httpClient, String contextPath) {

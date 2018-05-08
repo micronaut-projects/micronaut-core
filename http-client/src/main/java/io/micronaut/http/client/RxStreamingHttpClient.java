@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -25,7 +26,7 @@ import java.net.URL;
 import java.util.Map;
 
 /**
- * Extended version of {@link StreamingHttpClient} that exposes an RxJava 2.x interface
+ * Extended version of {@link StreamingHttpClient} that exposes an RxJava 2.x interface.
  *
  * @author Graeme Rocher
  * @since 1.0

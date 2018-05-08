@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.exceptions;
 
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * Parent class for all HTTP client exceptions
+ * Parent class for all HTTP client exceptions.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class HttpClientException extends HttpException {
+
+    /**
+     * @param message The message
+     */
     public HttpClientException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public HttpClientException(String message, Throwable cause) {
         super(message, cause);
     }

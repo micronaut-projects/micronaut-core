@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -46,7 +47,7 @@ public interface LoadBalancer {
     }
 
     /**
-     * A {@link LoadBalancer} that does no load balancing and always hits the given URL
+     * A {@link LoadBalancer} that does no load balancing and always hits the given URL.
      *
      * @param url The URL
      * @return The {@link LoadBalancer}
@@ -55,6 +56,9 @@ public interface LoadBalancer {
         return discriminator -> Publishers.just(ServiceInstance.of("Unknown", url));
     }
 
+    /**
+     * @return An error because there are no load balancer
+     */
     static LoadBalancer empty() {
         return discriminator -> Publishers.just(new NoAvailableServiceException("Load balancer contains no servers"));
     }

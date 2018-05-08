@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -29,7 +30,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * A custom {@link Scope} for injecting {@link HttpClient} implementations
+ * A custom {@link Scope} for injecting {@link HttpClient} implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -56,7 +57,7 @@ public @interface Client {
     String id() default "";
 
     /**
-     * The base URI for the client
+     * The base URI for the client.
      *
      * @return The base URI
      */
