@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains classes for reading and writing annotation metadata at compile time
+ * Contains classes for reading and writing annotation metadata at compile time.
  *
  * @author graemerocher
  * @since 1.0

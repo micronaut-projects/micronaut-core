@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains classes and interfaces related to conditional beans
+ * Contains classes and interfaces related to conditional beans.
  *
  * @author graemerocher
  * @since 1.0

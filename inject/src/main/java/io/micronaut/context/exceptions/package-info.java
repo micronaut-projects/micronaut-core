@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains common exceptions thrown from the {@link io.micronaut.context.BeanContext}
+ * Contains common exceptions thrown from the {@link io.micronaut.context.BeanContext}.
  *
  * @author graemerocher
  * @since 1.0

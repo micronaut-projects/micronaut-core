@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
@@ -26,7 +27,8 @@ import io.micronaut.core.type.Argument;
 public interface CallableInjectionPoint extends InjectionPoint {
 
     /**
-     * The required argument types
+     *
+     * @return The required argument types.
      */
     Argument<?>[] getArguments();
 }

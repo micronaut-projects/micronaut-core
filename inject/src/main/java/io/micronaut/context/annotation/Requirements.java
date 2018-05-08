@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import java.lang.annotation.Documented;
@@ -22,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * For specifying multiple requirements
+ * For specifying multiple requirements.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,5 +33,8 @@ import java.lang.annotation.Target;
 @Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 public @interface Requirements {
 
+    /**
+     * @return The required dependencies
+     */
     Requires[] value();
 }

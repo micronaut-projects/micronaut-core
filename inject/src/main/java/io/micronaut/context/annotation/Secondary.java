@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -23,7 +24,7 @@ import java.lang.annotation.Retention;
 
 /**
  * <p>Counter part to {@link Primary} that allows reducing the priority of a given bean for the purposes of dependency
- * injection</p>
+ * injection.</p>
  *
  * @author Graeme Rocher
  * @see Qualifier @Qualifier

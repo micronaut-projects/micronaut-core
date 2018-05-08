@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 /**
- * Thrown when an exception occurs during compilation due to a class generation error
+ * Thrown when an exception occurs during compilation due to a class generation error.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ClassGenerationException extends RuntimeException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public ClassGenerationException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public ClassGenerationException(String message) {
         super(message);
     }

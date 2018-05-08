@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanDefinitionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.service.ServiceDescriptorGenerator;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.objectweb.asm.ClassWriter;
@@ -26,13 +26,11 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Optional;
 
 /**
- * Writes the bean definition class file to disk
+ * Writes the bean definition class file to disk.
  *
  * @author Graeme Rocher
  * @see BeanDefinitionReference
@@ -42,7 +40,7 @@ import java.util.Optional;
 public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWriter {
 
     /**
-     * Suffix for reference classes
+     * Suffix for reference classes.
      */
     public static final String REF_SUFFIX = "Class";
 
@@ -54,6 +52,11 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
+    /**
+     * @param beanTypeName       The bean type name
+     * @param beanDefinitionName The bean definition name
+     * @param annotationMetadata The annotation metadata
+     */
     public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
         super(beanDefinitionName + REF_SUFFIX, annotationMetadata);
         this.beanTypeName = beanTypeName;
@@ -63,7 +66,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
+     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes.
      *
      * @param outputVisitor The {@link ClassWriterOutputVisitor}
      * @throws IOException If an error occurs
@@ -78,13 +81,13 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             outputStream.write(classWriter.toByteArray());
         }
         outputVisitor.visitServiceDescriptor(
-                BeanDefinitionReference.class,
-                beanDefinitionReferenceClassName
+            BeanDefinitionReference.class,
+            beanDefinitionReferenceClassName
         );
     }
 
     /**
-     * Set whether the bean should be in context scope
+     * Set whether the bean should be in context scope.
      *
      * @param contextScope The context scope
      */
@@ -93,7 +96,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * The name of the bean this bean replaces
+     * The name of the bean this bean replaces.
      *
      * @param replaceBeanName The replace bean name
      */
@@ -102,7 +105,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true
+     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true.
      *
      * @param shouldPreProcess True if they should be pre-processed
      */

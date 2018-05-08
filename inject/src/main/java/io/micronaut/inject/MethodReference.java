@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
@@ -23,15 +24,17 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 /**
- * A reference to a method
+ * A reference to a method.
  *
+ * @param <T> The type
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface MethodReference<T, R> extends AnnotationMetadataDelegate {
 
     /**
-     * The required argument types
+     * @return The required argument types
      */
     Argument[] getArguments();
 

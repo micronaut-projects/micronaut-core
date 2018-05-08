@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
@@ -24,8 +24,9 @@ import javax.inject.Named;
 import java.util.stream.Stream;
 
 /**
- * A {@link Qualifier} that uses {@link AnnotationMetadata}
+ * A {@link io.micronaut.context.Qualifier} that uses {@link AnnotationMetadata}.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,6 +34,10 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private final AnnotationMetadata annotationMetadata;
 
+    /**
+     * @param metadata The annotation metadata
+     * @param name     The name
+     */
     AnnotationMetadataQualifier(AnnotationMetadata metadata, String name) {
         super(name);
         this.annotationMetadata = metadata;

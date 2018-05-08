@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.inject.BeanDefinition;
@@ -20,8 +21,9 @@ import io.micronaut.inject.BeanIdentifier;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
- * {@link javax.inject.Singleton}</p>
+ * {@link javax.inject.Singleton}.</p>
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -30,20 +32,34 @@ public class BeanRegistration<T> {
     final BeanDefinition<T> beanDefinition;
     final T bean;
 
+    /**
+     * @param identifier     The bean identifier
+     * @param beanDefinition The bean definition
+     * @param bean           The bean instance
+     */
     public BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean) {
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
     }
 
+    /**
+     * @return Teh bean identifier
+     */
     public BeanIdentifier getIdentifier() {
         return identifier;
     }
 
+    /**
+     * @return The bean definition
+     */
     public BeanDefinition<T> getBeanDefinition() {
         return beanDefinition;
     }
 
+    /**
+     * @return The bean instance
+     */
     public T getBean() {
         return bean;
     }

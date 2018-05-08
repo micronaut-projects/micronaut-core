@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -28,8 +29,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * <p>Abstract base class for generated {@link ExecutableMethod} classes to implement. The generated classes should
@@ -45,6 +44,12 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
 
+    /**
+     * @param declaringType     The declaring type
+     * @param methodName        The method name
+     * @param genericReturnType The generic return type
+     * @param arguments         The arguments
+     */
     @SuppressWarnings("WeakerAccess")
     protected AbstractExecutableMethod(Class<?> declaringType,
                                        String methodName,
@@ -56,6 +61,11 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     }
 
+    /**
+     * @param declaringType     The declaring type
+     * @param methodName        The method name
+     * @param genericReturnType The generic return type
+     */
     @SuppressWarnings("WeakerAccess")
     protected AbstractExecutableMethod(Class<?> declaringType,
                                        String methodName,
@@ -65,12 +75,16 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         AbstractExecutableMethod that = (AbstractExecutableMethod) o;
         return Objects.equals(declaringType, that.declaringType) &&
-                Objects.equals(methodName, that.methodName) &&
-                Arrays.equals(argTypes, that.argTypes);
+            Objects.equals(methodName, that.methodName) &&
+            Arrays.equals(argTypes, that.argTypes);
     }
 
     @Override
@@ -112,6 +126,11 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         return invokeInternal(instance, arguments);
     }
 
+    /**
+     * @param instance  The instance
+     * @param arguments The arguments
+     * @return The result
+     */
     @SuppressWarnings("WeakerAccess")
     protected abstract Object invokeInternal(Object instance, Object[] arguments);
 
@@ -134,32 +153,30 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
     }
 
+    /**
+     * A {@link ReturnType} implementation.
+     */
     class ReturnTypeImpl implements ReturnType<Object> {
-
 
         @SuppressWarnings("unchecked")
         @Override
         public Class<Object> getType() {
-            if(genericReturnType != null) {
+            if (genericReturnType != null) {
                 return (Class<Object>) genericReturnType.getType();
-            }
-            else {
+            } else {
                 return (Class<Object>) getTargetMethod().getReturnType();
             }
         }
 
-
         @Override
         public AnnotatedElement[] getAnnotatedElements() {
             Method method = getTargetMethod();
-            if(method != null) {
+            if (method != null) {
                 return new AnnotatedElement[]{method.getAnnotatedReturnType(), method};
-            }
-            else {
-                if(genericReturnType != null) {
+            } else {
+                if (genericReturnType != null) {
                     return genericReturnType.getAnnotatedElements();
-                }
-                else {
+                } else {
                     return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
                 }
             }
@@ -167,7 +184,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
         @Override
         public Argument[] getTypeParameters() {
-            if(genericReturnType != null) {
+            if (genericReturnType != null) {
                 return genericReturnType.getTypeParameters();
             }
             return Argument.ZERO_ARGUMENTS;
@@ -175,7 +192,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            if(genericReturnType != null) {
+            if (genericReturnType != null) {
                 return genericReturnType.getTypeVariables();
             }
             return Collections.emptyMap();

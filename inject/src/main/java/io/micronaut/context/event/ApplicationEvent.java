@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import java.util.EventObject;
 
 /**
- * An {@link ApplicationEvent} is a user specified event object
+ * An {@link ApplicationEvent} is a user specified event object.
  *
  * @author Graeme Rocher
  * @since 1.0

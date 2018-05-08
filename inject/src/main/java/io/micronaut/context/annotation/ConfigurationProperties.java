@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.value.PropertyResolver;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
@@ -27,9 +25,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>Defines a singleton bean whose property values are resolved from a {@link PropertyResolver}.</p>
+ * <p>Defines a singleton bean whose property values are resolved from a {@link io.micronaut.core.value.PropertyResolver}.</p>
  * <p>
- * <p>The {@link PropertyResolver} is typically the Micronaut {@link io.micronaut.context.env.Environment}.</p>
+ * <p>The {@link io.micronaut.core.value.PropertyResolver} is typically the Micronaut {@link io.micronaut.context.env.Environment}.</p>
  * <p>
  * <p>The {@link #value()} of the annotation is used to indicate the prefix where the configuration properties are located.
  * The class can define properties or fields which will have the configuration properties to them at runtime.

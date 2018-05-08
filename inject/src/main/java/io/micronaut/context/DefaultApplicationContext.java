@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.EachBean;
@@ -46,7 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Creates a default implementation of the {@link ApplicationContext} interface
+ * Creates a default implementation of the {@link ApplicationContext} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -61,7 +62,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private List<BeanDefinitionReference> resolvedBeanReferences;
 
     /**
-     * Construct a new ApplicationContext for the given environment name
+     * Construct a new ApplicationContext for the given environment name.
      *
      * @param environmentNames The environment names
      */
@@ -70,7 +71,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     /**
-     * Construct a new ApplicationContext for the given environment name and classloader
+     * Construct a new ApplicationContext for the given environment name and classloader.
      *
      * @param environmentNames The environment names
      * @param resourceLoader   The class loader
@@ -104,7 +105,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     /**
-     * Creates the default environment for the given environment name
+     * Creates the default environment for the given environment name.
      *
      * @param environmentNames The environment name
      * @return The environment instance
@@ -114,7 +115,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     /**
-     * Creates the default conversion service
+     * Creates the default conversion service.
      *
      * @return The conversion service
      */
@@ -165,6 +166,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
     }
 
+    /**
+     * Start the environment.
+     */
     protected void startEnvironment() {
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
@@ -306,6 +310,33 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
     }
 
+    /**
+     * @param beanContext The bean context
+     */
+    protected void initializeTypeConverters(BeanContext beanContext) {
+        Collection<TypeConverter> typeConverters = beanContext.getBeansOfType(TypeConverter.class);
+        for (TypeConverter typeConverter : typeConverters) {
+            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
+            if (genericTypes.length == 2) {
+                Class source = genericTypes[0];
+                Class target = genericTypes[1];
+                if (source != null && target != null) {
+                    if (!(source == Object.class && target == Object.class)) {
+                        getConversionService().addConverter(source, target, typeConverter);
+                    }
+                }
+            }
+        }
+        Collection<TypeConverterRegistrar> registrars = beanContext.getBeansOfType(TypeConverterRegistrar.class);
+        for (TypeConverterRegistrar registrar : registrars) {
+            registrar.register(conversionService);
+        }
+    }
+
+    /**
+     * Bootstraop property source implementation.
+     */
+    @SuppressWarnings("MagicNumber")
     private static class BootstrapPropertySource implements PropertySource {
         private final PropertySource delegate;
 
@@ -345,6 +376,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
     }
 
+    /**
+     * Bootstrap environment.
+     */
     private static class BootstrapEnvironment extends DefaultEnvironment {
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
             super(resourceLoader, conversionService, activeEnvironments);
@@ -357,6 +391,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
     }
 
+    /**
+     * Bootstrap application context.
+     */
     private class BootstrapApplicationContext extends DefaultApplicationContext {
         private final BootstrapEnvironment bootstrapEnvironment;
 
@@ -405,26 +442,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     }
 
-    void initializeTypeConverters(BeanContext beanContext) {
-        Collection<TypeConverter> typeConverters = beanContext.getBeansOfType(TypeConverter.class);
-        for (TypeConverter typeConverter : typeConverters) {
-            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
-            if (genericTypes.length == 2) {
-                Class source = genericTypes[0];
-                Class target = genericTypes[1];
-                if (source != null && target != null) {
-                    if (!(source == Object.class && target == Object.class)) {
-                        getConversionService().addConverter(source, target, typeConverter);
-                    }
-                }
-            }
-        }
-        Collection<TypeConverterRegistrar> registrars = beanContext.getBeansOfType(TypeConverterRegistrar.class);
-        for (TypeConverterRegistrar registrar : registrars) {
-            registrar.register(conversionService);
-        }
-    }
-
+    /**
+     * Runtime configured environment.
+     */
     private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;

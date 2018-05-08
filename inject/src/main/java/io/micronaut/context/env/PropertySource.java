@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.core.order.Ordered;
@@ -29,7 +30,7 @@ import java.util.Map;
 public interface PropertySource extends Iterable<String>, Ordered {
 
     /**
-     * The name of the property source with values supplied directly from the context
+     * The name of the property source with values supplied directly from the context.
      */
     String CONTEXT = "context";
 
@@ -39,7 +40,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     String getName();
 
     /**
-     * Get a property value of the given key
+     * Get a property value of the given key.
      *
      * @param key The key
      * @return The value
@@ -54,7 +55,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
      * @param name The name of the property source
      * @param map  The map
@@ -65,7 +66,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
      * @param name       The name of the property source
      * @param map        The map
@@ -82,7 +83,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
      * @param name     The name of the property source
      * @param map      The map
@@ -99,7 +100,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map
+     * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map.
      *
      * @param map The map
      * @return The {@link PropertySource}
@@ -108,14 +109,18 @@ public interface PropertySource extends Iterable<String>, Ordered {
         return new MapPropertySource(Environment.DEFAULT_NAME, map);
     }
 
+    /**
+     * Property convention.
+     */
     enum PropertyConvention {
+
         /**
-         * Upper case separated by under scores (environment variable style)
+         * Upper case separated by under scores (environment variable style).
          */
         ENVIRONMENT_VARIABLE,
 
         /**
-         * Lower case separated by dots (java properties file style)
+         * Lower case separated by dots (java properties file style).
          */
         JAVA_PROPERTIES
     }

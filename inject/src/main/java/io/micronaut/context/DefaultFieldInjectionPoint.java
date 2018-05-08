@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -30,8 +31,9 @@ import java.lang.reflect.Field;
 import java.util.Objects;
 
 /**
- * Represents an injection point for a field
+ * Represents an injection point for a field.
  *
+ * @param <T> The field type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,20 +47,21 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     private final Argument[] typeArguments;
 
     /**
-     * @param declaringBean The declaring bean
-     * @param declaringType The declaring type
-     * @param fieldType The field type
-     * @param field The name of the field
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param fieldType          The field type
+     * @param field              The name of the field
      * @param annotationMetadata The annotation metadata
-     * @param typeArguments the generic type arguments
+     * @param typeArguments      the generic type arguments
      */
     DefaultFieldInjectionPoint(
-            BeanDefinition declaringBean,
-            Class declaringType,
-            Class<T> fieldType,
-            String field,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument[] typeArguments) {
+        BeanDefinition declaringBean,
+        Class declaringType,
+        Class<T> fieldType,
+        String field,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument[] typeArguments) {
+
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;
         this.fieldType = fieldType;
@@ -74,17 +77,20 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultFieldInjectionPoint<?> that = (DefaultFieldInjectionPoint<?>) o;
         return Objects.equals(declaringType, that.declaringType) &&
-                Objects.equals(fieldType, that.fieldType) &&
-                Objects.equals(field, that.field);
+            Objects.equals(fieldType, that.fieldType) &&
+            Objects.equals(field, that.field);
     }
 
     @Override
     public int hashCode() {
-
         return Objects.hash(declaringType, fieldType, field);
     }
 
@@ -111,8 +117,8 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     @Override
     public Annotation getQualifier() {
         return annotationMetadata.getAnnotationTypeByStereotype(Qualifier.class)
-                                 .map(annotationMetadata::getAnnotation)
-                                 .orElse(null);
+            .map(annotationMetadata::getAnnotation)
+            .orElse(null);
     }
 
     @Override
@@ -129,10 +135,10 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     @Override
     public Argument<T> asArgument() {
         return Argument.of(
-                fieldType,
-                field,
-                annotationMetadata,
-                typeArguments
+            fieldType,
+            field,
+            annotationMetadata,
+            typeArguments
         );
     }
 
