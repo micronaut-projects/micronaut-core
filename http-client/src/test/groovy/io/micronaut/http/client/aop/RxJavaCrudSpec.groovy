@@ -16,6 +16,8 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
 import io.micronaut.http.annotation.Get
@@ -79,6 +81,14 @@ class RxJavaCrudSpec extends Specification {
         book.title == "The Stand"
         book.id == 1
 
+
+        when:'the full response is resolved'
+        HttpResponse<Book> bookAndResponse = client.getResponse(book.id).blockingGet()
+
+        then:"The response is valid"
+        bookAndResponse.status() == HttpStatus.OK
+        bookAndResponse.body().title == "The Stand"
+
         when:
         book = client.update(book.id, "The Shining").blockingGet()
 
@@ -121,6 +131,15 @@ class RxJavaCrudSpec extends Specification {
         }
 
         @Override
+        Single<HttpResponse<Book>> getResponse(Long id) {
+            Book book = books.get(id)
+            if(book) {
+                return Single.just(HttpResponse.ok(book))
+            }
+            return Single.just(HttpResponse.notFound())
+        }
+
+        @Override
         Single<List<Book>> list() {
             return Single.just(books.values().toList())
         }
@@ -158,6 +177,9 @@ class RxJavaCrudSpec extends Specification {
 
         @Get("/{id}")
         Maybe<Book> get(Long id)
+
+        @Get("/res/{id}")
+        Single<HttpResponse<Book>> getResponse(Long id)
 
         @Get('/')
         Single<List<Book>> list()
