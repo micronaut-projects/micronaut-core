@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
@@ -23,8 +24,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A {@link Qualifier} composed of other qualifiers
+ * A {@link Qualifier} composed of other qualifiers.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -32,6 +34,9 @@ class CompositeQualifier<T> implements Qualifier<T> {
 
     private final Qualifier[] qualifiers;
 
+    /**
+     * @param qualifiers The qualifiers
+     */
     CompositeQualifier(Qualifier... qualifiers) {
         this.qualifiers = qualifiers;
     }
@@ -47,8 +52,12 @@ class CompositeQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         CompositeQualifier<?> that = (CompositeQualifier<?>) o;
         return Arrays.equals(qualifiers, that.qualifiers);

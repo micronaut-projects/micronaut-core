@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
@@ -24,8 +25,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A {@link Qualifier} that qualifies beans by generic type arguments
+ * A {@link Qualifier} that qualifies beans by generic type arguments.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,6 +35,9 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
     private final Class[] typeArguments;
 
+    /**
+     * @param typeArguments The type arguments
+     */
     public TypeArgumentQualifier(Class... typeArguments) {
         this.typeArguments = typeArguments;
     }
@@ -50,6 +55,10 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
         });
     }
 
+    /**
+     * @param classes An array of classes
+     * @return Whether the types are compatible
+     */
     protected boolean areTypesCompatible(Class[] classes) {
         if (classes.length == 0) {
             // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
@@ -60,7 +69,9 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
             for (int i = 0; i < classes.length; i++) {
                 Class left = classes[i];
                 Class right = typeArguments[i];
-                if (right == Object.class) continue;
+                if (right == Object.class) {
+                    continue;
+                }
                 if (left != right && !left.isAssignableFrom(right)) {
                     return false;
                 }
@@ -71,8 +82,12 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         TypeArgumentQualifier<?> that = (TypeArgumentQualifier<?>) o;
         return Arrays.equals(typeArguments, that.typeArguments);

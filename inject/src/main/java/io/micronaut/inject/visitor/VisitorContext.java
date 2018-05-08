@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.visitor;
 
 /**
- * Provides a way for {@link TypeElementVisitor} classes to
- * log messages during compilation and fail compilation.
+ * Provides a way for {@link TypeElementVisitor} classes to log messages during compilation and fail compilation.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -26,7 +26,7 @@ package io.micronaut.inject.visitor;
 public interface VisitorContext {
 
     /**
-     * Allows failing compilation for a given element with the given message
+     * Allows failing compilation for a given element with the given message.
      *
      * @param message The message
      * @param element The element
@@ -34,7 +34,7 @@ public interface VisitorContext {
     void fail(String message, Element element);
 
     /**
-     * Allows printing a warning for the given message and element
+     * Allows printing a warning for the given message and element.
      *
      * @param message The message
      * @param element The element

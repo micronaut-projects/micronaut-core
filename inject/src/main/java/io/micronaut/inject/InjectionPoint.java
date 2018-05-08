@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -24,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
  * @since 1.0
  */
 public interface InjectionPoint extends AnnotationMetadataProvider {
+
     /**
      * @return The bean that declares this injection point
      */

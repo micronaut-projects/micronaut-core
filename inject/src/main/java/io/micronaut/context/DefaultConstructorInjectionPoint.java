@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.BeanInstantiationException;
@@ -29,8 +30,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A constructor injection point for the non-reflection case
+ * A constructor injection point for the non-reflection case.
  *
+ * @param <T> The type
  * @author graemerocher
  * @since 1.0
  */
@@ -43,11 +45,18 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     private final AnnotationMetadata annotationMetadata;
     private final Argument<?>[] arguments;
 
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring class type
+     * @param annotationMetadata The annotation metadata
+     * @param arguments          The arguments
+     */
     DefaultConstructorInjectionPoint(
-             BeanDefinition<T> declaringBean,
-             Class<T> declaringType,
-             AnnotationMetadata annotationMetadata,
-             Argument<?>[] arguments) {
+        BeanDefinition<T> declaringBean,
+        Class<T> declaringType,
+        AnnotationMetadata annotationMetadata,
+        Argument<?>[] arguments) {
+
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;
@@ -58,7 +67,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     @Override
     public T invoke(Object... args) {
         Optional<Constructor<T>> potentialConstructor = ReflectionUtils.findConstructor(declaringType, argTypes);
-        if(potentialConstructor.isPresent()) {
+        if (potentialConstructor.isPresent()) {
             return ReflectionConstructorInjectionPoint.invokeConstructor(potentialConstructor.get(), arguments, args);
         }
         throw new BeanInstantiationException("Constructor not found for type: " + this);
@@ -86,11 +95,15 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultConstructorInjectionPoint<?> that = (DefaultConstructorInjectionPoint<?>) o;
         return Objects.equals(declaringType, that.declaringType) &&
-                Arrays.equals(argTypes, that.argTypes);
+            Arrays.equals(argTypes, that.argTypes);
     }
 
     @Override

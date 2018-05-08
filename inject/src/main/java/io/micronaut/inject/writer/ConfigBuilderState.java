@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -23,7 +24,7 @@ import org.objectweb.asm.Type;
 import javax.annotation.concurrent.Immutable;
 
 /**
- * Stores data to be used when visiting a configuration builder method
+ * Stores data to be used when visiting a configuration builder method.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -40,7 +41,7 @@ class ConfigBuilderState {
     private final AnnotationMetadata annotationMetadata;
 
     /**
-     * Constructs a config builder
+     * Constructs a config builder.
      *
      * @param type               The builder type
      * @param name               The name of the field or method
@@ -56,22 +57,37 @@ class ConfigBuilderState {
         this.annotationMetadata = annotationMetadata;
     }
 
+    /**
+     * @return The configuration metadata builder
+     */
     public ConfigurationMetadataBuilder<?> getMetadataBuilder() {
         return metadataBuilder;
     }
 
+    /**
+     * @return The name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @return The type
+     */
     public Type getType() {
         return type;
     }
 
+    /**
+     * @return Whther is a method
+     */
     public boolean isMethod() {
         return invokeMethod;
     }
 
+    /**
+     * @return The annotation metadata
+     */
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

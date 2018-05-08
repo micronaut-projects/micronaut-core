@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env.yaml;
 
 import io.micronaut.context.env.AbstractPropertySourceLoader;
@@ -26,7 +27,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Loads properties from a YML file
+ * Loads properties from a YML file.
  *
  * @author Graeme Rocher
  * @since 1.0

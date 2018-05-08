@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
@@ -27,8 +28,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Implementation of {@link Type} qualifier
+ * Implementation of {@link Type} qualifier.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,6 +38,9 @@ class TypeAnnotationQualifier<T> implements Qualifier<T> {
 
     private final List<Class> types;
 
+    /**
+     * @param types The types
+     */
     TypeAnnotationQualifier(@Nullable Class<?>... types) {
         this.types = new ArrayList<>();
         if (types != null) {
@@ -46,7 +51,6 @@ class TypeAnnotationQualifier<T> implements Qualifier<T> {
                 } else {
                     this.types.add(type);
                 }
-
             }
         }
     }
@@ -58,8 +62,12 @@ class TypeAnnotationQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         TypeAnnotationQualifier<?> that = (TypeAnnotationQualifier<?>) o;
 
@@ -76,6 +84,10 @@ class TypeAnnotationQualifier<T> implements Qualifier<T> {
         return "<" + types.stream().map(Class::getSimpleName).collect(Collectors.joining("|")) + ">";
     }
 
+    /**
+     * @param type The type
+     * @return Whether the types are compatible
+     */
     protected boolean areTypesCompatible(Class type) {
         return types.stream().anyMatch(c ->
             c.isAssignableFrom(type)

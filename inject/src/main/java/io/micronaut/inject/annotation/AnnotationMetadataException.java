@@ -13,22 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.exceptions.BeanContextException;
 
 /**
- * An exception that occurs constructing {@link io.micronaut.core.annotation.AnnotationMetadata}
+ * An exception that occurs constructing {@link io.micronaut.core.annotation.AnnotationMetadata}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class AnnotationMetadataException extends BeanContextException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public AnnotationMetadataException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public AnnotationMetadataException(String message) {
         super(message);
     }

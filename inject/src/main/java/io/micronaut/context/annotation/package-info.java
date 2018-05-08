@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains core annotations related to Dependency Injection and the Bean Container
+ * Contains core annotations related to Dependency Injection and the Bean Container.
  *
  * @author graemerocher
  * @since 1.0

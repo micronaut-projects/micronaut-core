@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CustomScope;
@@ -25,7 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Default implementation of the {@link CustomScopeRegistry} interface
+ * Default implementation of the {@link CustomScopeRegistry} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +36,10 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     private final BeanLocator beanLocator;
     private final Map<Class, Optional<CustomScope>> scopes = new ConcurrentHashMap<>(1);
 
-    public DefaultCustomScopeRegistry(BeanLocator beanLocator) {
+    /**
+     * @param beanLocator The bean locator
+     */
+    DefaultCustomScopeRegistry(BeanLocator beanLocator) {
         this.beanLocator = beanLocator;
     }
 

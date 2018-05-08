@@ -13,19 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context;
 
+package io.micronaut.context;
 
 import javax.inject.Provider;
 
 /**
- * A default component provider
+ * A default component provider.
+ *
+ * @param <T> The type
+ * @author Graeme Rocher
+ * @since 1.0
  */
 class UnresolvedProvider<T> implements Provider<T> {
 
     private final Class<T> beanType;
     private final BeanContext context;
 
+    /**
+     * @param beanType The bean type
+     * @param context  The bean context
+     */
     UnresolvedProvider(Class<T> beanType, BeanContext context) {
         this.beanType = beanType;
         this.context = context;

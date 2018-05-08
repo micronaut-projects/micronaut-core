@@ -13,37 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
+/**
+ * @author Ryan Vanderwerf
+ * @since 1.0
+ */
 public enum ComputePlatform {
 
     /**
-     * Google Compute Platform
+     * Google Compute Platform.
      */
     GOOGLE_COMPUTE,
 
     /**
-     * Amazon EC2
+     * Amazon EC2.
      */
     AMAZON_EC2,
 
     /**
-     * Microsoft Azure
+     * Microsoft Azure.
      */
     AZURE,
 
     /**
-     * Cloud or non cloud provider on bare metal (unknown)
+     * Cloud or non cloud provider on bare metal (unknown).
      */
     BARE_METAL,
 
     /**
-     * IBM Cloud
+     * IBM Cloud.
      */
     IBM,
-    
+
     /**
-     * Other
+     * Other.
      */
     OTHER;
 }
