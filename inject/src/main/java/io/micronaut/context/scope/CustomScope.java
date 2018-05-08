@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -23,10 +24,10 @@ import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
-
 /**
- * Represents a custom scope within the {@link io.micronaut.context.BeanContext}
+ * Represents a custom scope within the {@link io.micronaut.context.BeanContext}.
  *
+ * @param <A> An annotation type
  * @author Graeme Rocher
  * @see javax.inject.Scope
  * @since 1.0
@@ -39,7 +40,7 @@ public interface CustomScope<A extends Annotation> {
     Class<A> annotationType();
 
     /**
-     * Resolve an object from the given scope
+     * Resolve an object from the given scope.
      *
      * @param <T>               The bean generic type
      * @param resolutionContext The bean resolution context
@@ -56,7 +57,7 @@ public interface CustomScope<A extends Annotation> {
     );
 
     /**
-     * Remove a bean definition from the scope
+     * Remove a bean definition from the scope.
      *
      * @param identifier The {@link BeanIdentifier}
      * @param <T>        The generic type

@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.inject.BeanIdentifier;
@@ -45,9 +44,10 @@ public interface BeanContext extends
     AnnotationMetadataResolver {
 
     /**
-     * Inject an existing instance
+     * Inject an existing instance.
      *
      * @param instance The instance to inject
+     * @param <T>      The bean generic type
      * @return The instance to inject
      */
     <T> T inject(T instance);
@@ -70,8 +70,9 @@ public interface BeanContext extends
      * <p>
      * Note that the instance returned is not saved as a singleton in the context.
      *
-     * @param beanType The bean type
-     * @param <T>      The bean generic type
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean generic type
      * @return The instance
      */
     <T> T createBean(Class<T> beanType, Qualifier<T> qualifier);
@@ -79,8 +80,8 @@ public interface BeanContext extends
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      * <p>
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
-     * parameter will be used</p>
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed
+     * in the {@code argumentValues} parameter will be used</p>
      * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -95,8 +96,8 @@ public interface BeanContext extends
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      * <p>
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
-     * parameter will be used</p>
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code argumentValues} parameter will be used</p>
      * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -111,8 +112,8 @@ public interface BeanContext extends
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      * <p>
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
-     * parameter will be used</p>
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code argumentValues} parameter will be used</p>
      * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -128,8 +129,8 @@ public interface BeanContext extends
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      * <p>
-     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues}
-     * parameter will be used</p>
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code argumentValues} parameter will be used</p>
      * <p>
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -155,9 +156,11 @@ public interface BeanContext extends
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
      * <p>
-     * <p>Note that if the bean was produced by a {@link Factory} then this method will refresh the factory too</p>
+     * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
+     * refresh the factory too</p>
      *
      * @param identifier The {@link BeanIdentifier}
+     * @param <T>        The concrete class
      * @return An {@link Optional} of the instance if it exists for the given registration
      */
     <T> Optional<T> refreshBean(BeanIdentifier identifier);
@@ -193,7 +196,7 @@ public interface BeanContext extends
     }
 
     /**
-     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
+     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}.
      *
      * @return The running {@link BeanContext}
      */
@@ -202,7 +205,7 @@ public interface BeanContext extends
     }
 
     /**
-     * Build a {@link BeanContext}
+     * Build a {@link BeanContext}.
      *
      * @return The built, but not yet running {@link BeanContext}
      */
@@ -211,7 +214,7 @@ public interface BeanContext extends
     }
 
     /**
-     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
+     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}.
      *
      * @param classLoader The classloader to use
      * @return The running {@link BeanContext}
@@ -221,7 +224,7 @@ public interface BeanContext extends
     }
 
     /**
-     * Build a {@link BeanContext}
+     * Build a {@link BeanContext}.
      *
      * @param classLoader The classloader to use
      * @return The built, but not yet running {@link BeanContext}

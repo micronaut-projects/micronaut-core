@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
@@ -21,7 +22,7 @@ import java.io.IOException;
 import java.io.Writer;
 
 /**
- * Metadata about a configuration group
+ * Metadata about a configuration group.
  *
  * @author Graeme Rocher
  */

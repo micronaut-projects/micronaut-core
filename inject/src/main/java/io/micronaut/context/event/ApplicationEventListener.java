@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import java.util.EventListener;
 
 /**
- * An interface for receivers of application events
+ * An interface for receivers of application events.
  *
+ * @param <E> An event
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,7 +35,7 @@ public interface ApplicationEventListener<E> extends EventListener {
     void onApplicationEvent(E event);
 
     /**
-     * Whether the given event is supported
+     * Whether the given event is supported.
      *
      * @param event The event
      * @return True if it is

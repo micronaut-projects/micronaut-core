@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.condition.ConditionContext;
@@ -25,8 +26,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A Default context implementation
- * 
+ * A Default context implementation.
+ *
+ * @param <T> The condition context type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,6 +38,10 @@ class DefaultConditionContext<T extends AnnotationMetadataProvider> implements C
     private final T component;
     private final List<Failure> failures = new ArrayList<>(2);
 
+    /**
+     * @param beanContext The bean context
+     * @param component   The component type
+     */
     DefaultConditionContext(BeanContext beanContext, T component) {
         this.beanContext = beanContext;
         this.component = component;

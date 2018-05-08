@@ -13,26 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.Qualifier;
 
 /**
- * Thrown when no such beans exists
+ * Thrown when no such beans exists.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class NoSuchBeanException extends BeanContextException {
 
+    /**
+     * @param beanType The bean type
+     */
     public NoSuchBeanException(Class beanType) {
         super("No bean of type [" + beanType.getName() + "] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.");
     }
 
+    /**
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The type
+     */
     public <T> NoSuchBeanException(Class<T> beanType, Qualifier<T> qualifier) {
         super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + ". If you are using Java or Kotlin make sure you have enabled annotation processing.");
     }
 
+    /**
+     * @param message The message
+     */
     protected NoSuchBeanException(String message) {
         super(message);
     }

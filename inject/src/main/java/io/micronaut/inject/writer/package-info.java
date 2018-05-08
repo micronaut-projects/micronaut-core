@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains classes responsible for using ASM to write bean metadata to disk
+ * Contains classes responsible for using ASM to write bean metadata to disk.
  *
  * @author graemerocher
  * @since 1.0

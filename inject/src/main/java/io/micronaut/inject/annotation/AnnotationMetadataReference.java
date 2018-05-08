@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 
 /**
- * A reference to {@link AnnotationMetadata}
+ * A reference to {@link AnnotationMetadata}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,6 +30,10 @@ public class AnnotationMetadataReference implements AnnotationMetadataDelegate {
     private final String className;
     private final AnnotationMetadata annotationMetadata;
 
+    /**
+     * @param className          The class name
+     * @param annotationMetadata The annotation metadata
+     */
     public AnnotationMetadataReference(String className, AnnotationMetadata annotationMetadata) {
         this.className = className;
         this.annotationMetadata = annotationMetadata;

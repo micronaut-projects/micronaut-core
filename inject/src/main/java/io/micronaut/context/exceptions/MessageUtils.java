@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -22,7 +23,7 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 
 /**
- * Utility methods for building error messages
+ * Utility methods for building error messages.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +31,7 @@ import io.micronaut.inject.MethodInjectionPoint;
 class MessageUtils {
 
     /**
-     * Builds an appropriate error message
+     * Builds an appropriate error message.
      *
      * @param resolutionContext The resolution context
      * @param message           The message
@@ -65,7 +66,7 @@ class MessageUtils {
     }
 
     /**
-     * Builds an appropriate error message
+     * Builds an appropriate error message.
      *
      * @param resolutionContext    The resolution context
      * @param methodInjectionPoint The injection point
@@ -93,7 +94,7 @@ class MessageUtils {
     }
 
     /**
-     * Builds an appropriate error message
+     * Builds an appropriate error message.
      *
      * @param resolutionContext   The resolution context
      * @param fieldInjectionPoint The injection point
@@ -118,9 +119,10 @@ class MessageUtils {
     }
 
     /**
-     * Builds an appropriate error message for a constructor argument
+     * Builds an appropriate error message for a constructor argument.
      *
      * @param resolutionContext The resolution context
+     * @param argument          The argument
      * @param message           The message
      * @param circular          Is the path circular
      * @return The message
@@ -151,7 +153,9 @@ class MessageUtils {
     private static void appendPath(boolean circular, StringBuilder builder, String ls, BeanResolutionContext.Path path) {
         String pathString = circular ? path.toCircularString() : path.toString();
         builder.append("Path Taken: ");
-        if (circular) builder.append(ls);
+        if (circular) {
+            builder.append(ls);
+        }
         builder.append(pathString);
     }
 }

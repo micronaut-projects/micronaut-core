@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.naming.Named;
 
 import java.io.Serializable;
 
 /**
- * An identifier for a {@link Bean} that can be used as a key to uniquely identify an instance
+ * An identifier for a {@link io.micronaut.context.annotation.Bean} that can be used as a key to uniquely identify an
+ * instance.
  *
  * @author Graeme Rocher
  * @since 1.0

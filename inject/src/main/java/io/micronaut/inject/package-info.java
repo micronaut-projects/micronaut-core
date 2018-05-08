@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  *
- * Contains the core dependency injection interfaces
+ * Contains the core dependency injection interfaces.
  *
  * @author graemerocher
  * @since 1.0

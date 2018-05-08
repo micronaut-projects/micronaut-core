@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
@@ -26,6 +27,7 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
  * This interface is generally implemented by a build time tool such as an AST transformation framework that will build
  * the code necessary to construct a valid bean instance.</p>
  *
+ * @param <T> The bean type
  * @author Graeme Rocher
  * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 1.0
@@ -33,7 +35,7 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 public interface BeanFactory<T> {
 
     /**
-     * Builds a bean instance
+     * Builds a bean instance.
      *
      * @param context    The context
      * @param definition The definition
@@ -45,10 +47,11 @@ public interface BeanFactory<T> {
     }
 
     /**
-     * Builds a bean instance
+     * Builds a bean instance.
      *
-     * @param context    The context
-     * @param definition The definition
+     * @param resolutionContext The bean resolution context
+     * @param context           The context
+     * @param definition        The definition
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */

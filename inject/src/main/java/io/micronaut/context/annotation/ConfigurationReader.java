@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -23,7 +24,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>A meta annotation for use with other annotations to indicate that the annotation reads configuration</p>
+ * <p>A meta annotation for use with other annotations to indicate that the annotation reads configuration.</p>
  *
  * @author Graeme Rocher
  * @see ConfigurationProperties

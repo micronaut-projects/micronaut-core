@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.visitor;
 
 /**
- * Provides a hook into the compilation process to allow user
- * defined functionality to be created at compile time.
+ * Provides a hook into the compilation process to allow user defined functionality to be created at compile time.
  *
  * @param <C> The annotation required on the class.
  * @param <E> The annotation required on the element.
@@ -27,7 +27,7 @@ package io.micronaut.inject.visitor;
 public interface TypeElementVisitor<C, E> {
 
     /**
-     * Executed when a class is encountered that matches the <C> generic
+     * Executed when a class is encountered that matches the <C> generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -37,7 +37,7 @@ public interface TypeElementVisitor<C, E> {
     }
 
     /**
-     * Executed when a method is encountered that matches the <E> generic
+     * Executed when a method is encountered that matches the <E> generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -47,7 +47,7 @@ public interface TypeElementVisitor<C, E> {
     }
 
     /**
-     * Executed when a field is encountered that matches the <E> generic
+     * Executed when a field is encountered that matches the <E> generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -57,7 +57,7 @@ public interface TypeElementVisitor<C, E> {
     }
 
     /**
-     * Called once when visitor processing starts
+     * Called once when visitor processing starts.
      *
      * @param visitorContext The visitor context
      */
@@ -66,7 +66,8 @@ public interface TypeElementVisitor<C, E> {
     }
 
     /**
-     * Called once when visitor processing finishes
+     * Called once when visitor processing finishes.
+     *
      * @param visitorContext The visitor context
      */
     default void finish(VisitorContext visitorContext) {

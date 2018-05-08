@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import javax.inject.Provider;
 import java.util.Map;
 
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
+ * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}.
  *
+ * @param <T> The type
  * @author graemerocher
  * @since 1.0
  */

@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Additional {@link io.micronaut.core.convert.TypeConverter} instances related to the {@link io.micronaut.context.BeanContext}
+ * Additional {@link io.micronaut.core.convert.TypeConverter} instances related to the
+ * {@link io.micronaut.context.BeanContext}.
  *
  * @author graemerocher
  * @since 1.0

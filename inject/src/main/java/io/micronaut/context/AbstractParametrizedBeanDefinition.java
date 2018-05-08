@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.Parameter;
@@ -26,8 +27,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,8 +34,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A {@link BeanDefinition} that is a {@link ParametrizedBeanFactory}
+ * A {@link BeanDefinition} that is a {@link ParametrizedBeanFactory}.
  *
+ * @param <T> The Bean definition type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,16 +45,30 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
     private final Argument[] requiredArguments;
 
+    /**
+     * @param producedType       The produced type
+     * @param declaringType      The declaring type
+     * @param methodName         The method name
+     * @param methodMetadata     The method metadata
+     * @param requiresReflection Whether requires refection
+     * @param arguments          The arguments
+     */
     public AbstractParametrizedBeanDefinition(Class<T> producedType, Class<?> declaringType, String methodName, AnnotationMetadata methodMetadata, boolean requiresReflection, Argument... arguments) {
         super(producedType, declaringType, methodName, methodMetadata, requiresReflection, arguments);
         this.requiredArguments = resolveRequiredArguments();
     }
 
+    /**
+     * @param type               The type
+     * @param annotationMetadata The annotation metadata
+     * @param requiresReflection Whether requires reflection
+     * @param arguments          The arguments
+     */
     protected AbstractParametrizedBeanDefinition(Class<T> type,
                                                  AnnotationMetadata annotationMetadata,
                                                  boolean requiresReflection,
                                                  Argument... arguments) {
-        super(type, annotationMetadata,requiresReflection, arguments);
+        super(type, annotationMetadata, requiresReflection, arguments);
         this.requiredArguments = resolveRequiredArguments();
     }
 
@@ -94,6 +108,13 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
         return doBuild(resolutionContext, context, definition, requiredArgumentValues);
     }
 
+    /**
+     * @param resolutionContext      The resolution context
+     * @param context                The bean context
+     * @param definition             The bean definition
+     * @param requiredArgumentValues The required arguments
+     * @return The built instance
+     */
     protected abstract T doBuild(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition, Map<String, Object> requiredArgumentValues);
 
     private Argument[] resolveRequiredArguments() {

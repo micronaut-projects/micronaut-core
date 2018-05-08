@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -32,7 +33,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * A method injection point that does not use reflection
+ * A method injection point that does not use reflection.
  *
  * @author graemerocher
  * @since 1.0
@@ -49,34 +50,36 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Argument[] arguments;
 
     /**
-     * Constructs a new {@link DefaultMethodInjectionPoint}
+     * Constructs a new {@link DefaultMethodInjectionPoint}.
+     *
      * @param declaringBean The declaring bean
      * @param declaringType The declaring type
-     * @param methodName The method name
-     * @param arguments The arguments
+     * @param methodName    The method name
+     * @param arguments     The arguments
      */
     DefaultMethodInjectionPoint(
-            BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments) {
-       this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
+        BeanDefinition declaringBean,
+        Class<?> declaringType,
+        String methodName,
+        @Nullable Argument[] arguments) {
+        this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
     }
 
     /**
-     * Constructs a new {@link DefaultMethodInjectionPoint}
-     * @param declaringBean The declaring bean
-     * @param declaringType The declaring type
-     * @param methodName The method name
-     * @param arguments The arguments
+     * Constructs a new {@link DefaultMethodInjectionPoint}.
+     *
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param methodName         The method name
+     * @param arguments          The arguments
      * @param annotationMetadata The annotation metadata
      */
     DefaultMethodInjectionPoint(
-            BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata) {
+        BeanDefinition declaringBean,
+        Class<?> declaringType,
+        String methodName,
+        @Nullable Argument[] arguments,
+        @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
         this.declaringType = declaringType;
         this.methodName = methodName;
@@ -84,12 +87,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
-        if(this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+        if (this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotatedElements = AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-        }
-        else {
-            this.annotatedElements = new AnnotatedElement[] {
-                    annotationMetadata
+        } else {
+            this.annotatedElements = new AnnotatedElement[]{
+                annotationMetadata
             };
         }
     }
@@ -97,7 +99,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     @Override
     public Method getMethod() {
         Method method = ReflectionUtils.getMethod(declaringType, methodName, argTypes)
-                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
+            .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
         method.setAccessible(true);
         return method;
     }
@@ -150,12 +152,16 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultMethodInjectionPoint that = (DefaultMethodInjectionPoint) o;
         return Objects.equals(declaringType, that.declaringType) &&
-                Objects.equals(methodName, that.methodName) &&
-                Arrays.equals(argTypes, that.argTypes);
+            Objects.equals(methodName, that.methodName) &&
+            Arrays.equals(argTypes, that.argTypes);
     }
 
     @Override

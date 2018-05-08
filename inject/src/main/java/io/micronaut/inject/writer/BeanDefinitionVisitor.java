@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.AbstractBeanDefinition;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
@@ -31,7 +27,7 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}
+ * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,37 +35,38 @@ import java.util.Map;
 public interface BeanDefinitionVisitor {
 
     /**
-     * The suffix use for generated AOP intercepted types
+     * The suffix use for generated AOP intercepted types.
      */
     String PROXY_SUFFIX = "$Intercepted";
 
     /**
-     * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean, Map, Map, Map)} should be called at least once
+     * Visits a no arguments constructor. Either this method or
+     * {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean, Map, Map, Map)} should be called at least
+     * once.
      *
-     * @param annotationMetadata The annotation metadata for the constructor
-     * @param requiresReflection Whether invoking the constructor requires reflection
+     * @param annotationMetadata The annotation metadata for the constructor.
+     * @param requiresReflection Whether invoking the constructor requires reflection.
      */
     void visitBeanDefinitionConstructor(
-            AnnotationMetadata annotationMetadata,
-            boolean requiresReflection
+        AnnotationMetadata annotationMetadata,
+        boolean requiresReflection
     );
 
     /**
      * Visits the constructor used to create the bean definition.
      *
-     * @param annotationMetadata The annotation metadata for the constructor
-     * @param requiresReflection Whether invoking the constructor requires reflection
-     * @param argumentTypes  The argument type names for each parameter
+     * @param annotationMetadata         The annotation metadata for the constructor
+     * @param requiresReflection         Whether invoking the constructor requires reflection
+     * @param argumentTypes              The argument type names for each parameter
      * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes   The generic types for each parameter
+     * @param genericTypes               The generic types for each parameter
      */
-    void visitBeanDefinitionConstructor(            AnnotationMetadata annotationMetadata,
-                                                    boolean requiresReflection,
+    void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
+                                        boolean requiresReflection,
 
                                         Map<String, Object> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                         Map<String, Map<String, Object>> genericTypes);
-
 
     /**
      * @return Whether the provided type an interface
@@ -82,21 +79,22 @@ public interface BeanDefinitionVisitor {
     boolean isSingleton();
 
     /**
-     * Visit a marker interface on the generated bean definition
+     * Visit a marker interface on the generated bean definition.
      *
      * @param interfaceType The interface type
      */
     void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType);
 
     /**
-     * Alter the super class of this bean definition. The passed class should be a subclass of {@link AbstractBeanDefinition}
+     * Alter the super class of this bean definition. The passed class should be a subclass of
+     * {@link io.micronaut.context.AbstractBeanDefinition}.
      *
      * @param name The super type
      */
     void visitSuperBeanDefinition(String name);
 
     /**
-     * Alter the super class of this bean definition to use another factory bean
+     * Alter the super class of this bean definition to use another factory bean.
      *
      * @param beanName The bean name
      */
@@ -108,22 +106,22 @@ public interface BeanDefinitionVisitor {
     String getBeanTypeName();
 
     /**
-     * The provided type of the bean. Usually this is the same as {@link #getBeanTypeName()}, except in the case of factory beans
-     * which produce a different type
+     * The provided type of the bean. Usually this is the same as {@link #getBeanTypeName()}, except in the case of
+     * factory beans which produce a different type.
      *
      * @return The provided type
      */
     Type getProvidedType();
 
     /**
-     * Make the bean definition as validated by javax.validation
+     * Make the bean definition as validated by javax.validation.
      *
      * @param validated Whether the bean definition is validated
      */
     void setValidated(boolean validated);
 
     /**
-     * @return Return whether the bean definition is validated
+     * @return Return whether the bean definition is validated.
      */
     boolean isValidated();
 
@@ -134,12 +132,12 @@ public interface BeanDefinitionVisitor {
 
 
     /**
-     * Finalize the bean definition to the given output stream
+     * Finalize the bean definition to the given output stream.
      */
     void visitBeanDefinitionEnd();
 
     /**
-     * Write the state of the writer to the given compilation directory
+     * Write the state of the writer to the given compilation directory.
      *
      * @param compilationDir The compilation directory
      * @throws IOException If an I/O error occurs
@@ -147,7 +145,7 @@ public interface BeanDefinitionVisitor {
     void writeTo(File compilationDir) throws IOException;
 
     /**
-     * Write the class to output via a visitor that manages output destination
+     * Write the class to output via a visitor that manages output destination.
      *
      * @param visitor the writer output visitor
      * @throws IOException If an error occurs
@@ -158,7 +156,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a field and setter pairing.
      *
      * @param declaringType      The declaring type
-     * @param annotationMetadata      The annotation metadata
+     * @param annotationMetadata The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
      * @param fieldName          The field name
@@ -179,13 +177,14 @@ public interface BeanDefinitionVisitor {
     /**
      * Visits an injection point for a setter.
      *
-     * @param declaringType      The declaring type
-     * @param methodMetadata     The annotation metadata
-     * @param requiresReflection Whether the setter requires reflection
-     * @param valueType          The field type
-     * @param setterName         The setter name
-     * @param genericTypes       The generic types
-     * @param isOptional         Whether the setter is optional
+     * @param declaringType          The declaring type
+     * @param methodMetadata         The annotation metadata
+     * @param requiresReflection     Whether the setter requires reflection
+     * @param valueType              The field type
+     * @param setterName             The setter name
+     * @param genericTypes           The generic types
+     * @param setterArgumentMetadata The setter argument metadata
+     * @param isOptional             Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
                           AnnotationMetadata methodMetadata,
@@ -197,15 +196,19 @@ public interface BeanDefinitionVisitor {
                           boolean isOptional);
 
     /**
-     * Visits a method injection point
-     *  @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param argumentAnnotationMetadata     The argument annotation metadata
-     * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata The annotation metadata
+     * Visits a method injection point.
+     *
+     * @param declaringType              The declaring type of the method. Either a Class or a string representing
+     *                                   the name of the type
+     * @param requiresReflection         Whether the method requires reflection
+     * @param returnType                 The return type of the method. Either a Class or a string representing the
+     *                                   name of the type
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                   Can be null or empty.
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types of each argument. Can be null.
+     * @param annotationMetadata         The annotation metadata
      */
     void visitPostConstructMethod(Object declaringType,
                                   boolean requiresReflection,
@@ -217,15 +220,19 @@ public interface BeanDefinitionVisitor {
                                   AnnotationMetadata annotationMetadata);
 
     /**
-     * Visits a method injection point
-     *  @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param argumentAnnotationMetadata     The argument annotation metadata
-     * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata The annotation metadata
+     * Visits a method injection point.
+     *
+     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
+     *                                   name of the type
+     * @param requiresReflection         Whether the method requires reflection
+     * @param returnType                 The return type of the method. Either a Class or a string representing the name
+     *                                   of the type
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                   Can be null or empty.
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types of each argument. Can be null.
+     * @param annotationMetadata         The annotation metadata
      */
     void visitPreDestroyMethod(Object declaringType,
                                boolean requiresReflection,
@@ -236,15 +243,19 @@ public interface BeanDefinitionVisitor {
                                Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
 
     /**
-     * Visits a method injection point
-     *  @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param argumentAnnotationMetadata     The argument annotation metadata
-     * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata The annotation metadata
+     * Visits a method injection point.
+     *
+     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
+     *                                   name of the type
+     * @param requiresReflection         Whether the method requires reflection
+     * @param returnType                 The return type of the method. Either a Class or a string representing the name
+     *                                   of the type
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                   Can be null or empty.
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types of each argument. Can be null.
+     * @param annotationMetadata         The annotation metadata
      */
     void visitMethodInjectionPoint(Object declaringType,
                                    boolean requiresReflection,
@@ -256,15 +267,20 @@ public interface BeanDefinitionVisitor {
                                    AnnotationMetadata annotationMetadata);
 
     /**
-     * Visit a method that is to be made executable allow invocation of said method without reflection
+     * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param argumentAnnotationMetadata     The argument annotation metadata
-     * @param genericTypes       The generic types of each argument. Can be null.
-     * @param annotationMetadata The annotation metadata for the method
+     * @param declaringType              The declaring type of the method. Either a Class or a string representing the
+     *                                   name of the type
+     * @param returnType                 The return type of the method. Either a Class or a string representing the name
+     *                                   of the type
+     * @param genericReturnType          The generic return type
+     * @param returnTypeGenericTypes     The return type for generic types
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                   Can be null or empty.
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types of each argument. Can be null.
+     * @param annotationMetadata         The annotation metadata for the method
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
@@ -278,14 +294,14 @@ public interface BeanDefinitionVisitor {
                                                  @Nullable AnnotationMetadata annotationMetadata);
 
     /**
-     * Visits a field injection point
+     * Visits a field injection point.
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldType          The type of the field
      * @param fieldName          The name of the field
      * @param requiresReflection Whether accessing the field requires reflection
      * @param annotationMetadata The annotation metadata for the field
-     * @param typeArguments The generic type arguments
+     * @param typeArguments      The generic type arguments
      */
     void visitFieldInjectionPoint(Object declaringType,
                                   Object fieldType,
@@ -295,23 +311,23 @@ public interface BeanDefinitionVisitor {
                                   @Nullable Map<String, Object> typeArguments);
 
     /**
-     * Visits a field injection point
+     * Visits a field injection point.
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldType          The type of the field
      * @param fieldName          The name of the field
      * @param requiresReflection Whether accessing the field requires reflection
      * @param annotationMetadata The annotation metadata for the field
-     * @param typeArguments The generic type arguments
-     * @param isOptional Is the value optional
+     * @param typeArguments      The generic type arguments
+     * @param isOptional         Is the value optional
      */
-    void visitFieldValue( Object declaringType,
-                          Object fieldType,
-                          String fieldName,
-                          boolean requiresReflection,
-                          @Nullable AnnotationMetadata annotationMetadata,
-                          @Nullable Map<String, Object> typeArguments,
-                          boolean isOptional);
+    void visitFieldValue(Object declaringType,
+                         Object fieldType,
+                         String fieldName,
+                         boolean requiresReflection,
+                         @Nullable AnnotationMetadata annotationMetadata,
+                         @Nullable Map<String, Object> typeArguments,
+                         boolean isOptional);
 
     /**
      * @return The package name of the bean
@@ -329,13 +345,13 @@ public interface BeanDefinitionVisitor {
     AnnotationMetadata getAnnotationMetadata();
 
     /**
-     * Begin defining a configuration builder
+     * Begin defining a configuration builder.
      *
      * @param type               The type of the builder
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
-     * @see ConfigurationBuilder
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
         Object type,
@@ -344,13 +360,13 @@ public interface BeanDefinitionVisitor {
         ConfigurationMetadataBuilder metadataBuilder);
 
     /**
-     * Begin defining a configuration builder
+     * Begin defining a configuration builder.
      *
      * @param type               The type of the builder
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
      * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
-     * @see ConfigurationBuilder
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
         Object type,
@@ -359,7 +375,7 @@ public interface BeanDefinitionVisitor {
         ConfigurationMetadataBuilder metadataBuilder);
 
     /**
-     * Visit a configuration builder method
+     * Visit a configuration builder method.
      *
      * @param prefix              The prefix used for the method
      * @param configurationPrefix The prefix used to retrieve the configuration value
@@ -367,7 +383,7 @@ public interface BeanDefinitionVisitor {
      * @param methodName          The method name
      * @param paramType           The method type
      * @param generics            The generic types of the method
-     * @see ConfigurationBuilder
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
         String prefix,
@@ -378,13 +394,13 @@ public interface BeanDefinitionVisitor {
         Map<String, Object> generics);
 
     /**
-     * Visit a configuration builder method that accepts a long and a TimeUnit
+     * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
      * @param prefix              The prefix used for the method
      * @param configurationPrefix The prefix used to retrieve the configuration value
      * @param returnType          The return type
      * @param methodName          The method name
-     * @see ConfigurationBuilder
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(
         String prefix,
@@ -393,25 +409,26 @@ public interface BeanDefinitionVisitor {
         String methodName);
 
     /**
-     * Finalize a configuration builder field
+     * Finalize a configuration builder field.
      *
-     * @see ConfigurationBuilder
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderEnd();
 
     /**
-     * By default, when the {@link BeanContext} is started, the {@link BeanDefinition#getExecutableMethods()} are not processed by registered {@link ExecutableMethodProcessor}
-     * instances unless this method returns true.
+     * By default, when the {@link io.micronaut.context.BeanContext} is started, the
+     * {@link BeanDefinition#getExecutableMethods()} are not processed by registered
+     * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.
      *
      * @return Whether the bean definition requires method processing
-     * @see Executable#processOnStartup()
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
      */
     default boolean requiresMethodProcessing() {
         return false;
     }
 
     /**
-     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true
+     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true.
      *
      * @param shouldPreProcess True if they should be pre-processed
      */

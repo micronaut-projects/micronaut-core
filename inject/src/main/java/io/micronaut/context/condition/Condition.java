@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.condition;
 
 import java.util.function.Predicate;
 
 /**
- * A condition allows conditional loading of a {@link io.micronaut.inject.BeanConfiguration}
+ * A condition allows conditional loading of a {@link io.micronaut.inject.BeanConfiguration}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,7 +28,7 @@ import java.util.function.Predicate;
 public interface Condition extends Predicate<ConditionContext> {
 
     /**
-     * Check whether a specific condition is met
+     * Check whether a specific condition is met.
      *
      * @param context The condition context
      * @return True if has been met

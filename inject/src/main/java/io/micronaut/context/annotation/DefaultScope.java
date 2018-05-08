@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import java.lang.annotation.Annotation;
@@ -24,7 +25,7 @@ import java.lang.annotation.Target;
 
 /**
  * A  meta annotation that can be applied to another annotation to specify a fallback scope of no scope is specified
- * by the user for a bean
+ * by the user for a bean.
  *
  * @author graemerocher
  * @since 1.0
