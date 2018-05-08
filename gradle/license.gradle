@@ -24,4 +24,5 @@ license {
     exclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
     exclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     exclude '**/org/atinject/tck/auto/Tck.kt'
+    exclude '**/io/micronaut/http/netty/stream/package-info.java'
 }

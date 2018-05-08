@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.buffer;
 
 import io.micronaut.core.annotation.Internal;
@@ -32,7 +33,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 /**
- * A {@link ByteBuffer} implementation for Netty
+ * A {@link ByteBuffer} implementation for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +43,9 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     private ByteBuf delegate;
 
+    /**
+     * @param delegate The {@link ByteBuf}
+     */
     NettyByteBuffer(ByteBuf delegate) {
         this.delegate = delegate;
     }
@@ -177,6 +181,10 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
         return this;
     }
 
+    /**
+     * @param byteBufs The {@link ByteBuf}s
+     * @return The {@link ByteBuffer}
+     */
     public ByteBuffer write(ByteBuf... byteBufs) {
         if (this.delegate instanceof CompositeByteBuf) {
             CompositeByteBuf compositeByteBuf = (CompositeByteBuf) this.delegate;

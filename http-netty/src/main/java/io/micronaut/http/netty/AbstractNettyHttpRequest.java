@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -30,8 +31,9 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Abstract implementation of {@link HttpRequest} for Netty
+ * Abstract implementation of {@link HttpRequest} for Netty.
  *
+ * @param <B> The body
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -49,6 +51,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     private Locale locale;
     private String path;
 
+    /**
+     * @param nettyRequest      The Http netty request
+     * @param conversionService The conversion service
+     */
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
@@ -71,7 +77,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 httpParameters = this.httpParameters;
                 if (httpParameters == null) {
-                    this.httpParameters = httpParameters = decodeParameters(nettyRequest.uri());
+                    httpParameters = decodeParameters(nettyRequest.uri());
+                    this.httpParameters = httpParameters;
                 }
             }
         }
@@ -85,7 +92,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 contentType = this.mediaType;
                 if (contentType == null) {
-                    this.mediaType = contentType = HttpRequest.super.getContentType().orElse(null);
+                    contentType = HttpRequest.super.getContentType().orElse(null);
+                    this.mediaType = contentType;
                 }
             }
         }
@@ -99,7 +107,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 charset = this.charset;
                 if (charset == null) {
-                    this.charset = charset = initCharset(HttpRequest.super.getCharacterEncoding());
+                    charset = initCharset(HttpRequest.super.getCharacterEncoding());
+                    this.charset = charset;
                 }
             }
         }
@@ -113,7 +122,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 locale = this.locale;
                 if (locale == null) {
-                    this.locale = locale = HttpRequest.super.getLocale().orElse(null);
+                    locale = HttpRequest.super.getLocale().orElse(null);
+                    this.locale = locale;
                 }
             }
         }
@@ -137,15 +147,24 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 path = this.path;
                 if (path == null) {
-                    this.path = path = decodePath(nettyRequest.uri());
+                    path = decodePath(nettyRequest.uri());
+                    this.path = path;
                 }
             }
         }
         return path;
     }
 
+    /**
+     * @param characterEncoding The charactger encoding
+     * @return The Charset
+     */
     protected abstract Charset initCharset(Charset characterEncoding);
 
+    /**
+     * @param uri The URI
+     * @return The query string decoder
+     */
     protected QueryStringDecoder createDecoder(String uri) {
         Charset charset = getCharacterEncoding();
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
