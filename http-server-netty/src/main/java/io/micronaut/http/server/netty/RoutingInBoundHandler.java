@@ -16,11 +16,6 @@
 
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.*;
-import io.micronaut.http.hateos.JsonError;
-import io.micronaut.http.netty.reactive.HandlerPublisher;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -29,19 +24,28 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyHttpResponse;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
+import io.micronaut.http.netty.reactive.HandlerPublisher;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.HttpServerException;
@@ -706,63 +710,61 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     ReturnType<?> genericReturnType = routeMatch.getReturnType();
                     Class<?> javaReturnType = genericReturnType.getType();
 
-                    if(result != null && isResponsePublisher(genericReturnType, javaReturnType)) {
+                    if (result != null && isResponsePublisher(genericReturnType, javaReturnType)) {
                         // special case, handle an emitted http response
                         @SuppressWarnings("unchecked")
                         Flowable<HttpResponse<?>> responseFlowable = ConversionService.SHARED.convert(result, Flowable.class)
-                                                                                      .orElseThrow(()->new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
+                            .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
 
                         responseFlowable.subscribeOn(Schedulers.from(executor))
-                                        .subscribe(new Subscriber<HttpResponse<?>>() {
-                            boolean emitted = false;
-                            @Override
-                            public void onSubscribe(Subscription s) {
-                                s.request(1);
-                            }
+                            .subscribe(new Subscriber<HttpResponse<?>>() {
+                                boolean emitted = false;
 
-                            @Override
-                            public void onNext(HttpResponse<?> httpResponse) {
-                                emitted = true;
-                                if(!(httpResponse instanceof MutableHttpResponse)) {
-                                    Optional<NettyHttpResponse> converted = ConversionService.SHARED.convert(httpResponse, NettyHttpResponse.class);
-                                    if(converted.isPresent()) {
-                                        emitter.onNext(converted.get());
+                                @Override
+                                public void onSubscribe(Subscription s) {
+                                    s.request(1);
+                                }
+
+                                @Override
+                                public void onNext(HttpResponse<?> httpResponse) {
+                                    emitted = true;
+                                    if (!(httpResponse instanceof MutableHttpResponse)) {
+                                        Optional<NettyHttpResponse> converted = ConversionService.SHARED.convert(httpResponse, NettyHttpResponse.class);
+                                        if (converted.isPresent()) {
+                                            emitter.onNext(converted.get());
+                                        } else {
+                                            emitter.onError(new InternalServerException("Emitted response is not mutable"));
+                                        }
+                                    } else {
+                                        emitter.onNext((MutableHttpResponse<?>) httpResponse);
                                     }
-                                    else {
-                                        emitter.onError(new InternalServerException("Emitted response is not mutable"));
+                                }
+
+                                @Override
+                                public void onError(Throwable t) {
+                                    emitted = true;
+                                    emitter.onError(t);
+                                }
+
+                                @Override
+                                public void onComplete() {
+                                    if (!emitted) {
+                                        emitter.onNext(io.micronaut.http.HttpResponse.status(HttpStatus.NOT_FOUND));
                                     }
+                                    emitter.onComplete();
                                 }
-                                else {
-                                    emitter.onNext((MutableHttpResponse<?>) httpResponse);
-                                }
-                            }
-
-                            @Override
-                            public void onError(Throwable t) {
-                                emitted = true;
-                                emitter.onError(t);
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                if(!emitted) {
-                                    emitter.onNext(io.micronaut.http.HttpResponse.status(HttpStatus.NOT_FOUND));
-                                }
-                                emitter.onComplete();
-                            }
-                        });
+                            });
 
                         return;
-                    }
-                    else if (result == null) {
+                    } else if (result == null) {
                         if (javaReturnType != void.class) {
                             // handle re-mapping of errors
                             result = router.route(HttpStatus.NOT_FOUND)
-                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
-                                    .filter(RouteMatch::isExecutable)
-                                    .map(RouteMatch::execute)
-                                    .map(Object.class::cast)
-                                    .orElse(NettyHttpResponseFactory.getOr(request, io.micronaut.http.HttpResponse.notFound()));
+                                .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
+                                .filter(RouteMatch::isExecutable)
+                                .map(RouteMatch::execute)
+                                .map(Object.class::cast)
+                                .orElse(NettyHttpResponseFactory.getOr(request, io.micronaut.http.HttpResponse.notFound()));
 
                             if (result instanceof MutableHttpResponse) {
                                 response = (MutableHttpResponse<?>) result;
