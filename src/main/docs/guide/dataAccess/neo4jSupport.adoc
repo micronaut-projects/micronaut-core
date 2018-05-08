@@ -1,1 +1,11 @@
-https://github.com/micronaut-projects/micronaut-core/issues/105[TODO]
+Micronaut supports Neo4j driver configuration. Configuration values can be supplied a property source such as below.
+The property name is derived from api:configuration.neo4j.bolt.Neo4JBoltConfiguration[] and the builder methods in
+https://neo4j.com/docs/api/java-driver/current/org/neo4j/driver/v1/Config.ConfigBuilder.html[Config.ConfigBuilder] (without the prefix).
+
+.Supply Configuration
+[source,groovy]
+----
+include::configurations/neo4j-bolt/src/test/groovy/io/micronaut/configuration/neo4j/bolt/Neo4jBoltConfigurationSpec.groovy[tags=start, indent=0]
+----
+
+Note the `embedded` keyword is used for properties to configure the api:configuration.neo4j.bolt.embedded.EmbeddedNeo4jServer[].

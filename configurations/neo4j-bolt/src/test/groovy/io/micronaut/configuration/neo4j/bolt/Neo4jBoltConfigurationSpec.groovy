@@ -28,10 +28,12 @@ class Neo4jBoltConfigurationSpec extends Specification {
 
     void "test neo4j configuration"() {
         when:
+        // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.uri':'bolt://someserver:7687',
                 'neo4j.embedded.enabled':false
         )
+        // end::start[]
 
         then:
         applicationContext.containsBean(Neo4jBoltConfiguration)
