@@ -66,8 +66,8 @@ public class StaticResourceConfiguration implements Toggleable {
      * @return The list of {@link ResourceLoader} available for the path
      */
     public List<ResourceLoader> getResourceLoaders() {
+        List<ResourceLoader> loaders = new ArrayList<>(paths.size());
         if (enabled) {
-            List<ResourceLoader> loaders = new ArrayList<>(paths.size());
             for (String path : paths) {
                 Optional<ResourceLoader> loader = resourceResolver.getLoaderForBasePath(path);
                 if (loader.isPresent()) {
@@ -76,8 +76,7 @@ public class StaticResourceConfiguration implements Toggleable {
                     throw new ConfigurationException("Unrecognizable resource path: " + path);
                 }
             }
-            return loaders;
         }
-        return Collections.emptyList();
+        return loaders;
     }
 }
