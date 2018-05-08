@@ -16,6 +16,9 @@
 package io.micronaut.http.client.docs.basics;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 
@@ -24,6 +27,9 @@ import static org.junit.Assert.*;
 
 import io.reactivex.Flowable;
 import org.junit.Test;
+
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * @author graemerocher
@@ -65,6 +71,87 @@ public class HelloControllerTest {
                 "Hello John",
                 response.blockingFirst()
         );
+
+        embeddedServer.stop();
+        client.stop();
+    }
+
+    @Test
+    public void testRetrieveWithJSON() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+
+        // tag::jsonmap[]
+        Flowable<Map> response = client.retrieve(
+                GET("/greet/John"), Map.class
+        );
+        // end::jsonmap[]
+
+        assertEquals(
+                "Hello John",
+                response.blockingFirst().get("text")
+        );
+
+        // tag::jsonmaptypes[]
+        response = client.retrieve(
+                GET("/greet/John"),
+                Argument.of(Map.class, String.class, String.class) // <1>
+        );
+        // end::jsonmaptypes[]
+
+        assertEquals(
+                "Hello John",
+                response.blockingFirst().get("text")
+        );
+        embeddedServer.stop();
+        client.stop();
+    }
+
+
+    @Test
+    public void testRetrieveWithPOJO() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+
+        // tag::jsonpojo[]
+        Flowable<Message> response = client.retrieve(
+                GET("/greet/John"), Message.class
+        );
+
+        assertEquals(
+                "Hello John",
+                response.blockingFirst().getText()
+        );
+        // end::jsonpojo[]
+
+        embeddedServer.stop();
+        client.stop();
+    }
+
+    @Test
+    public void testRetrieveWithPOJOResponse() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+
+        // tag::pojoresponse[]
+        Flowable<HttpResponse<Message>> call = client.exchange(
+                GET("/greet/John"), Message.class // <1>
+        );
+
+        HttpResponse<Message> response = call.blockingFirst();
+        Optional<Message> message = response.getBody(Message.class); // <2>
+        // check the status
+        assertEquals(
+                HttpStatus.OK,
+                response.getStatus() // <3>
+        );
+        // check the body
+        assertTrue(message.isPresent());
+        assertEquals(
+                "Hello John",
+                message.get().getText()
+        );
+        // end::pojoresponse[]
 
         embeddedServer.stop();
         client.stop();
