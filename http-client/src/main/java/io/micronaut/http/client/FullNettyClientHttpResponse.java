@@ -85,11 +85,24 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
-            this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+            if(HttpResponse.class.isAssignableFrom(bodyType.getType())) {
+                Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
+                if(responseBodyType.isPresent()) {
+                    Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
+                    this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
+                }
+                else {
+                    this.body = null;
+                }
+            }
+            else {
+                this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+            }
         } else {
             this.body = null;
         }
     }
+
 
     @Override
     public String reason() {
@@ -122,6 +135,13 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             return Optional.empty();
         }
         return getBody(Argument.of(type));
+    }
+
+    /**
+     * @return The Netty native response object
+     */
+    public FullHttpResponse getNativeResponse() {
+        return nettyHttpResponse;
     }
 
     @SuppressWarnings("unchecked")
@@ -167,6 +187,10 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         return result;
     }
 
+    private boolean isParseableBodyType(Class<?> rawBodyType) {
+        return CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType);
+    }
+
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
@@ -200,12 +224,5 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
-    }
-
-    /**
-     * @return The Netty native response object
-     */
-    public FullHttpResponse getNativeResponse() {
-        return nettyHttpResponse;
     }
 }
