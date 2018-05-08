@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -60,7 +61,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
 
-    public static final String PRIMARY_ATTRIBUTE = "io.micronaut.core.Primary";
+    static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         if (!(definition instanceof BeanFactory)) {
