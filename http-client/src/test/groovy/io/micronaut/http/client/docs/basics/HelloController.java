@@ -47,4 +47,11 @@ public class HelloController {
     String helloEndpoint(String name) {
         return "Hello " + name;
     }
+
+    // tag::json[]
+    @Get("/greet/{name}")
+    Message greet(String name) {
+        return new Message("Hello " + name);
+    }
+    // end::json[]
 }
