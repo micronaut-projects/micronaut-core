@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -34,7 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Responsible for writing class files that are instances of {@link AnnotationMetadata}
+ * Responsible for writing class files that are instances of {@link AnnotationMetadata}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -93,7 +94,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private final DefaultAnnotationMetadata annotationMetadata;
 
     /**
-     * Constructs a new writer for the given class name and metadata
+     * Constructs a new writer for the given class name and metadata.
      *
      * @param className          The class name for which the metadata relates
      * @param annotationMetadata The annotation metadata
@@ -115,7 +116,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
+     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes.
      *
      * @param outputVisitor The {@link ClassWriterOutputVisitor}
      * @throws IOException If an error occurs
@@ -128,7 +129,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object
+     * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object.
      *
      * @param outputStream the output stream pointing to the target class file
      */
@@ -143,8 +144,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}
-     * @param generatorAdapter The generator adapter
+     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
+     *
+     * @param generatorAdapter   The generator adapter
      * @param annotationMetadata The annotation metadata
      */
     public static void instantiateNewMetadata(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata) {
@@ -152,10 +154,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes annotation attributes to the given generator
+     * Writes annotation attributes to the given generator.
      *
      * @param generatorAdapter The generator adapter
-     * @param annotationData The annotation data
+     * @param annotationData   The annotation data
      */
     @Internal
     public static void pushAnnotationAttributes(GeneratorAdapter generatorAdapter, Map<CharSequence, Object> annotationData) {
@@ -170,7 +172,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             // use the property type as the value
             Object value = entry.getValue();
             pushStoreInArray(generatorAdapter, i++, totalSize, () ->
-                    pushValue(generatorAdapter, value)
+                pushValue(generatorAdapter, value)
             );
         }
         // invoke the AbstractBeanDefinition.createMap method
@@ -178,11 +180,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     private static void instantiateInternal(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, boolean isNew) {
-        if(isNew) {
+        if (isNew) {
             generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA.getInternalName());
             generatorAdapter.visitInsn(DUP);
-        }
-        else {
+        } else {
             generatorAdapter.loadThis();
         }
         // 1st argument: the declared annotations

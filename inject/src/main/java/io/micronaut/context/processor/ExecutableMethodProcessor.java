@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.processor;
 
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
 
 /**
- * <p>A class capable of processing an {@link io.micronaut.inject.ExecutableMethod} instances</p>
+ * <p>A class capable of processing an {@link io.micronaut.inject.ExecutableMethod} instances.</p>
  * <p>
  * <p>The use case here is framework components that need to react to the presence of an annotation. For example given
  * the following annotation:</p>
@@ -37,21 +37,21 @@ import java.lang.annotation.Annotation;
  * </pre>
  * <p>
  * <p>One could write a {@code ExecutableMethodProcessor} that processed all methods annotated with {@literal @}Scheduled:</p>
- * <p>
+ *
  * <pre class="code">
  * {@code
  * public class MyProcessor implements ExecutableMethodProcessor<Scheduled> {
  * }}
  * </pre>
  *
- * @param <A> The annotation type, which should be a stereotype of {@link Executable}
+ * @param <A> The annotation type, which should be a stereotype of {@link io.micronaut.context.annotation.Executable}
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ExecutableMethodProcessor<A extends Annotation> extends AnnotationProcessor<A, ExecutableMethod<?, ?>> {
 
     /**
-     * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
+     * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A.
      *
      * @param beanDefinition The bean definition to process
      * @param method         The executable method

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import static io.micronaut.inject.writer.BeanDefinitionWriter.buildArgumentWithGenerics;
@@ -22,10 +23,8 @@ import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.AnnotationValue;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -40,7 +39,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Writes out {@link ExecutableMethod} implementations
+ * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,7 +47,7 @@ import java.util.Map;
 public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes {
 
     /**
-     * Constant for parent field
+     * Constant for parent field.
      */
     public static final String FIELD_PARENT = "$parent";
 
@@ -65,6 +64,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private String outerClassName = null;
     private boolean isStatic = false;
 
+    /**
+     * @param beanFullClassName    The bean full class name
+     * @param methodClassName      The method class name
+     * @param methodProxyShortName The method proxy short name
+     * @param isInterface          Whether is an interface
+     * @param annotationMetadata   The annotation metadata
+     */
     public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -90,6 +96,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         return internalName;
     }
 
+    /**
+     * @param outerName        The outer name
+     * @param outerClassWriter The outer class writer
+     */
     public void makeInner(String outerName, ClassWriter outerClassWriter) {
         outerClassWriter.visitInnerClass(internalName, getInternalName(outerName), methodProxyShortName.substring(1), 0);
         classWriter.visitOuterClass(getInternalName(outerName), null, null);
@@ -101,15 +111,16 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     }
 
     /**
-     * Write the method
+     * Write the method.
      *
-     * @param declaringType          The declaring type
-     * @param returnType             The return type
-     * @param returnTypeGenericTypes The return type generics
-     * @param methodName             The method name
-     * @param argumentTypes          The argument types
-     * @param argumentAnnotationMetadata         The argument annotation metadata
-     * @param genericTypes           The generic types
+     * @param declaringType              The declaring type
+     * @param returnType                 The return type
+     * @param genericReturnType          The generic return type
+     * @param returnTypeGenericTypes     The return type generics
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types
      */
     public void visitMethod(Object declaringType,
                             Object returnType,
@@ -171,7 +182,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         // 2nd argument: the method name
         constructorWriter.push(methodName);
 
-
         // 3rd argument the generic return type
         // Argument.of(genericReturnType, returnTypeGenericTypes)
         if (genericReturnType instanceof Class && ((Class) genericReturnType).isPrimitive()) {
@@ -187,26 +197,26 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         if (hasArgs) {
             // 4th argument: the generic types
             pushBuildArgumentsForMethod(
-                    constructorWriter,
-                    argumentTypes,
-                    argumentAnnotationMetadata,
-                    genericTypes
+                constructorWriter,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes
             );
             // now invoke super(..) if no arg constructor
             invokeConstructor(
-                    executorMethodConstructor,
-                    AbstractExecutableMethod.class,
-                    Class.class,
-                    String.class,
-                    Argument.class,
-                    Argument[].class);
+                executorMethodConstructor,
+                AbstractExecutableMethod.class,
+                Class.class,
+                String.class,
+                Argument.class,
+                Argument[].class);
         } else {
             invokeConstructor(
-                    executorMethodConstructor,
-                    AbstractExecutableMethod.class,
-                    Class.class,
-                    String.class,
-                    Argument.class);
+                executorMethodConstructor,
+                AbstractExecutableMethod.class,
+                Class.class,
+                String.class,
+                Argument.class);
         }
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
@@ -228,6 +238,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
     }
 
+    /**
+     * @param declaringTypeObject The declaring object type
+     * @param methodName          The method name
+     * @param returnType          The return type
+     * @param argumentTypes       The argument types
+     * @param invokeMethodVisitor The invoke method visitor
+     */
     protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
@@ -264,6 +281,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         invokeMethodVisitor.visitEnd();
     }
 
+    /**
+     * @param parentInternalName The parent internal name
+     * @param classWriter        The current class writer
+     */
     public void makeStaticInner(String parentInternalName, ClassWriter classWriter) {
         this.isStatic = true;
         makeInner(parentInternalName, classWriter);

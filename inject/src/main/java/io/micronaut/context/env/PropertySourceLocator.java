@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import java.util.Optional;
 
 /**
- * An interface for beans that are capable of locating a {@link PropertySource} instance
+ * An interface for beans that are capable of locating a {@link PropertySource} instance.
  *
  * @author graemerocher
  * @since 1.0
@@ -26,7 +27,7 @@ import java.util.Optional;
 public interface PropertySourceLocator {
 
     /**
-     * Locate a {@link PropertySource} for the given environment
+     * Locate a {@link PropertySource} for the given environment.
      *
      * @param environment The environment
      * @return The located property source

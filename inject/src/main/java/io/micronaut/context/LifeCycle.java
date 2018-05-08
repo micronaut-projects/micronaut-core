@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import java.io.Closeable;
@@ -20,10 +21,11 @@ import java.io.IOException;
 
 /**
  * A life cycle interface providing a start method and extending Closeable which provides a close() method for
- * termination
+ * termination.
  * <p>
  * Components can implement this interface
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,21 +37,25 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
     boolean isRunning();
 
     /**
-     * Starts the lifecyle component
+     * Starts the lifecyle component.
+     *
+     * @return This lifecycle component
      */
     default T start() {
         return (T) this;
     }
 
     /**
-     * Stops the life cycle component
+     * Stops the life cycle component.
+     *
+     * @return This lifecycle component
      */
     default T stop() {
         return (T) this;
     }
 
     /**
-     * Delegates to {@link #stop()}
+     * Delegates to {@link #stop()}.
      */
     @Override
     default void close() throws IOException {
@@ -57,7 +63,7 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
     }
 
     /**
-     * Refreshes the current life cycle object. Effectively this calls {@link #stop()} followed by {@link #start()}
+     * Refreshes the current life cycle object. Effectively this calls {@link #stop()} followed by {@link #start()}.
      *
      * @return This lifecycle component
      */

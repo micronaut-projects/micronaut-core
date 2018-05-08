@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.Toggleable;
 
@@ -30,7 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An abstract implementation of the {@link PropertySourceLoader} interface
+ * An abstract implementation of the {@link PropertySourceLoader} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,7 +38,7 @@ import java.util.Set;
 public abstract class AbstractPropertySourceLoader implements PropertySourceLoader, Toggleable, Ordered {
 
     /**
-     * Default position for the property source loader
+     * Default position for the property source loader.
      */
     public static final int DEFAULT_POSITION = EnvironmentPropertySource.POSITION - 100;
 
@@ -49,7 +49,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
 
     @Override
     public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, String environmentName) {
-        if(isEnabled()) {
+        if (isEnabled()) {
             Set<String> extensions = getExtensions();
             for (String ext : extensions) {
                 String fileName = resourceName;
@@ -58,7 +58,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 }
                 String qualifiedName = fileName;
                 fileName += "." + ext;
-                Map<String,Object> finalMap = loadProperties(resourceLoader, qualifiedName, fileName);
+                Map<String, Object> finalMap = loadProperties(resourceLoader, qualifiedName, fileName);
 
                 int order = this.getOrder();
                 if (environmentName != null) {
@@ -83,8 +83,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
 
     private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
         Optional<InputStream> config = readInput(resourceLoader, fileName);
-        if(config.isPresent()) {
-            try(InputStream input = config.get()) {
+        if (config.isPresent()) {
+            try (InputStream input = config.get()) {
                 return read(qualifiedName, input);
             } catch (IOException e) {
                 throw new ConfigurationException("I/O exception occurred reading [" + fileName + "]: " + e.getMessage(), e);
@@ -100,12 +100,28 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
         return finalMap;
     }
 
+    /**
+     * @param resourceLoader The resource loader
+     * @param fileName       The file name
+     * @return An input stream wrapped inside an {@link Optional}
+     */
     protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
         return resourceLoader.getResourceAsStream(fileName);
     }
 
+    /**
+     * @param name     The name
+     * @param input    The input stream
+     * @param finalMap The map with all the properties processed
+     * @throws IOException If the input stream doesn't exist
+     */
     protected abstract void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException;
 
+    /**
+     * @param finalMap The map with all the properties processed
+     * @param map      The map to process
+     * @param prefix   The prefix for the keys
+     */
     protected void processMap(Map<String, Object> finalMap, Map map, String prefix) {
         for (Object o : map.entrySet()) {
             Map.Entry entry = (Map.Entry) o;

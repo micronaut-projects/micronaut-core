@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
@@ -20,7 +21,7 @@ import io.micronaut.context.BeanContext;
 import java.util.EventObject;
 
 /**
- * A BeanContextEvent is an event fired from the {@link BeanContext} instance
+ * A BeanContextEvent is an event fired from the {@link BeanContext} instance.
  *
  * @author Graeme Rocher
  * @since 1.0

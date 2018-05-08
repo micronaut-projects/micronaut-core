@@ -76,6 +76,12 @@
     <!-- See http://checkstyle.sf.net/config_filters.html#SuppressWarningsFilter -->
     <module name="SuppressWarningsFilter"/>
 
+    <!-- See http://checkstyle.sourceforge.net/config_filters.html#SuppressionFilter -->
+    <module name="SuppressionFilter">
+        <property name="file" value="config/checkstyle/suppressions.xml"/>
+        <property name="optional" value="false"/>
+    </module>
+
      <module name="TreeWalker">
 
         <!-- Needed for SuppressWarningsFilter -->
@@ -112,7 +118,7 @@
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
         <!-- <module name="LineLength"/> -->
         <module name="ParameterNumber">
-            <property name="max" value="10"/>
+            <property name="max" value="12"/>
         </module>
 
         <!-- Checks for whitespace                               -->

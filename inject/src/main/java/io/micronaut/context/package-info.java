@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * This package contains the core classes for starting a {@link io.micronaut.context.BeanContext}
+ * This package contains the core classes for starting a {@link io.micronaut.context.BeanContext}.
  *
+ * @author graemerocher
  * @see io.micronaut.context.BeanContext
  * @see io.micronaut.context.ApplicationContext
- * @author graemerocher
  * @since 1.0
  */
 package io.micronaut.context;

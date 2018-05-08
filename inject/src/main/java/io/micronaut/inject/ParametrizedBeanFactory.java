@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
@@ -23,8 +24,9 @@ import io.micronaut.core.type.Argument;
 import java.util.Map;
 
 /**
- * A {@link BeanFactory} that requires additional (possibly user supplied) parameters in order construct a bean
+ * A {@link BeanFactory} that requires additional (possibly user supplied) parameters in order construct a bean.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -51,7 +53,6 @@ public interface ParametrizedBeanFactory<T> extends BeanFactory<T> {
             BeanContext context,
             BeanDefinition<T> definition,
             Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
-
 
     @Override
     default T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {

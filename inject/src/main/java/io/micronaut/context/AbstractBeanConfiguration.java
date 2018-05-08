@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
@@ -33,6 +34,9 @@ public class AbstractBeanConfiguration extends AbstractBeanContextConditional im
 
     private final String packageName;
 
+    /**
+     * @param thePackage The package name
+     */
     protected AbstractBeanConfiguration(String thePackage) {
         this.packageName = thePackage.intern();
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import static io.micronaut.core.util.ArgumentUtils.check;
@@ -31,8 +32,9 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Qualifies using a name
+ * Qualifies using a name.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -40,6 +42,9 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
     private final String name;
 
+    /**
+     * @param name The qualifier name
+     */
     NameQualifier(String name) {
         this.name = Objects.requireNonNull(name, "Argument [name] cannot be null");
     }
@@ -68,8 +73,12 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || !NameQualifier.class.isAssignableFrom(o.getClass())) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || !NameQualifier.class.isAssignableFrom(o.getClass())) {
+            return false;
+        }
 
         NameQualifier<?> that = (NameQualifier<?>) o;
 
@@ -91,6 +100,13 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         return name;
     }
 
+    /**
+     * @param beanType       The bean type
+     * @param candidates     The candidates
+     * @param annotationName The annotation name
+     * @param <BT>           Bean type
+     * @return A stream
+     */
     protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName) {
         return candidates.filter(candidate -> {
                 String candidateName;

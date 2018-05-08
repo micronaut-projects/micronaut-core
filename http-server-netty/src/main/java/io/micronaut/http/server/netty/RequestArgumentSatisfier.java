@@ -83,22 +83,28 @@ class RequestArgumentSatisfier {
         return route;
     }
 
+    /**
+     * @param argument         The argument
+     * @param request          The HTTP request
+     * @param satisfyOptionals Whether to satisfy optionals
+     * @return An {@link Optional} for the value
+     */
     protected Optional<Object> getValueForArgument(Argument argument, HttpRequest<?> request, boolean satisfyOptionals) {
         Object value = null;
         Optional<ArgumentBinder> registeredBinder =
-                binderRegistry.findArgumentBinder(argument, request);
+            binderRegistry.findArgumentBinder(argument, request);
         if (registeredBinder.isPresent()) {
             ArgumentBinder argumentBinder = registeredBinder.get();
             ArgumentConversionContext conversionContext = ConversionContext.of(
-                    argument,
-                    request.getLocale().orElse(null),
-                    request.getCharacterEncoding()
+                argument,
+                request.getLocale().orElse(null),
+                request.getCharacterEncoding()
             );
 
             if (argumentBinder instanceof BodyArgumentBinder) {
                 if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
                     ArgumentBinder.BindingResult bindingResult = argumentBinder
-                            .bind(conversionContext, request);
+                        .bind(conversionContext, request);
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
@@ -112,7 +118,7 @@ class RequestArgumentSatisfier {
             } else {
 
                 ArgumentBinder.BindingResult bindingResult = argumentBinder
-                        .bind(conversionContext, request);
+                    .bind(conversionContext, request);
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
                         Optional optionalValue = bindingResult.getValue();
@@ -123,7 +129,7 @@ class RequestArgumentSatisfier {
                         }
                     }
                 } else if (bindingResult.isPresentAndSatisfied()) {
-                   value = bindingResult.get();
+                    value = bindingResult.get();
                 } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
                     value = (UnresolvedArgument) () -> {
                         ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);

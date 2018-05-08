@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Classes related to the Micronaut environment
+ * Classes related to the Micronaut environment.
  *
  * @author graemerocher
  * @since 1.0

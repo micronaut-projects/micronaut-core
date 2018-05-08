@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Contains interfaces related to the definition of custom scopes
+ * Contains interfaces related to the definition of custom scopes.
  *
  * @author graemerocher
  * @since 1.0

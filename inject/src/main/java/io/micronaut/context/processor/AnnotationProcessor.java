@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.processor;
 
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
 
@@ -26,6 +26,8 @@ import java.lang.annotation.Annotation;
  * <p>The {@link #process(BeanDefinition, Object)} method returns void since a processor is not able to mutate the
  * object itself or return an alternative instance, instead the design of a processor is to react to the rep</p>
  *
+ * @param <A> An annotation type
+ * @param <T> A type
  * @author Graeme Rocher
  * @see ExecutableMethodProcessor
  * @since 1.0
@@ -33,9 +35,10 @@ import java.lang.annotation.Annotation;
 public interface AnnotationProcessor<A extends Annotation, T> {
 
     /**
-     * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
+     * The process method will be called for every {@link io.micronaut.inject.ExecutableMethod} that is annotated with
+     * the type parameter A.
      *
-     * @param beanDefinition
+     * @param beanDefinition The bean definition
      * @param object         The object to be processed
      */
     void process(BeanDefinition<?> beanDefinition, T object);

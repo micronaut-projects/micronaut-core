@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.condition;
 
 /**
- * A {@link Condition} that simply returns true
+ * A {@link Condition} that simply returns true.
  *
  * @author Graeme Rocher
  * @since 1.0
