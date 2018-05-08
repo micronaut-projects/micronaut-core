@@ -44,7 +44,7 @@ public class BookControllerTest {
         // tag::posturitemplate[]
         Flowable<HttpResponse<Book>> call = client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
-                Book.class 
+                Book.class
         );
         // end::posturitemplate[]
 
