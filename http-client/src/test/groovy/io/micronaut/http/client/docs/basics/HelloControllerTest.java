@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 
@@ -152,6 +153,70 @@ public class HelloControllerTest {
                 message.get().getText()
         );
         // end::pojoresponse[]
+
+        embeddedServer.stop();
+        client.stop();
+    }
+
+    @Test
+    public void testPostRequestWithString() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+
+        // tag::poststring[]
+        Flowable<HttpResponse<String>> call = client.exchange(
+                POST("/hello", "Hello John") // <1>
+                    .contentType(MediaType.TEXT_PLAIN_TYPE)
+                    .accept(MediaType.TEXT_PLAIN_TYPE), // <2>
+                String.class // <3>
+        );
+        // end::poststring[]
+
+        HttpResponse<String> response = call.blockingFirst();
+        Optional<String> message = response.getBody(String.class); // <2>
+        // check the status
+        assertEquals(
+                HttpStatus.CREATED,
+                response.getStatus() // <3>
+        );
+        // check the body
+        assertTrue(message.isPresent());
+        assertEquals(
+                "Hello John",
+                message.get()
+        );
+
+
+        embeddedServer.stop();
+        client.stop();
+    }
+
+    @Test
+    public void testPostRequestWithPOJO() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+
+        // tag::postpojo[]
+        Flowable<HttpResponse<Message>> call = client.exchange(
+                POST("/greet", new Message("Hello John")), // <1>
+                Message.class // <2>
+        );
+        // end::postpojo[]
+
+        HttpResponse<Message> response = call.blockingFirst();
+        Optional<Message> message = response.getBody(Message.class); // <2>
+        // check the status
+        assertEquals(
+                HttpStatus.CREATED,
+                response.getStatus() // <3>
+        );
+        // check the body
+        assertTrue(message.isPresent());
+        assertEquals(
+                "Hello John",
+                message.get().getText()
+        );
+
 
         embeddedServer.stop();
         client.stop();
