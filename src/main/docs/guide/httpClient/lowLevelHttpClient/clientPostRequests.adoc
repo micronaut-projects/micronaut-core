@@ -41,76 +41,48 @@ The following example demonstrates how to send a simply `String` body:
 .Sending a `String` body
 [source,java]
 ----
-TODO - example showing:
-import static HttpRequest.*;
-client.exchange(
-    POST("/foo/bar", "My Body") <1>
-    .contentType(MediaType.TEXT_PLAIN) <2>
-).subscribe(response ->
-     // handle response
-)
+include::{testsclient}/basics/HelloControllerTest.java[tags=poststring, indent=0]
 ----
 
 <1> The `POST` method is used with the first argument being the URI and the second argument the body
-<2> The content type is set to `text/plain` (the default content type is `application/json`)
+<2> The content type and accepted type are set to `text/plain` (the default content type is `application/json`)
+<3> The expected response type is a `String`
 
 ==== Sending JSON
 
 The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it.
 
-For example, given a class `Book` that looks like the following:
-
-.Example POJO
-[source,java]
-----
-TODO - example showing:
-class Book {
-..
-}
-----
-
-If you create an instance and pass it to the `POST` method:
+For example, the `Message` class from the previous section, you can create an instance and pass it to the `POST` method:
 
 .Sending a JSON body
 [source,java]
 ----
-TODO - example showing:
-import static HttpRequest.*;
-
-Book book = new Book("The Stand")
-client.exchange(
-    POST("/foo/bar", book)
-).subscribe(response ->
-    // handle response
-)
+include::{testsclient}/basics/HelloControllerTest.java[tags=postpojo, indent=0]
 ----
 
-Then the following JSON will be sent as the body of the request:
+<1> And instance of `Message` is created and passed to the `POST` method
+<2> The same class is used to decode the response
+
+With the above example the following JSON will be sent as the body of the request:
 
 .Resulting JSON
 [source,json]
 ----
-{"title":"The Stand"}
+{"text":"Hello John"}
 ----
 
 The JSON itself can be customized however you want using https://github.com/FasterXML/jackson-annotations[Jackson Annotations].
 
 ==== Using a URI Template
 
-If some of the properties of the object need to be in the URI being posted to you can use a URI template. For example:
+If some of the properties of the object need to be in the URI being posted to you can use a URI template.
+
+For example imagine you have a class `Book` that has a property called `title`. You can represent the `title` property in the URI template and then populate it from an instance of `Book. For example:
 
 .Sending a JSON body with a URI template
 [source,java]
 ----
-TODO - example showing:
-import static HttpRequest.*;
-
-Book book = new Book("The Stand")
-client.exchange(
-    POST("/book/{title}", book)
-).subscribe(response ->
-    // handle response
-)
+include::{testsclient}/basics/BookControllerTest.java[tags=posturitemplate, indent=0]
 ----
 
 In the above case the `title` property of the passed object will be included in the URI being posted to.
