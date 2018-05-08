@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
@@ -32,21 +33,19 @@ class FilePart extends AbstractFilePart {
     private final File data;
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
+     * @param name     Parameter name to bind in the multipart request
      * @param filename Name of the file
-     * @param data The file to copy the content from
+     * @param data     The file to copy the content from
      */
     FilePart(String name, String filename, File data) {
         this(name, filename, null, data);
     }
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
-     * @param filename Name of the file
+     * @param name        Parameter name to bind in the multipart request
+     * @param filename    Name of the file
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
-     * @param data The file to copy the content from
+     * @param data        The file to copy the content from
      */
     FilePart(String name, String filename, MediaType contentType, File data) {
         super(name, filename, contentType);
@@ -54,7 +53,7 @@ class FilePart extends AbstractFilePart {
     }
 
     /**
-     * Copy the file content into {@link FileUpload}
+     * Copy the file content into {@link FileUpload}.
      *
      * @see AbstractFilePart#setContent(FileUpload)
      */
@@ -64,7 +63,6 @@ class FilePart extends AbstractFilePart {
     }
 
     /**
-     *
      * @see AbstractFilePart#getLength()
      */
     @Override

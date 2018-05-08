@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.beans.BeanMap;
@@ -24,12 +25,13 @@ import io.micronaut.http.uri.UriTemplate;
 import java.util.Map;
 
 /**
- * Implementation of the {@link HttpRequestFactory} interface for Netty
+ * Implementation of the {@link HttpRequestFactory} interface for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class NettyClientHttpRequestFactory implements HttpRequestFactory {
+
     @Override
     public <T> MutableHttpRequest<T> get(String uri) {
         return new NettyClientHttpRequest<>(HttpMethod.GET, uri);

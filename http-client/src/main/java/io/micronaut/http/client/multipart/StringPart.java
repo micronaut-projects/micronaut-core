@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.netty.handler.codec.http.HttpRequest;
@@ -30,8 +31,7 @@ class StringPart extends Part {
     protected final String value;
 
     /**
-     *
-     * @param name parameter name
+     * @param name  parameter name
      * @param value String value
      */
     StringPart(String name, String value) {
@@ -44,7 +44,7 @@ class StringPart extends Part {
     }
 
     /**
-     * Create an object of {@link InterfaceHttpData} to build Netty multipart request body
+     * Create an object of {@link InterfaceHttpData} to build Netty multipart request body.
      *
      * @see Part#getData(HttpRequest, HttpDataFactory)
      */
