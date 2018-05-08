@@ -26,8 +26,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a response from the http client to a response processable
- * by the http server.
+ * Converts a response from the http client to a response processable by the http server.
  *
  * @author James Kleeh
  * @since 1.0
@@ -37,6 +36,9 @@ public class ClientResponseConverter implements TypeConverter<FullNettyClientHtt
 
     private final ConversionService conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     protected ClientResponseConverter(ConversionService conversionService) {
         this.conversionService = conversionService;
     }

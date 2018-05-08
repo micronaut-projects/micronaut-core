@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -24,7 +25,7 @@ import org.reactivestreams.Publisher;
 import java.util.Map;
 
 /**
- * Extended version of the {@link HttpClient} that supports streaming responses
+ * Extended version of the {@link HttpClient} that supports streaming responses.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,7 +33,7 @@ import java.util.Map;
 public interface StreamingHttpClient extends HttpClient {
 
     /**
-     * Request a stream of data where each emitted item is a {@link ByteBuffer} instance
+     * Request a stream of data where each emitted item is a {@link ByteBuffer} instance.
      *
      * @param request The request
      * @param <I>     The request body type
@@ -70,6 +71,7 @@ public interface StreamingHttpClient extends HttpClient {
      * @param request The {@link HttpRequest} to execute
      * @param type    The type of object to convert the JSON into
      * @param <I>     The request body type
+     * @param <O>     The response type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Argument<O> type);
@@ -82,6 +84,7 @@ public interface StreamingHttpClient extends HttpClient {
      * @param request The {@link HttpRequest} to execute
      * @param type    The type of object to convert the JSON into
      * @param <I>     The request body type
+     * @param <O>     The response type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     default <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Class<O> type) {

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.converters;
 
 import io.micronaut.core.convert.ConversionService;
@@ -25,7 +26,7 @@ import java.net.URL;
 import java.util.function.Function;
 
 /**
- * Converters from URL to {@link LoadBalancer} interface
+ * Converters from URL to {@link LoadBalancer} interface.
  *
  * @author graemerocher
  * @since 1.0

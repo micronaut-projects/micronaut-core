@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.scope;
 
 import io.micronaut.context.BeanContext;
@@ -46,7 +47,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A scope for injecting {@link io.micronaut.http.client.HttpClient} implementations
+ * A scope for injecting {@link io.micronaut.http.client.HttpClient} implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -59,6 +60,10 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
     private final LoadBalancerResolver loadBalancerResolver;
     private final BeanContext beanContext;
 
+    /**
+     * @param loadBalancerResolver The load balancer resolver
+     * @param beanContext          The bean context
+     */
     public ClientScope(LoadBalancerResolver loadBalancerResolver, BeanContext beanContext) {
         this.loadBalancerResolver = loadBalancerResolver;
         this.beanContext = beanContext;
@@ -141,6 +146,9 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         refresh();
     }
 
+    /**
+     * Client key.
+     */
     private static class ClientKey {
         final BeanIdentifier identifier;
         final String[] value;
@@ -152,8 +160,12 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             ClientKey clientKey = (ClientKey) o;
             return Objects.equals(identifier, clientKey.identifier) &&
                 Arrays.equals(value, clientKey.value);

@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 /**
- * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization per reactive framework
+ * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization
+ * per reactive framework.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -24,7 +26,7 @@ package io.micronaut.http.client;
 public interface ReactiveClientResultTransformer {
 
     /**
-     * Transform the publisher result
+     * Transform the publisher result.
      *
      * @param publisherResult The publisher result that is an object that conforms to
      *                        {@link io.micronaut.core.async.publisher.Publishers#isConvertibleToPublisher(Class)}

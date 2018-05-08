@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,23 +33,25 @@ class InputStreamPart extends AbstractFilePart {
     private final long contentLength;
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
-     * @param filename Name of the file
-     * @param data The {@link InputStream} to copy the content from
-     * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+     * @param name          Parameter name to bind in the multipart request
+     * @param filename      Name of the file
+     * @param data          The {@link InputStream} to copy the content from
+     * @param contentLength The size of the content to pass to
+     *                      {@link io.netty.handler.codec.http.multipart.HttpDataFactory} in order to create
+     *                      {@link FileUpload} object
      */
     InputStreamPart(String name, String filename, InputStream data, long contentLength) {
         this(name, filename, null, data, contentLength);
     }
 
     /**
-     *
-     * @param name Parameter name to bind in the multipart request
-     * @param filename Name of the file
-     * @param contentType The type of the content, example - "application/json", "text/plain" etc
-     * @param data The {@link InputStream} to copy the content from
-     * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+     * @param name          Parameter name to bind in the multipart request
+     * @param filename      Name of the file
+     * @param contentType   The type of the content, example - "application/json", "text/plain" etc
+     * @param data          The {@link InputStream} to copy the content from
+     * @param contentLength The size of the content to pass to
+     *                      {@link io.netty.handler.codec.http.multipart.HttpDataFactory} in order to create
+     *                      {@link FileUpload} object
      */
     InputStreamPart(String name, String filename, MediaType contentType, InputStream data, long contentLength) {
         super(name, filename, contentType);
@@ -58,7 +60,7 @@ class InputStreamPart extends AbstractFilePart {
     }
 
     /**
-     * Copy the {@link InputStream} data content into {@link FileUpload}
+     * Copy the {@link InputStream} data content into {@link FileUpload}.
      *
      * @see AbstractFilePart#setContent
      */
@@ -68,7 +70,6 @@ class InputStreamPart extends AbstractFilePart {
     }
 
     /**
-     *
      * @see AbstractFilePart#getLength()
      */
     @Override
