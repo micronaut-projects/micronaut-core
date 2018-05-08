@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
 /**
- * <p>A {@link LoadBalancer} that uses the {@link DiscoveryClient} and a {@link ServiceInstance} ID to automatically
- * load balance between discovered clients in a non-blocking manner</p>
+ * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
+ * {@link ServiceInstance} ID to automatically load balance between discovered clients in a non-blocking manner.</p>
  * <p>
- * <p>Note that the when {@link DiscoveryClient} caching is enabled then this load balancer may not always have the latest
- * server list from the {@link DiscoveryClient} (the default TTL is 30 seconds)</p>
+ * <p>Note that the when {@link DiscoveryClient} caching is enabled then this load balancer may not always have the
+ * latest server list from the {@link DiscoveryClient} (the default TTL is 30 seconds)</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,6 +36,10 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     private final String serviceID;
     private final DiscoveryClient discoveryClient;
 
+    /**
+     * @param serviceID       The service ID
+     * @param discoveryClient The discovery client
+     */
     public DiscoveryClientRoundRobinLoadBalancer(String serviceID, DiscoveryClient discoveryClient) {
         this.serviceID = serviceID;
         this.discoveryClient = discoveryClient;
