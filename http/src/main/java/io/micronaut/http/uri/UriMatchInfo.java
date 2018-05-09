@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.uri;
 
-
-import java.net.URI;
 import java.util.Map;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(URI)}
+ * The result of a call to {@link UriMatchTemplate#match(java.net.URI)}.
  *
  * @author Graeme Rocher
  * @since 1.0

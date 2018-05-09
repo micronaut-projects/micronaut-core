@@ -13,20 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.multipart;
 
 import org.reactivestreams.Publisher;
 
 import java.io.File;
+
 /**
- * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
+ * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
  *
- * <p>The <tt>StreamingFileUpload</tt> may be incomplete when first received, in which case the consumer can subscribe to the file upload to process the data a chunk at a time.</p>
+ * <p>The <tt>StreamingFileUpload</tt> may be incomplete when first received, in which case the consumer can subscribe
+ * to the file upload to process the data a chunk at a time.</p>
  *
- * <p>The {@link #transferTo(String)} method can be used whether the upload is complete or not. If it is not complete the framework will automatically subscribe to the
- * upload and transfer the data chunk by chunk in a non-blocking manner</p>
+ * <p>The {@link #transferTo(String)} method can be used whether the upload is complete or not. If it is not complete
+ * the framework will automatically subscribe to the upload and transfer the data chunk by chunk in a non-blocking
+ * manner</p>
  *
- * <p>All I/O operation return a {@link Publisher} that runs on the the configured I/O {@link java.util.concurrent.ExecutorService}</p>
+ * <p>All I/O operation return a {@link Publisher} that runs on the the configured I/O
+ * {@link java.util.concurrent.ExecutorService}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,10 +43,8 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      *
      * <p>This method will return a no-op {@link Publisher} if called multiple times for the same location</p>
      *
-     * @param location the name of the file to which the stream will be
-     * written. The file is created relative to the location as
-     * specified in the <tt>MultipartConfiguration</tt>
-     *
+     * @param location the name of the file to which the stream will be written. The file is created relative to
+     *                 the location as specified in the <tt>MultipartConfiguration</tt>
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     Publisher<Boolean> transferTo(String location);
@@ -51,16 +54,13 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      *
      * <p>This method will return a no-op {@link Publisher} if called multiple times for the same location</p>
      *
-     * @param destination the destination of the file to which the stream will be
-     * written.
-     *
+     * @param destination the destination of the file to which the stream will be written.
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     Publisher<Boolean> transferTo(File destination);
 
     /**
-     * Deletes the underlying storage for a file item, including deleting any
-     * associated temporary disk file.
+     * Deletes the underlying storage for a file item, including deleting any associated temporary disk file.
      *
      * @return A {@link Publisher} that outputs whether the delete was successful
      */

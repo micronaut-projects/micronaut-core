@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.uri;
 
 import java.io.UnsupportedEncodingException;
@@ -28,7 +29,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and https://medialize.github.io/URI.js/uri-template.html</p>
+ * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
+ * https://medialize.github.io/URI.js/uri-template.html.</p>
  * <p>
  * <p>Note: this class has a natural ordering that is inconsistent with equals.</p>
  *
@@ -57,7 +59,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private final List<PathSegment> segments = new ArrayList<>();
 
     /**
-     * Construct a new URI template for the given template
+     * Construct a new URI template for the given template.
      *
      * @param templateString The template string
      */
@@ -66,99 +68,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
-     * Nests another URI template with this template
+     * Construct a new URI template for the given template.
      *
-     * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
-     * @return The new URI template
+     * @param templateString  The template string
+     * @param parserArguments The parsed arguments
      */
-    public UriTemplate nest(CharSequence uriTemplate) {
-        return nest(uriTemplate, new Object[0]);
-    }
-
-    /**
-     * Expand the string with the given parameters
-     *
-     * @param parameters The parameters
-     * @return The expanded URI
-     */
-    public String expand(Map<String, Object> parameters) {
-        StringBuilder builder = new StringBuilder();
-        if (segments != null) {
-            boolean previousHasContent = false;
-            for (PathSegment segment : segments) {
-                String result = segment.expand(parameters, previousHasContent);
-                if (result == null) break;
-                previousHasContent = result.length() > 0;
-                builder.append(result);
-            }
-
-        }
-        return builder.toString();
-    }
-
-    @Override
-    public String toString() {
-        return templateString;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        UriTemplate that = (UriTemplate) o;
-
-        return templateString.equals(that.templateString);
-    }
-
-    @Override
-    public int hashCode() {
-        return templateString.hashCode();
-    }
-
-    @Override
-    public int compareTo(UriTemplate o) {
-        if (this.equals(o)) return 0;
-        List<PathSegment> thisSegments = this.segments;
-        List<PathSegment> thatSegments = o.segments;
-        int thisLength = thisSegments.size();
-        int thatLength = thatSegments.size();
-        for (int i = 0; i < thisLength && i < thatLength; i++) {
-            PathSegment thisSeg = thisSegments.get(i);
-            PathSegment thatSeg = thatSegments.get(i);
-            boolean isThisRaw = thisSeg instanceof UriTemplateParser.RawPathSegment;
-            boolean isThatRaw = thatSeg instanceof UriTemplateParser.RawPathSegment;
-            if (isThisRaw && !isThatRaw) {
-                return 1;
-            } else if (!isThisRaw && isThatRaw) {
-                return -1;
-            } else if (isThisRaw && isThatRaw) {
-                // they are both raw
-                int lengthCompare = Integer.valueOf(thisSeg.toString().length()).compareTo(thatSeg.toString().length());
-                if (lengthCompare != 0) {
-                    return lengthCompare;
-                }
-            }
-        }
-        return 0;
-    }
-
-    /**
-     * Create a new {@link UriTemplate} for the given URI
-     *
-     * @param uri The URI
-     * @return The template
-     */
-    public static UriTemplate of(String uri) {
-        return new UriTemplate(uri);
-    }
-
-
-    /**
-     * Construct a new URI template for the given template
-     *
-     * @param templateString The template string
-     */
+    @SuppressWarnings("MagicNumber")
     protected UriTemplate(CharSequence templateString, Object... parserArguments) {
         if (templateString == null) {
             throw new IllegalArgumentException("Argument [templateString] should not be null");
@@ -207,30 +122,147 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
     }
 
+    /**
+     * @param templateString The template
+     * @param segments       The list of segments
+     */
     protected UriTemplate(String templateString, List<PathSegment> segments) {
         this.templateString = templateString;
         this.segments.addAll(segments);
     }
 
     /**
-     * Nests another URI template with this template
+     * Nests another URI template with this template.
      *
      * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
      * @return The new URI template
      */
+    public UriTemplate nest(CharSequence uriTemplate) {
+        return nest(uriTemplate, new Object[0]);
+    }
+
+    /**
+     * Expand the string with the given parameters.
+     *
+     * @param parameters The parameters
+     * @return The expanded URI
+     */
+    public String expand(Map<String, Object> parameters) {
+        StringBuilder builder = new StringBuilder();
+        if (segments != null) {
+            boolean previousHasContent = false;
+            for (PathSegment segment : segments) {
+                String result = segment.expand(parameters, previousHasContent);
+                if (result == null) {
+                    break;
+                }
+                previousHasContent = result.length() > 0;
+                builder.append(result);
+            }
+
+        }
+        return builder.toString();
+    }
+
+    @Override
+    public String toString() {
+        return templateString;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        UriTemplate that = (UriTemplate) o;
+
+        return templateString.equals(that.templateString);
+    }
+
+    @Override
+    public int hashCode() {
+        return templateString.hashCode();
+    }
+
+    @Override
+    public int compareTo(UriTemplate o) {
+        if (this.equals(o)) {
+            return 0;
+        }
+        List<PathSegment> thisSegments = this.segments;
+        List<PathSegment> thatSegments = o.segments;
+        int thisLength = thisSegments.size();
+        int thatLength = thatSegments.size();
+        for (int i = 0; i < thisLength && i < thatLength; i++) {
+            PathSegment thisSeg = thisSegments.get(i);
+            PathSegment thatSeg = thatSegments.get(i);
+            boolean isThisRaw = thisSeg instanceof UriTemplateParser.RawPathSegment;
+            boolean isThatRaw = thatSeg instanceof UriTemplateParser.RawPathSegment;
+            if (isThisRaw && !isThatRaw) {
+                return 1;
+            } else if (!isThisRaw && isThatRaw) {
+                return -1;
+            } else if (isThisRaw && isThatRaw) {
+                // they are both raw
+                int lengthCompare = Integer.valueOf(thisSeg.toString().length()).compareTo(thatSeg.toString().length());
+                if (lengthCompare != 0) {
+                    return lengthCompare;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Create a new {@link UriTemplate} for the given URI.
+     *
+     * @param uri The URI
+     * @return The template
+     */
+    public static UriTemplate of(String uri) {
+        return new UriTemplate(uri);
+    }
+
+    /**
+     * Nests another URI template with this template.
+     *
+     * @param uriTemplate     The URI template. If it does not begin with forward slash it will automatically be
+     *                        appended with forward slash
+     * @param parserArguments The parsed arguments
+     * @return The new URI template
+     */
     protected UriTemplate nest(CharSequence uriTemplate, Object... parserArguments) {
-        if (uriTemplate == null) return this;
+        if (uriTemplate == null) {
+            return this;
+        }
         int len = uriTemplate.length();
-        if (len == 0) return this;
+        if (len == 0) {
+            return this;
+        }
 
         List<PathSegment> newSegments = buildNestedSegments(uriTemplate, len, parserArguments);
         return newUriTemplate(uriTemplate, newSegments);
     }
 
+    /**
+     * @param uriTemplate The URI template
+     * @param newSegments The new segments
+     * @return The new {@link UriTemplate}
+     */
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
         return new UriTemplate(this.templateString + uriTemplate, newSegments);
     }
 
+    /**
+     * @param uriTemplate     The URI template
+     * @param len             The lenght
+     * @param parserArguments The parsed arguments
+     * @return A list of path segments
+     */
     protected List<PathSegment> buildNestedSegments(CharSequence uriTemplate, int len, Object... parserArguments) {
         List<PathSegment> newSegments = new ArrayList<>();
         List<PathSegment> querySegments = new ArrayList<>();
@@ -260,17 +292,26 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
-     * Creates a parser
+     * Creates a parser.
      *
-     * @param templateString
+     * @param templateString  The template
+     * @param parserArguments The parsed arguments
      * @return The created parser
      */
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
         return new UriTemplateParser(templateString);
     }
 
+    private boolean shouldPrependSlash(String templateString, int len) {
+        String parentString = this.templateString;
+        int parentLen = parentString.length();
+        return (parentLen > 0 && parentString.charAt(parentLen - 1) != '/') &&
+            templateString.charAt(0) != '/' &&
+            !(len > 1 && templateString.charAt(0) == '{' && templateString.charAt(1) == '/');
+    }
+
     /**
-     * Represents an expandable path segment
+     * Represents an expandable path segment.
      */
     protected interface PathSegment {
         /**
@@ -281,7 +322,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         /**
-         * Expands the query segment
+         * Expands the query segment.
          *
          * @param parameters         The parameters
          * @param previousHasContent Whether there was previous content
@@ -290,6 +331,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
         String expand(Map<String, Object> parameters, boolean previousHasContent);
     }
 
+    /**
+     * An URI template parser.
+     */
     protected static class UriTemplateParser {
         private static final int STATE_TEXT = 0; // raw text
         private static final int STATE_VAR_START = 1; // the start of a URI variable ie. {
@@ -304,11 +348,19 @@ public class UriTemplate implements Comparable<UriTemplate> {
         private String varDelimiter;
         private boolean isQuerySegment = false;
 
+        /**
+         * @param templateText The template
+         */
         UriTemplateParser(String templateText) {
             this.templateText = templateText;
         }
 
-        void parse(List<PathSegment> segments) {
+        /**
+         * Parse a list of segments.
+         *
+         * @param segments The list of segments
+         */
+        protected void parse(List<PathSegment> segments) {
             char[] chars = templateText.toCharArray();
             StringBuilder buff = new StringBuilder();
             StringBuilder modBuff = new StringBuilder();
@@ -333,7 +385,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         }
                     case STATE_VAR_MODIFIER:
                     case STATE_VAR_NEXT_MODIFIER:
-                        if (c == ' ') continue;
+                        if (c == ' ') {
+                            continue;
+                        }
                     case STATE_VAR_NEXT:
                     case STATE_VAR_CONTENT:
                         switch (c) {
@@ -466,6 +520,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 state = STATE_VAR_CONTENT;
                                 buff.append(c);
                         }
+                    default:
+                        // no-op
                 }
             }
 
@@ -476,18 +532,18 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         /**
-         * Adds a raw content segment
+         * Adds a raw content segment.
          *
          * @param segments       The segments
          * @param value          The value
-         * @param isQuerySegment
+         * @param isQuerySegment Whether is a query segment
          */
         protected void addRawContentSegment(List<PathSegment> segments, String value, boolean isQuerySegment) {
             segments.add(new RawPathSegment(isQuerySegment, value));
         }
 
         /**
-         * Adds a new variable segment
+         * Adds a new variable segment.
          *
          * @param segments          The segments to augment
          * @param variable          The variable
@@ -499,7 +555,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
          * @param modifierChar      The modifier as char
          * @param operator          The currently active operator
          * @param previousDelimiter The delimiter to use if a variable appeared before this variable
-         * @param isQuerySegment
+         * @param isQuerySegment    Whether is a query segment
          */
         protected void addVariableSegment(List<PathSegment> segments,
                                           String variable,
@@ -548,6 +604,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
+        /**
+         * Raw path segment implementation.
+         */
         private static class RawPathSegment implements PathSegment {
             private final boolean isQuerySegment;
             private final String value;
@@ -569,12 +628,18 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public boolean equals(Object o) {
-                if (this == o) return true;
-                if (o == null || getClass() != o.getClass()) return false;
+                if (this == o) {
+                    return true;
+                }
+                if (o == null || getClass() != o.getClass()) {
+                    return false;
+                }
 
                 RawPathSegment that = (RawPathSegment) o;
 
-                if (isQuerySegment != that.isQuerySegment) return false;
+                if (isQuerySegment != that.isQuerySegment) {
+                    return false;
+                }
                 return value != null ? value.equals(that.value) : that.value == null;
             }
 
@@ -591,6 +656,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
+        /**
+         * Variable path segment implementation.
+         */
         private class VariablePathSegment implements PathSegment {
 
             private final boolean isQuerySegment;
@@ -654,7 +722,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         result = joiner.toString();
                     } else if (found instanceof Map) {
                         Map<Object, Object> map = (Map<Object, Object>) found;
-                        if (map.isEmpty()) return "";
+                        if (map.isEmpty()) {
+                            return "";
+                        }
                         final StringJoiner joiner;
                         if (modifierChar == '*') {
 
@@ -733,11 +803,4 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
     }
 
-    private boolean shouldPrependSlash(String templateString, int len) {
-        String parentString = this.templateString;
-        int parentLen = parentString.length();
-        return (parentLen > 0 && parentString.charAt(parentLen - 1) != '/') &&
-            templateString.charAt(0) != '/' &&
-            !(len > 1 && templateString.charAt(0) == '{' && templateString.charAt(1) == '/');
-    }
 }

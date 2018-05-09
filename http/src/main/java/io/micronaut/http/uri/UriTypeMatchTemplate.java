@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.uri;
 
 import java.math.BigDecimal;
@@ -22,7 +23,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * <p>A {@link UriMatchTemplate} that allows specifying types for the URI variables</p>
+ * <p>A {@link UriMatchTemplate} that allows specifying types for the URI variables.</p>
  *
  * @author Graeme Rocher
  * @see UriMatchTemplate
@@ -33,11 +34,22 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
 
     private Class[] variableTypes;
 
+    /**
+     * @param templateString The template
+     * @param variableTypes  The variable types
+     */
     public UriTypeMatchTemplate(CharSequence templateString, Class... variableTypes) {
         super(templateString, new Object[]{variableTypes});
         this.variableTypes = variableTypes == null ? new Class[0] : variableTypes;
     }
 
+    /**
+     * @param templateString The template
+     * @param segments       The segments
+     * @param matchPattern   The match pattern
+     * @param variableTypes  The variable types
+     * @param variables      The variables
+     */
     protected UriTypeMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Class[] variableTypes, String... variables) {
         super(templateString, segments, matchPattern, variables);
         this.variableTypes = variableTypes;
@@ -48,6 +60,11 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         return (UriTypeMatchTemplate) super.nest(uriTemplate);
     }
 
+    /**
+     * @param uriTemplate   The URI template
+     * @param variableTypes The variable types
+     * @return The new URI template
+     */
     public UriTypeMatchTemplate nest(CharSequence uriTemplate, Class... variableTypes) {
         return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[]{variableTypes});
     }
@@ -70,6 +87,12 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         return new UriTypeMatchTemplate(uriTemplate, newSegments, newPattern, variableTypes, variables);
     }
 
+    /**
+     * @param variableType The variable type
+     * @param variable     The variable
+     * @param operator     The operator
+     * @return The variable match pattern
+     */
     protected String resolveTypePattern(Class variableType, String variable, char operator) {
         if (Number.class.isAssignableFrom(variableType)) {
             if (Double.class == variableType || Float.class == variableType || BigDecimal.class == variableType) {
@@ -82,9 +105,16 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         }
     }
 
+    /**
+     * A typed uri match templated parser.
+     */
     protected static class TypedUriMatchTemplateParser extends UriMatchTemplateParser {
         private int variableIndex = 0;
 
+        /**
+         * @param templateText  The template
+         * @param matchTemplate The match template
+         */
         TypedUriMatchTemplateParser(String templateText, UriTypeMatchTemplate matchTemplate) {
             super(templateText, matchTemplate);
         }

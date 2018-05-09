@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
@@ -27,11 +28,13 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * <p>Common interface for HTTP request implementations</p>
+ * <p>Common interface for HTTP request implementations.</p>
  *
+ * @param <B> The Http message body
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("MethodName")
 public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
@@ -111,19 +114,22 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> GET(URI uri) {
         return GET(uri.toString());
     }
+
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -136,19 +142,22 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI.
      *
      * @param uri The URI
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> OPTIONS(URI uri) {
         return OPTIONS(uri.toString());
     }
+
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI.
      *
      * @param uri The URI
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -161,7 +170,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI.
      *
      * @param uri The URI
      * @return The {@link MutableHttpRequest} instance
@@ -172,7 +181,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI.
      *
      * @param uri The URI
      * @return The {@link MutableHttpRequest} instance
@@ -186,12 +195,12 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return factory.head(uri);
     }
 
-
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -200,10 +209,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -218,10 +228,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -230,10 +241,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -248,10 +260,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -260,10 +273,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -278,21 +292,24 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(URI uri, T body) {
         return DELETE(uri.toString(), body);
     }
+
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
      *
      * @param uri  The URI
      * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -306,9 +323,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
      *
      * @param uri The URI
+     * @param <T> The Http request type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
@@ -317,11 +335,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Create a new {@link MutableHttpRequest} for the given method and URI
+     * Create a new {@link MutableHttpRequest} for the given method and URI.
      *
      * @param httpMethod The method
      * @param uri        The URI
-     * @param <T>
+     * @param <T>        The Http request type
      * @return The request
      */
     static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {

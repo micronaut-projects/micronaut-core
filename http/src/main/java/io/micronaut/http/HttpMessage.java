@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.attr.MutableAttributeHolder;
@@ -25,7 +26,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Common interface for HTTP messages
+ * Common interface for HTTP messages.
  *
  * @param <B> The body type
  * @author Graeme Rocher
@@ -61,7 +62,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     }
 
     /**
-     * Return the body as the given type
+     * Return the body as the given type.
      *
      * @param type The type of the body
      * @param <T>  The generic type
@@ -72,7 +73,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     }
 
     /**
-     * Return the body as the given type
+     * Return the body as the given type.
      *
      * @param type The type of the body
      * @param <T>  The generic type
@@ -100,7 +101,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     }
 
     /**
-     * The request or response content type
+     * The request or response content type.
      *
      * @return The content type
      */

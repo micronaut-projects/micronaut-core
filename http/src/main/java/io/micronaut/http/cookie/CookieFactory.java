@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 
 /**
- * A CookieFactory creates {@link Cookie} instances and should be implemented by a concrete server
+ * A CookieFactory creates {@link Cookie} instances and should be implemented by a concrete server.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,7 +28,7 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 public interface CookieFactory {
 
     /**
-     * The default {@link CookieFactory} instance
+     * The default {@link CookieFactory} instance.
      */
     CookieFactory INSTANCE = SoftServiceLoader
         .load(CookieFactory.class)
@@ -36,7 +37,7 @@ public interface CookieFactory {
         .orElse(null);
 
     /**
-     * Create a new cookie
+     * Create a new cookie.
      *
      * @param name  The name
      * @param value The value
