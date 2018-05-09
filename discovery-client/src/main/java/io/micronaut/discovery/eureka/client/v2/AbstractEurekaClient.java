@@ -125,7 +125,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
 
         @JsonCreator
         public ApplicationInfos(@JsonProperty("application") List<ApplicationInfo> applications) {
-            this.applications = applications;
+            this.applications = applications != null ? applications : Collections.emptyList();
         }
 
         @JsonProperty("application")

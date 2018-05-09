@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.basics;
+package io.micronaut.http.client.docs.binding;
 
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -26,7 +26,7 @@ import io.micronaut.http.annotation.Status;
  * @author graemerocher
  * @since 1.0
  */
-@Controller("/amazon")
+@Controller("/binding")
 public class BookController {
 
     @Post(uri = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})

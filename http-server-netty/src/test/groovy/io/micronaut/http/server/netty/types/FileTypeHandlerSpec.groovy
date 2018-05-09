@@ -84,7 +84,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body() == '{"_links":{},"_embedded":{},"message":"Internal Server Error: Could not find file"}'
+        response.body() == '{"message":"Internal Server Error: Could not find file"}'
     }
 
     void "test when an attached file is returned"() {

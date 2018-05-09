@@ -47,7 +47,7 @@ public class JacksonConfiguration {
     protected Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
     protected Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     protected Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
-    protected JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_ABSENT;
+    protected JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
 
     /**
      * @return The default serialization inclusion settings
