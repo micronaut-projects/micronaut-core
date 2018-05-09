@@ -63,11 +63,10 @@ public @interface Filter {
     HttpMethod[] methods() default {};
 
     /**
-     * The clients identifiers this filter applies to. Applies only to {@link io.micronaut.http.filter.HttpClientFilter}
-     * instances.
+     * The service identifiers this filter applies to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
      * Equivalent to the {@code id()} of {@code io.micronaut.http.client.Client}.
      *
-     * @return The client identifiers
+     * @return The service identifiers
      */
-    String[] clients() default {};
+    String[] serviceId() default {};
 }
