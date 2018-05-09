@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -26,7 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Base class for all checks
+ * Base class for all checks.
  *
  * @author Graeme Rocher
  * @see HTTPCheck
@@ -41,11 +42,17 @@ public abstract class NewCheck implements Check {
     private Status status = Status.PASSING;
     private String notes;
 
+    /**
+     * @param name The name
+     */
     @JsonCreator
     protected NewCheck(@JsonProperty("Name") String name) {
         this.name = name;
     }
 
+    /**
+     * Default constructor.
+     */
     protected NewCheck() {
     }
 
@@ -130,7 +137,7 @@ public abstract class NewCheck implements Check {
      * @param ID The ID of the check
      * @return The deregisterCriticalServiceAfter as a {@link Duration}
      */
-    public NewCheck id(String ID) {
+    public NewCheck id(@SuppressWarnings("ParameterName") String ID) {
         setID(ID);
         return this;
     }
@@ -155,8 +162,12 @@ public abstract class NewCheck implements Check {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         NewCheck check = (NewCheck) o;
         return Objects.equals(deregisterCriticalServiceAfter, check.deregisterCriticalServiceAfter) &&
             Objects.equals(name, check.name) &&
@@ -170,24 +181,39 @@ public abstract class NewCheck implements Check {
         return Objects.hash(deregisterCriticalServiceAfter, name, ID, status, notes);
     }
 
-    void setName(String name) {
+    /**
+     * @param name The name
+     */
+    protected void setName(String name) {
         this.name = name;
     }
 
-    void setDeregisterCriticalServiceAfter(String deregisterCriticalServiceAfter) {
+    /**
+     * @param deregisterCriticalServiceAfter Service to de-regsiter after
+     */
+    protected void setDeregisterCriticalServiceAfter(String deregisterCriticalServiceAfter) {
         this.deregisterCriticalServiceAfter = ConversionService.SHARED.convert(deregisterCriticalServiceAfter, Duration.class).orElseThrow(() -> new IllegalArgumentException("Invalid deregisterCriticalServiceAfter Specified"));
     }
 
+    /**
+     * @param ID The id
+     */
     @JsonProperty("ID")
-    void setID(String ID) {
+    void setID(@SuppressWarnings("ParameterName") String ID) {
         this.ID = ID;
     }
 
-    void setStatus(String status) {
+    /**
+     * @param status The status
+     */
+    protected void setStatus(String status) {
         this.status = Status.valueOf(status.toUpperCase());
     }
 
-    void setNotes(String notes) {
+    /**
+     * @param notes The notes
+     */
+    protected void setNotes(String notes) {
         this.notes = notes;
     }
 }

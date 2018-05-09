@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -31,7 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A class representing an HTTP check. See https://www.consul.io/api/agent/check.html
+ * A class representing an HTTP check. See https://www.consul.io/api/agent/check.html.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -45,12 +46,19 @@ public class HTTPCheck extends NewCheck {
     private boolean TLSSkipVerify = false;
     private ConvertibleMultiValues<String> headers = ConvertibleMultiValues.empty();
 
+    /**
+     * @param name The name
+     * @param url  The URL
+     */
     @JsonCreator
     public HTTPCheck(@JsonProperty("Name") String name, @JsonProperty("HTTP") URL url) {
         super(name);
         this.url = url;
     }
 
+    /**
+     * @param url The URL
+     */
     public HTTPCheck(@JsonProperty("HTTP") URL url) {
         this.url = url;
     }
@@ -62,7 +70,12 @@ public class HTTPCheck extends NewCheck {
         return this.interval;
     }
 
-    void setInterval(String interval) {
+    /**
+     * Sets the interval.
+     *
+     * @param interval The interval
+     */
+    protected void setInterval(String interval) {
         this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(() -> new IllegalArgumentException("Invalid Duration Specified"));
     }
 
@@ -97,7 +110,7 @@ public class HTTPCheck extends NewCheck {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#http
+     * See https://www.consul.io/api/agent/service.html#http.
      *
      * @return The HTTP URL to check
      */
@@ -107,7 +120,7 @@ public class HTTPCheck extends NewCheck {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#method
+     * See https://www.consul.io/api/agent/service.html#method.
      *
      * @return The HTTP method to use for the check
      */
@@ -116,7 +129,7 @@ public class HTTPCheck extends NewCheck {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#header
+     * See https://www.consul.io/api/agent/service.html#header.
      *
      * @return The HTTP headers to use for the check
      */
@@ -148,7 +161,7 @@ public class HTTPCheck extends NewCheck {
      * @param TLSSkipVerify Skip the TLS verification
      */
     @JsonProperty("TLSSkipVerify")
-    public void setTLSSkipVerify(boolean TLSSkipVerify) {
+    public void setTLSSkipVerify(@SuppressWarnings("ParameterName") boolean TLSSkipVerify) {
         this.TLSSkipVerify = TLSSkipVerify;
     }
 
@@ -174,7 +187,7 @@ public class HTTPCheck extends NewCheck {
      * @param TLSSkipVerify Skip the TLS verification
      * @return The {@link HTTPCheck} instance
      */
-    public HTTPCheck tlsSkipVerify(boolean TLSSkipVerify) {
+    public HTTPCheck tlsSkipVerify(@SuppressWarnings("ParameterName") boolean TLSSkipVerify) {
         this.TLSSkipVerify = TLSSkipVerify;
         return this;
     }
@@ -205,9 +218,15 @@ public class HTTPCheck extends NewCheck {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
         HTTPCheck httpCheck = (HTTPCheck) o;
         return TLSSkipVerify == httpCheck.TLSSkipVerify &&
             Objects.equals(interval, httpCheck.interval) &&

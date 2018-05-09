@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Parameter;
@@ -32,7 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * API operations for Consul
+ * API operations for Consul.
  *
  * @author graemerocher
  * @since 1.0
@@ -40,7 +41,7 @@ import java.util.Optional;
 public interface ConsulOperations {
 
     /**
-     * Writes a value for the given key to Consul
+     * Writes a value for the given key to Consul.
      *
      * @param key   The key
      * @param value The value as a String
@@ -50,16 +51,16 @@ public interface ConsulOperations {
     Publisher<Boolean> putValue(String key, @Body String value);
 
     /**
-     * Reads a Key from Consul. See https://www.consul.io/api/kv.html
+     * Reads a Key from Consul. See https://www.consul.io/api/kv.html.
      *
+     * @param key The key to read
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
-
     @Get("/kv/{key}?recurse")
     Publisher<List<KeyValue>> readValues(String key);
 
     /**
-     * Reads a Key from Consul. See https://www.consul.io/api/kv.html
+     * Reads a Key from Consul. See https://www.consul.io/api/kv.html.
      *
      * @param key        The key
      * @param datacenter The data center
@@ -79,7 +80,7 @@ public interface ConsulOperations {
         @Nullable String seperator);
 
     /**
-     * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     * Pass the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @param note    An optional note
@@ -89,7 +90,7 @@ public interface ConsulOperations {
     Publisher<HttpStatus> pass(String checkId, @Nullable String note);
 
     /**
-     * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     * Warn the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @param note    An optional note
@@ -99,7 +100,7 @@ public interface ConsulOperations {
     Publisher<HttpStatus> warn(String checkId, @Nullable String note);
 
     /**
-     * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     * Fail the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @param note    An optional note
@@ -115,7 +116,7 @@ public interface ConsulOperations {
     Publisher<String> status();
 
     /**
-     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
+     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html.
      *
      * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
@@ -124,7 +125,7 @@ public interface ConsulOperations {
     Publisher<Boolean> register(@NotNull @Body CatalogEntry entry);
 
     /**
-     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
+     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html.
      *
      * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
@@ -133,7 +134,7 @@ public interface ConsulOperations {
     Publisher<Boolean> deregister(@NotNull @Body CatalogEntry entry);
 
     /**
-     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
+     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html.
      *
      * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
@@ -146,7 +147,7 @@ public interface ConsulOperations {
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
 
     /**
-     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
+     * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html.
      *
      * @param service The service to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
@@ -159,7 +160,7 @@ public interface ConsulOperations {
     Publisher<HttpStatus> deregister(@NotNull String service);
 
     /**
-     * Gets all of the registered services
+     * Gets all of the registered services.
      *
      * @return The {@link NewServiceEntry} instances
      */
@@ -167,8 +168,12 @@ public interface ConsulOperations {
     Publisher<Map<String, ServiceEntry>> getServices();
 
     /**
-     * Gets the healthy services that are passing health checks
+     * Gets the healthy services that are passing health checks.
      *
+     * @param service The service
+     * @param passing The passing parameter
+     * @param tag     The tag
+     * @param dc      The dc
      * @return The {@link HealthEntry} instances
      */
     @Get("/health/service/{service}{?passing,tag,dc}")
@@ -179,7 +184,7 @@ public interface ConsulOperations {
         Optional<String> dc);
 
     /**
-     * Gets all of the registered nodes
+     * Gets all of the registered nodes.
      *
      * @return All the nodes
      */
@@ -187,7 +192,7 @@ public interface ConsulOperations {
     Publisher<List<CatalogEntry>> getNodes();
 
     /**
-     * Gets all the nodes for the given data center
+     * Gets all the nodes for the given data center.
      *
      * @param datacenter The data center
      * @return A publisher that emits the nodes
@@ -196,7 +201,7 @@ public interface ConsulOperations {
     Publisher<List<CatalogEntry>> getNodes(@NotNull String datacenter);
 
     /**
-     * Gets all of the service names and optional tags
+     * Gets all of the service names and optional tags.
      *
      * @return A Map where the keys are service names and the values are service tags
      */
@@ -204,7 +209,7 @@ public interface ConsulOperations {
     Publisher<Map<String, List<String>>> getServiceNames();
 
     /**
-     * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     * Pass the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
@@ -214,7 +219,7 @@ public interface ConsulOperations {
     }
 
     /**
-     * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     * Warn the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
@@ -224,7 +229,7 @@ public interface ConsulOperations {
     }
 
     /**
-     * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     * Fail the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
      * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
@@ -234,8 +239,9 @@ public interface ConsulOperations {
     }
 
     /**
-     * Gets service health information. Defaults to return both non-healthy and healthy services
+     * Gets service health information. Defaults to return both non-healthy and healthy services.
      *
+     * @param service The service
      * @return The {@link HealthEntry} instances
      */
     default Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -29,6 +30,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
+ * Base class for a service entry in consul.
+ *
  * @author graemerocher
  * @since 1.0
  */
@@ -41,12 +44,15 @@ public abstract class AbstractServiceEntry {
     private List<String> tags;
     private String ID;
 
+    /**
+     * @param name The service name
+     */
     public AbstractServiceEntry(String name) {
         this.name = name;
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#id
+     * See https://www.consul.io/api/agent/service.html#id.
      *
      * @return The ID of the service
      */
@@ -56,7 +62,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#id
+     * See https://www.consul.io/api/agent/service.html#id.
      *
      * @param id The ID of the service
      */
@@ -66,7 +72,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#address
+     * See https://www.consul.io/api/agent/service.html#address.
      *
      * @return The address of the service
      */
@@ -75,7 +81,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#address
+     * See https://www.consul.io/api/agent/service.html#address.
      *
      * @param address The address of the service
      */
@@ -84,7 +90,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#address
+     * See https://www.consul.io/api/agent/service.html#address.
      *
      * @return The port of the service
      */
@@ -97,7 +103,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#address
+     * See https://www.consul.io/api/agent/service.html#address.
      *
      * @param port The port of the service
      */
@@ -106,7 +112,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#tags
+     * See https://www.consul.io/api/agent/service.html#tags.
      *
      * @return The service tags
      */
@@ -118,7 +124,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#tags
+     * See https://www.consul.io/api/agent/service.html#tags.
      *
      * @param tags The service tags
      */
@@ -127,7 +133,7 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#name
+     * See https://www.consul.io/api/agent/service.html#name.
      *
      * @return The name of the service
      */
@@ -186,8 +192,12 @@ public abstract class AbstractServiceEntry {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         AbstractServiceEntry that = (AbstractServiceEntry) o;
         return Objects.equals(name, that.name) &&
             Objects.equals(address, that.address) &&

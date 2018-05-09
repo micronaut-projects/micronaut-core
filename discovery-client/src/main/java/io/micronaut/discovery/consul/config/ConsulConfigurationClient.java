@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.config;
 
 import io.micronaut.context.annotation.Requires;
@@ -60,7 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 /**
- * A {@link ConfigurationClient} for Consul
+ * A {@link ConfigurationClient} for Consul.
  */
 @Singleton
 @RequiresConsul
@@ -73,6 +74,11 @@ public class ConsulConfigurationClient implements ConfigurationClient {
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private ExecutorService executionService;
 
+    /**
+     * @param consulClient        The consul client
+     * @param consulConfiguration The consul configuration
+     * @param environment         The environment
+     */
     public ConsulConfigurationClient(ConsulClient consulClient, ConsulConfiguration consulConfiguration, Environment environment) {
         this.consulClient = consulClient;
         this.consulConfiguration = consulConfiguration;
@@ -92,6 +98,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         return consulClient.getDescription();
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     public Publisher<PropertySource> getPropertySources(Environment environment) {
         if (!consulConfiguration.getConfiguration().isEnabled()) {
@@ -218,6 +225,8 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                     }
                                 }
                                 break;
+                            default:
+                                // no-op
                         }
                     }
                 }
@@ -282,6 +291,8 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     if (ClassUtils.isPresent("org.yaml.snakeyaml.Yaml", YamlPropertySourceLoader.class.getClassLoader())) {
                         return new YamlPropertySourceLoader();
                     }
+                default:
+                    // no-op
             }
         } catch (Exception e) {
             // ignore, fallback to exception
@@ -289,6 +300,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         throw new ConfigurationException("Unsupported properties file format: " + format);
     }
 
+    /**
+     * @param executionService The execution service
+     */
     @Inject
     void setExecutionService(@Named(TaskExecutors.IO) @Nullable ExecutorService executionService) {
         if (executionService != null) {
@@ -303,7 +317,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         if (i > -1) {
             prefix = prefix.substring(0, i);
             propertySourceNames = calcPropertySourceNames(prefix, activeNames);
-            if (propertySourceNames == null) return null;
+            if (propertySourceNames == null) {
+                return null;
+            }
         }
         return propertySourceNames;
     }
@@ -343,8 +359,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                 property = property.substring(property.lastIndexOf('/') + 1);
             }
         }
-        if (property.indexOf('/') == -1)
+        if (property.indexOf('/') == -1) {
             return property;
+        }
         return null;
     }
 }
