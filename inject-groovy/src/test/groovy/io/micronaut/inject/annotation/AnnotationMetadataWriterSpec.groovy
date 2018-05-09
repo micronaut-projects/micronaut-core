@@ -136,7 +136,6 @@ class Test {
 
     }
 
-    @NotYetImplemented
     void "test build repeatable annotations"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
