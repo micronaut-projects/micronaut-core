@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.codec;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -39,7 +40,7 @@ public interface MediaTypeCodec {
     MediaType getMediaType();
 
     /**
-     * Decode the given type from the given {@link InputStream}
+     * Decode the given type from the given {@link InputStream}.
      *
      * @param type        The type
      * @param inputStream The input stream
@@ -50,7 +51,7 @@ public interface MediaTypeCodec {
     <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException;
 
     /**
-     * Encode the given type from the given {@link InputStream}
+     * Encode the given type from the given {@link InputStream}.
      *
      * @param object       The object to encode
      * @param outputStream The input stream
@@ -60,7 +61,7 @@ public interface MediaTypeCodec {
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
 
     /**
-     * Encode the given type returning the object as a byte[]
+     * Encode the given type returning the object as a byte[].
      *
      * @param object The object to encode
      * @param <T>    The generic type
@@ -70,7 +71,7 @@ public interface MediaTypeCodec {
     <T> byte[] encode(T object) throws CodecException;
 
     /**
-     * Encode the given type returning the object as a {@link ByteBuffer}
+     * Encode the given type returning the object as a {@link ByteBuffer}.
      *
      * @param object    The object to encode
      * @param allocator The allocator
@@ -81,7 +82,7 @@ public interface MediaTypeCodec {
     <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
 
     /**
-     * Decode the given type from the given {@link InputStream}
+     * Decode the given type from the given {@link InputStream}.
      *
      * @param type        The type
      * @param inputStream The input stream
@@ -94,7 +95,7 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given bytes
+     * Decode the given type from the given bytes.
      *
      * @param type  The type
      * @param bytes The bytes
@@ -107,7 +108,7 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given bytes
+     * Decode the given type from the given bytes.
      *
      * @param type  The type
      * @param bytes The bytes
@@ -120,7 +121,8 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
+     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances
+     * should override this method.
      *
      * @param type   The type
      * @param buffer the buffer
@@ -133,7 +135,8 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
+     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances
+     * should override this method.
      *
      * @param type   The type
      * @param buffer the buffer
@@ -146,7 +149,7 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given bytes
+     * Decode the given type from the given bytes.
      *
      * @param type The type
      * @param data The data as a string
@@ -159,7 +162,7 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Decode the given type from the given bytes
+     * Decode the given type from the given bytes.
      *
      * @param type The type
      * @param data The data as a string
@@ -172,7 +175,7 @@ public interface MediaTypeCodec {
     }
 
     /**
-     * Whether the codec can decode the given type
+     * Whether the codec can decode the given type.
      *
      * @param type The type
      * @return True if it can

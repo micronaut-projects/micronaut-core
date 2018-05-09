@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.annotation;
 
+package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -27,7 +27,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Annotation that can be applied to method to map it to an error route
+ * Annotation that can be applied to method to map it to an error route.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -55,7 +55,8 @@ public @interface Error {
     HttpStatus status() default HttpStatus.INTERNAL_SERVER_ERROR;
 
     /**
-     * Whether the error handler should be registered as a global error handler or just locally to the declaring {@link Controller}
+     * Whether the error handler should be registered as a global error handler or just locally to the declaring
+     * {@link Controller}.
      *
      * @return True if it should be global
      */

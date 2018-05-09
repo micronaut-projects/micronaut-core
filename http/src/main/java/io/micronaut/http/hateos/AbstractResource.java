@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.annotation.Internal;
@@ -32,8 +33,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * An abstract implementation of {@link Resource}
+ * An abstract implementation of {@link Resource}.
  *
+ * @param <Impl> An Abstract resource implementation
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -43,7 +45,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
 
     /**
-     * Add a link with the given reference
+     * Add a link with the given reference.
      *
      * @param ref  The reference
      * @param link The link
@@ -58,7 +60,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add a link with the given reference
+     * Add a link with the given reference.
      *
      * @param ref  The reference
      * @param link The link
@@ -73,7 +75,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref      The reference
      * @param resource The resource
@@ -88,7 +90,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref      The reference
      * @param resource The resource
@@ -103,7 +105,7 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref          The reference
      * @param resourceList The resources
@@ -128,7 +130,9 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Allows de-serializing of links with Jackson
+     * Allows de-serializing of links with Jackson.
+     *
+     * @param links The links
      */
     @SuppressWarnings("unchecked")
     @Internal

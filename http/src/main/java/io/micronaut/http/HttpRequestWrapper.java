@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
@@ -21,13 +22,17 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 
 /**
- * A wrapper around a {@link HttpRequest}
+ * A wrapper around a {@link HttpRequest}.
  *
+ * @param <B> The Http body type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements HttpRequest<B> {
 
+    /**
+     * @param delegate The Http Request
+     */
     public HttpRequestWrapper(HttpRequest<B> delegate) {
         super(delegate);
     }

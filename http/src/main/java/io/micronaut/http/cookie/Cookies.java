@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -22,7 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Models the defined {@link Cookie} instances in an application
+ * Models the defined {@link Cookie} instances in an application.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +36,7 @@ public interface Cookies extends ConvertibleValues<Cookie> {
     Set<Cookie> getAll();
 
     /**
-     * Find a {@link Cookie} for the given name
+     * Find a {@link Cookie} for the given name.
      *
      * @param name The cookie
      * @return An {@link Optional} cookie
@@ -43,7 +44,7 @@ public interface Cookies extends ConvertibleValues<Cookie> {
     Optional<Cookie> findCookie(CharSequence name);
 
     /**
-     * Get a cookie by name or return null
+     * Get a cookie by name or return null.
      *
      * @param name The name of the cookie
      * @return The Cookie instance

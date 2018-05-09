@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.http.MediaType;
@@ -21,7 +22,7 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * Default implementation of {@link Link}
+ * Default implementation of {@link Link}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +38,9 @@ class DefaultLink implements Link, Link.Builder {
     private MediaType type;
     private String name;
 
+    /**
+     * @param uri The URI
+     */
     DefaultLink(URI uri) {
         this.href = uri;
     }

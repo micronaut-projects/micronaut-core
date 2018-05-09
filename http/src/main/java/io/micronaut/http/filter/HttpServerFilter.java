@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.filter;
 
 import io.micronaut.http.HttpRequest;
@@ -21,7 +22,7 @@ import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
 
 /**
- * An HttpServerFilter extends {@link HttpFilter} and provides the response as a {@link MutableHttpResponse}
+ * An HttpServerFilter extends {@link HttpFilter} and provides the response as a {@link MutableHttpResponse}.
  *
  * @author Graeme Rocher
  * @see HttpFilter
@@ -31,7 +32,7 @@ public interface HttpServerFilter extends HttpFilter {
 
     /**
      * Variation of the {@link #doFilter(HttpRequest, FilterChain)} method that accepts a {@link ServerFilterChain}
-     * which allows to mutate the outgoing HTTP response
+     * which allows to mutate the outgoing HTTP response.
      *
      * @param request The request
      * @param chain   The chain
