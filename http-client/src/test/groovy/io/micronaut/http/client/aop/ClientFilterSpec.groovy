@@ -23,16 +23,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.filter.ClientFilterChain
-import io.micronaut.http.filter.HttpClientFilter
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpRequest
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -97,7 +87,7 @@ class ClientFilterSpec extends Specification{
         }
     }
 
-    @Filter(patterns = '/filters/**', clients = 'otherClient')
+    @Filter(patterns = '/filters/**', serviceId = 'otherClient')
     static class AnotherFilter implements HttpClientFilter {
 
         @Override

@@ -30,8 +30,6 @@ class ApiMacro extends InlineMacroProcessor {
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
         // is it a method reference
-        println target
-        println attributes
         int methodIndex = target.lastIndexOf('(')
         int propIndex = target.lastIndexOf('#')
         String methodRef = ""
@@ -92,10 +90,14 @@ class ApiMacro extends InlineMacroProcessor {
         }
 
         // Prepend twitterHandle with @ as text link.
-        final Inline apiLink = createInline(parent, 'anchor', shortName, attributes, options)
+        final Inline apiLink = createInline(parent, 'anchor', formatShortName(shortName), attributes, options)
 
         // Convert to String value.
         return apiLink.convert()
+    }
+
+    protected String formatShortName(String shortName) {
+        return shortName
     }
 
     protected String getBaseUri(Map<String, Object> attrs) {
