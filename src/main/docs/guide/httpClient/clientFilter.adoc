@@ -1,7 +1,10 @@
-Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or
-other Micronaut microservice. To simplify this, Micronaut includes a feature named `HttpClientFilter`.
+Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or when calling another Microservice.
 
-The next example illustrates a Micronaut's bean which interacts with https://bintray.com/docs/api/[Bintray REST Api].
+To simplify this, Micronaut includes the ability to define api:http.filter.HttpClientFilter[] classes that are applied to all matching HTTP clients.
+
+As an example say you want to build a client to communicate with the https://bintray.com/docs/api/[Bintray REST API]. It would be terribly tedious to have to specify authentication for every single HTTP call.
+
+To resolve this burden you can define a filter. The following is an example `BintrayService`:
 
 [source,groovy]
 ----
@@ -9,9 +12,10 @@ include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayApiCons
 include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayService, indent=0]
 ----
 
-Bintray API is secured. To authenticate you need to add an `Authorization` header for every request. You could
-modify `fetchRepositories` and `fetchPackages` methods to include the necessary HTTP Header for each request. A better solution is
-to create a filter to encapsulate this requirement.
+<1> An api:http.client.RxHttpClient[] is injected for the Bintray API
+<2> The organization is configurable via configuration
+
+The Bintray API is secured. To authenticate you need to add an `Authorization` header for every request. You could modify `fetchRepositories` and `fetchPackages` methods to include the necessary HTTP Header for each request. Using a filter is much simpler though:
 
 [source,groovy]
 ----
@@ -19,6 +23,8 @@ include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayFilter,
 ----
 
 <1> You can match only a subset of paths with a Client filter.
+<2> The `username` and `token` are injected via configuration
+<3> The `basicAuth` method is used include the HTTP BASIC credentials
 
-When you invoke `bintrayService.fetchRepositories()`, the `Authorization` HTTP header is included in the request.
+Now, whenever you invoke the `bintrayService.fetchRepositories()` method, the `Authorization` HTTP header is included in the request.
 
