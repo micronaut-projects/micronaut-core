@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.hibernate.jpa;
 
 import io.micronaut.context.annotation.Bean;
@@ -26,7 +27,7 @@ import javax.inject.Singleton;
 import javax.sql.DataSource;
 
 /**
- * Sets up the default hibernate transaction manager
+ * Sets up the default hibernate transaction manager.
  *
  * @author graemerocher
  * @since 1.0
@@ -35,6 +36,11 @@ import javax.sql.DataSource;
 @Requires(classes = HibernateTransactionManager.class)
 public class HibernateTransactionManagerFactory {
 
+    /**
+     * @param sessionFactory The {@link SessionFactory}
+     * @param dataSource     The {@link DataSource}
+     * @return The {@link HibernateTransactionManager}
+     */
     @Bean
     @Requires(classes = HibernateTransactionManager.class)
     @Singleton
