@@ -22,7 +22,16 @@ include::{testsclient}/annotation/PetOperations.java[tags=class, indent=0]
 
 Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. Also, as you can see you can use `javax.validation` constraints to validate arguments.
 
-On the server side of Micronaut you can implement this interface:
+Additionally, to use the `javax.validation` features you should have the `validation` and `hibernate-validator` dependencies on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:validation"
+compile "io.micronaut.configuration:hibernate-validator"
+----
+
+On the server-side of Micronaut you can implement the `PetOperations` interface:
 
 .PetController.java
 [source,java]
@@ -32,7 +41,7 @@ include::{testsclient}/annotation/PetController.java[tags=imports, indent=0]
 include::{testsclient}/annotation/PetController.java[tags=class, indent=0]
 ----
 
-You can then define a client in `src/test/java` that uses `@Client` to automatically, at compile time, implement a client:
+You can then define a declarative client in `src/test/java` that uses `@Client` to automatically, at compile time, implement a client:
 
 .PetClient.java
 [source,java]
@@ -40,7 +49,6 @@ You can then define a client in `src/test/java` that uses `@Client` to automatic
 include::{testsclient}/annotation/PetClient.java[tags=imports, indent=0]
 
 include::{testsclient}/annotation/PetClient.java[tags=class, indent=0]
-
 ----
 
 <1> The api:http.client.Client[] annotation is used with a value relative to the current server. In this case `/pets`
