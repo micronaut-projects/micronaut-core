@@ -1,1 +1,5 @@
-https://github.com/micronaut-projects/micronaut-core/issues/91[TODO]
+Being able to recover from failure is critical for HTTP clients, and that is where the integrated <<retry, Retry Advice>> included as part of Micronaut comes in really handy.
+
+You can declare the ann:retry.annotation.Retryable[] or ann:retry.annotation.CircuitBreaker[] annotations on any ann:http.client.Client[] interface and the retry policy will be applied.
+
+For more information on customizing retry, see the section on <<retry, Retry Advice>>.

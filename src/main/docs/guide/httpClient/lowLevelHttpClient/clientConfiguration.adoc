@@ -26,8 +26,6 @@ To configure the property of the HTTP client you can define the following bean:
 .Defining an HTTP client configuration bean
 [source,java]
 ----
-TODO: Add example http client config:
-
 @Named("hello")
 @Singleton
 class HelloConfiguration extends HttpClientConfiguration {

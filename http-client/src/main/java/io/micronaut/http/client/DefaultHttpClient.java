@@ -820,7 +820,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             }
             Filter filterAnn = annotatationMetadataResolver.resolveElement(filter).getAnnotation(Filter.class);
             if (filterAnn != null) {
-                String[] clients = filterAnn.clients();
+                String[] clients = filterAnn.serviceId();
                 if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
                     if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
                         // no matching clients

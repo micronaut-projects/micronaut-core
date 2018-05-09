@@ -101,3 +101,9 @@ public class Neo4jDriverFactory {
 
 
 === Retry Events
+
+You can register api:retry.event.RetryEventListener[] instances as beans in order to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
+
+In addition, you can register event listeners for api:retry.event.CircuitOpenEvent[], when a circuit breaker circuit is opened, or api:retry.event.CircuitClosedEvent[] for when a circuit is closed.
+
+

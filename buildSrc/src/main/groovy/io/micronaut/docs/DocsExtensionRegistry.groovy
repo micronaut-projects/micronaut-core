@@ -27,6 +27,8 @@ class DocsExtensionRegistry implements ExtensionRegistry{
 
         final JavaExtensionRegistry javaExtensionRegistry = asciidoctor.javaExtensionRegistry()
         javaExtensionRegistry.inlineMacro 'api', ApiMacro
+        javaExtensionRegistry.inlineMacro 'ann', AnnotationMacro
+        javaExtensionRegistry.inlineMacro 'pkg', PackageMacro
         javaExtensionRegistry.inlineMacro 'jdk', JdkApiMacro
         javaExtensionRegistry.inlineMacro 'jee', JeeApiMacro
         javaExtensionRegistry.inlineMacro 'rs', ReactiveStreamsApiMacro
