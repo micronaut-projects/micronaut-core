@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -26,7 +27,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>A meta annotation for HTTP {@link Controller} actions</p>
+ * <p>A meta annotation for HTTP {@link Controller} actions.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

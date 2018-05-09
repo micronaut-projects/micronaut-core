@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 /**
- * Represents HTTP query parameters parsed from the {@link HttpRequest#getUri()}
+ * Represents HTTP query parameters parsed from the {@link HttpRequest#getUri()}.
  *
  * @author Graeme Rocher
  * @see HttpRequest

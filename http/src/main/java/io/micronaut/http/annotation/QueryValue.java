@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -23,13 +24,12 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.net.URI;
 
 /**
- * Indicates that the parameter to a method should be bound from a value in the query string of the URI
+ * Indicates that the parameter to a method should be bound from a value in the query string of the URI.
  *
  * @author Graeme Rocher
- * @see URI#getQuery()
+ * @see java.net.URI#getQuery()
  * @since 1.0
  */
 @Documented

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.annotation.Internal;
@@ -20,7 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
 /**
- * A type that can be used to represent JSON errors that returns a content type of Vnd.Error
+ * A type that can be used to represent JSON errors that returns a content type of Vnd.Error.
  *
  * @author graemerocher
  * @since 1.0
@@ -28,11 +29,17 @@ import io.micronaut.http.annotation.Produces;
 @Produces(MediaType.APPLICATION_VND_ERROR)
 public class VndError extends JsonError {
 
+    /**
+     * @param message The message
+     */
     public VndError(String message) {
         super(message);
     }
 
-    @Internal // used by Jackson
+    /**
+     * Used by Jackson.
+     */
+    @Internal
     VndError() {
     }
 }

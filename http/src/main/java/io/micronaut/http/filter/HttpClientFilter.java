@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.filter;
 
 import io.micronaut.http.HttpRequest;
@@ -31,8 +32,8 @@ import org.reactivestreams.Publisher;
 public interface HttpClientFilter extends HttpFilter {
 
     /**
-     * A variation of {@link HttpFilter#doFilter(HttpRequest, FilterChain)} that receives a {@link MutableHttpRequest} allowing
-     * the request to be modified.
+     * A variation of {@link HttpFilter#doFilter(HttpRequest, FilterChain)} that receives a {@link MutableHttpRequest}
+     * allowing the request to be modified.
      *
      * @param request The request
      * @param chain   The filter chain
