@@ -15,5 +15,8 @@ endpoints:
         sensitive: Boolean
         id: String
 ----
+The `enabled` property is `false` by default and needs to be explicitly enabled to use the endpoint.
 
-NOTE: By default, the stop endpoint is disabled and needs to be explicitly enabled to be used.
+The `sensitive` property is `false` by default; setting this property to `true` will cause the endpoint to return a 401 if the request is unauthenticated.
+
+NOTE: The `sensitive` property requires the `io.micronaut:security` dependency and the `micronaut.security.enabled` property to be set to `true`.

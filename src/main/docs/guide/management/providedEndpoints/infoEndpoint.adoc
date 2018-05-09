@@ -16,6 +16,13 @@ endpoints:
         id: String
 ----
 
+The `enabled` property is `true` by default; setting this property to `false` will disable the endpoint.
+
+The `sensitive` property is `false` by default; setting this property to `true` will cause the endpoint to return a 401 if the request is unauthenticated.
+
+NOTE: The `sensitive` property requires the `io.micronaut:security` dependency and the `micronaut.security.enabled` property to be set to `true`.
+
+
 === Customization
 
 The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/source/InfoSource.html[InfoSource].  If your info source needs to retrieve data from Java properties files, you can extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
