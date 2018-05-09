@@ -17,6 +17,7 @@
 package io.micronaut.health;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.ServiceInstance;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Requires(property = "micronaut.heartbeat.enabled", value = "true", defaultValue = "true")
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 @Requires(beans = EmbeddedServer.class)
+@Requires(notEnv = Environment.ANDROID)
 public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEvent> {
 
     private AtomicReference<ServiceInstance> eventReference = new AtomicReference<>();
