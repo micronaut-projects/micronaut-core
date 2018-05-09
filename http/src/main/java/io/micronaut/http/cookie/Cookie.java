@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.cookie;
 
 import java.io.Serializable;
@@ -20,7 +21,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 
 /**
- * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265
+ * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,7 +40,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
 
     /**
      * Gets the domain name of this Cookie.
-     * <p>
+     *
      * <p>Domain names are formatted according to RFC 2109.
      *
      * @return the domain name of this Cookie
@@ -55,8 +56,8 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
 
     /**
      * Checks to see if this {@link Cookie} can only be accessed via HTTP.
-     * If this returns true, the {@link Cookie} cannot be accessed through
-     * client side script - But only if the browser supports it.
+     * If this returns true, the {@link Cookie} cannot be accessed through client side script - But only if the
+     * browser supports it.
      * <p>
      * See <a href="http://www.owasp.org/index.php/HTTPOnly">here</a> for reference
      *
@@ -75,7 +76,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     long getMaxAge();
 
     /**
-     * Sets the max age of the cookie in seconds
+     * Sets the max age of the cookie in seconds.
      *
      * @param maxAge The max age
      * @return This cookie
@@ -83,7 +84,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie maxAge(long maxAge);
 
     /**
-     * Sets the value
+     * Sets the value.
      *
      * @param value The value of the cookie
      * @return This cookie
@@ -91,7 +92,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie value(String value);
 
     /**
-     * Sets the domain of the cookie
+     * Sets the domain of the cookie.
      *
      * @param domain The domain of the cookie
      * @return This cookie
@@ -99,7 +100,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie domain(String domain);
 
     /**
-     * Sets the path of the cookie
+     * Sets the path of the cookie.
      *
      * @param path The path of the cookie
      * @return This cookie
@@ -107,7 +108,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie path(String path);
 
     /**
-     * Sets whether the cookie is secure
+     * Sets whether the cookie is secure.
      *
      * @param secure Is the cookie secure
      * @return This cookie
@@ -115,7 +116,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie secure(boolean secure);
 
     /**
-     * Sets whether the cookie is HTTP-Only
+     * Sets whether the cookie is HTTP-Only.
      *
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
@@ -123,7 +124,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     Cookie httpOnly(boolean httpOnly);
 
     /**
-     * Sets the max age of the cookie in seconds
+     * Sets the max age of the cookie in seconds.
      *
      * @param maxAge The max age
      * @return This cookie
@@ -133,7 +134,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     }
 
     /**
-     * Construct a new Cookie for the given name and value
+     * Construct a new Cookie for the given name and value.
      *
      * @param name  The name
      * @param value The value

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
 import io.micronaut.cache.annotation.Cacheable;
@@ -28,7 +29,8 @@ import io.reactivex.Flowable;
 import java.util.List;
 
 /**
- * Replaces the default {@link io.micronaut.discovery.DefaultCompositeDiscoveryClient} with one that caches the return values
+ * Replaces the default {@link io.micronaut.discovery.DefaultCompositeDiscoveryClient} with one that caches the return
+ * values.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +39,10 @@ import java.util.List;
 @Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
 @Replaces(DefaultCompositeDiscoveryClient.class)
 public class CachingCompositeDiscoveryClient extends CompositeDiscoveryClient {
+
+    /**
+     * @param discoveryClients The discovery clients
+     */
     public CachingCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.resource;
 
 import io.micronaut.context.annotation.Factory;
@@ -26,8 +27,8 @@ import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 import javax.inject.Singleton;
 
 /**
- * Creates beans for {@link ResourceLoader}s to handle static resource requests. Registers
- * a resource resolver that uses those beans.
+ * Creates beans for {@link ResourceLoader}s to handle static resource requests. Registers a resource resolver that
+ * uses those beans.
  *
  * @author James Kleeh
  * @since 1.0
@@ -35,16 +36,26 @@ import javax.inject.Singleton;
 @Factory
 public class ResourceLoaderFactory {
 
+    /**
+     * @return The class path resource loader
+     */
     @Singleton
     ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(ResourceLoaderFactory.class.getClassLoader());
     }
 
+    /**
+     * @return The file system resource loader
+     */
     @Singleton
     FileSystemResourceLoader fileSystemResourceLoader() {
         return new DefaultFileSystemResourceLoader();
     }
 
+    /**
+     * @param resourceLoaders The resource loaders
+     * @return The resource resolver
+     */
     @Singleton
     ResourceResolver resourceResolver(ResourceLoader[] resourceLoaders) {
         return new ResourceResolver(resourceLoaders);

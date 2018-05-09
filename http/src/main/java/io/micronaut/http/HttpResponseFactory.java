@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.http.cookie.CookieFactory;
 
 import java.util.Optional;
 
 /**
- * A factory interface for creating {@link MutableHttpResponse} instances
+ * A factory interface for creating {@link MutableHttpResponse} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,14 +30,14 @@ import java.util.Optional;
 public interface HttpResponseFactory {
 
     /**
-     * The default {@link CookieFactory} instance
+     * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
      */
     Optional<HttpResponseFactory> INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
         .firstOr("io.micronaut.http.server.netty.NettyHttpResponseFactory", HttpResponseFactory.class.getClassLoader())
         .map(ServiceDefinition::load);
 
     /**
-     * Creates an {@link HttpStatus#OK} response with a body
+     * Creates an {@link HttpStatus#OK} response with a body.
      *
      * @param body The body
      * @param <T>  The body type
@@ -46,24 +46,27 @@ public interface HttpResponseFactory {
     <T> MutableHttpResponse<T> ok(T body);
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
      * @param reason An alternatively reason message
+     * @param <T>    The response type
      * @return The response
      */
     <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
      * @param body   The body
+     * @param <T>    The body type
      * @return The response
      */
     <T> MutableHttpResponse<T> status(HttpStatus status, T body);
 
     /**
+     * @param <T> The response type
      * @return The ok response
      */
     default <T> MutableHttpResponse<T> ok() {
@@ -72,6 +75,7 @@ public interface HttpResponseFactory {
 
     /**
      * @param status The status
+     * @param <T>    The response type
      * @return The restus response
      */
     default <T> MutableHttpResponse<T> status(HttpStatus status) {

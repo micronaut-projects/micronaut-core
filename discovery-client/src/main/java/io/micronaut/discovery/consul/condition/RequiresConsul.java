@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.condition;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Meta annotation for Consul requirements
+ * Meta annotation for Consul requirements.
  *
  * @author graemerocher
  * @since 1.0

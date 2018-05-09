@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.health;
 
 import io.micronaut.context.annotation.Requires;
@@ -27,7 +28,7 @@ import javax.inject.Singleton;
 import java.util.Collections;
 
 /**
- * A {@link HealthIndicator} for Consul
+ * A {@link HealthIndicator} for Consul.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +40,9 @@ public class ConsulHealthIndicator implements HealthIndicator {
 
     private final ConsulClient client;
 
+    /**
+     * @param client The Consul client
+     */
     public ConsulHealthIndicator(ConsulClient client) {
         this.client = client;
     }

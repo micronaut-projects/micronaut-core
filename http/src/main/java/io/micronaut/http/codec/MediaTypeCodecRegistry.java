@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.codec;
 
 import io.micronaut.http.MediaType;
@@ -21,7 +22,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * <p>A registry of decoders</p>
+ * <p>A registry of decoders.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -29,7 +30,7 @@ import java.util.Optional;
 public interface MediaTypeCodecRegistry {
 
     /**
-     * Find a codec for the given media type
+     * Find a codec for the given media type.
      *
      * @param mediaType The {@link MediaType}
      * @return The codec
@@ -37,7 +38,7 @@ public interface MediaTypeCodecRegistry {
     Optional<MediaTypeCodec> findCodec(MediaType mediaType);
 
     /**
-     * Find a codec for the given media type and target type
+     * Find a codec for the given media type and target type.
      *
      * @param mediaType The {@link MediaType}
      * @param type      The type
@@ -51,7 +52,7 @@ public interface MediaTypeCodecRegistry {
     Collection<MediaTypeCodec> getCodecs();
 
     /**
-     * Create a new registry from the given codecs
+     * Create a new registry from the given codecs.
      *
      * @param codecs The decoders
      * @return The registry
@@ -61,7 +62,7 @@ public interface MediaTypeCodecRegistry {
     }
 
     /**
-     * Create a new registry from the given codecs
+     * Create a new registry from the given codecs.
      *
      * @param codecs The decoders
      * @return The registry

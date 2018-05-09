@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
+ * Abstract implementation of {@link ConsulClient} that also implements {@link io.micronaut.discovery.DiscoveryClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -47,10 +47,14 @@ public abstract class AbstractConsulClient implements ConsulClient {
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 
+    /**
+     * @param consulConfiguration The Consul configuration
+     */
     @Inject
     public void setConsulConfiguration(ConsulConfiguration consulConfiguration) {
-        if (consulConfiguration != null)
+        if (consulConfiguration != null) {
             this.consulConfiguration = consulConfiguration;
+        }
     }
 
     @Override

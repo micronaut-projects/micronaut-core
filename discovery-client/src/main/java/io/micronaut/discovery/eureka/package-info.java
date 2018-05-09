@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Micronaut and Eureka (https://github.com/Netflix/eureka)
+ * This package contains client APIs, service discovery and distributed configuration integration between Micronaut
+ * and Eureka (https://github.com/Netflix/eureka).
  *
  * @author graemerocher
  * @since 1.0
@@ -24,5 +26,3 @@
 package io.micronaut.discovery.eureka;
 
 import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.eureka.condition.RequiresEureka;

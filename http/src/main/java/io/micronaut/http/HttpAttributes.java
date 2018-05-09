@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,46 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 /**
- * Common HTTP attributes
+ * Common HTTP attributes.
  *
  * @author graemerocher
  * @since 1.0
  */
 public enum HttpAttributes implements CharSequence {
+
     /**
-     * Attribute used to store any exception that may have occurred during request processing
+     * Attribute used to store any exception that may have occurred during request processing.
      */
     ERROR(Constants.PREFIX + ".error"),
 
     /**
-     * Attribute used to store the object that represents the Route
+     * Attribute used to store the object that represents the Route.
      */
     ROUTE(Constants.PREFIX + ".route"),
 
     /**
-     * Attribute used to store the object that represents the Route match
+     * Attribute used to store the object that represents the Route match.
      */
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
-     * Attribute used to store the URI template defined by the route
+     * Attribute used to store the URI template defined by the route.
      */
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),
 
     /**
-     * Attribute used to store the HTTP method name, if required within the response
+     * Attribute used to store the HTTP method name, if required within the response.
      */
     METHOD_NAME(Constants.PREFIX + ".method.name"),
+
     /**
-     * Attribute used to store the service ID a client request is being sent to. Used for tracing purposes
+     * Attribute used to store the service ID a client request is being sent to. Used for tracing purposes.
      */
     SERVICE_ID(Constants.PREFIX + ".serviceId");
 
     private final String name;
 
+    /**
+     * @param name The name
+     */
     HttpAttributes(String name) {
         this.name = name;
     }
@@ -77,7 +83,9 @@ public enum HttpAttributes implements CharSequence {
         return name;
     }
 
-
+    /**
+     * Constants.
+     */
     private static class Constants {
         public static final String PREFIX = "micronaut.http";
     }

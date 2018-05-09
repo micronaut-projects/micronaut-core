@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.registration;
 
 import io.micronaut.context.annotation.Requires;
@@ -49,7 +50,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Auto registration implementation for consul
+ * Auto registration implementation for consul.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -64,6 +65,13 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     private final ServiceInstanceIdGenerator idGenerator;
     private final Environment environment;
 
+    /**
+     * @param environment            The environment
+     * @param consulClient           The Consul client
+     * @param heartbeatConfiguration The heartbeat configuration
+     * @param consulConfiguration    The Consul configuration
+     * @param idGenerator            The id generator
+     */
     protected ConsulAutoRegistration(
         Environment environment,
         ConsulClient consulClient,
@@ -159,6 +167,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
         }
     }
 
+    @SuppressWarnings("MagicNumber")
     @Override
     protected void register(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
@@ -244,7 +253,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     }
 
     /**
-     * Allows sub classes to override and customize the configuration
+     * Allows sub classes to override and customize the configuration.
      *
      * @param instance     The instance
      * @param serviceEntry The service entry

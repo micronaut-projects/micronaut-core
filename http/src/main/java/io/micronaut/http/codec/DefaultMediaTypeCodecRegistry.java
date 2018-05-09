@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.codec;
 
 import io.micronaut.http.MediaType;
@@ -25,21 +26,28 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Registry of {@link MediaTypeCodec} instances
+ * Registry of {@link MediaTypeCodec} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
-    private final Collection<MediaTypeCodec> codecs;
     Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
     Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
 
+    private final Collection<MediaTypeCodec> codecs;
+
+    /**
+     * @param codecs The media type codecs
+     */
     DefaultMediaTypeCodecRegistry(MediaTypeCodec... codecs) {
         this(Arrays.asList(codecs));
     }
 
+    /**
+     * @param codecs The media type codecs
+     */
     DefaultMediaTypeCodecRegistry(Collection<MediaTypeCodec> codecs) {
         if (codecs != null) {
             this.codecs = Collections.unmodifiableCollection(codecs);

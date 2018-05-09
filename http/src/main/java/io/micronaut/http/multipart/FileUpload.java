@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.multipart;
 
 import io.micronaut.http.MediaType;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
+ * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,14 +36,14 @@ public interface FileUpload {
     Optional<MediaType> getContentType();
 
     /**
-     * Gets the name of this part
+     * Gets the name of this part.
      *
      * @return The name of this part
      */
     String getName();
 
     /**
-     * Gets the name of this part
+     * Gets the name of this part.
      *
      * @return The name of this part
      */
@@ -59,7 +57,7 @@ public interface FileUpload {
     long getSize();
 
     /**
-     * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state
+     * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state.
      *
      * @return True if the part is fully uploaded
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.ssl;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -21,7 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import java.util.Optional;
 
 /**
- * Configuration properties for SSL handling
+ * Configuration properties for SSL handling.
  *
  * @author James Kleeh
  * @since 1.0
@@ -41,108 +42,7 @@ public class SslConfiguration implements Toggleable {
     protected Optional<String> protocol = Optional.of("TLS");
 
     /**
-     * Configuration properties for SSL key
-     */
-    @ConfigurationProperties("key")
-    public static class KeyConfiguration {
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> alias = Optional.empty();
-
-        /**
-         * @return The password of the key
-         */
-        public Optional<String> getPassword() {
-            return password;
-        }
-
-        /**
-         * @return The alias of the key
-         */
-        public Optional<String> getAlias() {
-            return alias;
-        }
-    }
-
-    /**
-     * Configuration properties for SSL key store
-     */
-    @ConfigurationProperties("keyStore")
-    public static class KeyStoreConfiguration {
-        protected Optional<String> path = Optional.empty();
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> type = Optional.empty();
-        protected Optional<String> provider = Optional.empty();
-
-        /**
-         * @return The path to the key store (typically .jks). Can use classpath: and file:.
-         */
-        public Optional<String> getPath() {
-            return path;
-        }
-
-        /**
-         * @return The password to the keyStore
-         */
-        public Optional<String> getPassword() {
-            return password;
-        }
-
-        /**
-         * @return The key store type
-         */
-        public Optional<String> getType() {
-            return type;
-        }
-
-        /**
-         * @return Provider for the key store.
-         */
-        public Optional<String> getProvider() {
-            return provider;
-        }
-    }
-
-    /**
-     * Configuration properties for SSL trust store
-     */
-    @ConfigurationProperties("trustStore")
-    public static class TrustStoreConfiguration {
-        protected Optional<String> path = Optional.empty();
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> type = Optional.empty();
-        protected Optional<String> provider = Optional.empty();
-
-        /**
-         * @return The path to the trust store (typically .jks). Can use classpath: and file:.
-         */
-        public Optional<String> getPath() {
-            return path;
-        }
-
-        /**
-         * @return The password to the keyStore
-         */
-        public Optional<String> getPassword() {
-            return password;
-        }
-
-        /**
-         * @return The key store type
-         */
-        public Optional<String> getType() {
-            return type;
-        }
-
-        /**
-         * @return Provider for the key store.
-         */
-        public Optional<String> getProvider() {
-            return provider;
-        }
-    }
-
-    /**
-     * @return Whether SSL is enabled
+     * @return Whether SSL is enabled.
      */
     @Override
     public boolean isEnabled() {
@@ -210,5 +110,106 @@ public class SslConfiguration implements Toggleable {
      */
     public Optional<String> getProtocol() {
         return protocol;
+    }
+
+    /**
+     * Configuration properties for SSL key.
+     */
+    @ConfigurationProperties("key")
+    public static class KeyConfiguration {
+        protected Optional<String> password = Optional.empty();
+        protected Optional<String> alias = Optional.empty();
+
+        /**
+         * @return The password of the key
+         */
+        public Optional<String> getPassword() {
+            return password;
+        }
+
+        /**
+         * @return The alias of the key
+         */
+        public Optional<String> getAlias() {
+            return alias;
+        }
+    }
+
+    /**
+     * Configuration properties for SSL key store.
+     */
+    @ConfigurationProperties("keyStore")
+    public static class KeyStoreConfiguration {
+        protected Optional<String> path = Optional.empty();
+        protected Optional<String> password = Optional.empty();
+        protected Optional<String> type = Optional.empty();
+        protected Optional<String> provider = Optional.empty();
+
+        /**
+         * @return The path to the key store (typically .jks). Can use classpath: and file:.
+         */
+        public Optional<String> getPath() {
+            return path;
+        }
+
+        /**
+         * @return The password to the keyStore
+         */
+        public Optional<String> getPassword() {
+            return password;
+        }
+
+        /**
+         * @return The key store type
+         */
+        public Optional<String> getType() {
+            return type;
+        }
+
+        /**
+         * @return Provider for the key store.
+         */
+        public Optional<String> getProvider() {
+            return provider;
+        }
+    }
+
+    /**
+     * Configuration properties for SSL trust store.
+     */
+    @ConfigurationProperties("trustStore")
+    public static class TrustStoreConfiguration {
+        protected Optional<String> path = Optional.empty();
+        protected Optional<String> password = Optional.empty();
+        protected Optional<String> type = Optional.empty();
+        protected Optional<String> provider = Optional.empty();
+
+        /**
+         * @return The path to the trust store (typically .jks). Can use classpath: and file:.
+         */
+        public Optional<String> getPath() {
+            return path;
+        }
+
+        /**
+         * @return The password to the keyStore
+         */
+        public Optional<String> getPassword() {
+            return password;
+        }
+
+        /**
+         * @return The key store type
+         */
+        public Optional<String> getType() {
+            return type;
+        }
+
+        /**
+         * @return Provider for the key store.
+         */
+        public Optional<String> getProvider() {
+            return provider;
+        }
     }
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -39,7 +40,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * A {@link ServiceInstance} for Consul
+ * A {@link ServiceInstance} for Consul.
  *
  * @author graemerocher
  * @since 1.0
@@ -51,7 +52,7 @@ public class ConsulServiceInstance implements ServiceInstance {
     private ConvertibleValues<String> metadata;
 
     /**
-     * Constructs a {@link ConsulServiceInstance} for the given {@link HealthEntry} and scheme
+     * Constructs a {@link ConsulServiceInstance} for the given {@link HealthEntry} and scheme.
      *
      * @param healthEntry The health entry
      * @param scheme      The scheme
@@ -123,7 +124,8 @@ public class ConsulServiceInstance implements ServiceInstance {
             synchronized (this) { // double check
                 metadata = this.metadata;
                 if (metadata == null) {
-                    this.metadata = metadata = buildMetadata();
+                    metadata = buildMetadata();
+                    this.metadata = metadata;
                 }
             }
         }

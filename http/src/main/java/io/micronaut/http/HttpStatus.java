@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
 
+package io.micronaut.http;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+ * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -111,6 +111,10 @@ public enum HttpStatus implements CharSequence {
     private final int code;
     private final String reason;
 
+    /**
+     * @param code   The code
+     * @param reason The reason
+     */
     HttpStatus(int code, String reason) {
         Objects.requireNonNull(reason, "Argument 'reason' cannot be null");
         this.code = code;
@@ -132,7 +136,7 @@ public enum HttpStatus implements CharSequence {
     }
 
     /**
-     * The status for the given code
+     * The status for the given code.
      *
      * @param code The code
      * @return The value

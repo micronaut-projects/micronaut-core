@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.annotation.Internal;
@@ -23,8 +24,7 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
- * A class that can be used to represent JSON errors that complies to Vnd.Error without
- * the content type requirements
+ * A class that can be used to represent JSON errors that complies to Vnd.Error without the content type requirements.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,15 +36,24 @@ public class JsonError extends AbstractResource<JsonError> {
     private String logref;
     private String path;
 
+    /**
+     * @param message The message
+     */
     public JsonError(String message) {
         this.message = message;
     }
 
-    @Internal // used by Jackson
+    /**
+     * Used by Jackson.
+     */
+    @Internal
     JsonError() {
     }
 
-    void setMessage(String message) {
+    /**
+     * @param message The message
+     */
+    public void setMessage(String message) {
         this.message = message;
     }
 
@@ -70,7 +79,7 @@ public class JsonError extends AbstractResource<JsonError> {
     }
 
     /**
-     * Sets the path
+     * Sets the path.
      *
      * @param path The path
      * @return This error object
@@ -81,7 +90,7 @@ public class JsonError extends AbstractResource<JsonError> {
     }
 
     /**
-     * Sets the logref
+     * Sets the logref.
      *
      * @param logref The logref
      * @return This error object

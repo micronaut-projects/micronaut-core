@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.util;
 
 import io.micronaut.http.HttpHeaders;
@@ -24,7 +25,7 @@ import java.nio.charset.UnsupportedCharsetException;
 import java.util.Optional;
 
 /**
- * Utility methods for HTTP handling
+ * Utility methods for HTTP handling.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,7 +33,8 @@ import java.util.Optional;
 public class HttpUtil {
 
     /**
-     * Return whether the given request features {@link MediaType#APPLICATION_FORM_URLENCODED} or {@link MediaType#MULTIPART_FORM_DATA}
+     * Return whether the given request features {@link MediaType#APPLICATION_FORM_URLENCODED} or
+     * {@link MediaType#MULTIPART_FORM_DATA}.
      *
      * @param request The request
      * @return True if it is form data
@@ -47,7 +49,7 @@ public class HttpUtil {
     }
 
     /**
-     * Resolve the {@link Charset} to use for the request
+     * Resolve the {@link Charset} to use for the request.
      *
      * @param request The request
      * @return An {@link Optional} of {@link Charset}

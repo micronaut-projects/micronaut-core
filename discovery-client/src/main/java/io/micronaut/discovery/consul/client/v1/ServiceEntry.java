@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -27,6 +28,10 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class ServiceEntry extends AbstractServiceEntry {
 
+    /**
+     * @param name The name
+     * @param id   The id
+     */
     @JsonCreator
     public ServiceEntry(@JsonProperty("Service") String name, @JsonProperty("ID") String id) {
         super(name);
@@ -34,7 +39,7 @@ public class ServiceEntry extends AbstractServiceEntry {
     }
 
     /**
-     * Creates a copy from another entry
+     * Creates a copy from another entry.
      *
      * @param entry The entry
      */
@@ -47,7 +52,7 @@ public class ServiceEntry extends AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#name
+     * See https://www.consul.io/api/agent/service.html#name.
      *
      * @return The name of the service
      */

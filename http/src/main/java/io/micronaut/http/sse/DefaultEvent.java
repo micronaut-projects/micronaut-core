@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.sse;
 
 import io.micronaut.core.annotation.Internal;
@@ -22,8 +23,9 @@ import io.micronaut.http.annotation.Produces;
 import java.time.Duration;
 
 /**
- * Default implementation of the {@link Event} interface
+ * Default implementation of the {@link Event} interface.
  *
+ * @param <T> The event type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -37,6 +39,9 @@ class DefaultEvent<T> implements Event<T> {
     private String comment;
     private Duration retry;
 
+    /**
+     * @param data The event
+     */
     DefaultEvent(T data) {
         this.data = data;
     }

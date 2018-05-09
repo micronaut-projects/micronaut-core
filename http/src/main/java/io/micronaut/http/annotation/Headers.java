@@ -16,28 +16,38 @@
 
 package io.micronaut.http.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * This lets you declare several headers for a client class and have them always included.
+ * This lets you declare several headers for a client class and have them always included. hola
  * Example usage:
- * @Headers({
- *         @Header(name="Content-type",value="application/octet-stream"),
- *         @Header(name="Content-length",value="2048")
+ * <pre><code>
+ *{@literal @}Headers({
+ *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
+ *     {@literal @}Header(name="Content-length",value="2048")
  * })
+ * </code></pre>
  * @author rvanderwerf
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
 public @interface Headers {
+
     /***
      * This allows you to have multiple @Header's set at the class level with Java and Groovy.
      * Example usage:
-     *  * @Headers({
-     *  *         @Header(name="Content-type",value="application/octet-stream"),
-     *  *         @Header(name="Content-length",value="2048")
-     * @return
+     * <pre><code>
+     *{@literal @}Headers({
+     *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
+     *     {@literal @}Header(name="Content-length",value="2048")
+     * })
+     * </code></pre>
+     * @return The headers
      */
     Header[] value() default {};
 }
