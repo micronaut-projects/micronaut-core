@@ -31,6 +31,7 @@ class Neo4jBoltConfigurationSpec extends Specification {
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.uri':'bolt://someserver:7687',
+                'neo4j.maxConnectionPoolSize': 80,
                 'neo4j.embedded.enabled':false
         )
         // end::start[]
@@ -39,6 +40,7 @@ class Neo4jBoltConfigurationSpec extends Specification {
         applicationContext.containsBean(Neo4jBoltConfiguration)
         applicationContext.getBean(Neo4jBoltConfiguration).uris.size() == 1
         applicationContext.getBean(Neo4jBoltConfiguration).uris[0] == URI.create('bolt://someserver:7687')
+        applicationContext.getBean(Neo4jBoltConfiguration).getConfig().maxConnectionPoolSize() == 80
 
         cleanup:
         applicationContext?.stop()
