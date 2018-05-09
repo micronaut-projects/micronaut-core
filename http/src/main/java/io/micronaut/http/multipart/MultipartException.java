@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.multipart;
 
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * Exception thrown during multi part handling
+ * Exception thrown during multi part handling.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class MultipartException extends HttpException {
+
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public MultipartException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public MultipartException(String message) {
         super(message);
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.filter;
 
 import io.micronaut.core.order.Ordered;
@@ -22,7 +23,7 @@ import org.reactivestreams.Publisher;
 
 /**
  * <p>A interface for classes that can intercept and filter {@link io.micronaut.http.HttpRequest} instances and can
- * either proceed with the request or return a modified result</p>
+ * either proceed with the request or return a modified result.</p>
  * <p>
  * <p>Implementations are passed a {@link FilterChain} where the last entry in the chain in the action to be executed
  * that returns a {@link Publisher} that emits an {@link HttpResponse}</p>
@@ -41,10 +42,11 @@ import org.reactivestreams.Publisher;
 public interface HttpFilter extends Ordered {
 
     /**
-     * Intercepts a {@link HttpRequest}
+     * Intercepts a {@link HttpRequest}.
      *
      * @param request The {@link HttpRequest} instance
      * @param chain   The {@link FilterChain} instance
+     * @return A {@link Publisher} for the Http response
      */
     Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain);
 }

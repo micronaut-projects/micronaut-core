@@ -13,23 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.exceptions;
 
 /**
- * Exception thrown when the content length exceeds the allowed amount
+ * Exception thrown when the content length exceeds the allowed amount.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ContentLengthExceededException extends HttpException {
+
+    /**
+     * @param message The message
+     */
     public ContentLengthExceededException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public ContentLengthExceededException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param advertisedLength The advertised length
+     * @param receivedLength   The received length
+     */
     public ContentLengthExceededException(long advertisedLength, long receivedLength) {
         this("The received length [" + receivedLength + "] exceeds the maximum content length [" + advertisedLength + "]");
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import java.net.URI;
@@ -28,7 +29,7 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 
 /**
- * Extends {@link HttpHeaders} add methods for mutation of headers
+ * Extends {@link HttpHeaders} add methods for mutation of headers.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,7 +37,7 @@ import java.util.stream.Collectors;
 public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
-     * Add a header for the given name and value
+     * Add a header for the given name and value.
      *
      * @param header The head name
      * @param value  The value
@@ -45,7 +46,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     MutableHttpHeaders add(CharSequence header, CharSequence value);
 
     /**
-     * Set the allowed HTTP methods
+     * Set the allowed HTTP methods.
      *
      * @param methods The methods to specify in the Allowed HTTP header
      * @return This HTTP headers
@@ -55,7 +56,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the date header for the given {@link ZonedDateTime}
+     * Adds the date header for the given {@link ZonedDateTime}.
      *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
@@ -68,7 +69,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the EXPIRES header for the given {@link ZonedDateTime}
+     * Adds the EXPIRES header for the given {@link ZonedDateTime}.
      *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
@@ -81,7 +82,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}
+     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}.
      *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
@@ -94,7 +95,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}
+     * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}.
      *
      * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
@@ -107,7 +108,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the DATE header for the given {@link ZonedDateTime}
+     * Adds the DATE header for the given {@link ZonedDateTime}.
      *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
@@ -119,7 +120,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the EXPIRES header for the given {@link ZonedDateTime}
+     * Adds the EXPIRES header for the given {@link ZonedDateTime}.
      *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
@@ -131,7 +132,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}
+     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}.
      *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
@@ -143,7 +144,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}
+     * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}.
      *
      * @param timeInMillis The current time in milli seconds
      * @return The {@link MutableHttpHeaders}
@@ -180,7 +181,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Set the allowed HTTP methods
+     * Set the allowed HTTP methods.
      *
      * @param methods The methods to specify in the Allowed HTTP header
      * @return This HTTP headers
@@ -191,7 +192,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Sets the location header to the given URI
+     * Sets the location header to the given URI.
      *
      * @param uri The URI
      * @return This HTTP headers
@@ -201,7 +202,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type
+     * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type.
      *
      * @param mediaType The media type
      * @return This HTTP headers
@@ -211,7 +212,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Add a header for the given name and value
+     * Add a header for the given name and value.
      *
      * @param header The head name
      * @param value  The value
@@ -225,7 +226,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
     }
 
     /**
-     * Add a header for the given name and value
+     * Add a header for the given name and value.
      *
      * @param header The head name
      * @param value  The value

@@ -13,18 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.exceptions;
 
 import java.net.URISyntaxException;
 
 /**
- * Thrown when the URI syntax is correct
+ * Thrown when the URI syntax is correct.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class UriSyntaxException extends HttpException {
 
+    /**
+     * @param e The throwable
+     */
     public UriSyntaxException(URISyntaxException e) {
         super(e.getMessage());
     }

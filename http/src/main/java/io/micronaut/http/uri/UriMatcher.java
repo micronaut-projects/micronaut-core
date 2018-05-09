@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.uri;
 
 import java.net.URI;
 import java.util.Optional;
 
 /**
- * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}</p>
+ * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,7 +28,7 @@ import java.util.Optional;
 public interface UriMatcher {
 
     /**
-     * Match the given {@link URI} object
+     * Match the given {@link URI} object.
      *
      * @param uri The URI
      * @return True if it matches
@@ -37,7 +38,7 @@ public interface UriMatcher {
     }
 
     /**
-     * Match the given URI string
+     * Match the given URI string.
      *
      * @param uri The uRI
      * @return True if it matches

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.multipart;
 
 import io.micronaut.http.MediaType;
@@ -23,7 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
- * Represents a chunk of data belonging to a part of a multipart request
+ * Represents a chunk of data belonging to a part of a multipart request.
  *
  * @author James Kleeh
  * @since 1.0
@@ -31,7 +32,7 @@ import java.util.Optional;
 public interface PartData {
 
     /**
-     * Gets the content of this chunk as an <tt>InputStream</tt>
+     * Gets the content of this chunk as an <tt>InputStream</tt>.
      *
      * @return The content of this chunk as an <tt>InputStream</tt>
      * @throws IOException If an error occurs in retrieving the content
@@ -39,7 +40,7 @@ public interface PartData {
     InputStream getInputStream() throws IOException;
 
     /**
-     * Gets the content of this chunk as a <tt>byte[]</tt>
+     * Gets the content of this chunk as a <tt>byte[]</tt>.
      *
      * @return The content of this chunk as a <tt>byte[]</tt>
      * @throws IOException If an error occurs in retrieving the content
@@ -47,7 +48,7 @@ public interface PartData {
     byte[] getBytes() throws IOException;
 
     /**
-     * Gets the content of this chunk as a <tt>ByteBuffer</tt>
+     * Gets the content of this chunk as a <tt>ByteBuffer</tt>.
      *
      * @return The content of this chunk as a <tt>ByteBuffer</tt>
      * @throws IOException If an error occurs in retrieving the content

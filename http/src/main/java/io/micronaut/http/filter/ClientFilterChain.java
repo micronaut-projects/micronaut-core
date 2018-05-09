@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.filter;
 
 import io.micronaut.http.HttpRequest;
@@ -26,6 +27,10 @@ import org.reactivestreams.Publisher;
  */
 public interface ClientFilterChain extends FilterChain {
 
+    /**
+     * @param request The Http request
+     * @return A {@link Publisher} for the HttpResponse
+     */
     Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request);
 
     @Override
