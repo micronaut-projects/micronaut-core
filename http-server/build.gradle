@@ -18,7 +18,9 @@ shadowJar {
         exclude(project(":core"))
         exclude(project(":http"))
         exclude(project(":inject"))
+        exclude(project(":aop"))
 
+        exclude(dependency(dependencyVersion("snakeyaml")))
         exclude(dependency("com.fasterxml.*:.*:.*"))
         exclude(dependency("javax.validation:.*:.*"))
         exclude(dependency("io.reactivex.rxjava2:.*:.*"))

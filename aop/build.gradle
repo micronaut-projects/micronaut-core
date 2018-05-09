@@ -9,6 +9,7 @@ shadowJar {
     dependencies {
         exclude(project(":inject"))
         exclude(project(":core"))
+        exclude(dependency(dependencyVersion("snakeyaml")))
         exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
