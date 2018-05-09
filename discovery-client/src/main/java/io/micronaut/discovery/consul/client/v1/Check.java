@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
@@ -45,7 +46,7 @@ public interface Check {
     Status status();
 
     /**
-     * Valid health status values
+     * Valid health status values.
      */
     @JsonNaming(PropertyNamingStrategy.LowerCaseStrategy.class)
     enum Status {

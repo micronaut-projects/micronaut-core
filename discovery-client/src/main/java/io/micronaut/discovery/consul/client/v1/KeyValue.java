@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -21,7 +22,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 /**
- * Represents a Key/Value pair returned from Consul via /kv/:key
+ * Represents a Key/Value pair returned from Consul via /kv/:key.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,16 +32,26 @@ public class KeyValue {
     private String key;
     private String value;
 
+    /**
+     * @param key   The key
+     * @param value The value
+     */
     @JsonCreator
     public KeyValue(@JsonProperty("Key") String key, @JsonProperty("Value") String value) {
         this.key = key;
         this.value = value;
     }
 
+    /**
+     * @return The key
+     */
     public String getKey() {
         return key;
     }
 
+    /**
+     * @return The value
+     */
     public String getValue() {
         return value;
     }

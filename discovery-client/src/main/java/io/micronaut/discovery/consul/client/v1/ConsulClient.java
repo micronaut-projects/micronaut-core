@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -23,14 +24,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A non-blocking HTTP client for consul
+ * A non-blocking HTTP client for consul.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ConsulClient extends ConsulOperations, DiscoveryClient {
+
     /**
-     * The default ID of the consul service
+     * The default ID of the consul service.
      */
     String SERVICE_ID = "consul";
 

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -32,7 +33,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Represents an application instance in Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations
+ * Represents an application instance in Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations.
  * <p>
  * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java
  *
@@ -41,18 +42,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @JsonRootName("instance")
 public class InstanceInfo implements ConfigurableInstanceInfo {
+
     /**
-     * Eureka default port
+     * Eureka default port.
      */
     public static final int DEFAULT_PORT = 7001;
 
     /**
-     * Secure port disabled by default
+     * Secure port disabled by default.
      */
     public static final int DEFAULT_SECURE_PORT = 0;
 
     /**
-     * US by default
+     * US by default.
      */
     public static final int DEFAULT_COUNTRY_ID = 1;
 
@@ -77,7 +79,28 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     private Map<String, String> metadata = new ConcurrentHashMap<>();
 
     /**
-     * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java
+     * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java.
+     *
+     * @param instanceId           The instance id
+     * @param appName              The application name
+     * @param appGroupName         The application group name
+     * @param ipAddr               The IP addres
+     * @param port                 The port
+     * @param securePort           The secure port
+     * @param homePageUrl          The homepage URL
+     * @param statusPageUrl        The status page URL
+     * @param healthCheckUrl       The health check URL
+     * @param secureHealthCheckUrl The secure health check URL
+     * @param vipAddress           The VIP address
+     * @param secureVipAddress     The secure VIP address
+     * @param countryId            The country ID
+     * @param dataCenterInfo       The data center info
+     * @param hostName             The hostname
+     * @param status               The status
+     * @param overriddenstatus     The overridden status
+     * @param leaseInfo            The lease info
+     * @param metadata             The metadata
+     * @param asgName              The asg name
      */
     @JsonCreator
     InstanceInfo(
@@ -129,13 +152,8 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         }
     }
 
-    @Override
-    public String toString() {
-        return getId();
-    }
-
     /**
-     * Creates an {@link InstanceInfo}
+     * Creates an {@link InstanceInfo}.
      *
      * @param host       The host name
      * @param appName    The application name
@@ -172,6 +190,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      *
      * @param host       The host name
      * @param port       The port
+     * @param ipAddress  The IP address
      * @param appName    The application name
      * @param instanceId The instance identifier
      */
@@ -195,8 +214,13 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         this.instanceId = instanceId;
     }
 
+    @Override
+    public String toString() {
+        return getId();
+    }
+
     /**
-     * The host name of the application instance
+     * The host name of the application instance.
      */
     @Override
     @NotBlank
@@ -227,7 +251,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The port of the application instance
+     * The port of the application instance.
      */
     @Override
     @JsonIgnore
@@ -236,7 +260,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The secure port of the application instance
+     * The secure port of the application instance.
      */
     @Override
     @JsonIgnore
@@ -244,6 +268,9 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         return securePort;
     }
 
+    /**
+     * @return The port
+     */
     @JsonProperty("port")
     PortWrapper getPortWrapper() {
         if (port < 1) {
@@ -252,6 +279,9 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         return new PortWrapper(true, port);
     }
 
+    /**
+     * @return The secure port
+     */
     @JsonProperty("securePort")
     PortWrapper getSecurePortWrapper() {
         if (securePort < 1) {
@@ -273,7 +303,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The application name
+     * The application name.
      */
     @Override
     @NotBlank
@@ -282,7 +312,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The application group name
+     * The application group name.
      */
     @Override
     public String getAppGroupName() {
@@ -290,7 +320,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The instance id
+     * The instance id.
      */
     @Override
     @NotBlank
@@ -299,7 +329,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The country id
+     * The country id.
      */
     @Override
     @Min(1L)
@@ -308,7 +338,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The IP address of the instance
+     * The IP address of the instance.
      */
     @Override
     @NotBlank
@@ -323,7 +353,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The {@link DataCenterInfo} instance
+     * The {@link DataCenterInfo} instance.
      */
     @Override
     @NotNull
@@ -332,7 +362,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The {@link LeaseInfo} instance
+     * The {@link LeaseInfo} instance.
      */
     @Override
     public LeaseInfo getLeaseInfo() {
@@ -340,7 +370,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * @return The instance metadata
+     * @return The instance metadata.
      */
     @Override
     public Map<String, String> getMetadata() {
@@ -424,7 +454,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * Sets the instance ID
+     * Sets the instance ID.
      *
      * @param instanceId The instance ID
      */
@@ -529,40 +559,6 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         }
     }
 
-    /**
-     * The instance status according to Eureka
-     */
-    public enum Status {
-        UP, DOWN, STARTING, OUT_OF_SERVICE, UNKNOWN;
-    }
-
-    /**
-     * {@link InstanceInfo} JSON and XML format for port information does not follow the usual conventions, which
-     * makes its mapping complicated. This class represents the wire format for port information.
-     */
-    static class PortWrapper {
-
-        private final boolean enabled;
-        private final int port;
-
-        @JsonCreator
-        public PortWrapper(@JsonProperty("@enabled") boolean enabled, @JsonProperty("$") int port) {
-            this.enabled = enabled;
-            this.port = port;
-        }
-
-        @JsonProperty("@enabled")
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        @JsonProperty("$")
-        public int getPort() {
-            return port;
-        }
-
-    }
-
     private String portString() {
         return port > 0 ? ":" + this.port : "";
     }
@@ -577,5 +573,49 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException("Unable to lookup host IP address: " + host, e);
         }
+    }
+
+    /**
+     * The instance status according to Eureka.
+     */
+    public enum Status {
+        UP, DOWN, STARTING, OUT_OF_SERVICE, UNKNOWN;
+    }
+
+    /**
+     * {@link InstanceInfo} JSON and XML format for port information does not follow the usual conventions, which
+     * makes its mapping complicated. This class represents the wire format for port information.
+     */
+    static class PortWrapper {
+
+        private final boolean enabled;
+        private final int port;
+
+        /**
+         * @param enabled Whether is enabled
+         * @param port    The port
+         */
+        @JsonCreator
+        public PortWrapper(@JsonProperty("@enabled") boolean enabled, @JsonProperty("$") int port) {
+            this.enabled = enabled;
+            this.port = port;
+        }
+
+        /**
+         * @return Whether is enabled
+         */
+        @JsonProperty("@enabled")
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * @return The port
+         */
+        @JsonProperty("$")
+        public int getPort() {
+            return port;
+        }
+
     }
 }
