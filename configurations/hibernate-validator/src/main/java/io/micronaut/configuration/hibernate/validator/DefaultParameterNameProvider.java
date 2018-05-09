@@ -25,12 +25,10 @@ import io.micronaut.inject.ExecutableMethod;
 import javax.inject.Singleton;
 import javax.validation.ParameterNameProvider;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.lang.reflect.Parameter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -58,7 +56,7 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
         Class<?> declaringClass = constructor.getDeclaringClass();
         Class<?>[] parameterTypes = constructor.getParameterTypes();
         if (INTERNAL_CLASS_NAMES.contains(declaringClass.getName())) {
-            return defaultParameterTypes(parameterTypes);
+            return doGetParameterNames(constructor);
         }
         Optional<? extends BeanDefinition<?>> definition = beanContext.findBeanDefinition(declaringClass);
         return definition.map(def ->
@@ -71,7 +69,7 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
         Class<?>[] parameterTypes = method.getParameterTypes();
         Class<?> declaringClass = method.getDeclaringClass();
         if (INTERNAL_CLASS_NAMES.contains(declaringClass.getName())) {
-            return defaultParameterTypes(parameterTypes);
+            return doGetParameterNames(method);
         }
 
         Optional<? extends ExecutableMethod<?, Object>> executableMethod = beanContext.findExecutableMethod(declaringClass, method.getName(), parameterTypes);
@@ -89,5 +87,16 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
             names.add("arg" + i);
         }
         return names;
+    }
+
+    private List<String> doGetParameterNames(Executable executable) {
+        Parameter[] parameters = executable.getParameters();
+        List<String> parameterNames = new ArrayList<>( parameters.length );
+
+        for ( Parameter parameter : parameters ) {
+            parameterNames.add( parameter.getName() );
+        }
+
+        return Collections.unmodifiableList( parameterNames );
     }
 }

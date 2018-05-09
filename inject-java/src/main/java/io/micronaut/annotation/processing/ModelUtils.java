@@ -291,6 +291,20 @@ class ModelUtils {
     }
 
     /**
+     * Resolves a type name for the given name
+     *
+     * @param type The type
+     * @return The type reference
+     */
+    String resolveTypeName(TypeMirror type) {
+        Object reference = resolveTypeReference(type);
+        if(reference instanceof Class) {
+            return ((Class) reference).getName();
+        }
+        return reference.toString();
+    }
+
+    /**
      * Resolves a type reference for the given type mirror. A type reference is either a reference to the concrete
      * {@link Class} or a String representing the type name.
      *
@@ -300,12 +314,12 @@ class ModelUtils {
     Object resolveTypeReference(TypeMirror type) {
         Object result = Void.TYPE;
         if (type.getKind().isPrimitive()) {
-            result = classOfPrimitiveFor(type.toString());
+            result = resolvePrimitiveTypeReference(type);
         } else if (type.getKind() == ARRAY) {
             ArrayType arrayType = (ArrayType) type;
             TypeMirror componentType = arrayType.getComponentType();
             if (componentType.getKind().isPrimitive()) {
-                result = classOfPrimitiveArrayFor(componentType.toString());
+                result = classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName());
             } else {
                 result = typeUtils.erasure(type).toString();
             }
@@ -444,5 +458,17 @@ class ModelUtils {
      */
     boolean isOptional(TypeMirror mirror) {
         return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
+    }
+
+    private Class resolvePrimitiveTypeReference(TypeMirror type) {
+        Class result;
+        if(type instanceof DeclaredType) {
+            DeclaredType dt = (DeclaredType) type;
+            result = classOfPrimitiveFor(dt.asElement().getSimpleName().toString());
+        }
+        else {
+            result = classOfPrimitiveFor(type.toString());
+        }
+        return result;
     }
 }

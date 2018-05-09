@@ -3,9 +3,7 @@ The previous example presented a trivial example that uses the parameters of a m
 .PetOperations.java
 [source,java]
 ----
-TODO: replace with include
-@Post("/")
-Single<Pet> save(@NotBlank String name, int age)
+include::{testsclient}/annotation/PetOperations.java[tags=save, indent=0]
 ----
 
 The `save` method when called will perform an HTTP `POST` with the following JSON by default:

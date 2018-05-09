@@ -30,5 +30,5 @@ Once you have enabled annotation processing in IntelliJ you can run the applicat
 
 If you have no choice and have to use Eclipse, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 
-As of this writing, Eclipse has https://github.com/eclipse/eclipse.jdt.core/blob/8df02ebc7fde26fb9a3e7f4ba4730fef2349f133/org.eclipse.jdt.apt.pluggable.core/src/org/eclipse/jdt/internal/apt/pluggable/core/filer/IdeFilerImpl.java#L65[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
+As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
 
