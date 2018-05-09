@@ -68,10 +68,16 @@ public class InstantiationUtils {
             }
             return Optional.empty();
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Tried, but could not instantiate type: " + type, e);
+            try {
+                Constructor<T> defaultConstructor = type.getDeclaredConstructor();
+                defaultConstructor.setAccessible(true);
+                return tryInstantiate(defaultConstructor);
+            } catch (Throwable e1) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Tried, but could not instantiate type: " + type, e);
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
         }
     }
 

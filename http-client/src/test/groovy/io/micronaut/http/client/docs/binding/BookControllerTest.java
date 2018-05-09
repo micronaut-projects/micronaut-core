@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.basics;
+package io.micronaut.http.client.docs.binding;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
+import org.hamcrest.CoreMatchers;
+import org.hamcrest.Matcher;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
-import java.net.MalformedURLException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 import static io.micronaut.http.HttpRequest.POST;
@@ -37,64 +43,32 @@ import static org.junit.Assert.fail;
  * @since 1.0
  */
 public class BookControllerTest {
-    @Test
-    public void testPostWithURITemplate() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
-        // tag::posturitemplate[]
-        Flowable<HttpResponse<Book>> call = client.exchange(
-                POST("/amazon/book/{title}", new Book("The Stand")),
-                Book.class
-        );
-        // end::posturitemplate[]
-
-        HttpResponse<Book> response = call.blockingFirst();
-        Optional<Book> message = response.getBody(Book.class); // <2>
-        // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
-        // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
-                "The Stand",
-                message.get().getTitle()
-        );
-
-
-        embeddedServer.stop();
-        client.stop();
-    }
-
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @Test
-    public void testPostFormData() {
+    public void testPostInvalidFormData() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::postform[]
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("title", "The Stand");
+        data.put("pages", "notnumber");
+        data.put("url", "noturl");
         Flowable<HttpResponse<Book>> call = client.exchange(
-                POST("/amazon/book/{title}", new Book("The Stand"))
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED),
+                POST("/binding/book/{title}", data)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
         );
         // end::postform[]
 
+        thrown.expect(HttpClientResponseException.class);
+        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [pages] for value [notnumber]"));
+
         HttpResponse<Book> response = call.blockingFirst();
-        Optional<Book> message = response.getBody(Book.class); // <2>
-        // check the status
-        assertEquals(
-                HttpStatus.CREATED,
-                response.getStatus() // <3>
-        );
-        // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
-                "The Stand",
-                message.get().getTitle()
-        );
+
 
 
         embeddedServer.stop();

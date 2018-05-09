@@ -89,19 +89,13 @@ In the above case the `title` property of the passed object will be included in 
 
 ==== Sending Form Data
 
-You can also encode a POJO or a map as regular form data instead of JSON. Just send the content type on the post request:
+You can also encode a POJO or a map as regular form data instead of JSON. Just set the content type to `application/x-www-form-urlencoded` on the post request:
 
 .Sending a Form Data
 [source,java]
 ----
-TODO - example showing:
-import static HttpRequest.*;
-
-Book book = new Book("The Stand")
-client.exchange(
-    POST("/foo/bar", book)
-        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-).subscribe(response ->
-    // handle response
-)
+include::{testsclient}/basics/BookControllerTest.java[tags=postform, indent=0]
 ----
+
+Note that Jackson is used to bind form data too, so to customize the binding process you can use https://github.com/FasterXML/jackson-annotations[Jackson annotations].
+

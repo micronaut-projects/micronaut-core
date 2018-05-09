@@ -63,7 +63,7 @@ class LoginControllerSpec extends Specification {
         rsp.body().accessToken
         rsp.body().refreshToken
         rsp.body().username
-        rsp.body().roles == []
+        rsp.body().roles == null
         rsp.body().expiresIn
     }
 

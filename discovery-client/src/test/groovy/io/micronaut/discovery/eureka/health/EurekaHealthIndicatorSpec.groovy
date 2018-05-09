@@ -16,8 +16,6 @@
 package io.micronaut.discovery.eureka.health
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.management.health.indicator.HealthResult
-import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.eureka.MockEurekaServer
 import io.micronaut.health.HealthStatus
 import io.micronaut.management.health.indicator.HealthResult
