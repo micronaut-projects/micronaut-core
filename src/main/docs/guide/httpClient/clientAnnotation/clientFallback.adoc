@@ -13,18 +13,7 @@ To illustrate this consider again the `PetOperations` interface declared earlier
 .Defining a Fallback
 [source,java]
 ----
-TODO: replace with include
-
-@Fallback
-class PetFallback implements PetOperations {
-    @Override
-    public Single<Pet> save(@NotBlank String name, int age) {
-        Pet pet = new Pet()
-        pet.setName(name)
-        pet.setAge(age)
-        return Single.just(pet)
-    }
-}
+include::{testsclient}/annotation/retry/PetFallback.java[tags=class, indent=0]
 ----
 
 TIP: If you purely want to use fallbacks to help with testing against external Microservices you can define fallbacks in the `src/test/java` directory so they are not included in production code.
