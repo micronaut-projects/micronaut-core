@@ -7,11 +7,7 @@ Let's start with a simple example. Given the following class:
 .Pet.java
 [source,java]
 ----
-TODO: provide actual example
-class Pet {
-    String name
-    Integer age
-}
+include::{testsclient}/annotation/Pet.java[tags=class, indent=0]
 ----
 
 You can define a common interface for saving new `Pet` instances:
@@ -19,11 +15,9 @@ You can define a common interface for saving new `Pet` instances:
 .PetOperations.java
 [source,java]
 ----
-TODO: provide actual example
-interface PetOperations {
-    @Post("/")
-    Single<Pet> save(@NotBlank String name, int age)
-}
+include::{testsclient}/annotation/PetOperations.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetOperations.java[tags=class, indent=0]
 ----
 
 Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. Also, as you can see you can use `javax.validation` constraints to validate arguments.
@@ -33,31 +27,20 @@ On the server side of Micronaut you can implement this interface:
 .PetController.java
 [source,java]
 ----
-TODO: provide actual example
-@Controller("/pets")
-class PetController implements PetOperations {
-    @Override
-    public Single<Pet> save(@NotBlank String name, int age) {
-        Pet pet = new Pet()
-        pet.setName(name)
-        pet.setAge(age)
-        // save to database or something
-        return Single.just(pet)
-    }
-}
+include::{testsclient}/annotation/PetController.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetController.java[tags=class, indent=0]
 ----
 
 You can then define a client in `src/test/java` that uses `@Client` to automatically, at compile time, implement a client:
 
-.PetController.java
+.PetClient.java
 [source,java]
 ----
-TODO: provide actual example
-@Client("/pets") // <1>
-interface PetClient extends PetOperations { // <2>
-    @Override
-    public Single<Pet> save(@NotBlank String name, int age) // <3>
-}
+include::{testsclient}/annotation/PetClient.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetClient.java[tags=class, indent=0]
+
 ----
 
 <1> The api:http.client.Client[] annotation is used with a value relative to the current server. In this case `/pets`
