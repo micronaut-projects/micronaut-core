@@ -61,6 +61,11 @@ ext {
                     name:'jackson-datatype-jdk8',
                     modules:['jackson-datatype-jsr310']
             ],
+            jsr305:[
+                version:jsr305Version,
+                group:'com.google.code.findbugs',
+                name:'jsr305'
+            ],
             mongodb:[
                 version: mongoVersion,
                 group:'org.mongodb',
@@ -110,6 +115,11 @@ ext {
                 version: spockVersion,
                 group:'org.spockframework',
                 name: 'spock-core'
+            ],
+            'reactive.streams':[
+                version:reactiveStreamsVersion,
+                group:'org.reactivestreams',
+                name:'reactive-streams'
             ],
             rxjava1: [
                 version: rxJava1Version,
