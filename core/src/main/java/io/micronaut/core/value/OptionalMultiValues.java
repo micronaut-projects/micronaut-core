@@ -24,6 +24,7 @@ import java.util.Optional;
 /**
  * An {@link OptionalValues} that for each key features an {@link java.util.Optional} {@link List} of values.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

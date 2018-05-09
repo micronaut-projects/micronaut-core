@@ -24,10 +24,17 @@ package io.micronaut.core.reflect.exception;
  */
 public class InvocationException extends RuntimeException {
 
+    /**
+     * @param message The message
+     */
     public InvocationException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public InvocationException(String message, Throwable cause) {
         super(message, cause);
     }

@@ -168,7 +168,13 @@
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 
-        <!-- Checks for class design                         -->
+         <!-- Checks for Inner assigment -->
+         <!-- See http://checkstyle.sourceforge.net/config_coding.html#InnerAssignment -->
+         <module name="InnerAssignment">
+             <property name="tokens" value="ASSIGN,PLUS_ASSIGN,MINUS_ASSIGN"/>
+         </module>
+
+         <!-- Checks for class design                         -->
         <!-- See http://checkstyle.sf.net/config_design.html -->
         <module name="DesignForExtension">
             <property name="ignoredAnnotations" value="Override"/>

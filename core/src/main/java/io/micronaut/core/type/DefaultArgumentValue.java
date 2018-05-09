@@ -26,6 +26,7 @@ import java.util.Optional;
 /**
  * Default implementation of {@link ArgumentValue}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -34,6 +35,10 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     private final Argument<V> argument;
     private final V value;
 
+    /**
+     * @param argument The argument
+     * @param value    The value
+     */
     DefaultArgumentValue(Argument<V> argument, V value) {
         this.argument = argument;
         this.value = value;

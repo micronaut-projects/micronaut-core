@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -34,20 +35,21 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Represents an argument to a method or constructor or type
+ * Represents an argument to a method or constructor or type.
  *
+ * @param <T> The argument type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named, AnnotationMetadataProvider {
 
     /**
-     * Constant representing zero arguments
+     * Constant representing zero arguments.
      */
     Argument[] ZERO_ARGUMENTS = new Argument[0];
 
     /**
-     * Default Object argument
+     * Default Object argument.
      */
     Argument<Object> OBJECT_ARGUMENT = of(Object.class);
 
@@ -67,8 +69,8 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     Annotation getQualifier();
 
     /**
-     * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument name
-     * within the comparison so this method offers a variation that just compares types
+     * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
+     * name within the comparison so this method offers a variation that just compares types.
      *
      * @param other The type type
      * @return True if they are equal
@@ -76,24 +78,23 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     boolean equalsType(Argument<?> other);
 
     /**
-     * The hash code including only the types. The regular {@link Object#hashCode()} implementation includes the argument name
-     * within the comparison so this method offers a variation that just compares types
+     * The hash code including only the types. The regular {@link Object#hashCode()} implementation includes the
+     * argument name within the comparison so this method offers a variation that just compares types.
      *
      * @return The type hash code
      */
     int typeHashCode();
 
     /**
-     * Convert an argument array to a class array
+     * Convert an argument array to a class array.
      *
      * @param arguments The arguments
      * @return The class array
      */
-    static Class[] toClassArray(Argument...arguments) {
-        if(ArrayUtils.isEmpty(arguments)) {
+    static Class[] toClassArray(Argument... arguments) {
+        if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
-        }
-        else {
+        } else {
             Class[] types = new Class[arguments.length];
             for (int i = 0; i < arguments.length; i++) {
                 Argument argument = arguments[i];
@@ -104,11 +105,12 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Convert the arguments to a string representation
+     * Convert the arguments to a string representation.
+     *
      * @param arguments The arguments
      * @return The String representation
      */
-    static String toString(Argument...arguments) {
+    static String toString(Argument... arguments) {
         StringBuilder baseString = new StringBuilder();
         for (int i = 0; i < arguments.length; i++) {
             Argument argument = arguments[i];
@@ -119,8 +121,9 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         }
         return baseString.toString();
     }
-     /**
-     * Creates a new argument for the given type, name and qualifier
+
+    /**
+     * Creates a new argument for the given type, name and qualifier.
      *
      * @param type      The type
      * @param name      The name
@@ -136,12 +139,12 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
-     * @param type The type
-     * @param name The name
+     * @param type           The type
+     * @param name           The name
      * @param typeParameters the type parameters
-     * @param <T>  The generic type
+     * @param <T>            The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
@@ -152,24 +155,25 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
-     * @param type The type
-     * @param name The name
+     * @param type               The type
+     * @param name               The name
      * @param annotationMetadata the annotation metadata
-     * @param typeParameters the type parameters
-     * @param <T>  The generic type
+     * @param typeParameters     the type parameters
+     * @param <T>                The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
-            Class<T> type,
-            String name,
-            AnnotationMetadata annotationMetadata,
-            @Nullable Argument... typeParameters) {
+        Class<T> type,
+        String name,
+        AnnotationMetadata annotationMetadata,
+        @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, name, annotationMetadata, typeParameters);
     }
+
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
      * @param type The type
      * @param name The name
@@ -183,10 +187,11 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
-     * @param type The type
-     * @param <T>  The generic type
+     * @param type           The type
+     * @param typeParameters The parameters type
+     * @param <T>            The generic type
      * @return The argument instance
      */
     static <T> Argument<T> of(
@@ -195,7 +200,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
      * @param type The type
      * @param <T>  The generic type
@@ -207,14 +212,14 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Creates a new argument for the given type and name
+     * Creates a new argument for the given type and name.
      *
-     * @param type The type
-     * @param <T>  The generic type
+     * @param type           The type
+     * @param typeParameters the parameters type
+     * @param <T>            The generic type
      * @return The argument instance
      */
-    static <T> Argument<T> of(
-        Class<T> type, @Nullable Class<?>... typeParameters) {
+    static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
         if (typeParameters == null) {
             return of(type);
         } else {
@@ -234,7 +239,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Create a new argument for the given method
+     * Create a new argument for the given method.
      *
      * @param method         The method
      * @param name           The argument name
@@ -264,7 +269,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Create a new argument for the given constructor
+     * Create a new argument for the given constructor.
      *
      * @param constructor    The method
      * @param name           The argument name
@@ -294,7 +299,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Create a new argument for the given field
+     * Create a new argument for the given field.
      *
      * @param field          The field
      * @param name           The argument name
@@ -321,7 +326,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Create a new argument for the given field
+     * Create a new argument for the given field.
      *
      * @param field          The field
      * @param qualifierType  The qualifier type
@@ -346,7 +351,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Create a new argument for the given field
+     * Create a new argument for the given field.
      *
      * @param field          The field
      * @param typeParameters The generic type parameters
@@ -368,8 +373,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     }
 
     /**
-     * Returns the string representation of the argument
-     * type, including generics
+     * Returns the string representation of the argument type, including generics.
      *
      * @param simple If true, output the simple name of types
      * @return The type string representation

@@ -31,7 +31,7 @@ public class Introspector {
     /* The cache to store Bean Info objects that have been found or created */
     private static final int DEFAULT_CAPACITY = 128;
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "ConstantName"})
     private static final Cache<Class<?>, BeanInfo> theCache = Caffeine.newBuilder()
                                                                       .maximumSize(DEFAULT_CAPACITY)
                                                                       .build();

@@ -44,6 +44,7 @@ public interface ObjectSerializer {
      *
      * @param object       The object to serialize
      * @param outputStream The output stream
+     * @throws SerializationException if there is a serialization problem
      */
     void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException;
 
@@ -54,6 +55,7 @@ public interface ObjectSerializer {
      * @param requiredType The required type
      * @param <T>          The required generic type
      * @return An {@link Optional} of the object
+     * @throws SerializationException if there is a serialization problem
      */
     <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException;
 
@@ -62,6 +64,7 @@ public interface ObjectSerializer {
      *
      * @param object The object to serialize
      * @return An optional of the bytes of the object
+     * @throws SerializationException if there is a serialization problem
      */
     default Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
         if (object == null) {
@@ -80,6 +83,7 @@ public interface ObjectSerializer {
      * @param requiredType The required type
      * @param <T>          The required generic type
      * @return An {@link Optional} of the object
+     * @throws SerializationException if there is a serialization problem
      */
     default <T> Optional<T> deserialize(@Nullable byte[] bytes, Class<T> requiredType) throws SerializationException {
         if (bytes == null) {
@@ -99,6 +103,7 @@ public interface ObjectSerializer {
      *
      * @param bytes The byte array
      * @return An {@link Optional} of the object
+     * @throws SerializationException if there is a serialization problem
      */
     default Optional<Object> deserialize(@Nullable byte[] bytes) throws SerializationException {
         if (bytes == null) {

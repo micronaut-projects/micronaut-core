@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 /**
  * An interface for classes that represent a map-like structure of values that can be converted.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -119,8 +120,8 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      *
      * @param keyType   The key type
      * @param valueType The value type
-     * @param <KT>
-     * @param <VT>
+     * @param <KT>      The key type
+     * @param <VT>      The value type
      * @return The values
      */
     default <KT, VT> Map<KT, VT> asMap(Class<KT> keyType, Class<VT> valueType) {

@@ -23,18 +23,29 @@ import java.util.Map;
 /**
  * Mutable version of {@link ConvertibleMultiValuesMap}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
 public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> implements MutableConvertibleValues<V> {
 
+    /**
+     * Default constructor.
+     */
     public MutableConvertibleValuesMap() {
     }
 
+    /**
+     * @param map The map
+     */
     public MutableConvertibleValuesMap(Map<? extends CharSequence, V> map) {
         super(map);
     }
 
+    /**
+     * @param map               The map
+     * @param conversionService The conversion service
+     */
     public MutableConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
         super(map, conversionService);
     }

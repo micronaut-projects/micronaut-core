@@ -51,7 +51,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
      *
      * @param type          The type
      * @param typeArguments The type arguments
-     * @param <T1>
+     * @param <T1>          The return type
      * @return A {@link ReturnType}
      */
     static <T1> ReturnType<T1> of(Class<T1> type, Argument<?>... typeArguments) {

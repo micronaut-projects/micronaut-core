@@ -43,7 +43,8 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * The default conversion context.
      */
-    ConversionContext DEFAULT = new ConversionContext() {};
+    ConversionContext DEFAULT = new ConversionContext() {
+    };
 
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
@@ -79,7 +80,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Augment this context with data for the given argument.
      *
-     * @param <T> type Generic
+     * @param <T>      type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -139,7 +140,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
-     * @param <T> type Generic
+     * @param <T>      type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -150,7 +151,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
-     * @param <T> type Generic
+     * @param <T>      type Generic
      * @param argument The argument
      * @return The conversion context
      */
@@ -161,7 +162,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
-     * @param <T> type Generic
+     * @param <T>      type Generic
      * @param argument The argument
      * @param locale   The locale
      * @return The conversion context
@@ -173,7 +174,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
-     * @param <T> type Generic
+     * @param <T>      type Generic
      * @param argument The argument
      * @param locale   The locale
      * @param charset  The charset
