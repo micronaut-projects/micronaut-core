@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Abstract class for all {@link io.micronaut.discovery.DiscoveryClient} configurations
+ * Abstract class for all {@link io.micronaut.discovery.DiscoveryClient} configurations.
  *
  * @author graemerocher
  * @since 1.0
@@ -53,10 +54,16 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     private int port = -1;
     private boolean secure;
 
+    /**
+     * Default constructor.
+     */
     public DiscoveryClientConfiguration() {
         this.applicationConfiguration = null;
     }
 
+    /**
+     * @param applicationConfiguration The application configuration.
+     */
     public DiscoveryClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.applicationConfiguration = applicationConfiguration;
@@ -80,7 +87,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     }
 
     /**
-     * Sets the Discovery servers to use for the default zone
+     * Sets the Discovery servers to use for the default zone.
      *
      * @param defaultZone The default zone
      */
@@ -103,7 +110,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     }
 
     /**
-     * Configures Discovery servers in other zones
+     * Configures Discovery servers in other zones.
      *
      * @param zones The zones
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -27,7 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * A service entry in Consul. See https://www.consul.io/api/catalog.html#service
+ * A service entry in Consul. See https://www.consul.io/api/catalog.html#service.
  *
  * @author graemerocher
  * @since 1.0
@@ -35,15 +36,18 @@ import java.util.List;
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class NewServiceEntry extends AbstractServiceEntry {
 
+    private List<NewCheck> checks = new ArrayList<>(1);
+
+    /**
+     * @param serviceName The service name
+     */
     @JsonCreator
     public NewServiceEntry(@JsonProperty("Name") String serviceName) {
         super(serviceName);
     }
 
-    private List<NewCheck> checks = new ArrayList<>(1);
-
     /**
-     * See https://www.consul.io/api/agent/service.html#checks
+     * See https://www.consul.io/api/agent/service.html#checks.
      *
      * @return The health checks to perform
      */
@@ -52,7 +56,7 @@ public class NewServiceEntry extends AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#checks
+     * See https://www.consul.io/api/agent/service.html#checks.
      *
      * @param checks The health checks
      * @return The {@link NewServiceEntry} instance
@@ -65,7 +69,7 @@ public class NewServiceEntry extends AbstractServiceEntry {
     }
 
     /**
-     * See https://www.consul.io/api/agent/service.html#checks
+     * See https://www.consul.io/api/agent/service.html#checks.
      *
      * @param check The health check
      * @return The {@link NewServiceEntry} instance
@@ -102,11 +106,18 @@ public class NewServiceEntry extends AbstractServiceEntry {
         return (NewServiceEntry) super.tags(tags);
     }
 
+    /**
+     * @param tags The tags
+     * @return The {@link NewServiceEntry} instance
+     */
     public NewServiceEntry tags(String... tags) {
         return (NewServiceEntry) super.tags(Arrays.asList(tags));
     }
 
-    void setChecks(List<HTTPCheck> checks) {
+    /**
+     * @param checks The list of Http checks
+     */
+    protected void setChecks(List<HTTPCheck> checks) {
         if (CollectionUtils.isNotEmpty(checks)) {
             this.checks.addAll(checks);
         }

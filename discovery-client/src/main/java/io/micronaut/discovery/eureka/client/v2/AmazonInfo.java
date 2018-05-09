@@ -13,6 +13,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -38,8 +39,8 @@ import java.util.regex.Pattern;
 /**
  * An AWS specific {@link DataCenterInfo} implementation.
  * <p>
- * Gets AWS specific information for registration with eureka by making a HTTP
- * call to an AWS service as recommended by AWS.
+ * Gets AWS specific information for registration with eureka by making a HTTP call to an AWS service as recommended
+ * by AWS.
  * </p>
  *
  * @author Karthik Ranganathan, Greg Kim
@@ -49,6 +50,9 @@ public class AmazonInfo implements DataCenterInfo {
     private static final String AWS_API_VERSION = "latest";
     private static final String AWS_METADATA_URL = "http://169.254.169.254/" + AWS_API_VERSION + "/meta-data/";
 
+    /**
+     * MetaData key.
+     */
     public enum MetaDataKey {
         instanceId("instance-id"),  // always have this first as we use it as a fail fast mechanism
         amiId("ami-id"),
@@ -95,24 +99,46 @@ public class AmazonInfo implements DataCenterInfo {
         protected String name;
         protected String path;
 
+        /**
+         * @param name The name
+         */
         MetaDataKey(String name) {
             this(name, "");
         }
 
+        /**
+         * @param name The name
+         * @param path The path
+         */
         MetaDataKey(String name, String path) {
             this.name = name;
             this.path = path;
         }
 
+        /**
+         * @return The name
+         */
         public String getName() {
             return name;
         }
 
-        // override to apply prepend and append
+        /**
+         * Override to apply prepend and append.
+         *
+         * @param prepend The prefix
+         * @param append  The suffix
+         * @return The new URL
+         * @throws MalformedURLException if the URL is not valid
+         */
         public URL getURL(String prepend, String append) throws MalformedURLException {
             return new URL(AWS_METADATA_URL + path + name);
         }
 
+        /**
+         * @param inputStream The input stream
+         * @return The information read
+         * @throws IOException if there is an error
+         */
         public String read(InputStream inputStream) throws IOException {
             String toReturn;
             try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
@@ -127,12 +153,155 @@ public class AmazonInfo implements DataCenterInfo {
             }
         }
 
+        @Override
         public String toString() {
             return getName();
         }
     }
 
+    private Map<String, String> metadata;
+
+    /**
+     * Default constructor.
+     */
+    public AmazonInfo() {
+        this.metadata = new HashMap<>();
+    }
+
+    /**
+     * Constructor provided for deserialization framework. It is expected that {@link AmazonInfo} will be built
+     * programmatically using {@link AmazonInfo.Builder}.
+     *
+     * @param name     this value is ignored, as it is always set to "Amazon"
+     * @param metadata The metadata
+     */
+    @JsonCreator
+    AmazonInfo(
+        @JsonProperty("name") String name,
+        @JsonProperty("metadata") HashMap<String, String> metadata) {
+        this.metadata = metadata;
+    }
+
+    /**
+     * Constructor provided for deserialization framework. It is expected that {@link AmazonInfo} will be built
+     * programmatically using {@link AmazonInfo.Builder}.
+     *
+     * @param name     this value is ignored, as it is always set to "Amazon"
+     * @param metadata The metadata
+     */
+    AmazonInfo(
+        @JsonProperty("name") String name,
+        @JsonProperty("metadata") Map<String, String> metadata) {
+        this.metadata = metadata;
+    }
+
+    /**
+     * @return The name. It always returns "Amazon"
+     */
+    @Override
+    public Name getName() {
+        return Name.Amazon;
+    }
+
+    /**
+     * Get the metadata information specific to AWS.
+     *
+     * @return the map of AWS metadata as specified by {@link AmazonInfo.MetaDataKey}.
+     */
+    @JsonProperty("metadata")
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    /**
+     * Set AWS metadata.
+     *
+     * @param metadataMap the map containing AWS metadata.
+     */
+    public void setMetadata(Map<String, String> metadataMap) {
+        this.metadata = metadataMap;
+    }
+
+    /**
+     * Gets the AWS metadata specified in {@link AmazonInfo.MetaDataKey}.
+     *
+     * @param key the metadata key.
+     * @return String returning the value.
+     */
+    public String get(AmazonInfo.MetaDataKey key) {
+        return metadata.get(key.getName());
+    }
+
+    /**
+     * @return The instance id
+     */
+    @JsonIgnore
+    public String getId() {
+        return get(AmazonInfo.MetaDataKey.instanceId);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof AmazonInfo)) {
+            return false;
+        }
+
+        AmazonInfo that = (AmazonInfo) o;
+
+        if (metadata != null ? !metadata.equals(that.metadata) : that.metadata != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return metadata != null ? metadata.hashCode() : 0;
+    }
+
+    @Override
+    public String toString() {
+        return "AmazonInfo{" +
+            "metadata=" + metadata +
+            '}';
+    }
+
+    /**
+     * @param metaDataKey         The metadata key
+     * @param url                 The URL
+     * @param connectionTimeoutMs The connection timeout
+     * @param readTimeoutMs       The read timeout in milliseconds
+     * @return The metadata
+     * @throws IOException if there is an error
+     */
+    @SuppressWarnings("EmptyBlock")
+    static String readEc2MetadataUrl(AmazonInfo.MetaDataKey metaDataKey, URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
+        HttpURLConnection uc = (HttpURLConnection) url.openConnection();
+        uc.setConnectTimeout(connectionTimeoutMs);
+        uc.setReadTimeout(readTimeoutMs);
+
+        if (uc.getResponseCode() != HttpURLConnection.HTTP_OK) {  // need to read the error for clean connection close
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(uc.getErrorStream()))) {
+                while (br.readLine() != null) {
+                    // do nothing but keep reading the line
+                }
+            }
+        } else {
+            return metaDataKey.read(uc.getInputStream());
+        }
+
+        return null;
+    }
+
+    /**
+     * Builder class.
+     */
     public static final class Builder {
+        @SuppressWarnings("ConstantName")
         private static final Logger logger = LoggerFactory.getLogger(AmazonInfo.Builder.class);
         private static final int SLEEP_TIME_MS = 100;
 
@@ -142,10 +311,18 @@ public class AmazonInfo implements DataCenterInfo {
             result = new AmazonInfo();
         }
 
+        /**
+         * @return The new builder
+         */
         public static Builder newBuilder() {
             return new Builder();
         }
 
+        /**
+         * @param key   The key
+         * @param value The value
+         * @return The builder instance
+         */
         public Builder addMetadata(MetaDataKey key, String value) {
             result.metadata.put(key.getName(), value);
             return this;
@@ -167,6 +344,7 @@ public class AmazonInfo implements DataCenterInfo {
          * @param config The Eureka configuration
          * @return the instance information specific to AWS.
          */
+        @SuppressWarnings("MagicNumber")
         public AmazonInfo autoBuild(EurekaConfiguration config) {
 
             for (AmazonInfo.MetaDataKey key : AmazonInfo.MetaDataKey.values()) {
@@ -212,111 +390,5 @@ public class AmazonInfo implements DataCenterInfo {
             }
             return result;
         }
-    }
-
-    private Map<String, String> metadata;
-
-    public AmazonInfo() {
-        this.metadata = new HashMap<>();
-    }
-
-    /**
-     * Constructor provided for deserialization framework. It is expected that {@link AmazonInfo} will be built
-     * programmatically using {@link AmazonInfo.Builder}.
-     *
-     * @param name this value is ignored, as it is always set to "Amazon"
-     */
-    @JsonCreator
-    AmazonInfo(
-        @JsonProperty("name") String name,
-        @JsonProperty("metadata") HashMap<String, String> metadata) {
-        this.metadata = metadata;
-    }
-
-    AmazonInfo(
-        @JsonProperty("name") String name,
-        @JsonProperty("metadata") Map<String, String> metadata) {
-        this.metadata = metadata;
-    }
-
-    @Override
-    public Name getName() {
-        return Name.Amazon;
-    }
-
-    /**
-     * Get the metadata information specific to AWS.
-     *
-     * @return the map of AWS metadata as specified by {@link AmazonInfo.MetaDataKey}.
-     */
-    @JsonProperty("metadata")
-    public Map<String, String> getMetadata() {
-        return metadata;
-    }
-
-    /**
-     * Set AWS metadata.
-     *
-     * @param metadataMap the map containing AWS metadata.
-     */
-    public void setMetadata(Map<String, String> metadataMap) {
-        this.metadata = metadataMap;
-    }
-
-    /**
-     * Gets the AWS metadata specified in {@link AmazonInfo.MetaDataKey}.
-     *
-     * @param key the metadata key.
-     * @return String returning the value.
-     */
-    public String get(AmazonInfo.MetaDataKey key) {
-        return metadata.get(key.getName());
-    }
-
-    @JsonIgnore
-    public String getId() {
-        return get(AmazonInfo.MetaDataKey.instanceId);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof AmazonInfo)) return false;
-
-        AmazonInfo that = (AmazonInfo) o;
-
-        if (metadata != null ? !metadata.equals(that.metadata) : that.metadata != null) return false;
-
-        return true;
-    }
-
-    @Override
-    public int hashCode() {
-        return metadata != null ? metadata.hashCode() : 0;
-    }
-
-    @Override
-    public String toString() {
-        return "AmazonInfo{" +
-            "metadata=" + metadata +
-            '}';
-    }
-
-    static String readEc2MetadataUrl(AmazonInfo.MetaDataKey metaDataKey, URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        HttpURLConnection uc = (HttpURLConnection) url.openConnection();
-        uc.setConnectTimeout(connectionTimeoutMs);
-        uc.setReadTimeout(readTimeoutMs);
-
-        if (uc.getResponseCode() != HttpURLConnection.HTTP_OK) {  // need to read the error for clean connection close
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(uc.getErrorStream()))) {
-                while (br.readLine() != null) {
-                    // do nothing but keep reading the line
-                }
-            }
-        } else {
-            return metaDataKey.read(uc.getInputStream());
-        }
-
-        return null;
     }
 }

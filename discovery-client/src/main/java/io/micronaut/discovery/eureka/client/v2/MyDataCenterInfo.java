@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -25,6 +26,9 @@ public class MyDataCenterInfo implements DataCenterInfo {
 
     private final Name name;
 
+    /**
+     * @param name The name
+     */
     @JsonCreator
     public MyDataCenterInfo(@JsonProperty("name") Name name) {
         this.name = name;

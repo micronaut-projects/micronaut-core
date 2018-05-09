@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client.config;
 
 import io.micronaut.context.annotation.Requires;
@@ -50,7 +51,10 @@ public class DistributedPropertySourceLocator implements BootstrapPropertySource
     private final ConfigurationClient configurationClient;
     private final Duration readTimeout;
 
-
+    /**
+     * @param configurationClient The configuration client
+     * @param readTimeout         The read timeout
+     */
     public DistributedPropertySourceLocator(
         ConfigurationClient configurationClient,
         @Value("${" + ConfigurationClient.READ_TIMEOUT + ":10s}")
