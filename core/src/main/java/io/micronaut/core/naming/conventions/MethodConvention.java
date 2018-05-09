@@ -20,7 +20,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI</p>.
+ * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -76,12 +76,19 @@ public enum MethodConvention {
     private final String httpMethod;
     private final String uri;
 
+    /**
+     * @param uri        The URI
+     * @param httpMethod The Http method
+     */
     MethodConvention(String uri, String httpMethod) {
         this.uri = uri;
         this.httpMethod = httpMethod;
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
+    /**
+     * @param uri The URI
+     */
     MethodConvention(String uri) {
         this.uri = uri;
         this.httpMethod = name();
@@ -96,7 +103,7 @@ public enum MethodConvention {
     }
 
     /**
-     * The HTTP method name for this convention.
+     * @return The HTTP method name for this convention.
      */
     public String httpMethod() {
         return httpMethod;

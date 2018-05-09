@@ -35,6 +35,9 @@ public enum TypeConvention {
 
     private final String suffix;
 
+    /**
+     * Default constructor.
+     */
     TypeConvention() {
         this.suffix = NameUtils.capitalize(name().toLowerCase(Locale.ENGLISH));
     }

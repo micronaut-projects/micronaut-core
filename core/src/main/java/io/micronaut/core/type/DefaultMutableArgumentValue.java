@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 /**
  * Default implementation of {@link MutableArgumentValue}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -30,6 +31,10 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
 
     private V value;
 
+    /**
+     * @param argument The argument
+     * @param value    The value
+     */
     DefaultMutableArgumentValue(Argument<V> argument, V value) {
         super(argument, value);
         this.value = value;

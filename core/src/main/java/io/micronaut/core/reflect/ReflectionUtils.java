@@ -265,6 +265,7 @@ public class ReflectionUtils {
      *
      * @param type          The type
      * @param argumentTypes The argument types
+     * @param <T>           The type
      * @return An {@link Optional} contains the method or empty
      * @throws NoSuchMethodError If the method doesn't exist
      */
@@ -317,8 +318,9 @@ public class ReflectionUtils {
     /**
      * Finds a field in the type or super type.
      *
-     * @param type The type
-     * @param name The field name
+     * @param type  The type
+     * @param name  The field name
+     * @param value The value
      */
     public static void setFieldIfPossible(Class type, String name, Object value) {
         Optional<Field> declaredField = findDeclaredField(type, name);
@@ -365,6 +367,11 @@ public class ReflectionUtils {
         return methodSet.stream();
     }
 
+    /**
+     * @param type The type
+     * @param name The field name
+     * @return An optional with the declared field
+     */
     public static Optional<Field> findDeclaredField(Class type, String name) {
         try {
             Field declaredField = type.getDeclaredField(name);
@@ -374,11 +381,20 @@ public class ReflectionUtils {
         }
     }
 
+    /**
+     * @param aClass A class
+     * @return All the interfaces
+     */
     public static Set<Class> getAllInterfaces(Class<?> aClass) {
         Set<Class> interfaces = new HashSet<>();
         return populateInterfaces(aClass, interfaces);
     }
 
+    /**
+     * @param aClass     A class
+     * @param interfaces The interfaces
+     * @return A set with the interfaces
+     */
     @SuppressWarnings("Duplicates")
     protected static Set<Class> populateInterfaces(Class<?> aClass, Set<Class> interfaces) {
         Class<?>[] theInterfaces = aClass.getInterfaces();
@@ -396,6 +412,12 @@ public class ReflectionUtils {
         return interfaces;
     }
 
+    /**
+     * @param declaringType The declaring type
+     * @param name          The method name
+     * @param argumentTypes The argument types
+     * @return A {@link NoSuchMethodError}
+     */
     public static NoSuchMethodError newNoSuchMethodError(Class declaringType, String name, Class[] argumentTypes) {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));

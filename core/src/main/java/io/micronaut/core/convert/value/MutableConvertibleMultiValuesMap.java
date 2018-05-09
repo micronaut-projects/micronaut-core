@@ -25,18 +25,29 @@ import java.util.Map;
 /**
  * Implementation of {@link MutableConvertibleMultiValues} that operates against a backing {@link java.util.LinkedHashMap}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
 public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesMap<V> implements MutableConvertibleMultiValues<V> {
 
+    /**
+     * Default constructor.
+     */
     public MutableConvertibleMultiValuesMap() {
     }
 
+    /**
+     * @param values The values
+     */
     public MutableConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
         super(values, ConversionService.SHARED);
     }
 
+    /**
+     * @param values            The values
+     * @param conversionService The conversion service
+     */
     public MutableConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
         super(values, conversionService);
     }
@@ -44,7 +55,7 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
     @Override
     public MutableConvertibleMultiValues<V> add(CharSequence key, V value) {
         this.values.computeIfAbsent(key, k -> new ArrayList<>())
-                   .add(value);
+            .add(value);
         return this;
     }
 
@@ -65,7 +76,7 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
     @Override
     public MutableConvertibleMultiValues<V> remove(CharSequence key, V value) {
         this.values.computeIfAbsent(key, k -> new ArrayList<>())
-                   .remove(value);
+            .remove(value);
 
         return this;
     }

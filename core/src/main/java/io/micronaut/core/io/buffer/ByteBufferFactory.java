@@ -19,6 +19,8 @@ package io.micronaut.core.io.buffer;
 /**
  * An allocator for {@link ByteBuffer} instances.
  *
+ * @param <T> The type
+ * @param <B> The body
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -30,42 +32,51 @@ public interface ByteBufferFactory<T, B> {
     T getNativeAllocator();
 
     /**
-     * Allocate a {@link ByteBuffer}. If it is a direct or heap buffer
-     * depends on the actual implementation.
+     * Allocate a {@link ByteBuffer}. If it is a direct or heap buffer depends on the actual implementation.
+     *
+     * @return The buffer
      */
     ByteBuffer<B> buffer();
 
     /**
-     * Allocate a {@link ByteBuffer} with the given initial capacity.
-     * If it is a direct or heap buffer depends on the actual implementation.
+     * Allocate a {@link ByteBuffer} with the given initial capacity. If it is a direct or heap buffer depends on the
+     * actual implementation.
+     *
+     * @param initialCapacity The initial capacity
+     * @return the buffer
      */
     ByteBuffer<B> buffer(int initialCapacity);
 
     /**
-     * Allocate a {@link ByteBuffer} with the given initial capacity and the given
-     * maximal capacity. If it is a direct or heap buffer depends on the actual
-     * implementation.
+     * Allocate a {@link ByteBuffer} with the given initial capacity and the given maximal capacity. If it is a direct
+     * or heap buffer depends on the actual implementation.
+     *
+     * @param initialCapacity The initial capacity
+     * @param maxCapacity     The maximum capacity
+     * @return The buffer
      */
     ByteBuffer<B> buffer(int initialCapacity, int maxCapacity);
 
     /**
-     * Creates a new big-endian buffer whose content is a copy of the
-     * specified {@code array}'s sub-region.  The new buffer's
-     * {@code readerIndex} and {@code writerIndex} are {@code 0} and
-     * the specified {@code length} respectively.
+     * Creates a new big-endian buffer whose content is a copy of the specified {@code array}'s sub-region. The new
+     * buffer's {@code readerIndex} and {@code writerIndex} are {@code 0} and the specified {@code length} respectively.
+     *
+     * @param bytes The bytes
+     * @return The buffer
      */
     ByteBuffer<B> copiedBuffer(byte[] bytes);
 
     /**
-     * Creates a new big-endian buffer whose content is a copy of the
-     * specified NIO buffer.  The new buffer's
-     * {@code readerIndex} and {@code writerIndex} are {@code 0} and
-     * the specified {@code length} respectively.
+     * Creates a new big-endian buffer whose content is a copy of the specified NIO buffer. The new buffer's
+     * {@code readerIndex} and {@code writerIndex} are {@code 0} and the specified {@code length} respectively.
+     *
+     * @param nioBuffer The nioBuffer
+     * @return The buffer
      */
     ByteBuffer<B> copiedBuffer(java.nio.ByteBuffer nioBuffer);
 
     /**
-     * Wrap an existing buffer
+     * Wrap an existing buffer.
      *
      * @param existing The buffer to wrap
      * @return The wrapped {@link ByteBuffer}

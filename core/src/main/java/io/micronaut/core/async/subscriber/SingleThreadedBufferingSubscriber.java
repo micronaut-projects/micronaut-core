@@ -23,8 +23,10 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 /**
- * A {@link Subscriber} designed to be used by a single thread that buffers incoming data for the purposes of managing back pressure.
+ * A {@link Subscriber} designed to be used by a single thread that buffers incoming data for the purposes of managing
+ * back pressure.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -50,6 +52,8 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
             case IDLE:
                 doOnSubscribe(subscription);
                 break;
+            default:
+                // no-op
         }
     }
 
@@ -101,6 +105,8 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
                         }
                     }
                 }
+            default:
+                // no-op
         }
     }
 
@@ -121,16 +127,22 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     /**
      * Implement {@link Subscriber#onSubscribe(Subscription)}.
+     *
+     * @param subscription The subscription
      */
     protected abstract void doOnSubscribe(Subscription subscription);
 
     /**
      * Implement {@link Subscriber#onNext(Object)}.
+     *
+     * @param message The message
      */
     protected abstract void doOnNext(T message);
 
     /**
      * Implement {@link Subscriber#onError(Throwable)}.
+     *
+     * @param t The throwable
      */
     protected abstract void doOnError(Throwable t);
 
@@ -139,57 +151,18 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
      */
     protected abstract void doOnComplete();
 
+    /**
+     * @param subscriber The subscriber
+     */
     protected void provideDownstreamSubscription(Subscriber subscriber) {
         subscriber.onSubscribe(newDownstreamSubscription());
     }
 
+    /**
+     * @return The subscription
+     */
     protected Subscription newDownstreamSubscription() {
         return new DownstreamSubscription();
-    }
-
-    protected enum BackPressureState {
-        /**
-         * There is no subscriber.
-         */
-        NO_SUBSCRIBER,
-
-        /**
-         * There is no demand yet and no buffering has taken place.
-         */
-        IDLE,
-
-        /**
-         * Buffering has stared, but not demand present.
-         */
-        BUFFERING,
-
-        /**
-         * The buffer is empty but there demand.
-         */
-        DEMANDING,
-
-        /**
-         * The data has been read, however the buffer is not empty.
-         */
-        FLOWING,
-
-        /**
-         * Finished.
-         */
-        DONE
-    }
-
-    protected class DownstreamSubscription implements Subscription {
-        @Override
-        public synchronized void request(long n) {
-            processDemand(n);
-            upstreamSubscription.request(n);
-        }
-
-        @Override
-        public synchronized void cancel() {
-            upstreamSubscription.cancel();
-        }
     }
 
     private void processDemand(long demand) {
@@ -249,5 +222,57 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     private void illegalDemand() {
         onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification"));
+    }
+
+    /**
+     * Back pressure state.
+     */
+    protected enum BackPressureState {
+
+        /**
+         * There is no subscriber.
+         */
+        NO_SUBSCRIBER,
+
+        /**
+         * There is no demand yet and no buffering has taken place.
+         */
+        IDLE,
+
+        /**
+         * Buffering has stared, but not demand present.
+         */
+        BUFFERING,
+
+        /**
+         * The buffer is empty but there demand.
+         */
+        DEMANDING,
+
+        /**
+         * The data has been read, however the buffer is not empty.
+         */
+        FLOWING,
+
+        /**
+         * Finished.
+         */
+        DONE
+    }
+
+    /**
+     * A downstream subscription.
+     */
+    protected class DownstreamSubscription implements Subscription {
+        @Override
+        public synchronized void request(long n) {
+            processDemand(n);
+            upstreamSubscription.request(n);
+        }
+
+        @Override
+        public synchronized void cancel() {
+            upstreamSubscription.cancel();
+        }
     }
 }

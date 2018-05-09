@@ -105,10 +105,15 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return classLoader;
     }
 
+    /**
+     * @param basePath The path to load resources
+     * @return The resouce loader
+     */
     public ResourceLoader forBase(String basePath) {
         return new DefaultClassPathResourceLoader(classLoader, basePath);
     }
 
+    @SuppressWarnings("MagicNumber")
     private String normalize(String path) {
         if (path != null) {
             if (path.startsWith("classpath:")) {
@@ -124,6 +129,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return path;
     }
 
+    @SuppressWarnings("MagicNumber")
     private String prefixPath(String path) {
         if (path.startsWith("classpath:")) {
             path = path.substring(10);

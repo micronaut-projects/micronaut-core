@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 /**
  * An implementation of {@link ConvertibleMultiValues} that uses a backing {@link LinkedHashMap}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

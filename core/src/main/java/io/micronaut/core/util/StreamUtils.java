@@ -16,7 +16,10 @@
 
 package io.micronaut.core.util;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -32,8 +35,7 @@ import java.util.stream.Collector;
 public class StreamUtils {
 
     /**
-     * A collector that returns all results that are the maximum based on the
-     * provided comparator.
+     * A collector that returns all results that are the maximum based on the provided comparator.
      *
      * @param comparator The comparator to order the items in the stream
      * @param downstream Which collector to use to combine the results
@@ -175,6 +177,12 @@ public class StreamUtils {
         return Collector.of(supplier, accumulator, combiner, finisher);
     }
 
+    /**
+     * @param collectionFactory The collection factory
+     * @param <T>               The type of the input elements
+     * @param <A>               The accumulation type
+     * @return An immutable collection
+     */
     public static <T, A extends Collection<T>> Collector<T, A, Collection<T>> toImmutableCollection(Supplier<A> collectionFactory) {
         return Collector.of(collectionFactory, Collection::add, (left, right) -> {
             left.addAll(right);
@@ -182,6 +190,10 @@ public class StreamUtils {
         }, Collections::unmodifiableCollection);
     }
 
+    /**
+     * @param <T> The type
+     * @return An immutable collection
+     */
     public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
         return toImmutableCollection(ArrayList::new);
     }
