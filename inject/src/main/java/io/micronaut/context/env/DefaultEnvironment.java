@@ -535,32 +535,36 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         }
 
-        ComputePlatform computePlatform = determineCloudProvider();
-        if (computePlatform != null) {
-            switch (computePlatform) {
-                case GOOGLE_COMPUTE:
-                    //instantiate bean for GC metadata discovery
-                    enviroments.add(GOOGLE_COMPUTE);
-                    break;
-                case AMAZON_EC2:
-                    //instantiate bean for ec2 metadata discovery
-                    enviroments.add(AMAZON_EC2);
-                    break;
-                case AZURE:
-                    // not implemented
-                    enviroments.add(AZURE);
-                    break;
-                case IBM:
-                    // not implemented
-                    enviroments.add(IBM);
-                    break;
-                case OTHER:
-                    // do nothing here
-                    break;
-                default:
-                    // no-op
+        if(!enviroments.contains(ANDROID)) {
+
+            ComputePlatform computePlatform = determineCloudProvider();
+            if (computePlatform != null) {
+                switch (computePlatform) {
+                    case GOOGLE_COMPUTE:
+                        //instantiate bean for GC metadata discovery
+                        enviroments.add(GOOGLE_COMPUTE);
+                        break;
+                    case AMAZON_EC2:
+                        //instantiate bean for ec2 metadata discovery
+                        enviroments.add(AMAZON_EC2);
+                        break;
+                    case AZURE:
+                        // not implemented
+                        enviroments.add(AZURE);
+                        break;
+                    case IBM:
+                        // not implemented
+                        enviroments.add(IBM);
+                        break;
+                    case OTHER:
+                        // do nothing here
+                        break;
+                    default:
+                        // no-op
+                }
             }
         }
+
 
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
             System.getenv(ENVIRONMENTS_ENV))
