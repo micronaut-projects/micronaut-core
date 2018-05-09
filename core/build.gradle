@@ -3,11 +3,13 @@ apply plugin: 'com.github.johnrengelman.plugin-shadow'
 
 shadowJar {
     dependencies {
+        exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'))
         exclude(dependency(group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'))
     }
     relocate "org.objectweb.asm", "io.micronaut.asm"
     relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+    exclude "module-info.class"
 }
 
 tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
