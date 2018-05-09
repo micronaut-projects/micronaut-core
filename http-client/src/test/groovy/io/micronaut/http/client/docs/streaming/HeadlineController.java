@@ -13,22 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.basics;
+package io.micronaut.http.client.docs.streaming;
 
-import io.micronaut.http.HttpStatus;
+// tag::imports[]
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
+import io.reactivex.Flowable;
+
+import java.time.ZonedDateTime;
+import java.util.concurrent.TimeUnit;
+// end::imports[]
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Controller("/amazon")
-public class BookController {
+@Controller("/streaming")
+public class HeadlineController {
 
-    @Post(uri = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
-    @Status(HttpStatus.CREATED)
-    Book save(@Body Book book) {
-        return book;
+    // tag::streaming[]
+    @Get(uri = "/headlines", produces = MediaType.APPLICATION_JSON_STREAM) // <1>
+    Flowable<Headline> streamHeadlines() {
+        return Flowable.fromCallable(() -> {  // <2>
+            Headline headline = new Headline();
+            headline.setText("Latest Headline at " + ZonedDateTime.now());
+            return headline;
+        }).repeat(100) // <3>
+          .delay(1, TimeUnit.SECONDS); // <4>
     }
+    // end::streaming[]
 }

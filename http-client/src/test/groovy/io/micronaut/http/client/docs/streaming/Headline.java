@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.basics;
-
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+package io.micronaut.http.client.docs.streaming;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Controller("/amazon")
-public class BookController {
+public class Headline {
+    private String text;
 
-    @Post(uri = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
-    @Status(HttpStatus.CREATED)
-    Book save(@Body Book book) {
-        return book;
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 }
