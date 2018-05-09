@@ -33,7 +33,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Filter(patterns = "/v1/**", clients = ConsulClient.SERVICE_ID)
+@Filter(patterns = "/v1/**", serviceId = ConsulClient.SERVICE_ID)
 @Requires(beans = ConsulConfiguration.class)
 public class ConsulAslTokenFilter implements HttpClientFilter, Toggleable {
 

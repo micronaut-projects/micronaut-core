@@ -1,0 +1,35 @@
+As mentioned previously, Jackson is used for message encoding to JSON. A default Jackson `ObjectMapper` is configured and used by Micronaut HTTP clients.
+
+You can override the settings used to construct the `ObjectMapper` using the properties defined by the api:jackson.JacksonConfiguration[] class in `application.yml`.
+
+For example, the following configuration enabled indented output for Jackson:
+
+.Example Jackson Configuration
+[source,yaml]
+----
+jackson:
+    serialization:
+        indentOutput: true
+----
+
+However, these settings apply globally and impact both how the HTTP server renders JSON and how JSON is sent from the HTTP client. Given that sometimes it useful to provide client specific Jackson settings which can be done with the ann:jackson.annotation.JacksonFeatures[] annotation on any client:
+
+As an example, the following snippet is taken from Micronaut's native Eureka client (which, of course, is built using Micronaut's HTTP client):
+
+.Example of JacksonFeatures
+[source,java]
+----
+@Client(id = EurekaClient.SERVICE_ID, path = "/eureka", configuration = EurekaConfiguration.class)
+@JacksonFeatures(
+    enabledSerializationFeatures = WRAP_ROOT_VALUE,
+    disabledSerializationFeatures = WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED,
+    enabledDeserializationFeatures = {UNWRAP_ROOT_VALUE, ACCEPT_SINGLE_VALUE_AS_ARRAY}
+)
+public interface EurekaClient {
+    ...
+}
+----
+
+The Eureka serialization format for JSON uses the `WRAP_ROOT_VALUE` serialization feature of Jackson, hence it is enabled just for that client.
+
+TIP: If the customization offered by `JacksonFeatures` is not enough, you can also write a api:context.event.BeanCreatedEventListener[] for the `ObjectMapper` and add whatever customizations you need.
