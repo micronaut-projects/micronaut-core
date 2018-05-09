@@ -17,6 +17,7 @@ tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowR
 }
 
 dependencies {
+    shadowCompile dependencyVersion("slf4j")
     shadowCompile group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'
     shadowCompile group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'
 
