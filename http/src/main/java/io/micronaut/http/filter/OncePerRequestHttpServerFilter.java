@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.filter;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -21,7 +22,7 @@ import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
 
 /**
- * A filter that is only executed once per request
+ * A filter that is only executed once per request.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,7 +42,7 @@ public abstract class OncePerRequestHttpServerFilter implements HttpServerFilter
     }
 
     /**
-     * Obtain the key used to store the attribute within a request
+     * Obtain the key used to store the attribute within a request.
      *
      * @param filterClass the filter class
      * @return The key
@@ -50,5 +51,10 @@ public abstract class OncePerRequestHttpServerFilter implements HttpServerFilter
         return "micronaut.once." + filterClass.getSimpleName();
     }
 
+    /**
+     * @param request The {@link HttpRequest} instance
+     * @param chain   The {@link ServerFilterChain} instance
+     * @return A {@link Publisher} for the Http response
+     */
     protected abstract Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain);
 }

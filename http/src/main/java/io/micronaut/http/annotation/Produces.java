@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>An annotation to indicate the {@link MediaType}s produced by a particular component. </p>
+ * <p>An annotation to indicate the {@link MediaType}s produced by a particular component.</p>
  * <p>
  * <p>Generally with controllers one can use the {@code produces} attribute of the {@code Controller} annotation,
  * however this annotation is more generic and applies to any component</p>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.kubernetes;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,10 +26,15 @@ import io.reactivex.Flowable;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
- * A {@link DiscoveryClient} implementation for Kubernetes. Kubernetes uses environment variables so no API calls is required
+ * A {@link DiscoveryClient} implementation for Kubernetes. Kubernetes uses environment variables so no API calls is
+ * required.
  *
  * @author graemerocher
  * @since 1.0
@@ -48,14 +54,13 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
 
         String envName = serviceId.toUpperCase(Locale.ENGLISH).replace('-', '_');
         String host = environment.get(envName + HOST_SUFFIX);
-        if(StringUtils.isNotEmpty(host)) {
+        if (StringUtils.isNotEmpty(host)) {
             String port = environment.get(envName + HTTPS_PORT_SUFFIX);
-            if(StringUtils.isNotEmpty(port)) {
+            if (StringUtils.isNotEmpty(port)) {
                 return singleService(serviceId, host, port, true);
-            }
-            else {
+            } else {
                 port = environment.get(envName + PORT_SUFFIX);
-                if(StringUtils.isNotEmpty(port)) {
+                if (StringUtils.isNotEmpty(port)) {
                     return singleService(serviceId, host, port, false);
                 }
             }
@@ -69,10 +74,10 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
 
         Map<String, String> environment = resolveEnvironment();
         for (String envName : environment.keySet()) {
-            if(envName.endsWith(HOST_SUFFIX)) {
+            if (envName.endsWith(HOST_SUFFIX)) {
                 String serviceId = envName.substring(0, envName.length() - HOST_SUFFIX.length());
 
-                services.add( serviceId.toLowerCase(Locale.ENGLISH).replace('_','-'));
+                services.add(serviceId.toLowerCase(Locale.ENGLISH).replace('_', '-'));
             }
         }
 
@@ -90,7 +95,7 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
     }
 
     /**
-     * Resolves the environment variables
+     * Resolves the environment variables.
      *
      * @return The environment variables
      */
@@ -101,13 +106,12 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
 
     private Flowable<List<ServiceInstance>> singleService(String serviceId, String host, String port, boolean secure) {
         return Flowable.just(
-                Collections.singletonList(
-                        ServiceInstance.builder(
-                                serviceId,
-                                URI.create((secure ? "https://" : "http://") + host + ":" + port)
-                        ).build()
-
-                )
+            Collections.singletonList(
+                ServiceInstance.builder(
+                    serviceId,
+                    URI.create((secure ? "https://" : "http://") + host + ":" + port)
+                ).build()
+            )
         );
     }
 }

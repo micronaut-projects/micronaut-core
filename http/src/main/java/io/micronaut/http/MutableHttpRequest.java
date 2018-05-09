@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 /**
  * An extended version of {@link HttpRequest} that allows mutating headers, the body etc.
  *
+ * @param <B> The request body type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,6 +37,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      * Sets the specified cookie on the request.
      *
      * @param cookie the Cookie to return to the client
+     * @return The http request
      */
     MutableHttpRequest<B> cookie(Cookie cookie);
 
@@ -46,7 +48,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     MutableHttpHeaders getHeaders();
 
     /**
-     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header
+     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header.
      *
      * @param mediaTypes The media types
      * @return This request

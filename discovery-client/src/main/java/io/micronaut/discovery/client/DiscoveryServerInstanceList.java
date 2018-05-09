@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -23,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Abstract {@link ServiceInstanceList} implementation for Discovery servers like Eureka and Consul
+ * Abstract {@link ServiceInstanceList} implementation for Discovery servers like Eureka and Consul.
  *
  * @author graemerocher
  * @since 1.0
@@ -32,6 +33,9 @@ public abstract class DiscoveryServerInstanceList implements ServiceInstanceList
 
     private final DiscoveryClientConfiguration configuration;
 
+    /**
+     * @param configuration The discovery client configuration
+     */
     public DiscoveryServerInstanceList(DiscoveryClientConfiguration configuration) {
         this.configuration = configuration;
     }

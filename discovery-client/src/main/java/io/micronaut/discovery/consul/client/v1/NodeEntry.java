@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -40,7 +41,7 @@ public class NodeEntry {
     private Map<String, String> nodeMetadata;
 
     /**
-     * Create a new catalog entry
+     * Create a new catalog entry.
      *
      * @param nodeId  The node ID
      * @param address The node address
@@ -52,7 +53,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#taggedaddresses
+     * See https://www.consul.io/api/catalog.html#taggedaddresses.
      *
      * @return The tagged addresses
      */
@@ -64,7 +65,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#taggedaddresses
+     * See https://www.consul.io/api/catalog.html#taggedaddresses.
      *
      * @param taggedAddresses The tagged addresses
      */
@@ -73,7 +74,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#nodemeta
+     * See https://www.consul.io/api/catalog.html#nodemeta.
      *
      * @return The node metadata
      */
@@ -94,7 +95,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#nodemeta
+     * See https://www.consul.io/api/catalog.html#nodemeta.
      *
      * @param nodeMetadata The node metadata
      */
@@ -103,7 +104,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#node
+     * See https://www.consul.io/api/catalog.html#node.
      *
      * @return The node ID
      */
@@ -112,7 +113,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#address
+     * See https://www.consul.io/api/catalog.html#address.
      *
      * @return The node address
      */
@@ -121,7 +122,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#datacenter
+     * See https://www.consul.io/api/catalog.html#datacenter.
      *
      * @return The data center to use
      */
@@ -130,7 +131,7 @@ public class NodeEntry {
     }
 
     /**
-     * See https://www.consul.io/api/catalog.html#datacenter
+     * See https://www.consul.io/api/catalog.html#datacenter.
      *
      * @param datacenter The data center to use
      */

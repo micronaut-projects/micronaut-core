@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from the HTTP body
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from the HTTP
+ * body.
  *
  * @author Graeme Rocher
  * @since 1.0

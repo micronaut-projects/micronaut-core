@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,8 +26,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from a specific part
- * of a "multipart/form-data" request.
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from a specific
+ * part of a "multipart/form-data" request.
  *
  * @author Graeme Rocher
  * @since 1.0

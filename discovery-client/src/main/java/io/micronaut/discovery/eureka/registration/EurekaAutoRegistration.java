@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.registration;
 
 import io.micronaut.context.annotation.Requires;
@@ -24,7 +25,6 @@ import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistrati
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
-import io.micronaut.discovery.registration.AutoRegistration;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
@@ -36,7 +36,7 @@ import org.reactivestreams.Subscription;
 import javax.inject.Singleton;
 
 /**
- * A {@link AutoRegistration} that registers with Eureka
+ * A {@link io.micronaut.discovery.registration.AutoRegistration} that registers with Eureka.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -53,6 +53,13 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ServiceInstanceIdGenerator idGenerator;
 
+    /**
+     * @param environment            The environment
+     * @param eurekaClient           The Eureka client
+     * @param eurekaConfiguration    The Eureka configuration
+     * @param heartbeatConfiguration The Heartbeat configuration
+     * @param idGenerator            The id generator
+     */
     protected EurekaAutoRegistration(
         Environment environment,
         EurekaClient eurekaClient,
@@ -134,9 +141,9 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
     }
 
     /**
-     * Translate a {@link HealthStatus} to a Eureka {@link io.micronaut.discovery.eureka.client.v2.InstanceInfo.Status}
+     * Translate a {@link HealthStatus} to a Eureka {@link io.micronaut.discovery.eureka.client.v2.InstanceInfo.Status}.
      *
-     * @param status
+     * @param status The status
      * @return The {@link io.micronaut.discovery.eureka.client.v2.InstanceInfo.Status} instance
      */
     protected InstanceInfo.Status translateState(HealthStatus status) {
@@ -178,7 +185,7 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
     }
 
     /**
-     * Subclasses can override to customize the instance info
+     * Subclasses can override to customize the instance info.
      *
      * @param instanceInfo The instance info
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -34,7 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Configuration for consul
+ * Configuration for consul.
  *
  * @author graemerocher
  * @since 1.0
@@ -44,23 +45,31 @@ import java.util.Optional;
 public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     /**
-     * The prefix to use for all Consul settings
+     * The prefix to use for all Consul settings.
      */
     public static final String PREFIX = "consul.client";
+
+    private static final int CONSULT_DEFAULT_PORT = 8500;
 
     private String aslToken;
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
     private ConsulConfigDiscoveryConfiguration configuration = new ConsulConfigDiscoveryConfiguration();
 
+    /**
+     * Default Consult configuration.
+     */
     public ConsulConfiguration() {
-        setPort(8500);
+        setPort(CONSULT_DEFAULT_PORT);
     }
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
     @Inject
     public ConsulConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
-        setPort(8500);
+        setPort(CONSULT_DEFAULT_PORT);
     }
 
     /**
@@ -138,20 +147,30 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         return ConsulClient.SERVICE_ID;
     }
 
+    @Override
+    public String toString() {
+        return "ConsulConfiguration{" +
+            "aslToken='" + aslToken + '\'' +
+            ", registration=" + registration +
+            ", discovery=" + discovery +
+            "} " + super.toString();
+    }
+
     /**
-     * Configuration class for Consul client config
+     * Configuration class for Consul client config.
      */
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
     public static class ConsulConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
+
         /**
-         * The full prefix for this configuration
+         * The full prefix for this configuration.
          */
         public static final String PREFIX = ConsulConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
 
         private String datacenter;
 
         /**
-         * The data center to use to read configuration
+         * The data center to use to read configuration.
          *
          * @return The data center name
          */
@@ -168,7 +187,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     }
 
     /**
-     * Configuration class for Consul client discovery
+     * Configuration class for Consul client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
@@ -179,7 +198,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         private boolean passing = false;
 
         /**
-         * Whether services that are not passing health checks should be returned
+         * Whether services that are not passing health checks should be returned.
          *
          * @return True if only passing services should be returned (defaults to false)
          */
@@ -195,7 +214,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         }
 
         /**
-         * A map of service ID to tags to use for querying
+         * A map of service ID to tags to use for querying.
          *
          * @return The tags
          */
@@ -213,7 +232,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         }
 
         /**
-         * A map of service ID to data centers to query
+         * A map of service ID to data centers to query.
          *
          * @return The map to query
          */
@@ -231,7 +250,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         }
 
         /**
-         * A map of service ID to protocol scheme (eg. http, https etc.). Default is http
+         * A map of service ID to protocol scheme (eg. http, https etc.). Default is http.
          *
          * @return A map of schemes
          */
@@ -257,13 +276,13 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     }
 
     /**
-     * Configuration class for Consul client registration
+     * Configuration class for Consul client registration.
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     public static class ConsulRegistrationConfiguration extends RegistrationConfiguration {
 
         /**
-         * The prefix to use for all Consul client registration settings
+         * The prefix to use for all Consul client registration settings.
          */
         public static final String PREFIX = ConsulConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
@@ -298,8 +317,16 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
             this.check = check;
         }
 
+        @Override
+        public String toString() {
+            return "ConsulRegistrationConfiguration{" +
+                "tags=" + tags +
+                ", check=" + check +
+                '}';
+        }
+
         /**
-         * Configuration for the HTTP check. See https://www.consul.io/api/agent/check.html
+         * Configuration for the HTTP check. See https://www.consul.io/api/agent/check.html.
          */
         @ConfigurationProperties("check")
         public static class CheckConfiguration implements Toggleable {
@@ -453,22 +480,6 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
                     '}';
             }
         }
-
-        @Override
-        public String toString() {
-            return "ConsulRegistrationConfiguration{" +
-                "tags=" + tags +
-                ", check=" + check +
-                '}';
-        }
     }
 
-    @Override
-    public String toString() {
-        return "ConsulConfiguration{" +
-            "aslToken='" + aslToken + '\'' +
-            ", registration=" + registration +
-            ", discovery=" + discovery +
-            "} " + super.toString();
-    }
 }

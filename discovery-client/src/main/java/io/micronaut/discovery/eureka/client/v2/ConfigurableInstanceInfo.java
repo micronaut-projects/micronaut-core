@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import javax.validation.constraints.Min;
@@ -21,7 +22,7 @@ import javax.validation.constraints.NotNull;
 import java.util.Map;
 
 /**
- * Interface implemented by {@link InstanceInfo} modelling the data returned by the Eureka REST API
+ * Interface implemented by {@link InstanceInfo} modelling the data returned by the Eureka REST API.
  * <p>
  * See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations
  *
@@ -31,7 +32,9 @@ import java.util.Map;
 public interface ConfigurableInstanceInfo {
 
     /**
-     * The host name of the application instance
+     * The host name of the application instance.
+     *
+     * @return The hostname
      */
     @NotBlank String getHostName();
 
@@ -46,77 +49,91 @@ public interface ConfigurableInstanceInfo {
     String getId();
 
     /**
-     * The port of the application instance
+     * The port of the application instance.
+     *
+     * @return The port
      */
     int getPort();
 
     /**
-     * Sets the port of the application instance
+     * Sets the port of the application instance.
      *
      * @param port The port of the application instance
      */
     void setPort(int port);
 
     /**
-     * The secure port of the application instance
+     * The secure port of the application instance.
+     *
+     * @return The secure port
      */
     int getSecurePort();
 
     /**
-     * Sets the secure port of the application instance
+     * Sets the secure port of the application instance.
      *
      * @param securePort The secure port of the application instance
      */
     void setSecurePort(int securePort);
 
     /**
-     * The application name
+     * The application name.
+     *
+     * @return The application name
      */
     @NotBlank String getApp();
 
     /**
-     * The application group name
+     * The application group name.
+     *
+     * @return The application group name
      */
     String getAppGroupName();
 
     /**
-     * Sets the application group name
+     * Sets the application group name.
      *
      * @param appGroupName The application group name
      */
     void setAppGroupName(String appGroupName);
 
     /**
-     * The instance id
+     * The instance id.
+     *
+     * @return The instance id
      */
     @NotBlank String getInstanceId();
 
     /**
-     * Sets the instance ID
+     * Sets the instance ID.
      *
      * @param instanceId The instance ID
      */
     void setInstanceId(String instanceId);
 
     /**
-     * The country id
+     * The country id.
+     *
+     * @return The country id
      */
     @Min(1L) int getCountryId();
 
     /**
-     * Sets the country id
+     * Sets the country id.
      *
      * @param countryId The country id
      */
     void setCountryId(int countryId);
 
     /**
-     * The IP address of the instance
+     * The IP address of the instance.
+     *
+     * @return The IP address
      */
     @NotBlank String getIpAddr();
 
     /**
-     * Sets the IP address of the instance
+     * Sets the IP address of the instance.
      *
      * @param ipAddr The IP address of the instance
      */
@@ -128,31 +145,35 @@ public interface ConfigurableInstanceInfo {
     @NotNull InstanceInfo.Status getStatus();
 
     /**
-     * Sets the application status
+     * Sets the application status.
      *
      * @param status The application status
      */
     void setStatus(InstanceInfo.Status status);
 
     /**
-     * The {@link DataCenterInfo} instance
+     * The {@link DataCenterInfo} instance.
+     *
+     * @return The data center info
      */
     @NotNull DataCenterInfo getDataCenterInfo();
 
     /**
-     * Sets the {@link DataCenterInfo}
+     * Sets the {@link DataCenterInfo}.
      *
      * @param dataCenterInfo The {@link DataCenterInfo}
      */
     void setDataCenterInfo(DataCenterInfo dataCenterInfo);
 
     /**
-     * The {@link LeaseInfo} instance
+     * The {@link LeaseInfo} instance.
+     *
+     * @return The lease info
      */
     LeaseInfo getLeaseInfo();
 
     /**
-     * Sets the {@link LeaseInfo}
+     * Sets the {@link LeaseInfo}.
      *
      * @param leaseInfo The {@link LeaseInfo}
      */
@@ -169,7 +190,7 @@ public interface ConfigurableInstanceInfo {
     String getStatusPageUrl();
 
     /**
-     * Sets the status page URL
+     * Sets the status page URL.
      *
      * @param statusPageUrl The status page URL
      */
@@ -181,7 +202,7 @@ public interface ConfigurableInstanceInfo {
     String getHomePageUrl();
 
     /**
-     * Sets the home page URL
+     * Sets the home page URL.
      *
      * @param homePageUrl The home page URL
      */
@@ -193,19 +214,19 @@ public interface ConfigurableInstanceInfo {
     String getHealthCheckUrl();
 
     /**
-     * Sets the health check URL
+     * Sets the health check URL.
      *
      * @param healthCheckUrl The health check URL
      */
     void setHealthCheckUrl(String healthCheckUrl);
 
     /**
-     * @return The Virtual Host Address for this instance (defaults to the app name)
+     * @return The Virtual Host Address for this instance (defaults to the app name).
      */
     String getVipAddress();
 
     /**
-     * Sets the Virtual Host Address
+     * Sets the Virtual Host Address.
      *
      * @param vipAddress The Virtual Host Address
      */
@@ -217,7 +238,7 @@ public interface ConfigurableInstanceInfo {
     String getSecureVipAddress();
 
     /**
-     * Sets the Secure Virtual Host Address
+     * Sets the Secure Virtual Host Address.
      *
      * @param secureVipAddress The Secure Virtual Host Address
      */
@@ -229,7 +250,7 @@ public interface ConfigurableInstanceInfo {
     String getSecureHealthCheckUrl();
 
     /**
-     * Sets the secure health check URL
+     * Sets the secure health check URL.
      *
      * @param secureHealthCheckUrl The secure health check URL
      */
@@ -241,7 +262,7 @@ public interface ConfigurableInstanceInfo {
     String getAsgName();
 
     /**
-     * Sets the Amazon auto scaling group name to use
+     * Sets the Amazon auto scaling group name to use.
      *
      * @param asgName The Amazon auto scaling group name to use
      */
