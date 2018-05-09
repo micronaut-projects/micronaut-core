@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka;
 
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -36,7 +37,7 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
- * Configuration options for the Eureka client
+ * Configuration options for the Eureka client.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -46,29 +47,35 @@ import java.util.Optional;
 public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     /**
-     * The prefix to use for all Eureka client settings
+     * The prefix to use for all Eureka client settings.
      */
     public static final String PREFIX = "eureka.client";
 
     /**
-     * The configuration name for Eureka host
+     * The configuration name for Eureka host.
      */
     public static final String HOST = PREFIX + ".host";
 
     /**
-     * The configuration name for Eureka port
+     * The configuration name for Eureka port.
      */
     public static final String PORT = PREFIX + ".port";
+
+    private static final int EUREKA_DEFAULT_PORT = 8761;
 
     private EurekaDiscoveryConfiguration discovery = new EurekaDiscoveryConfiguration();
     private EurekaRegistrationConfiguration registration;
 
+    /**
+     * @param applicationConfiguration        The application configuration
+     * @param eurekaRegistrationConfiguration The optional Eureka registration configuration
+     */
     public EurekaConfiguration(
         ApplicationConfiguration applicationConfiguration,
         Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
         this.registration = eurekaRegistrationConfiguration.orElse(null);
-        setPort(8761);
+        setPort(EUREKA_DEFAULT_PORT);
     }
 
     /**
@@ -114,26 +121,26 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     }
 
     /**
-     * Configuration properties for Eureka client discovery
+     * Configuration properties for Eureka client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class EurekaDiscoveryConfiguration extends DiscoveryConfiguration {
     }
 
     /**
-     * Configuration properties for Eureka client registration
+     * Configuration properties for Eureka client registration.
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
     public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
 
         /**
-         * Prefix for Eureka registration client
+         * Prefix for Eureka registration client.
          */
         public static final String PREFIX = EurekaConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
         /**
-         * Configuration name property for Eureka IP address
+         * Configuration name property for Eureka IP address.
          */
         public static final String IP_ADDRESS =
             EurekaConfiguration.PREFIX + '.' +
@@ -148,10 +155,16 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
         private final boolean explicitInstanceId;
 
+        /**
+         * @param embeddedServer           The embedded server
+         * @param applicationConfiguration The application configuration
+         * @param ipAddress                The IP address
+         * @param dataCenterInfo           The data center info
+         */
         public EurekaRegistrationConfiguration(
             EmbeddedServer embeddedServer,
             ApplicationConfiguration applicationConfiguration,
-            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") @Nullable String  ipAddress,
+            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") @Nullable String ipAddress,
             @Nullable DataCenterInfo dataCenterInfo) {
             String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
             String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
@@ -174,7 +187,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
                 );
             }
 
-            if(dataCenterInfo != null) {
+            if (dataCenterInfo != null) {
                 this.instanceInfo.setDataCenterInfo(dataCenterInfo);
             }
         }

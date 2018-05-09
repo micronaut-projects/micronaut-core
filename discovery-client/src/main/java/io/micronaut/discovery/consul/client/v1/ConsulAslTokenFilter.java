@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.context.annotation.Requires;
@@ -28,7 +29,7 @@ import org.reactivestreams.Publisher;
 import java.util.Optional;
 
 /**
- * A {@link HttpClientFilter} that adds the {@link #HEADER_CONSUL_TOKEN} header
+ * A {@link HttpClientFilter} that adds the {@link #HEADER_CONSUL_TOKEN} header.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,12 +39,15 @@ import java.util.Optional;
 public class ConsulAslTokenFilter implements HttpClientFilter, Toggleable {
 
     /**
-     * Consult header token
+     * Consult header token.
      */
     public static final String HEADER_CONSUL_TOKEN = "X-Consul-Token";
 
     private final ConsulConfiguration configuration;
 
+    /**
+     * @param configuration The Consul configuration
+     */
     public ConsulAslTokenFilter(ConsulConfiguration configuration) {
         this.configuration = configuration;
     }

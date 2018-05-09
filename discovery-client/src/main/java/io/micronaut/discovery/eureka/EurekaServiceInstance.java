@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -28,7 +29,7 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * A {@link ServiceInstance} implementation for Eureka
+ * A {@link ServiceInstance} implementation for Eureka.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -37,6 +38,9 @@ public class EurekaServiceInstance implements ServiceInstance {
     private final InstanceInfo instanceInfo;
     private final URI uri;
 
+    /**
+     * @param instanceInfo The instance info
+     */
     public EurekaServiceInstance(InstanceInfo instanceInfo) {
         this.instanceInfo = instanceInfo;
         this.uri = createURI(instanceInfo);

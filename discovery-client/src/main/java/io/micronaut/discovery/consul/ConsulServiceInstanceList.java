@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul;
 
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
@@ -24,10 +23,12 @@ import io.micronaut.discovery.consul.condition.RequiresConsul;
 import javax.inject.Singleton;
 
 /**
- * <p>A {@link ServiceInstanceList} for Consul which reads from the {@link ConsulConfiguration}</p>
+ * <p>A {@link io.micronaut.discovery.ServiceInstanceList} for Consul which reads from the
+ * {@link ConsulConfiguration}.</p>
  * <p>
- * <p>The reason this is useful is if a {@link io.micronaut.runtime.context.scope.refresh.RefreshEvent} occurs then the
- * {@link ConsulConfiguration} will be updated and the backing list of {@link ServiceInstance} changed at runtime.</p>
+ * <p>The reason this is useful is if a {@link io.micronaut.runtime.context.scope.refresh.RefreshEvent} occurs then
+ * the {@link ConsulConfiguration} will be updated and the backing list of {@link io.micronaut.discovery.ServiceInstance}
+ * changed at runtime.</p>
  *
  * @author graemerocher
  * @since 1.0
@@ -36,6 +37,9 @@ import javax.inject.Singleton;
 @RequiresConsul
 public class ConsulServiceInstanceList extends DiscoveryServerInstanceList {
 
+    /**
+     * @param configuration The Consul configuration
+     */
     public ConsulServiceInstanceList(ConsulConfiguration configuration) {
         super(configuration);
     }
