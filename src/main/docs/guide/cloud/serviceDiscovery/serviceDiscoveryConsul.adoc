@@ -1,4 +1,4 @@
-https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native api:discovery.consul.client.v1.ConsulClient[] that is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
+https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native non-blocking api:discovery.consul.client.v1.ConsulClient[] that is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
 ==== Starting Consul
 
@@ -38,7 +38,11 @@ NOTE: You could also simply set `consul.client.host` and `consul.client.port`, h
 
 By default registering with Consul is disabled hence you should set `consul.client.registration.enabled` to `true`. Note that you may wish to do this only in your production configuration.
 
+==== Customizing Consul Service Registration
+
 The api:discovery.consul.ConsulConfiguration[] class features a range of customization options for altering how an instance registers with Consul. You can customize the tags, the retry attempts, the fail fast behaviour and so on.
+
+Notice too that `ConsulConfiguration` extends api:discovery.client.DiscoveryClientConfiguration[]  which in turn extends api:http.client.HttpClientConfiguration[] allowing you to customize the settings for the Eureka client, including read timeout, proxy configuration and so on.
 
 For example:
 
