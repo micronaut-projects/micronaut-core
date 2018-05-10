@@ -26,26 +26,25 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * <p>An InvocationContext passed to one or many {@link Interceptor} instances. Attributes can be stored within the context and
- * shared between multiple {@link Interceptor} implementations. The {@link #proceed()} method should be called to proceed to
- * the next {@link Interceptor} with the last interceptor in the chain being the original decorated method implementation.</p>
+ * <p>An InvocationContext passed to one or many {@link Interceptor} instances. Attributes can be stored within the
+ * context and shared between multiple {@link Interceptor} implementations. The {@link #proceed()} method should be
+ * called to proceed to the next {@link Interceptor} with the last interceptor in the chain being the original
+ * decorated method implementation.</p>
  * <p>
- * <p>The parameters to pass to the next {@link Interceptor} can be mutated using {@link MutableArgumentValue} interface returned by the {@link #getParameters()} method</p>
-
+ * <p>The parameters to pass to the next {@link Interceptor} can be mutated using {@link MutableArgumentValue}
+ * interface returned by the {@link #getParameters()} method</p>
+ *
  * @param <T> The declaring type
  * @param <R> The result of the method call
-
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMetadataDelegate, MutableAttributeHolder {
 
-
     /**
      * @return The bound {@link ArgumentValue} instances
      */
     Map<String, MutableArgumentValue<?>> getParameters();
-
 
     /**
      * @return The target object
@@ -72,7 +71,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
 
     @SuppressWarnings("unchecked")
     @Override
-    default InvocationContext<T,R> setAttribute(CharSequence name, Object value) {
+    default InvocationContext<T, R> setAttribute(CharSequence name, Object value) {
         return (InvocationContext<T, R>) MutableAttributeHolder.super.setAttribute(name, value);
     }
 

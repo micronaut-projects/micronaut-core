@@ -22,11 +22,16 @@ import java.util.Map;
 /**
  * Default implementation of {@link OptionalMultiValues }.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
 class OptionalMultiValuesMap<V> extends OptionalValuesMap<List<V>> implements OptionalMultiValues<V> {
 
+    /**
+     * @param type   The type
+     * @param values The values
+     */
     public OptionalMultiValuesMap(Class<?> type, Map<CharSequence, ?> values) {
         super(type, values);
     }

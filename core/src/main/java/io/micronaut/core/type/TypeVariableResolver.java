@@ -50,6 +50,7 @@ public interface TypeVariableResolver {
     }
 
     /**
+     * @param name The name
      * @return Return the first type parameter if it is present
      */
     default Optional<Argument<?>> getTypeVariable(String name) {

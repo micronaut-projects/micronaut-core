@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2018 original authors
  *
@@ -14,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Configuration for GORM for Hibernate
+ * Configuration for GORM for Hibernate.
  *
  * @author graemerocher
  * @since 1.0

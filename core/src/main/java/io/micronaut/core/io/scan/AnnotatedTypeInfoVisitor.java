@@ -37,6 +37,9 @@ class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo
     private String className;
     private boolean isAbstract;
 
+    /**
+     * Default constructor.
+     */
     public AnnotatedTypeInfoVisitor() {
         super(Opcodes.ASM5);
     }

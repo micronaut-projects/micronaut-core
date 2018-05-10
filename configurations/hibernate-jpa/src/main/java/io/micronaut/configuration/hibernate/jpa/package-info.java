@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * This package contains a configuration for Hibernate and JPA
+ * This package contains a configuration for Hibernate and JPA.
  *
  * @author graemerocher
  * @since 1.0

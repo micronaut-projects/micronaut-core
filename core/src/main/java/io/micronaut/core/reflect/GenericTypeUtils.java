@@ -95,6 +95,10 @@ public class GenericTypeUtils {
         return Optional.empty();
     }
 
+    /**
+     * @param actualTypeArgument The actual type argument
+     * @return An optional with the resolved parameterized class
+     */
     protected static Optional<Class> resolveParameterizedTypeArgument(Type actualTypeArgument) {
         ParameterizedType pt;
         if (actualTypeArgument instanceof Class) {
@@ -206,11 +210,20 @@ public class GenericTypeUtils {
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
+    /**
+     * @param aClass A class
+     * @return All generic interfaces
+     */
     public static Set<Type> getAllGenericInterfaces(Class<?> aClass) {
         Set<Type> interfaces = new HashSet<>();
         return populateInterfaces(aClass, interfaces);
     }
 
+    /**
+     * @param aClass     Some class
+     * @param interfaces The interfaces
+     * @return A set of interfaces
+     */
     @SuppressWarnings("Duplicates")
     protected static Set<Type> populateInterfaces(Class<?> aClass, Set<Type> interfaces) {
         Type[] theInterfaces = aClass.getGenericInterfaces();
