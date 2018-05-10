@@ -77,12 +77,23 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -321,9 +332,9 @@ public class DefaultBeanContext implements BeanContext {
                     .findFirst()
                     .filter(m -> {
                         Class[] argTypes = m.getArgumentTypes();
-                        if(argTypes.length == arguments.length) {
+                        if (argTypes.length == arguments.length) {
                             for (int i = 0; i < argTypes.length; i++) {
-                                if(!arguments[i].isAssignableFrom(argTypes[i])) {
+                                if (!arguments[i].isAssignableFrom(argTypes[i])) {
                                     return false;
                                 }
                             }
@@ -341,14 +352,14 @@ public class DefaultBeanContext implements BeanContext {
     public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class[] arguments) {
         if (beanType != null) {
             Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-            if(!definitions.isEmpty()) {
+            if (!definitions.isEmpty()) {
                 BeanDefinition<T> beanDefinition = definitions.iterator().next();
                 Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
                 if (foundMethod.isPresent()) {
                     return foundMethod;
                 } else {
                     return beanDefinition.<R>findPossibleMethods(method)
-                            .findFirst();
+                        .findFirst();
                 }
             }
         }

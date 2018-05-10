@@ -291,14 +291,14 @@ class ModelUtils {
     }
 
     /**
-     * Resolves a type name for the given name
+     * Resolves a type name for the given name.
      *
      * @param type The type
      * @return The type reference
      */
     String resolveTypeName(TypeMirror type) {
         Object reference = resolveTypeReference(type);
-        if(reference instanceof Class) {
+        if (reference instanceof Class) {
             return ((Class) reference).getName();
         }
         return reference.toString();
@@ -462,11 +462,10 @@ class ModelUtils {
 
     private Class resolvePrimitiveTypeReference(TypeMirror type) {
         Class result;
-        if(type instanceof DeclaredType) {
+        if (type instanceof DeclaredType) {
             DeclaredType dt = (DeclaredType) type;
             result = classOfPrimitiveFor(dt.asElement().getSimpleName().toString());
-        }
-        else {
+        } else {
             result = classOfPrimitiveFor(type.toString());
         }
         return result;
