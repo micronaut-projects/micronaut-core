@@ -154,7 +154,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             } else if (lastOption.key == BUILD_FLAG) {
                 def val = lastOption.value
                 if (val == true) {
-                    candidates.addAll(BUILD_OPTIONS.collect { "$it " })
+                    candidates.addAll(BUILD_OPTIONS.collect { "$it ".toString() })
                 } else if (!BUILD_OPTIONS.contains(val)) {
                     def valStr = val.toString()
                     candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
