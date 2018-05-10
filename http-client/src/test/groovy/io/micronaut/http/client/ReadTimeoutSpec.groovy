@@ -31,11 +31,20 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ReadTimeoutSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             "micronaut.http.client.readTimeout":'1s'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
 
     void "test read timeout setting"() {
