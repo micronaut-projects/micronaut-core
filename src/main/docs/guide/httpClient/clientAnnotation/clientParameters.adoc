@@ -21,7 +21,6 @@ For example, the following defines a URI template and the `name` parameter is us
 .PetOperations.java
 [source,java]
 ----
-TODO: replace with include
 @Post("/{name}")
 Single<Pet> save(
     @NotBlank String name, // <1>
