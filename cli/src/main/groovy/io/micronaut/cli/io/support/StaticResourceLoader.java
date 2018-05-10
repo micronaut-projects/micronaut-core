@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
-
 /**
- * Loads relative to a static base resource
+ * Loads relative to a static base resource.
  *
  * @author Graeme Rocher
  * @since 3.1
@@ -26,14 +26,19 @@ public class StaticResourceLoader implements ResourceLoader {
 
     private Resource baseResource;
 
+    /**
+     * @param baseResource The base resource
+     */
     public StaticResourceLoader(Resource baseResource) {
         this.baseResource = baseResource;
     }
 
+    @Override
     public Resource getResource(String location) {
         return baseResource.createRelative(location);
     }
 
+    @Override
     public ClassLoader getClassLoader() {
         return Thread.currentThread().getContextClassLoader();
     }
