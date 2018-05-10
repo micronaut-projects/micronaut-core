@@ -13,19 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.parsing;
 
 /**
  * Represents a command line option.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class Option {
 
     private String name;
     private String description;
 
+    /**
+     * @param name        The name
+     * @param description The description
+     */
     public Option(String name, String description) {
         if (name == null || name.length() == 0) {
             throw new IllegalArgumentException("illegal option specified");
@@ -35,10 +40,16 @@ public class Option {
         this.description = description == null ? "" : description;
     }
 
+    /**
+     * @return The name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @return The description
+     */
     public String getDescription() {
         return description;
     }

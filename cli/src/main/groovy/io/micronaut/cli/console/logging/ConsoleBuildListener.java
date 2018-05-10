@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
 import org.apache.tools.ant.BuildEvent;
@@ -25,10 +26,16 @@ public class ConsoleBuildListener implements BuildListener {
 
     private MicronautConsole ui;
 
+    /**
+     * Default constructor.
+     */
     public ConsoleBuildListener() {
         this(MicronautConsole.getInstance());
     }
 
+    /**
+     * @param ui The Micronaut console
+     */
     public ConsoleBuildListener(MicronautConsole ui) {
         this.ui = ui;
     }
@@ -49,8 +56,7 @@ public class ConsoleBuildListener implements BuildListener {
      * will still be fired if an error occurred during the build.</p>
      *
      * @param finish An event with any relevant extra information.
-     *              Must not be <code>null</code>.
-     *
+     *               Must not be <code>null</code>.
      * @see BuildEvent#getException()
      */
     public final void buildFinished(final BuildEvent finish) {
@@ -62,7 +68,6 @@ public class ConsoleBuildListener implements BuildListener {
      *
      * @param start An event with any relevant extra information.
      *              Must not be <code>null</code>.
-     *
      * @see BuildEvent#getTarget()
      */
     public final void targetStarted(final BuildEvent start) {
@@ -74,8 +79,7 @@ public class ConsoleBuildListener implements BuildListener {
      * still be fired if an error occurred during the build.</p>
      *
      * @param finish An event with any relevant extra information.
-     *              Must not be <code>null</code>.
-     *
+     *               Must not be <code>null</code>.
      * @see BuildEvent#getException()
      */
     public final void targetFinished(final BuildEvent finish) {
@@ -87,7 +91,6 @@ public class ConsoleBuildListener implements BuildListener {
      *
      * @param start An event with any relevant extra information.
      *              Must not be <code>null</code>.
-     *
      * @see BuildEvent#getTask()
      */
     public final void taskStarted(final BuildEvent start) {
@@ -99,18 +102,18 @@ public class ConsoleBuildListener implements BuildListener {
      * be fired if an error occurred during the build.</p>
      *
      * @param finish An event with any relevant extra information.
-     *              Must not be <code>null</code>.
-     *
+     *               Must not be <code>null</code>.
      * @see BuildEvent#getException()
      */
     public final void taskFinished(final BuildEvent finish) {
         ui.indicateProgress();
     }
 
-    /** <p>When a message is sent to this logger, Ant calls this method.</p>
+    /**
+     * <p>When a message is sent to this logger, Ant calls this method.</p>
+     *
      * @param event An event with any relevant extra information.
      *              Must not be <code>null</code>.
-     *
      * @see BuildEvent#getMessage()
      * @see BuildEvent#getPriority()
      */
