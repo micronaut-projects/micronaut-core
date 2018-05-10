@@ -63,6 +63,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      * Allows invoking of Spring Boot's CLI
      */
     SpringInvoker spring = SpringInvoker.getInstance()
+
     /**
      * Access to Ant via AntBuilder
      */
@@ -72,10 +73,11 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      * The location of the user.home directory
      */
     String userHome = System.getProperty('user.home')
+
     /**
-     * The version of Grails being used
+     * The version of Micronaut being used
      */
-    String grailsVersion = getClass().getPackage()?.getImplementationVersion()
+    String micronautVersion = getClass().getPackage()?.getImplementationVersion()
 
     /**
      * Provides a description for the command
@@ -129,7 +131,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
     /**
      * @return The {@link MicronautConsole} instance
      */
-    MicronautConsole getGrailsConsole() { executionContext.console }
+    MicronautConsole getMicronautConsole() { executionContext.console }
 
     /**
      * Implementation of the handle method that runs the script

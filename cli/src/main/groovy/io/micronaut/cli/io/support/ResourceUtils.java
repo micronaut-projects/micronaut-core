@@ -169,7 +169,7 @@ public class ResourceUtils {
      * Gets the class name of the specified Micronaut resource.
      *
      * @param resource The Spring Resource
-     * @return The class name or null if the resource is not a Grails class
+     * @return The class name or null if the resource is not a Micronaut class
      */
     public static String getClassName(Resource resource) {
         try {

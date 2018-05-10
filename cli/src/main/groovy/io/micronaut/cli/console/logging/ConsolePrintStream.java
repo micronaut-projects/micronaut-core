@@ -19,7 +19,7 @@ package io.micronaut.cli.console.logging;
 import java.io.PrintStream;
 
 /**
- * Used to replace default System.out with one that routes calls through GrailsConsole.
+ * Used to replace default System.out with one that routes calls through MicronautConsole.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -113,7 +113,7 @@ class RenderStep extends AbstractStep {
 
         if (parts.size() == 1) {
             artifactName = parts[0]
-            artifactPackage = context.navigateConfig('grails', 'codegen', 'defaultPackage') ?: ''
+            artifactPackage = context.navigateConfig('micronaut', 'codegen', 'defaultPackage') ?: ''
         } else {
             artifactName = parts[-1]
             artifactPackage = parts[0..-2].join('.')

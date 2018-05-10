@@ -183,11 +183,11 @@ public final class NameUtils {
     }
 
     /**
-     * Retrieves the logical class name of a Grails artifact given the Grails class
+     * Retrieves the logical class name of a Micronaut artifact given the Micronaut class
      * and a specified trailing name.
      *
      * @param clazz        The class
-     * @param trailingName The trailing name such as "Controller" or "TagLib"
+     * @param trailingName The trailing name such as "Controller" or "Service"
      * @return The logical class name
      */
     public static String getLogicalName(Class<?> clazz, String trailingName) {
@@ -455,9 +455,9 @@ public final class NameUtils {
      * or only contains whitespace. If it contains anything other than
      * whitespace then the string is not considered to be blank and the
      * method returns <code>false</code>.</p>
-     * <p>We could use Commons Lang for this, but we don't want GrailsNameUtils
+     * <p>We could use Commons Lang for this, but we don't want NameUtils
      * to have a dependency on any external library to minimise the number of
-     * dependencies required to bootstrap Grails.</p>
+     * dependencies required to bootstrap Micronaut.</p>
      *
      * @param str The string to test.
      * @return <code>true</code> if the string is <code>null</code>, or

@@ -356,11 +356,11 @@ class MicronautCli {
                 }
 
                 if (mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
-                    System.setProperty("grails.verbose", "true")
-                    System.setProperty("grails.full.stacktrace", "true")
+                    System.setProperty("micronaut.verbose", "true")
+                    System.setProperty("micronaut.full.stacktrace", "true")
                 } else {
-                    System.setProperty("grails.verbose", "false")
-                    System.setProperty("grails.full.stacktrace", "false")
+                    System.setProperty("micronaut.verbose", "false")
+                    System.setProperty("micronaut.full.stacktrace", "false")
                 }
                 if (profile.handleCommand(context)) {
                     if (tiggerAppLoad) {

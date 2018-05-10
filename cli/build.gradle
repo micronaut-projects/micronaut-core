@@ -54,7 +54,7 @@ class MicronautCreateStartScripts extends org.gradle.api.tasks.application.Creat
 
 task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
     manifest {
-        attributes 'Main-Class': 'io.micronaut.cli.GrailsCli',
+        attributes 'Main-Class': 'io.micronaut.cli.MicronautCli',
                 'Implementation-Version': project.version
     }
     from {

@@ -62,8 +62,8 @@ import java.util.Stack;
  */
 public class MicronautConsole implements ConsoleLogger {
 
-    public static final String ENABLE_TERMINAL = "grails.console.enable.terminal";
-    public static final String ENABLE_INTERACTIVE = "grails.console.enable.interactive";
+    public static final String ENABLE_TERMINAL = "micronaut.console.enable.terminal";
+    public static final String ENABLE_INTERACTIVE = "micronaut.console.enable.interactive";
     public static final String LINE_SEPARATOR = System.getProperty("line.separator");
     public static final String CATEGORY_SEPARATOR = "|";
     public static final String PROMPT = "mn> ";
@@ -134,12 +134,12 @@ public class MicronautConsole implements ConsoleLogger {
     /**
      * Whether to enable verbose mode.
      */
-    private boolean verbose = Boolean.getBoolean("grails.verbose");
+    private boolean verbose = Boolean.getBoolean("micronaut.verbose");
 
     /**
      * Whether to show stack traces.
      */
-    private boolean stacktrace = Boolean.getBoolean("grails.show.stacktrace");
+    private boolean stacktrace = Boolean.getBoolean("micronaut.show.stacktrace");
 
     private boolean progressIndicatorActive = false;
 
@@ -324,7 +324,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Creates the instance of Terminal used directly in GrailsConsole. Note that there is also another terminal
+     * Creates the instance of Terminal used directly in MicronautConsole. Note that there is also another terminal
      * instance created implicitly inside of ConsoleReader. That instance is controlled by the jline.terminal system
      * property.
      *
@@ -495,7 +495,7 @@ public class MicronautConsole implements ConsoleLogger {
      * @throws IOException if there is an error
      */
     public static MicronautConsole createInstance() throws IOException {
-        String className = System.getProperty("grails.console.class");
+        String className = System.getProperty("micronaut.console.class");
         if (className != null) {
             try {
                 @SuppressWarnings("unchecked")
@@ -522,7 +522,7 @@ public class MicronautConsole implements ConsoleLogger {
         if (verbose) {
             // enable big traces in verbose mode
             // note - can't use StackTraceFilterer#SYS_PROP_DISPLAY_FULL_STACKTRACE as it is in grails-core
-            System.setProperty("grails.full.stacktrace", "true");
+            System.setProperty("micronaut.full.stacktrace", "true");
         }
         this.verbose = verbose;
     }
@@ -847,7 +847,7 @@ public class MicronautConsole implements ConsoleLogger {
         if ((error instanceof BuildException) && error.getCause() != null) {
             error = error.getCause();
         }
-        if (!isVerbose() && !Boolean.getBoolean("grails.full.stacktrace")) {
+        if (!isVerbose() && !Boolean.getBoolean("micronaut.full.stacktrace")) {
             StackTraceUtils.deepSanitize(error);
         }
         StringWriter sw = new StringWriter();

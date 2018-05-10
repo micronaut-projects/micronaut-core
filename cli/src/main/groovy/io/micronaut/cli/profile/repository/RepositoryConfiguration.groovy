@@ -34,7 +34,8 @@ class RepositoryConfiguration {
     final String password
 
     /**
-     * Creates a new {@code GrailsRepositoryConfiguration} instance.
+     * Creates a new {@code RepositoryConfiguration} instance.
+     *
      * @param name The name of the repository
      * @param uri The uri of the repository
      * @param snapshotsEnabled {@code true} if the repository should enable access to snapshots, {@code false} otherwise
@@ -46,7 +47,8 @@ class RepositoryConfiguration {
     }
 
     /**
-     * Creates a new {@code GrailsRepositoryConfiguration} instance.
+     * Creates a new {@code RepositoryConfiguration} instance.
+     *
      * @param name The name of the repository
      * @param uri The uri of the repository
      * @param snapshotsEnabled {@code true} if the repository should enable access to snapshots, {@code false} otherwise
