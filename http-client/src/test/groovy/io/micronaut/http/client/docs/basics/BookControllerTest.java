@@ -63,11 +63,9 @@ public class BookControllerTest {
                 message.get().getTitle()
         );
 
-
         embeddedServer.stop();
         client.stop();
     }
-
 
     @Test
     public void testPostFormData() {

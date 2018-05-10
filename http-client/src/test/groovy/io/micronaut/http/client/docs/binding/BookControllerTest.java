@@ -69,8 +69,6 @@ public class BookControllerTest {
 
         HttpResponse<Book> response = call.blockingFirst();
 
-
-
         embeddedServer.stop();
         client.stop();
     }

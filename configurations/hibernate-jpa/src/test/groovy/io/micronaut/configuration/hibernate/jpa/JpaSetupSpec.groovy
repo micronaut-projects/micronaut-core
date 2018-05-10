@@ -99,7 +99,6 @@ class JpaSetupSpec extends Specification {
         thrown(ConstraintViolationException)
     }
 
-
     void "test setup entity manager save entity"() {
         when:
         EntityManagerFactory entityManagerFactory = applicationContext.getBean(EntityManagerFactory)
@@ -117,7 +116,6 @@ class JpaSetupSpec extends Specification {
         then:
         em.createQuery("select book from Book book").resultList.size() == 1
 
-
         cleanup:
         tx.rollback()
     }
@@ -125,7 +123,6 @@ class JpaSetupSpec extends Specification {
     void "test spring based transaction management"() {
         given:
         BookService bookService = applicationContext.getBean(BookService)
-
 
         when:
         List<Book> books = bookService.listBooks()
@@ -135,7 +132,6 @@ class JpaSetupSpec extends Specification {
 
         when:
         bookService.saveError()
-
 
         then:
         def e  = thrown(RuntimeException)
@@ -151,7 +147,6 @@ class JpaSetupSpec extends Specification {
 
         then:
         books.size() == 1
-
     }
 }
 

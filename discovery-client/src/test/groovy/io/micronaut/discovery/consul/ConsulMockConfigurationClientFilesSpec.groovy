@@ -65,7 +65,6 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
     @Shared
     ConsulClient client = someContext.getBean(ConsulClient)
 
-
     def setup() {
         consulServer.applicationContext.getBean(MockConsulServer)
                 .keyvalues.clear()

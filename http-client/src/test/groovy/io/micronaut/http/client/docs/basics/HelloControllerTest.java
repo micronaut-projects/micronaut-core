@@ -108,7 +108,6 @@ public class HelloControllerTest {
         client.stop();
     }
 
-
     @Test
     public void testRetrieveWithPOJO() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
@@ -185,7 +184,6 @@ public class HelloControllerTest {
                 "Hello John",
                 message.get()
         );
-
 
         embeddedServer.stop();
         client.stop();

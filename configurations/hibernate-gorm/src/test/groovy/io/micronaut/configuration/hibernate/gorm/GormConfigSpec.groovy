@@ -46,7 +46,6 @@ class GormConfigSpec extends Specification {
                 .mainClass(GormConfigSpec)
                 .start()
 
-
         DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource.targetDataSource
 
         expect:
@@ -56,7 +55,6 @@ class GormConfigSpec extends Specification {
         cleanup:
         applicationContext.close()
     }
-
 
     void "test gorm configured correctly"() {
         given:

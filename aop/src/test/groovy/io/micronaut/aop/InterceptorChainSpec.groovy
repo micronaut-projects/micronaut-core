@@ -36,8 +36,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
  */
 class InterceptorChainSpec extends Specification {
 
-
-
     void "test invoke interceptor chain"() {
         given:
         Interceptor[] interceptors = [new TwoInterceptor(), new OneInterceptor(), new ThreeInterceptor()]
@@ -70,9 +68,6 @@ class InterceptorChainSpec extends Specification {
             return context.proceed()
         }
     }
-
-
-
 
     static class OneInterceptor implements Interceptor {
 
