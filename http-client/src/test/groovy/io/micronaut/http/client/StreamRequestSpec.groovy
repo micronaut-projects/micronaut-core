@@ -73,7 +73,6 @@ class StreamRequestSpec extends Specification {
         cleanup:
         client.stop()
         client.close()
-
     }
 
     void "test stream post request with byte chunks"() {
@@ -132,10 +131,7 @@ class StreamRequestSpec extends Specification {
         cleanup:
         client.stop()
         client.close()
-
     }
-
-
 
     void "test stream post request with POJOs flowable"() {
         given:
@@ -164,8 +160,6 @@ class StreamRequestSpec extends Specification {
         client.stop()
         client.close()
     }
-
-
 
     void "test json stream post request with POJOs flowable"() {
         given:

@@ -40,8 +40,6 @@ class ConsulMockConfigurationClientPropertiesSpec extends Specification {
             (MockConsulServer.ENABLED): true
     ])
 
-
-
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -57,8 +55,6 @@ class ConsulMockConfigurationClientPropertiesSpec extends Specification {
 
     @Shared
     ConsulConfigurationClient configClient = embeddedServer.applicationContext.getBean(ConsulConfigurationClient)
-
-
 
     def setup() {
         consulServer.applicationContext.getBean(MockConsulServer)

@@ -38,7 +38,6 @@ class SimpleEndpointSpec extends Specification {
         )
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
-
         when:
         def response = rxClient.exchange("/simple", String).blockingFirst()
 

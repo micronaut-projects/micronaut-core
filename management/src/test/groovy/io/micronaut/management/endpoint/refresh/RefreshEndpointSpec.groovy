@@ -33,7 +33,6 @@ import spock.lang.Specification
  */
 class RefreshEndpointSpec extends Specification {
 
-
     void "test refresh endpoint"() {
         given:
         System.setProperty("foo.bar", "test")
