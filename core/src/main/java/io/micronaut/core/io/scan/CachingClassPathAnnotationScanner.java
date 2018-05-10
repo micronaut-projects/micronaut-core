@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan</p>.
+ * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +39,7 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
 
     /**
      * Constructor.
+     *
      * @param classLoader classLoader
      */
     public CachingClassPathAnnotationScanner(ClassLoader classLoader) {
@@ -57,7 +58,7 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
     }
 
     /**
-     * Inner class CacheKey
+     * Inner class CacheKey.
      */
     private final class CacheKey implements Serializable {
         final String annotation;

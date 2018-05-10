@@ -91,7 +91,7 @@ public class OrderUtil {
      *
      * @param objects The array to sort
      */
-    public static void sort(Ordered...objects) {
+    public static void sort(Ordered... objects) {
         Arrays.sort(objects, COMPARATOR);
     }
 
@@ -101,7 +101,7 @@ public class OrderUtil {
      * @param objects The array to sort
      */
     public static void sort(Object[] objects) {
-        Arrays.sort(objects,COMPARATOR);
+        Arrays.sort(objects, COMPARATOR);
     }
 
     private static int getOrder(Object o) {

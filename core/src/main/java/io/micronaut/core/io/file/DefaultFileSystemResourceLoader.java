@@ -37,14 +37,23 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
 
     private final Optional<File> baseDir;
 
+    /**
+     * Default constructor.
+     */
     public DefaultFileSystemResourceLoader() {
         this.baseDir = Optional.empty();
     }
 
+    /**
+     * @param baseDir The base directory
+     */
     public DefaultFileSystemResourceLoader(File baseDir) {
         this.baseDir = Optional.of(baseDir);
     }
 
+    /**
+     * @param path The path
+     */
     public DefaultFileSystemResourceLoader(String path) {
         this.baseDir = Optional.of(new File(normalize(path)));
     }
@@ -66,7 +75,8 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
             try {
                 URL url = file.toURI().toURL();
                 return Optional.of(url);
-            } catch (MalformedURLException e) {}
+            } catch (MalformedURLException e) {
+            }
         }
         return Optional.empty();
     }
@@ -76,10 +86,15 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         throw new UnsupportedOperationException(getClass().getName() + " does not support retrieving a stream of resources");
     }
 
+    /**
+     * @param basePath The path to load resources
+     * @return The resource loader
+     */
     public ResourceLoader forBase(String basePath) {
         return new DefaultFileSystemResourceLoader(basePath);
     }
 
+    @SuppressWarnings("MagicNumber")
     private static String normalize(String path) {
         if (path == null) {
             return null;

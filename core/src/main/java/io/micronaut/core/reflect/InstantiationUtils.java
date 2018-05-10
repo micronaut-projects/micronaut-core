@@ -119,7 +119,8 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
-     * @param type The type
+     * @param type        The type
+     * @param classLoader The classloader
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      */
@@ -136,7 +137,9 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
-     * @param type The type
+     * @param type         The type
+     * @param requiredType The required type
+     * @param <T>          The type
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      */

@@ -50,18 +50,27 @@ public class ArgumentUtils {
 
     /**
      * Allows producing error messages.
+     *
+     * @param <T> The type
      */
     public static class ArgumentCheck<T> {
         private final Check check;
         private final String name;
         private final T value;
 
+        /**
+         * @param check The check
+         */
         public ArgumentCheck(Check check) {
             this.check = check;
             this.name = null;
             this.value = null;
         }
 
+        /**
+         * @param name  The name
+         * @param value The value
+         */
         public ArgumentCheck(String name, T value) {
             this.check = null;
             this.name = name;
@@ -92,8 +101,15 @@ public class ArgumentUtils {
         }
     }
 
+    /**
+     * Functional interface the check a condition.
+     */
     @FunctionalInterface
     public interface Check {
+
+        /**
+         * @return Whether the condition is true
+         */
         boolean condition();
     }
 }

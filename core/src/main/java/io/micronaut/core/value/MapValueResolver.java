@@ -26,12 +26,16 @@ import java.util.Optional;
 /**
  * A simple map based implementation of the {@link ValueResolver} interface.
  *
+ * @param <K> The key type
  * @author Graeme Rocher
  * @since 1.0
  */
 class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
     private final Map<K, ?> map;
 
+    /**
+     * @param map The map
+     */
     MapValueResolver(Map<K, ?> map) {
         this.map = map;
     }

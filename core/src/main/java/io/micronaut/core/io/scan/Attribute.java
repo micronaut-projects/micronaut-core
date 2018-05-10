@@ -43,7 +43,7 @@ class Attribute {
     /**
      * The type of this attribute.
      */
-    public final String type;
+    final String type;
 
     /**
      * The raw value of this attribute, used only for unknown attributes.

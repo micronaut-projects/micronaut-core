@@ -39,6 +39,12 @@ import java.util.stream.Stream;
  */
 public class StreamSoftServiceLoader {
 
+    /**
+     * @param serviceType The service type
+     * @param classLoader The class loader
+     * @param <T>         The type
+     * @return A stream
+     */
     @SuppressWarnings("unchecked")
     public static <T> Stream<ServiceDefinition<T>> loadParallel(Class<T> serviceType, ClassLoader classLoader) {
         Enumeration<URL> serviceConfigs;
@@ -78,6 +84,12 @@ public class StreamSoftServiceLoader {
             });
     }
 
+    /**
+     * @param serviceType The service type
+     * @param classLoader The class loader
+     * @param <T>         The type
+     * @return A stream with services loaded
+     */
     @SuppressWarnings("unchecked")
     public static <T> Stream<T> loadPresentParallel(Class<T> serviceType, ClassLoader classLoader) {
         return loadParallel(serviceType, classLoader)

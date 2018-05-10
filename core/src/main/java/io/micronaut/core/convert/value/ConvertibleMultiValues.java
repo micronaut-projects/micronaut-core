@@ -33,6 +33,7 @@ import java.util.function.BiConsumer;
 /**
  * Specialization of {@link ConvertibleValues} where each name has multiple possible values.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

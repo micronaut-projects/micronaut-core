@@ -24,6 +24,10 @@ package io.micronaut.core.serialize.exceptions;
  */
 public class SerializationException extends RuntimeException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public SerializationException(String message, Throwable cause) {
         super(message, cause);
     }

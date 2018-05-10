@@ -43,7 +43,9 @@ import java.util.function.Supplier;
 @Internal
 public class Publishers {
 
+    @SuppressWarnings("ConstantName")
     static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
+    @SuppressWarnings("ConstantName")
     static final List<Class<?>> singleTypes = new ArrayList<>(3);
 
     static {
@@ -71,7 +73,7 @@ public class Publishers {
      * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param futureSupplier The supplier of the {@link CompletableFuture}
-     * @param <T>
+     * @param <T>            The type of the publisher
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> fromCompletableFuture(Supplier<CompletableFuture<T>> futureSupplier) {
@@ -241,14 +243,15 @@ public class Publishers {
 
     /**
      * Is the given object a Publisher or convertible to a publisher.
+     *
      * @param object The object
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Object object) {
-        if(object == null) {
+        if (object == null) {
             return false;
         }
-        if(object instanceof Publisher) {
+        if (object instanceof Publisher) {
             return true;
         } else {
             return isConvertibleToPublisher(object.getClass());
@@ -270,6 +273,11 @@ public class Publishers {
         return false;
     }
 
+    /**
+     * A publisher for a value.
+     *
+     * @param <T> The type
+     */
     private static class JustPublisher<T> implements Publisher<T> {
         private final T value;
 
@@ -300,6 +308,11 @@ public class Publishers {
         }
     }
 
+    /**
+     * A publisher that throws an error.
+     *
+     * @param <T> The type
+     */
     private static class JustThrowPublisher<T> implements Publisher<T> {
 
         private final Throwable error;
