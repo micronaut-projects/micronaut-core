@@ -17,6 +17,7 @@
 package io.micronaut.discovery.kubernetes;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
@@ -40,7 +41,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(env = "KUBERNETES_SERVICE_HOST")
+@Requires(env = Environment.KUBERNETES)
 public class KubernetesDiscoveryClient implements DiscoveryClient {
 
     private static final String HOST_SUFFIX = "_SERVICE_HOST";
