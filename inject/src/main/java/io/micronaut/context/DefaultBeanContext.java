@@ -325,7 +325,12 @@ public class DefaultBeanContext implements BeanContext {
                     .filter(m -> {
                         Class[] argTypes = m.getArgumentTypes();
                         if(argTypes.length == arguments.length) {
-                            return Arrays.equals(argTypes, arguments);
+                            for (int i = 0; i < argTypes.length; i++) {
+                                if(!arguments[i].isAssignableFrom(argTypes[i])) {
+                                    return false;
+                                }
+                            }
+                            return true;
                         }
                         return false;
                     })
