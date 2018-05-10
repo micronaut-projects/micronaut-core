@@ -95,13 +95,16 @@ httpClient:
   clientFilter: HTTP Client Filters
 cloud:
   title: Cloud Native Features
-  configurationSharing: Configuration Sharing
+  distributedConfiguration:
+    title: Distributed Configuration
+    distributedConfigurationConsul: Consul Support
+#    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
-    serviceDiscoveryRoute53: AWS Route 53 Support
+#    serviceDiscoveryRoute53: AWS Route 53 Support
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
@@ -109,9 +112,9 @@ cloud:
     title: Distributed Tracing
     zipkin: Tracing with Zipkin
     jaeger: Tracing with Jaeger
-  serverlessFunctions:
-    title: Serverless Function Support
-    lambdaFunctions: AWS Lambda Function Support
+serverlessFunctions:
+  title: Serverless Functions
+  lambdaFunctions: AWS Lambda Function Support
 dataAccess:
   title: Configurations for Data Access
   sqlSupport: Configuring a SQL Data Source
