@@ -1,5 +1,13 @@
+Add the following to the `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:redis-lettuce:${projectVersion}"
+----
+
 Micronaut supports Redis configuration by using the https://lettuce.io/[Lettuce Redis Client].
-Configuration values can be supplied a property source such as below.  The Client can be configured for the Redis URI and Caches, like the example below.
+Configuration values can be supplied a property source. The Client can be configured for the Redis URI and Caches, like the example below.
 
 .Supply Configuration
 [source,groovy]
@@ -7,5 +15,5 @@ Configuration values can be supplied a property source such as below.  The Clien
 include::configurations/redis-lettuce/src/test/groovy/io/micronaut/configuration/lettuce/cache/SyncCacheSpec.groovy[tags=start, indent0]
 ----
 
-IMPORTANT: Redis configuration values can be used to configure the client in various ways by following the naming patterns
+IMPORTANT: Redis configuration values can be used to create Redis client beans in various ways by following the naming patterns
 in api:configuration.lettuce.RedisSetting[].
