@@ -19,10 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.annotation.Controller
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.annotation.Controller
 import io.micronaut.web.router.GroovyRouteBuilder
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router

@@ -16,12 +16,8 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.annotation.ConfigurationProperties
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification

@@ -18,10 +18,6 @@ package io.micronaut.inject.factory
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Prototype
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Prototype
 import spock.lang.Specification
 
 /**

@@ -19,10 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.DefaultEnvironment
-import io.micronaut.context.env.Environment
 import spock.lang.Specification
 
 import javax.inject.Inject

@@ -15,14 +15,6 @@
  */
 package io.micronaut.session.http
 
-import io.micronaut.core.convert.ConversionService
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.cookie.Cookie
-import io.micronaut.http.netty.cookies.NettyCookie
-import io.micronaut.http.server.HttpServerConfiguration
-import io.micronaut.http.server.netty.NettyHttpRequest
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.HttpMethod

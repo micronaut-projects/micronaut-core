@@ -16,9 +16,6 @@
 package io.micronaut.discovery.cloud
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.micronaut.context.env.Environment
-import io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadataResolver
-import io.micronaut.discovery.cloud.gcp.GoogleComputeMetadataConfiguration
 import io.micronaut.context.env.ComputePlatform
 import io.micronaut.context.env.Environment
 import io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadataResolver

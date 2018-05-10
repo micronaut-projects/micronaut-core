@@ -17,7 +17,6 @@
 package io.micronaut.configuration.neo4j.bolt
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 /**

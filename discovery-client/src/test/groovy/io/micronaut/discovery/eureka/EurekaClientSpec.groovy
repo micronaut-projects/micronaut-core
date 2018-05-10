@@ -15,11 +15,6 @@
  */
 package io.micronaut.discovery.eureka
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.eureka.client.v2.ApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.EurekaClient
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.micronaut.http.HttpStatus
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.CompositeDiscoveryClient

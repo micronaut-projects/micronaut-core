@@ -15,13 +15,9 @@
  */
 package io.micronaut.http.server.netty.configuration
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.server.cors.CorsOriginConfiguration

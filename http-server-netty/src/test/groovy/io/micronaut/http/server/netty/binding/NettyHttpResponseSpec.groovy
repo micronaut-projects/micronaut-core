@@ -20,7 +20,6 @@ import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.cookie.Cookie

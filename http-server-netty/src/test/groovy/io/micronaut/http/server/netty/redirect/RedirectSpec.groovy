@@ -15,14 +15,7 @@
  */
 package io.micronaut.http.server.netty.redirect
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse

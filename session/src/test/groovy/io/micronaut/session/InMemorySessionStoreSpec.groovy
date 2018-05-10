@@ -17,17 +17,13 @@ package io.micronaut.session
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
 import io.micronaut.session.event.SessionDeletedEvent
-import io.micronaut.session.event.SessionDestroyedEvent
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
-import java.time.Instant
 
 /**
  * @author Graeme Rocher

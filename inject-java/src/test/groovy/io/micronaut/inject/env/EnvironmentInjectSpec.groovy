@@ -17,9 +17,6 @@ package io.micronaut.inject.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.Environment
 import spock.lang.Specification
 
 class EnvironmentInjectSpec extends Specification {

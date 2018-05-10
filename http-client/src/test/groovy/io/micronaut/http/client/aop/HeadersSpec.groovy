@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Headers
 import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 

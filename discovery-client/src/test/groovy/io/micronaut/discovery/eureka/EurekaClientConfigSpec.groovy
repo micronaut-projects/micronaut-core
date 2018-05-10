@@ -16,8 +16,6 @@
 package io.micronaut.discovery.eureka
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.eureka.client.v2.EurekaClient
-import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.runtime.ApplicationConfiguration

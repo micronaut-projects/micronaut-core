@@ -17,8 +17,6 @@ package io.micronaut.docs.server.request
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.HttpClient
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared

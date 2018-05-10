@@ -18,8 +18,6 @@ package io.micronaut.inject.constructor
 import groovy.transform.PackageScope
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 import javax.inject.Inject

@@ -20,7 +20,6 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Ignore
 import spock.lang.Specification
 /**
  * @author Graeme Rocher

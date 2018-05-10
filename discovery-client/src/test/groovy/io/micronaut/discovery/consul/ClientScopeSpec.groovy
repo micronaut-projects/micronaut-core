@@ -21,7 +21,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
