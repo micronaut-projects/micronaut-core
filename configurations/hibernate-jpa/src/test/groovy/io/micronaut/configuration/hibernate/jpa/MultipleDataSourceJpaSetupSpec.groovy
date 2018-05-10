@@ -23,8 +23,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.sql.DataSource
-
 /**
  * @author graemerocher
  * @since 1.0

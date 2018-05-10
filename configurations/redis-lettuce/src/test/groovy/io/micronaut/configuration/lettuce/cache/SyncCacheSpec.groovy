@@ -16,11 +16,8 @@
 
 package io.micronaut.configuration.lettuce.cache
 
-import io.micronaut.cache.SyncCache
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
-import io.micronaut.inject.qualifiers.Qualifiers
-import redis.embedded.RedisServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

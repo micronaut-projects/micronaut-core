@@ -15,8 +15,6 @@
  */
 package io.micronaut.cache
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.micronaut.cache.annotation.CacheConfig

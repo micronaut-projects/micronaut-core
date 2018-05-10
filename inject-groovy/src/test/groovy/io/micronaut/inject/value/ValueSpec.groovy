@@ -17,9 +17,6 @@ package io.micronaut.inject.value
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Value
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Value
 import spock.lang.Specification
 
 import javax.inject.Inject

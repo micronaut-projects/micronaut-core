@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.lettuce
 
-import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulRedisConnection
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils

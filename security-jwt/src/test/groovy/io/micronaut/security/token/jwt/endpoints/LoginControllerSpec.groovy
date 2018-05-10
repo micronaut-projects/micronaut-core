@@ -13,10 +13,7 @@ import io.micronaut.security.authentication.UsernamePasswordCredentials
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
 import io.micronaut.security.token.jwt.render.BearerAccessRefreshToken
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
-import io.micronaut.security.token.jwt.signature.rsa.RSASignatureConfiguration
-import io.micronaut.security.token.jwt.signature.rsa.RSASignatureFactory
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 

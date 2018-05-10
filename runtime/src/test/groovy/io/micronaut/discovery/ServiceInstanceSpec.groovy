@@ -16,7 +16,6 @@
 package io.micronaut.discovery
 
 import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpHeaders
 import spock.lang.Specification
 
 /**

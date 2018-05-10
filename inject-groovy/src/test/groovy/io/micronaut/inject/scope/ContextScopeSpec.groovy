@@ -17,8 +17,6 @@ package io.micronaut.inject.scope
 
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Context
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Context
 import spock.lang.Specification
 
 /**

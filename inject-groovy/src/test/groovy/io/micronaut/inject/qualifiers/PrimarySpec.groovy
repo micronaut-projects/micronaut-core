@@ -18,9 +18,6 @@ package io.micronaut.inject.qualifiers
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Primary
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Primary
 import spock.lang.Specification
 
 import javax.inject.Inject
