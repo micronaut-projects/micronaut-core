@@ -52,7 +52,7 @@ public @interface Endpoint {
     /**
      * Whether endpoints are sensitive by default.
      */
-    boolean SENSITIVE = false;
+    boolean SENSITIVE = true;
 
     /**
      * @return The ID of the endpoint
