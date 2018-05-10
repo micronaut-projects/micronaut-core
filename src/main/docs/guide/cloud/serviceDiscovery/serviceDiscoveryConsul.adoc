@@ -1,1 +1,37 @@
-https://github.com/micronaut-projects/micronaut-core/issues/94[TODO]
+https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native api:discovery.consul.client.v1.ConsulClient[] that is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
+
+==== Starting Consul
+
+The quickest way to start using Consul is via Docker:
+
+. Starting Consul with Docker
+[source,bash]
+----
+docker run -p 8500:8500 consul
+----
+
+Alternatively you can https://www.consul.io/docs/install/index.html[install and run a local Consul instance].
+
+==== Auto Registering with Consul
+
+To register a Micronaut application with Consul simply add the necessary api:discovery.consul.ConsulConfiguration[]. A minimal example can be seen below:
+
+.Auto Regsitering with Consul
+[source,yaml]
+----
+micronaut:
+    application:
+        name: hello-world
+consul:
+  client:
+    registration:
+      enabled: true
+  defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+----
+
+
+
+==== Discovery Services from Consul
+
+
+==== Consul Health Checks
