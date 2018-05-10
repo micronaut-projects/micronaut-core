@@ -80,23 +80,12 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -333,6 +322,13 @@ public class DefaultBeanContext implements BeanContext {
             } else {
                 return beanDefinition.findPossibleMethods(method)
                     .findFirst()
+                    .filter(m -> {
+                        Class[] argTypes = m.getArgumentTypes();
+                        if(argTypes.length == arguments.length) {
+                            return Arrays.equals(argTypes, arguments);
+                        }
+                        return false;
+                    })
                     .map((ExecutableMethod executableMethod) -> new BeanExecutionHandle(this, beanType, qualifier, executableMethod));
             }
         }
