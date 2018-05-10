@@ -7,3 +7,5 @@ The api:discovery.config.ConfigurationClient[] interface has a single method cal
 The `getPropertySources` returns a rs:Publisher[] that emits zero or many api:context.env.PropertySource[] instances.
 
 The default implementation is api:discovery.config.DefaultCompositeConfigurationClient[] which merges all registered `ConfigurationClient` beans into a single bean.
+
+You can either implement your own api:discovery.config.ConfigurationClient[] implementation or you can use one of the ones already built into Micronaut. The following sections cover those.
