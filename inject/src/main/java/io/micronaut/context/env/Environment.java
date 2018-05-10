@@ -118,6 +118,16 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String IBM = "ibm";
 
     /**
+     * Running on Kubernetes
+     */
+    String KUBERNETES = "k8s";
+
+    /**
+     * Running on Cloud Foundry
+     */
+    String CLOUD_FOUNDRY = "pcf";
+
+    /**
      * @return The active environment names
      */
     Set<String> getActiveNames();

@@ -81,6 +81,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String PCF_ENV = "VCAP_SERVICES";
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -511,9 +513,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static EnvironmentsAndPackage deduceEnvironments() {
+
+
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         Set<String> enviroments = environmentsAndPackage.enviroments;
+
+        // analyze stack to check for Android / Test env
         for (StackTraceElement stackTraceElement : stackTrace) {
             String methodName = stackTraceElement.getMethodName();
             if (methodName.contains("$spock_")) {
@@ -536,6 +542,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         if(!enviroments.contains(ANDROID)) {
+            // deduce k8s
+            if(StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                enviroments.add(Environment.KUBERNETES);
+            }
+            // deduce CF
+            if(StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                enviroments.add(Environment.CLOUD_FOUNDRY);
+            }
 
             ComputePlatform computePlatform = determineCloudProvider();
             if (computePlatform != null) {
@@ -549,11 +563,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         enviroments.add(AMAZON_EC2);
                         break;
                     case AZURE:
-                        // not implemented
+                        // not yet implemented
                         enviroments.add(AZURE);
                         break;
                     case IBM:
-                        // not implemented
+                        // not yet implemented
                         enviroments.add(IBM);
                         break;
                     case OTHER:
