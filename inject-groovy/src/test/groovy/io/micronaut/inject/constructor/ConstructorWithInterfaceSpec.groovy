@@ -17,13 +17,9 @@ package io.micronaut.inject.constructor
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Provided
 import spock.lang.Specification
 
 import javax.inject.Inject
-import javax.inject.Provider
 import javax.inject.Singleton
 
 /**

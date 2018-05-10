@@ -15,8 +15,6 @@
  */
 package io.micronaut.docs.intro
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.*
 import spock.lang.Specification
 
 /**

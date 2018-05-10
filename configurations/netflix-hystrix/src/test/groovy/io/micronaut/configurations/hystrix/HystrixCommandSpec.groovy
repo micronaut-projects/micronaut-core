@@ -18,12 +18,6 @@ package io.micronaut.configurations.hystrix
 import com.netflix.hystrix.HystrixInvokable
 import com.netflix.hystrix.exception.HystrixRuntimeException
 import com.netflix.hystrix.strategy.executionhook.HystrixCommandExecutionHook
-import io.micronaut.configurations.hystrix.annotation.Hystrix
-import io.micronaut.configurations.hystrix.annotation.HystrixCommand
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Property
-import io.micronaut.retry.annotation.Fallback
-import io.micronaut.retry.annotation.Retryable
 import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Observable

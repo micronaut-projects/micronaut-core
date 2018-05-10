@@ -15,12 +15,6 @@
  */
 package io.micronaut.http.server.netty.cors
 
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.server.cors.CorsFilter
-import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod

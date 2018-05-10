@@ -17,7 +17,6 @@ package io.micronaut.configuration.hibernate.jpa
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanContextException
-import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.http.exceptions.ConnectionClosedException
 import io.micronaut.http.exceptions.HttpException

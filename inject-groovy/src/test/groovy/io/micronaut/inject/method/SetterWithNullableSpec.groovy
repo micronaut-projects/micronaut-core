@@ -18,14 +18,10 @@ package io.micronaut.inject.method
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
 import javax.annotation.Nullable
 import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Created by graemerocher on 30/05/2017.

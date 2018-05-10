@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.naming.NameUtils
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext

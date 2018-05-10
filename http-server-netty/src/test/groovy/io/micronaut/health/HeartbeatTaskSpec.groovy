@@ -17,8 +17,6 @@ package io.micronaut.health
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions

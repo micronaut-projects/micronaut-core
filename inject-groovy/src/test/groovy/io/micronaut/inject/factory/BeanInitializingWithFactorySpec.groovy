@@ -21,17 +21,10 @@ import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.event.BeanInitializedEventListener
-import io.micronaut.context.event.BeanInitializingEvent
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject
-import javax.inject.Provider
 import javax.inject.Singleton
 
 /**

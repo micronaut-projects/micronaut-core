@@ -18,7 +18,6 @@ package io.micronaut.management.endpoint.beans
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.Ignore
 import spock.lang.Specification
 import io.micronaut.http.client.*
 

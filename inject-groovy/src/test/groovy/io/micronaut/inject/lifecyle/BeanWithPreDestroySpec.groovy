@@ -17,11 +17,7 @@ package io.micronaut.inject.lifecyle
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
-
-import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 import javax.inject.Inject
 import javax.inject.Singleton
