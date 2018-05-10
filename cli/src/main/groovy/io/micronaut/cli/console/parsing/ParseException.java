@@ -13,22 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.parsing;
 
 /**
  * Exception that is thrown in command line parsing fails.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class ParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1;
 
+    /**
+     * @param message The message
+     */
     public ParseException(String message) {
         super(message);
     }
 
+    /**
+     * @param cause The throwable
+     */
     public ParseException(Throwable cause) {
         super(cause);
     }
