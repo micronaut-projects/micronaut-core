@@ -9,8 +9,9 @@ dependencies {
     compileOnly "io.micronaut:inject-groovy:${projectVersion}"
 
     compile project(":api")
-    compile "io.micronaut.configuration:neo4j-gorm:${projectVersion}"
-
+    // tag::neo4j-gorm[]
+    compile "io.micronaut.configuration:neo4j-gorm:${projectVersion}" // <1>
+    // end::neo4j-gorm[]
     compile "io.micronaut:http-server-netty:${projectVersion}"
     compile "io.micronaut:discovery-client:${projectVersion}"
 
@@ -19,5 +20,7 @@ dependencies {
         exclude module:'groovy-all'
     }
     compile "org.codehaus.groovy:groovy-json:$groovyVersion"
-    testRuntime "org.neo4j.test:neo4j-harness:3.3.3"
+    //tag::neo4j-test[]
+    testRuntime "org.neo4j.test:neo4j-harness:3.3.3" // <2>
+    //end::neo4j-test[]
 }

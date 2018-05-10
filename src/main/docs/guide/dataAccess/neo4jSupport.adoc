@@ -1,3 +1,19 @@
+In the application `build.gradle`, these dependencies are needed to support Neo4J:
+
+.build.gradle
+
+[source,groovy]
+----
+// Used for basic neo4j client
+compile 'org.neo4j.driver:neo4j-java-driver:1.5.1'
+
+include::examples/petstore/comments/build.gradle[tags=neo4j-gorm, indent=0]
+include::examples/petstore/comments/build.gradle[tags=neo4j-test, indent=0]
+----
+
+<1> Used to setup GORM for neo4j
+<2> Used for test harness to create the api:configuration.neo4j.bolt.embedded.EmbeddedNeo4jServer[]
+
 Micronaut supports Neo4j driver configuration. Configuration values can be supplied a property source such as below.
 The property name is derived from api:configuration.neo4j.bolt.Neo4JBoltConfiguration[] and the builder methods in
 https://neo4j.com/docs/api/java-driver/current/org/neo4j/driver/v1/Config.ConfigBuilder.html[Config.ConfigBuilder] (without the prefix).
@@ -9,3 +25,13 @@ include::configurations/neo4j-bolt/src/test/groovy/io/micronaut/configuration/ne
 ----
 
 Note the `embedded` keyword is used for properties to configure the api:configuration.neo4j.bolt.embedded.EmbeddedNeo4jServer[].
+
+If you would like to use the Neo4j https://neo4j.com/docs/api/java-driver/current/org/neo4j/driver/v1/Driver.html[Driver] directly,
+just inject into a bean. The example below uses Constructor injection:
+
+.Constructor Injection of Driver
+[source,groovy]
+----
+include::configurations/neo4j-bolt/src/main/java/io/micronaut/configuration/neo4j/bolt/health/Neo4jHealthIndicator.java[tags=driver, indent=0]
+...
+----

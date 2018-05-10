@@ -40,6 +40,7 @@ import java.util.concurrent.CompletionStage;
  * @author graemerocher
  * @since 1.0
  */
+// tag::driver[]
 @Requires(classes = HealthIndicator.class)
 @Singleton
 public class Neo4jHealthIndicator implements HealthIndicator {
@@ -54,6 +55,7 @@ public class Neo4jHealthIndicator implements HealthIndicator {
     public Neo4jHealthIndicator(Driver boltDriver) {
         this.boltDriver = boltDriver;
     }
+    // end::driver[]
 
     @Override
     public Publisher<HealthResult> getResult() {
