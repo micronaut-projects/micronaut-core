@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import groovy.transform.Canonical
@@ -24,7 +25,7 @@ import jline.console.completer.Completer
  * Describes a {@link Command}
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 @Canonical
@@ -93,7 +94,7 @@ class CommandDescription {
      * @param synonyms The synonyms
      * @return This command description
      */
-    CommandDescription synonyms(String...synonyms) {
+    CommandDescription synonyms(String... synonyms) {
         this.synonyms.addAll(synonyms)
         return this
     }
@@ -128,7 +129,7 @@ class CommandDescription {
     CommandDescription argument(Map args) {
         def arg = new CommandArgument(args)
         def name = arg.name
-        if(name) {
+        if (name) {
             arguments[name] = arg
         }
         return this
@@ -143,7 +144,7 @@ class CommandDescription {
     CommandDescription flag(Map args) {
         def arg = new CommandArgument(args)
         def name = arg.name
-        if(name) {
+        if (name) {
             arg.required = false
             flags[name] = arg
         }

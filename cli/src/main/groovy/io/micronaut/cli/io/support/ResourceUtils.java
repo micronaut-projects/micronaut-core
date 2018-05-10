@@ -13,12 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cli.io.support;
 
-import io.micronaut.cli.util.CliSettings;
-import groovy.lang.Closure;
-import groovy.util.ConfigObject;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
+package io.micronaut.cli.io.support;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -28,19 +24,74 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 /**
  * Utility methods for resource handling / figuring out class names.
  *
  * @author Graeme Rocher
  * @author Juergen Hoeller
- * @since 2.0
+ * @since 1.0
  */
+@SuppressWarnings("MagicNumber")
 public class ResourceUtils {
+
+    /**
+     * The JAR URL separator.
+     */
+    public static final String JAR_URL_SEPARATOR = "!/";
+
+    /**
+     * URL prefix for loading from the file system: "file:".
+     */
+    public static final String FILE_URL_PREFIX = "file:";
+
+    /**
+     * URL protocol for a file in the file system: "file".
+     */
+    public static final String URL_PROTOCOL_FILE = "file";
+
+    /**
+     * URL protocol for an entry from a jar file: "jar".
+     */
+    public static final String URL_PROTOCOL_JAR = "jar";
+
+    /**
+     * URL protocol for an entry from a zip file: "zip".
+     */
+    public static final String URL_PROTOCOL_ZIP = "zip";
+
+    /**
+     * URL protocol for a JBoss VFS resource: "vfs".
+     */
+    public static final String URL_PROTOCOL_VFS = "vfs";
+
+    /**
+     * URL protocol for an entry from a WebSphere jar file: "wsjar".
+     */
+    public static final String URL_PROTOCOL_WSJAR = "wsjar";
+
+    /**
+     * URL protocol for an entry from an OC4J jar file: "code-source".
+     */
+    public static final String URL_PROTOCOL_CODE_SOURCE = "code-source";
+
+    /**
+     * Regex file separator.
+     */
+    public static final String REGEX_FILE_SEPARATOR = "[\\\\/]"; // backslashes need escaping in regexes
+
+    /**
+     * Resources are resolved against the platform specific path and must therefore obey the specific File.separator.
+     */
+    @SuppressWarnings("ConstantName")
+    public static final Pattern[] patterns = new Pattern[6];
 
     private static final String WINDOWS_FOLDER_SEPARATOR = "\\";
 
@@ -49,37 +100,6 @@ public class ResourceUtils {
     private static final String CURRENT_PATH = ".";
 
     private static final String FOLDER_SEPARATOR = "/";
-    public static final String JAR_URL_SEPARATOR = "!/";
-
-    /** URL prefix for loading from the file system: "file:" */
-    public static final String FILE_URL_PREFIX = "file:";
-
-    /** URL protocol for a file in the file system: "file" */
-    public static final String URL_PROTOCOL_FILE = "file";
-
-    /** URL protocol for an entry from a jar file: "jar" */
-    public static final String URL_PROTOCOL_JAR = "jar";
-
-    /** URL protocol for an entry from a zip file: "zip" */
-    public static final String URL_PROTOCOL_ZIP = "zip";
-
-    /** URL protocol for a JBoss VFS resource: "vfs" */
-    public static final String URL_PROTOCOL_VFS = "vfs";
-
-    /** URL protocol for an entry from a WebSphere jar file: "wsjar" */
-    public static final String URL_PROTOCOL_WSJAR = "wsjar";
-
-    /** URL protocol for an entry from an OC4J jar file: "code-source" */
-    public static final String URL_PROTOCOL_CODE_SOURCE = "code-source";
-
-
-    public static final String REGEX_FILE_SEPARATOR = "[\\\\/]"; // backslashes need escaping in regexes
-
-    /*
-    Resources are resolved against the platform specific path and must therefore obey the
-    specific File.separator.
-     */
-    public static final Pattern[] patterns = new Pattern[6];
 
     static {
         String fs = REGEX_FILE_SEPARATOR;
@@ -91,7 +111,6 @@ public class ResourceUtils {
         patterns[5] = Pattern.compile(createResourcePattern(fs, "src" + fs + "test" + fs + "kotlin"));
     }
 
-
     private static String createResourcePattern(String separator, String base) {
         return ".+" + separator + base + separator + "(.+)\\.(groovy|java)$";
     }
@@ -99,6 +118,7 @@ public class ResourceUtils {
     /**
      * Extract the filename from the given path,
      * e.g. "mypath/myfile.txt" -> "myfile.txt".
+     *
      * @param path the file path (may be <code>null</code>)
      * @return the extracted filename, or <code>null</code> if none
      */
@@ -118,8 +138,9 @@ public class ResourceUtils {
      * directly to <code>ClassLoader.getResource()</code>. For it to be fed to
      * <code>Class.getResource</code> instead, a leading slash would also have
      * to be prepended to the returned value.
+     *
      * @param clazz the input class. A <code>null</code> value or the default
-     * (empty) package will result in an empty string ("") being returned.
+     *              (empty) package will result in an empty string ("") being returned.
      * @return a path which represents the package name
      * @see ClassLoader#getResource
      * @see Class#getResource
@@ -137,22 +158,24 @@ public class ResourceUtils {
         return packageName.replace('.', '/');
     }
 
+    /**
+     * @param con The URL connection
+     */
     public static void useCachesIfNecessary(URLConnection con) {
         con.setUseCaches(con.getClass().getName().startsWith("JNLP"));
     }
 
     /**
-     * Gets the class name of the specified Grails resource
+     * Gets the class name of the specified Micronaut resource.
      *
      * @param resource The Spring Resource
-     * @return The class name or null if the resource is not a Grails class
+     * @return The class name or null if the resource is not a Micronaut class
      */
     public static String getClassName(Resource resource) {
         try {
             return getClassName(resource.getFile().getAbsolutePath());
-        }
-        catch (IOException e) {
-             return null;
+        } catch (IOException e) {
+            return null;
         }
     }
 
@@ -175,23 +198,23 @@ public class ResourceUtils {
     /**
      * Resolve the given resource URL to a <code>java.io.File</code>,
      * i.e. to a file in the file system.
+     *
      * @param resourceUrl the resource URL to resolve
      * @param description a description of the original resource that
-     * the URL was created for (for example, a class path location)
+     *                    the URL was created for (for example, a class path location)
      * @return a corresponding File object
      * @throws java.io.FileNotFoundException if the URL cannot be resolved to
-     * a file in the file system
+     *                                       a file in the file system
      */
     public static File getFile(URL resourceUrl, String description) throws FileNotFoundException {
         if (!URL_PROTOCOL_FILE.equals(resourceUrl.getProtocol())) {
             throw new FileNotFoundException(
-                    description + " cannot be resolved to absolute file path " +
-                            "because it does not reside in the file system: " + resourceUrl);
+                description + " cannot be resolved to absolute file path " +
+                    "because it does not reside in the file system: " + resourceUrl);
         }
         try {
             return new File(toURI(resourceUrl).getSchemeSpecificPart());
-        }
-        catch (URISyntaxException ex) {
+        } catch (URISyntaxException ex) {
             // Fallback for URLs that are not valid URIs (should hardly ever happen).
             return new File(resourceUrl.getFile());
         }
@@ -203,31 +226,34 @@ public class ResourceUtils {
      * <p>"zip" and "wsjar" are used by BEA WebLogic Server and IBM WebSphere, respectively,
      * but can be treated like jar files. The same applies to "code-source" URLs on Oracle
      * OC4J, provided that the path contains a jar separator.
+     *
      * @param url the URL to check
      * @return whether the URL has been identified as a JAR URL
      */
     public static boolean isJarURL(URL url) {
         String protocol = url.getProtocol();
         return (URL_PROTOCOL_JAR.equals(protocol) ||
-                URL_PROTOCOL_ZIP.equals(protocol) ||
-                URL_PROTOCOL_WSJAR.equals(protocol) ||
-                (URL_PROTOCOL_CODE_SOURCE.equals(protocol) && url.getPath().contains(JAR_URL_SEPARATOR)));
+            URL_PROTOCOL_ZIP.equals(protocol) ||
+            URL_PROTOCOL_WSJAR.equals(protocol) ||
+            (URL_PROTOCOL_CODE_SOURCE.equals(protocol) && url.getPath().contains(JAR_URL_SEPARATOR)));
     }
+
     /**
      * Resolve the given resource URI to a <code>java.io.File</code>,
      * i.e. to a file in the file system.
+     *
      * @param resourceUri the resource URI to resolve
      * @param description a description of the original resource that
-     * the URI was created for (for example, a class path location)
+     *                    the URI was created for (for example, a class path location)
      * @return a corresponding File object
      * @throws FileNotFoundException if the URL cannot be resolved to
-     * a file in the file system
+     *                               a file in the file system
      */
     public static File getFile(URI resourceUri, String description) throws FileNotFoundException {
         if (!URL_PROTOCOL_FILE.equals(resourceUri.getScheme())) {
             throw new FileNotFoundException(
-                    description + " cannot be resolved to absolute file path " +
-                            "because it does not reside in the file system: " + resourceUri);
+                description + " cannot be resolved to absolute file path " +
+                    "because it does not reside in the file system: " + resourceUri);
         }
         return new File(resourceUri.getSchemeSpecificPart());
     }
@@ -237,6 +263,7 @@ public class ResourceUtils {
      * replacing spaces with "%20" quotes first.
      * <p>Furthermore, this method works on JDK 1.4 as well,
      * in contrast to the <code>URL.toURI()</code> method.
+     *
      * @param url the URL to convert into a URI instance
      * @return the URI instance
      * @throws URISyntaxException if the URL wasn't a valid URI
@@ -249,6 +276,7 @@ public class ResourceUtils {
     /**
      * Determine whether the given URL points to a resource in the file system,
      * that is, has protocol "file" or "vfs".
+     *
      * @param url the URL to check
      * @return whether the URL has been identified as a file system URL
      */
@@ -260,9 +288,10 @@ public class ResourceUtils {
     /**
      * Apply the given relative path to the given path,
      * assuming standard Java folder separation (i.e. "/" separators).
-     * @param path the path to start from (usually a full file path)
+     *
+     * @param path         the path to start from (usually a full file path)
      * @param relativePath the relative path to apply
-     * (relative to the full file path above)
+     *                     (relative to the full file path above)
      * @return the full file path that results from applying the relative path
      */
     public static String applyRelativePath(String path, String relativePath) {
@@ -276,14 +305,17 @@ public class ResourceUtils {
         }
         return relativePath;
     }
+
     /**
      * Normalize the path by suppressing sequences like "path/.." and
      * inner simple dots.
      * <p>The result is convenient for path comparison. For other uses,
      * notice that Windows separators ("\") are replaced by simple slashes.
+     *
      * @param path the original path
      * @return the normalized path
      */
+    @SuppressWarnings("EmptyBlock")
     public static String cleanPath(String path) {
         if (path == null) {
             return null;
@@ -313,17 +345,14 @@ public class ResourceUtils {
             String element = pathArray[i];
             if (CURRENT_PATH.equals(element)) {
                 // Points to current directory - drop it.
-            }
-            else if (TOP_PATH.equals(element)) {
+            } else if (TOP_PATH.equals(element)) {
                 // Registering top path found.
                 tops++;
-            }
-            else {
+            } else {
                 if (tops > 0) {
                     // Merging path element with element corresponding to top path.
                     tops--;
-                }
-                else {
+                } else {
                     // Normal path element found.
                     pathElements.add(0, element);
                 }
@@ -341,6 +370,7 @@ public class ResourceUtils {
     private static String collectionToDelimitedString(Collection<?> coll, String delim) {
         return collectionToDelimitedString(coll, delim, "", "");
     }
+
     private static String collectionToDelimitedString(Collection<?> coll, String delim, String prefix, String suffix) {
         if (coll == null || coll.isEmpty()) {
             return "";
@@ -361,9 +391,10 @@ public class ResourceUtils {
      * <p>A single delimiter can consists of more than one character: It will still
      * be considered as single delimiter string, rather than as bunch of potential
      * delimiter characters - in contrast to <code>tokenizeToStringArray</code>.
-     * @param str the input String
+     *
+     * @param str       the input String
      * @param delimiter the delimiter between elements (this is a single delimiter,
-     * rather than a bunch individual delimiter characters)
+     *                  rather than a bunch individual delimiter characters)
      * @return an array of the tokens in the list
      */
     private static String[] delimitedListToStringArray(String str, String delimiter) {
@@ -375,11 +406,12 @@ public class ResourceUtils {
      * <p>A single delimiter can consists of more than one character: It will still
      * be considered as single delimiter string, rather than as bunch of potential
      * delimiter characters - in contrast to <code>tokenizeToStringArray</code>.
-     * @param str the input String
-     * @param delimiter the delimiter between elements (this is a single delimiter,
-     * rather than a bunch individual delimiter characters)
+     *
+     * @param str           the input String
+     * @param delimiter     the delimiter between elements (this is a single delimiter,
+     *                      rather than a bunch individual delimiter characters)
      * @param charsToDelete a set of characters to delete. Useful for deleting unwanted
-     * line breaks: e.g. "\r\n\f" will delete all new lines and line feeds in a String.
+     *                      line breaks: e.g. "\r\n\f" will delete all new lines and line feeds in a String.
      * @return an array of the tokens in the list
      */
     private static String[] delimitedListToStringArray(String str, String delimiter, String charsToDelete) {
@@ -387,15 +419,14 @@ public class ResourceUtils {
             return new String[0];
         }
         if (delimiter == null) {
-            return new String[] {str};
+            return new String[]{str};
         }
         List<String> result = new ArrayList<String>();
         if ("".equals(delimiter)) {
             for (int i = 0; i < str.length(); i++) {
                 result.add(deleteAny(str.substring(i, i + 1), charsToDelete));
             }
-        }
-        else {
+        } else {
             int pos = 0;
             int delPos;
             while ((delPos = str.indexOf(delimiter, pos)) != -1) {
@@ -434,7 +465,8 @@ public class ResourceUtils {
     /**
      * Replace all occurences of a substring within a string with
      * another string.
-     * @param inString String to examine
+     *
+     * @param inString   String to examine
      * @param oldPattern String to replace
      * @param newPattern String to insert
      * @return a String with the replacements
@@ -466,6 +498,7 @@ public class ResourceUtils {
     /**
      * Extract the URL for the actual jar file from the given URL
      * (which may point to a resource in a jar file or to a jar file itself).
+     *
      * @param jarUrl the original URL
      * @return the URL for the actual jar file
      * @throws MalformedURLException if no valid jar file URL could be extracted
@@ -477,8 +510,7 @@ public class ResourceUtils {
             String jarFile = urlFile.substring(0, separatorIndex);
             try {
                 return new URL(jarFile);
-            }
-            catch (MalformedURLException ex) {
+            } catch (MalformedURLException ex) {
                 // Probably no protocol in original jar URL, like "jar:C:/mypath/myjar.jar".
                 // This usually indicates that the jar file resides in the file system.
                 if (!jarFile.startsWith("/")) {
@@ -493,6 +525,7 @@ public class ResourceUtils {
     /**
      * Create a URI instance for the given location String,
      * replacing spaces with "%20" quotes first.
+     *
      * @param location the location String to convert into a URI instance
      * @return the URI instance
      * @throws URISyntaxException if the location wasn't a valid URI

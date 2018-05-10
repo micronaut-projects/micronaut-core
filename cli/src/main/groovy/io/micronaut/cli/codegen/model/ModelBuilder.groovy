@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.codegen.model
 
-import io.micronaut.cli.util.NameUtils
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.runtime.MetaClassHelper
 import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.Resource
+import io.micronaut.cli.io.support.ResourceUtils
+import io.micronaut.cli.util.NameUtils
+import org.codehaus.groovy.runtime.MetaClassHelper
 
 /**
  * Used to build a Model for the purposes of codegen
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 trait ModelBuilder {
@@ -49,10 +50,9 @@ trait ModelBuilder {
      * @return The {@link Model} instance
      */
     Model model(String className) {
-        if(defaultPackage && !className.contains('.')) {
+        if (defaultPackage && !className.contains('.')) {
             return new ModelImpl("${defaultPackage}.$className")
-        }
-        else {
+        } else {
             return new ModelImpl(className)
         }
     }
@@ -119,7 +119,7 @@ trait ModelBuilder {
 
         @Override
         String convention(String name, String conventionName) {
-            if(name.endsWith(conventionName)) {
+            if (name.endsWith(conventionName)) {
                 name
             } else {
                 "${name}${conventionName}"
@@ -132,7 +132,7 @@ trait ModelBuilder {
 
         @Override
         String trimConvention(String name, String conventionName) {
-            if(name.endsWith(conventionName)) {
+            if (name.endsWith(conventionName)) {
                 int end = name.lastIndexOf(conventionName)
                 name.substring(0, end)
             } else {

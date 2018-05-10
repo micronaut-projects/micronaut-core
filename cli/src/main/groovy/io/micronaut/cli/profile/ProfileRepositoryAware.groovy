@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 /**
  * For commands and steps that need to be made aware of the {@link ProfileRepository} to implement
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface ProfileRepositoryAware {
     void setProfileRepository(ProfileRepository profileRepository)

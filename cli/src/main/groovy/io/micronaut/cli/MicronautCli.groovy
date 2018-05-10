@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
+import io.micronaut.cli.config.CodeGenConfig
+import io.micronaut.cli.config.ConfigMap
+import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.console.parsing.CommandLineParser
 import io.micronaut.cli.console.parsing.DefaultCommandLine
 import io.micronaut.cli.console.proxy.SystemPropertiesAuthenticator
-import io.micronaut.cli.config.CodeGenConfig
-import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.interactive.completers.EscapingFileNameCompletor
 import io.micronaut.cli.interactive.completers.RegexCompletor
 import io.micronaut.cli.interactive.completers.SortedAggregateCompleter
@@ -38,18 +40,19 @@ import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProjectContext
 import io.micronaut.cli.profile.commands.CommandCompleter
 import io.micronaut.cli.profile.commands.CommandRegistry
-import io.micronaut.cli.profile.repository.RepositoryConfiguration
 import io.micronaut.cli.profile.repository.MavenProfileRepository
-import io.micronaut.cli.profile.repository.StaticJarProfileRepository
+import io.micronaut.cli.profile.repository.RepositoryConfiguration
 import io.micronaut.cli.util.CliSettings
-import io.micronaut.cli.config.NavigableMap
 import jline.UnixTerminal
 import jline.console.UserInterruptException
 import jline.console.completer.ArgumentCompleter
 import jline.internal.NonBlockingInputStream
-import org.codehaus.plexus.util.ExceptionUtils
 
-import java.util.concurrent.*
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * Main class for the Micronaut command line. Handles interactive mode and running Micronaut commands within the context of a profile
@@ -57,7 +60,7 @@ import java.util.concurrent.*
  * @author Lari Hotari
  * @author Graeme Rocher
  *
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class MicronautCli {
@@ -67,8 +70,10 @@ class MicronautCli {
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
     private static final String USAGE_MESSAGE = "create-service [NAME]"
-    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
-    private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original() // store original System.in, System.out and System.err
+    private static
+    final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
+    private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original()
+    // store original System.in, System.out and System.err
     private static ExecutionContext currentExecutionContext = null
 
     private static boolean interactiveModeActive
@@ -76,7 +81,7 @@ class MicronautCli {
     private static final NavigableMap SETTINGS_MAP = new NavigableMap()
 
     static {
-        if(CliSettings.SETTINGS_FILE.exists()) {
+        if (CliSettings.SETTINGS_FILE.exists()) {
             try {
                 SETTINGS_MAP.merge new ConfigSlurper().parse(CliSettings.SETTINGS_FILE.toURI().toURL())
             } catch (Throwable e) {
@@ -101,10 +106,7 @@ class MicronautCli {
     }
 
 
-
-
-
-    SortedAggregateCompleter aggregateCompleter=new SortedAggregateCompleter()
+    SortedAggregateCompleter aggregateCompleter = new SortedAggregateCompleter()
     CommandLineParser cliParser = new CommandLineParser()
     boolean keepRunning = true
     Boolean ansiEnabled = null
@@ -125,14 +127,11 @@ class MicronautCli {
      */
     public static <T> T getSetting(String key, Class<T> targetType = Object.class, T defaultValue = null) {
         def value = SETTINGS_MAP.get(key, defaultValue)
-        if(value == null) {
+        if (value == null) {
             return null
-        }
-
-        else if(targetType.isInstance(value)) {
-            return (T)value
-        }
-        else {
+        } else if (targetType.isInstance(value)) {
+            return (T) value
+        } else {
             try {
                 return value.asType(targetType)
             } catch (Throwable e) {
@@ -147,13 +146,13 @@ class MicronautCli {
      */
     public static void main(String[] args) {
 
-        Authenticator.setDefault( getSetting( CliSettings.AUTHENTICATOR, Authenticator,  new SystemPropertiesAuthenticator() ) )
+        Authenticator.setDefault(getSetting(CliSettings.AUTHENTICATOR, Authenticator, new SystemPropertiesAuthenticator()))
         def proxySelector = getSetting(CliSettings.PROXY_SELECTOR, ProxySelector)
-        if(proxySelector != null) {
-            ProxySelector.setDefault( proxySelector )
+        if (proxySelector != null) {
+            ProxySelector.setDefault(proxySelector)
         }
 
-        MicronautCli cli=new MicronautCli()
+        MicronautCli cli = new MicronautCli()
         try {
             exit(cli.execute(args))
         }
@@ -195,15 +194,15 @@ class MicronautCli {
     public int execute(String... args) {
         CommandLine mainCommandLine = cliParser.parse(args)
 
-        if(mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
+        if (mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
             System.setProperty("micronaut.verbose", "true")
             System.setProperty("micronaut.full.stacktrace", "true")
         }
-        if(mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
+        if (mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
             System.setProperty("micronaut.show.stacktrace", "true")
         }
 
-        if(mainCommandLine.hasOption(CommandLine.VERSION_ARGUMENT) || mainCommandLine.hasOption('v')) {
+        if (mainCommandLine.hasOption(CommandLine.VERSION_ARGUMENT) || mainCommandLine.hasOption('v')) {
             def console = MicronautConsole.instance
             console.addStatus("Micronaut Version: ${MicronautCli.getPackage().implementationVersion}")
             console.addStatus("Groovy Version: ${GroovySystem.version}")
@@ -211,21 +210,21 @@ class MicronautCli {
             exit(0)
         }
 
-        if(mainCommandLine.hasOption(CommandLine.HELP_ARGUMENT) || mainCommandLine.hasOption('h')) {
+        if (mainCommandLine.hasOption(CommandLine.HELP_ARGUMENT) || mainCommandLine.hasOption('h')) {
             profileRepository = createMavenProfileRepository()
             def cmd = CommandRegistry.getCommand("help", profileRepository)
             cmd.handle(createExecutionContext(mainCommandLine))
             exit(0)
         }
 
-        File micronautCli =new File("micronaut-cli.yml")
-        File profileYml =new File("profile.yml")
-        if(!micronautCli.exists() && !profileYml.exists()) {
+        File micronautCli = new File("micronaut-cli.yml")
+        File profileYml = new File("profile.yml")
+        if (!micronautCli.exists() && !profileYml.exists()) {
             //Execution path for CLI outside of a project
             profileRepository = createMavenProfileRepository()
-            if(!mainCommandLine || !mainCommandLine.commandName) {
+            if (!mainCommandLine || !mainCommandLine.commandName) {
                 integrateGradle = false
-                    def console = MicronautConsole.getInstance()
+                def console = MicronautConsole.getInstance()
                 // force resolve of all profiles
                 profileRepository.getAllProfiles()
                 def commandNames = CommandRegistry.findCommands(profileRepository).collect() { Command cmd -> cmd.name }
@@ -236,30 +235,28 @@ class MicronautCli {
                     def cl = context.commandLine
                     def name = cl.commandName
                     def cmd = CommandRegistry.getCommand(name, profileRepository)
-                    if(cmd != null) {
+                    if (cmd != null) {
                         return executeCommandWithArgumentValidation(cmd, cl)
-                    }
-                    else {
+                    } else {
                         console.error("Command not found [$name]")
                         return false
                     }
-                } ] as Profile
+                }] as Profile
 
                 startInteractiveMode(console)
                 return 0
             }
             def cmd = CommandRegistry.getCommand(mainCommandLine.commandName, profileRepository)
-            if(cmd) {
+            if (cmd) {
                 return executeCommandWithArgumentValidation(cmd, mainCommandLine) ? 0 : 1
-            }
-            else {
+            } else {
                 return getBaseUsage()
             }
 
         } else {
             //Execution path for CLI within a project
             initializeApplication(mainCommandLine)
-            if(mainCommandLine.commandName) {
+            if (mainCommandLine.commandName) {
                 return handleCommand(mainCommandLine) ? 0 : 1
             } else {
                 handleInteractiveMode()
@@ -300,14 +297,14 @@ class MicronautCli {
 
     protected MavenProfileRepository createMavenProfileRepository() {
         def profileRepos = getSetting(CliSettings.PROFILE_REPOSITORIES, Map.class, Collections.emptyMap())
-        if(!profileRepos.isEmpty()) {
+        if (!profileRepos.isEmpty()) {
             profileRepositories.clear()
             for (repoName in profileRepos.keySet()) {
                 def data = profileRepos.get(repoName)
-                if(data instanceof Map) {
+                if (data instanceof Map) {
                     def uri = data.get("url")
                     def snapshots = data.get('snapshotsEnabled')
-                    if(uri != null) {
+                    if (uri != null) {
                         boolean enableSnapshots = snapshots != null ? Boolean.valueOf(snapshots.toString()) : false
                         RepositoryConfiguration repositoryConfiguration
                         final String username = data.get('username')
@@ -336,15 +333,15 @@ class MicronautCli {
     ExecutionContext createExecutionContext(CommandLine commandLine) {
         new ExecutionContextImpl(commandLine, projectContext)
     }
-    
-    Boolean handleCommand( CommandLine commandLine ) {
+
+    Boolean handleCommand(CommandLine commandLine) {
 
         handleCommand(createExecutionContext(commandLine))
     }
-    
-    Boolean handleCommand( ExecutionContext context ) {
+
+    Boolean handleCommand(ExecutionContext context) {
         def console = MicronautConsole.getInstance()
-        synchronized(MicronautCli) {
+        synchronized (MicronautCli) {
             try {
                 currentExecutionContext = context
                 if (handleBuiltInCommands(context)) {
@@ -352,22 +349,21 @@ class MicronautCli {
                 }
 
                 def mainCommandLine = context.getCommandLine()
-                if(mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
+                if (mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
                     console.setStacktrace(true);
                 } else {
                     console.setStacktrace(false);
                 }
 
-                if(mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
-                    System.setProperty("grails.verbose", "true")
-                    System.setProperty("grails.full.stacktrace", "true")
-                }
-                else {
-                    System.setProperty("grails.verbose", "false")
-                    System.setProperty("grails.full.stacktrace", "false")
+                if (mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
+                    System.setProperty("micronaut.verbose", "true")
+                    System.setProperty("micronaut.full.stacktrace", "true")
+                } else {
+                    System.setProperty("micronaut.verbose", "false")
+                    System.setProperty("micronaut.full.stacktrace", "false")
                 }
                 if (profile.handleCommand(context)) {
-                    if(tiggerAppLoad) {
+                    if (tiggerAppLoad) {
                         console.updateStatus("Initializing application. Please wait...")
                         try {
                             initializeApplication(context.commandLine)
@@ -380,7 +376,7 @@ class MicronautCli {
                 }
                 return false
             }
-            catch(Throwable e) {
+            catch (Throwable e) {
                 console.error("Command [${context.commandLine.commandName}] error: ${e.message}", e)
                 return false
             } finally {
@@ -405,7 +401,7 @@ class MicronautCli {
         console.resetCompleters()
         // add bang operator completer
         completers.add(new ArgumentCompleter(
-                new RegexCompletor("!\\w+"), new EscapingFileNameCompletor())
+            new RegexCompletor("!\\w+"), new EscapingFileNameCompletor())
         )
 
         completers.addAll((profile.getCompleters(projectContext) ?: []) as Collection)
@@ -424,24 +420,24 @@ class MicronautCli {
     }
 
     private void interactiveModeLoop(MicronautConsole console, ExecutorService commandExecutor) {
-        NonBlockingInputStream nonBlockingInput = (NonBlockingInputStream)console.reader.getInput()
+        NonBlockingInputStream nonBlockingInput = (NonBlockingInputStream) console.reader.getInput()
         interactiveModeActive = true
         boolean firstRun = true
-        while(keepRunning) {
+        while (keepRunning) {
             try {
-                if(firstRun) {
+                if (firstRun) {
                     console.addStatus("Enter a command name to run. Use TAB for completion:")
                     firstRun = false
                 }
                 String commandLine = console.showPrompt()
-                if(commandLine==null) {
+                if (commandLine == null) {
                     // CTRL-D was pressed, exit interactive mode
                     exitInteractiveMode()
                 } else if (commandLine.trim()) {
-                    if(nonBlockingInput.isNonBlockingEnabled()) {
+                    if (nonBlockingInput.isNonBlockingEnabled()) {
                         handleCommandWithCancellationSupport(console, commandLine, commandExecutor, nonBlockingInput)
                     } else {
-                        handleCommand( cliParser.parseString(commandLine))
+                        handleCommand(cliParser.parseString(commandLine))
                     }
                 }
             } catch (UserInterruptException e) {
@@ -453,20 +449,20 @@ class MicronautCli {
     }
 
     private Boolean handleCommandWithCancellationSupport(MicronautConsole console, String commandLine, ExecutorService commandExecutor, NonBlockingInputStream nonBlockingInput) {
-        ExecutionContext executionContext = createExecutionContext( cliParser.parseString(commandLine))
+        ExecutionContext executionContext = createExecutionContext(cliParser.parseString(commandLine))
         Future<?> commandFuture = commandExecutor.submit({ handleCommand(executionContext) } as Callable<Boolean>)
         def terminal = console.reader.terminal
         if (terminal instanceof UnixTerminal) {
             ((UnixTerminal) terminal).disableInterruptCharacter()
         }
         try {
-            while(!commandFuture.done) {
-                if(nonBlockingInput.nonBlockingEnabled) {
+            while (!commandFuture.done) {
+                if (nonBlockingInput.nonBlockingEnabled) {
                     int peeked = nonBlockingInput.peek(100L)
-                    if(peeked > 0) {
+                    if (peeked > 0) {
                         // read peeked character from buffer
                         nonBlockingInput.read(1L)
-                        if(peeked == KEYPRESS_CTRL_C || peeked == KEYPRESS_ESC) {
+                        if (peeked == KEYPRESS_CTRL_C || peeked == KEYPRESS_ESC) {
                             executionContext.console.log('  ')
                             executionContext.console.updateStatus("Stopping build. Please wait...")
                             executionContext.cancel()
@@ -479,7 +475,7 @@ class MicronautCli {
                 ((UnixTerminal) terminal).enableInterruptCharacter()
             }
         }
-        if(!commandFuture.isCancelled()) {
+        if (!commandFuture.isCancelled()) {
             try {
                 return commandFuture.get()
             } catch (ExecutionException e) {
@@ -498,7 +494,7 @@ class MicronautCli {
         String profileName = applicationConfig.get(CliSettings.PROFILE) ?: getSetting(CliSettings.PROFILE, String, DEFAULT_PROFILE_NAME)
         this.profile = profileRepository.getProfile(profileName)
 
-        if(profile == null) {
+        if (profile == null) {
             throw new IllegalStateException("No profile found for name [$profileName].")
         }
     }
@@ -506,7 +502,7 @@ class MicronautCli {
     private CodeGenConfig loadApplicationConfig() {
         CodeGenConfig config = new CodeGenConfig()
         File cliYml = new File("micronaut-cli.yml")
-        if(cliYml.exists()) {
+        if (cliYml.exists()) {
             config.loadYml(cliYml)
         }
         config
@@ -516,11 +512,10 @@ class MicronautCli {
         CommandLine commandLine = context.commandLine
         def commandName = commandLine.commandName
 
-        if(commandName && commandName.size()>1 && commandName.startsWith('!')) {
+        if (commandName && commandName.size() > 1 && commandName.startsWith('!')) {
             return executeProcess(context, commandLine.rawArguments)
-        }
-        else {
-            switch(commandName) {
+        } else {
+            switch (commandName) {
                 case '!':
                     return bang(context)
                 case 'exit':
@@ -572,8 +567,7 @@ class MicronautCli {
         String historicalCommand = history.current()
         if (historicalCommand.startsWith("!")) {
             console.error "Can not repeat command: $historicalCommand"
-        }
-        else {
+        } else {
             return handleCommand(cliParser.parseString(historicalCommand))
         }
         return false
@@ -587,7 +581,8 @@ class MicronautCli {
     @Canonical
     public static class ExecutionContextImpl implements ExecutionContext {
         CommandLine commandLine
-        @Delegate(excludes = ['getConsole', 'getBaseDir']) ProjectContext projectContext
+        @Delegate(excludes = ['getConsole', 'getBaseDir'])
+        ProjectContext projectContext
         MicronautConsole console = MicronautConsole.getInstance()
 
         ExecutionContextImpl(CodeGenConfig config) {
@@ -597,21 +592,21 @@ class MicronautCli {
         ExecutionContextImpl(CommandLine commandLine, ProjectContext projectContext) {
             this.commandLine = commandLine
             this.projectContext = projectContext
-            if(projectContext?.console) {
+            if (projectContext?.console) {
                 console = projectContext.console
             }
         }
 
-        private List<CommandCancellationListener> cancelListeners=[]
-        
+        private List<CommandCancellationListener> cancelListeners = []
+
         @Override
         public void addCancelledListener(CommandCancellationListener listener) {
             cancelListeners << listener
-        }    
-        
+        }
+
         @Override
         public void cancel() {
-            for(CommandCancellationListener listener : cancelListeners) {
+            for (CommandCancellationListener listener : cancelListeners) {
                 try {
                     listener.commandCancelled()
                 } catch (Exception e) {
@@ -625,7 +620,7 @@ class MicronautCli {
             this.projectContext?.baseDir ?: new File(".")
         }
     }
-    
+
     @Canonical
     private static class ProjectContextImpl implements ProjectContext {
         MicronautConsole console = MicronautConsole.getInstance()
@@ -645,6 +640,6 @@ class MicronautCli {
         @Override
         public <T> T navigateConfigForType(Class<T> requiredType, String... path) {
             cliConfig.navigate(requiredType, path)
-        }        
+        }
     }
 }

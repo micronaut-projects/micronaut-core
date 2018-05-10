@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.exceptions.reporting
 
 /**
  * Defines method for pretty printing Stack traces.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 interface StackTracePrinter {
 

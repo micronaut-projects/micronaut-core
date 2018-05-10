@@ -13,44 +13,48 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.exceptions.reporting;
 
 /**
- * Improves the output of stack traces produced by exceptions in a Grails application.
+ * Improves the output of stack traces produced by exceptions in a Micronaut application.
  *
- * @since 2.0
  * @author Graeme Rocher
+ * @since 1.0
  */
 public interface StackTraceFilterer {
 
     String FULL_STACK_TRACE_MESSAGE = "Full Stack Trace:";
-    String SYS_PROP_DISPLAY_FULL_STACKTRACE = "grails.full.stacktrace";
+    String SYS_PROP_DISPLAY_FULL_STACKTRACE = "micronaut.full.stacktrace";
 
     /**
-     * Adds a package name that should be filtered
+     * Adds a package name that should be filtered.
      *
      * @param name The name of the package
      */
     void addInternalPackage(String name);
 
     /**
-     * Sets the package where the stack trace should end
+     * Sets the package where the stack trace should end.
+     *
      * @param cutOffPackage The cut off package
      */
     void setCutOffPackage(String cutOffPackage);
 
     /**
-     * <p>Remove all apparently Grails-internal trace entries from the exception instance<p>
-     * <p>This modifies the original instance and returns it, it does not clone</p>
-     * @param source The source exception
+     * Remove all apparently Micronaut-internal trace entries from the exception instance. This modifies the original
+     * instance and returns it, it does not clone.
+     *
+     * @param source    The source exception
      * @param recursive Whether to recursively filter the cause
      * @return The exception passed in, after cleaning the stack trace
      */
     Throwable filter(Throwable source, boolean recursive);
 
     /**
-     * <p>Remove all apparently Grails-internal trace entries from the exception instance<p>
-     * <p>This modifies the original instance and returns it, it does not clone</p>
+     * Remove all apparently Micronaut-internal trace entries from the exception instance. This modifies the original
+     * instance and returns it, it does not clone.
+     *
      * @param source The source exception
      * @return The exception passed in, after cleaning the stack trace
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers
 
 import jline.console.completer.Completer
@@ -24,7 +25,7 @@ import java.util.regex.Pattern
  * expression pattern.
  *
  * @author Peter Ledbrook
- * @since 2.0
+ * @since 1.0
  */
 class RegexCompletor implements Completer {
     Pattern pattern
@@ -50,7 +51,8 @@ class RegexCompletor implements Completer {
         if (buffer ==~ pattern) {
             candidates << buffer
             return 0
+        } else {
+            return -1
         }
-        else return -1
     }
 }

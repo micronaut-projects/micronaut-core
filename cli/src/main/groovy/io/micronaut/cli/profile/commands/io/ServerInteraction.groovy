@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.io
 
 import groovy.transform.CompileStatic
-
 
 /**
  * Methods to aid interacting with the server from the CLI
  *
  * @author Graeme Rocher
- * @since 3.0.3
+ * @since 1.0
  */
 @CompileStatic
 trait ServerInteraction {
@@ -34,12 +34,12 @@ trait ServerInteraction {
      * @param port The port
      */
     void waitForStartup(String host = "localhost", int port = 8080) {
-        while(!isServerAvailable(host, port)) {
+        while (!isServerAvailable(host, port)) {
             sleep 100
         }
         try {
             new URL("http://${host ?: 'localhost'}:${port ?: 8080}/is-tomcat-running").text
-        } catch(ignored) {
+        } catch (ignored) {
             // ignore
         }
     }

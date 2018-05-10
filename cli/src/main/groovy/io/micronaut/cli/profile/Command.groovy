@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import io.micronaut.cli.util.Named
 
 /**
- * An interface that represents a command to be executed by the Grails command line. Commands are by default global,
+ * An interface that represents a command to be executed by the Micronaut command line. Commands are by default global,
  * however a command can be made specific to a particular {@link Profile} by implementation the {@link ProfileCommand} interface.
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface Command extends Named {
 

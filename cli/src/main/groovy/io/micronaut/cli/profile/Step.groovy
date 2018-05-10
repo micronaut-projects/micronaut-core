@@ -15,12 +15,11 @@
  */
 package io.micronaut.cli.profile
 
-
 /**
  * Represents a step within a {@link Command}. Commands are made up of 1 or many steps.
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface Step {
 

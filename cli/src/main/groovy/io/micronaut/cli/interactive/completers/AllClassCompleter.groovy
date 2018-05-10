@@ -17,16 +17,15 @@ package io.micronaut.cli.interactive.completers
 
 import io.micronaut.cli.util.CliSettings
 
-
 /**
  * A completer that completes all classes in the project
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 class AllClassCompleter extends ClassNameCompleter {
     AllClassCompleter() {
-        super([(new File(CliSettings.BASE_DIR, "src/main/java")): "**/*.java",
+        super([(new File(CliSettings.BASE_DIR, "src/main/java"))  : "**/*.java",
                (new File(CliSettings.BASE_DIR, "src/main/groovy")): "**/*.groovy",
                (new File(CliSettings.BASE_DIR, "src/main/kotlin")): "**/*.kt"])
     }

@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,10 +25,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Used to locate resources at build / development time
+ * Used to locate resources at build / development time.
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 public class ResourceLocator {
     public static final String WILDCARD = "*";
@@ -43,18 +43,31 @@ public class ResourceLocator {
     protected List<String> resourceSearchDirectories = new ArrayList<String>();
     protected Map<String, Resource> classNameToResourceCache = new ConcurrentHashMap<String, Resource>();
     protected Map<String, Resource> uriToResourceCache = new ConcurrentHashMap<String, Resource>();
-    protected ResourceLoader defaultResourceLoader =  new FileSystemResourceLoader();
+    protected ResourceLoader defaultResourceLoader = new FileSystemResourceLoader();
 
+    /**
+     * Set the search location.
+     *
+     * @param searchLocation The search location
+     */
     public void setSearchLocation(String searchLocation) {
         ResourceLoader resourceLoader = getDefaultResourceLoader();
         patchMatchingResolver = new PathMatchingResourcePatternResolver(resourceLoader);
         initializeForSearchLocation(searchLocation);
     }
 
+    /**
+     * @return The default resource loader
+     */
     protected ResourceLoader getDefaultResourceLoader() {
         return defaultResourceLoader;
     }
 
+    /**
+     * Set search locations.
+     *
+     * @param searchLocations The search locations
+     */
     public void setSearchLocations(Collection<String> searchLocations) {
         patchMatchingResolver = new PathMatchingResourcePatternResolver(getDefaultResourceLoader());
         for (String searchLocation : searchLocations) {
@@ -70,6 +83,12 @@ public class ResourceLocator {
         resourceSearchDirectories.add(searchLocationPlusSlash);
     }
 
+    /**
+     * Find a resource for URI.
+     *
+     * @param uri The uri
+     * @return The resource if found, {@code null} otherwise
+     */
     public Resource findResourceForURI(String uri) {
         Resource resource = uriToResourceCache.get(uri);
         if (resource == null) {
@@ -82,8 +101,7 @@ public class ResourceLocator {
                 Resource res = resolveExceptionSafe(resourceSearchDirectory + uriWebAppRelative);
                 if (res.exists()) {
                     resource = res;
-                }
-                else {
+                } else {
                     Resource dir = resolveExceptionSafe(resourceSearchDirectory);
                     if (dir.exists() && info != null) {
                         String filename = dir.getFilename();
@@ -111,7 +129,6 @@ public class ResourceLocator {
         return resource == NULL_RESOURCE ? null : resource;
     }
 
-
     private PluginResourceInfo inferPluginNameFromURI(String uri) {
         if (uri.startsWith("/plugins/")) {
             String withoutPluginsPath = uri.substring("/plugins/".length(), uri.length());
@@ -126,6 +143,12 @@ public class ResourceLocator {
         return null;
     }
 
+    /**
+     * Find a resource for class name.
+     *
+     * @param className The class name
+     * @return The resource if found, {@code null} otherwise
+     */
     public Resource findResourceForClassName(String className) {
 
         if (className.contains(CLOSURE_MARKER)) {
@@ -170,11 +193,18 @@ public class ResourceLocator {
         return null;
     }
 
+    /**
+     * Sets the default resource loader.
+     *
+     * @param resourceLoader The resource loader
+     */
     public void setResourceLoader(ResourceLoader resourceLoader) {
         defaultResourceLoader = resourceLoader;
     }
 
-
+    /**
+     * Plugin resource info.
+     */
     class PluginResourceInfo {
         String pluginName;
         String uri;

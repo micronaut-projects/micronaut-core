@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.interactive;
 
 import jline.console.ConsoleReader;
@@ -24,19 +25,29 @@ import java.util.List;
 
 /**
  * Fixes issues with the default CandidateListCompletionHandler such as clearing out the whole buffer when
- * a completion matches a list of candidates
+ * a completion matches a list of candidates.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class CandidateListCompletionHandler implements CompletionHandler {
 
     private boolean eagerNewlines = true;
 
+    /**
+     * @param eagerNewlines eager new lines
+     */
     public void setAlwaysIncludeNewline(boolean eagerNewlines) {
         this.eagerNewlines = eagerNewlines;
     }
 
+    /**
+     * @param reader     The console reader
+     * @param candidates The candidates
+     * @param pos        The position
+     * @return Whether the console has been read
+     * @throws IOException if there is a problem
+     */
     public boolean complete(ConsoleReader reader, @SuppressWarnings("rawtypes") List<CharSequence> candidates, int pos) throws IOException {
         CursorBuffer buf = reader.getCursorBuffer();
 
@@ -102,9 +113,9 @@ public class CandidateListCompletionHandler implements CompletionHandler {
 
     /**
      * @return true is all the elements of <i>candidates</i>
-     *         start with <i>starts</i>
+     * start with <i>starts</i>
      */
-    private final boolean startsWith(final String starts, final String[] candidates) {
+    private boolean startsWith(final String starts, final String[] candidates) {
         for (int i = 0; i < candidates.length; i++) {
             if (!candidates[i].startsWith(starts)) {
                 return false;

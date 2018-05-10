@@ -13,29 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
 import groovy.json.JsonParserType
 import groovy.json.JsonSlurper
 import groovy.transform.CompileStatic
+import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.commands.DefaultMultiStepCommand
-import io.micronaut.cli.io.support.Resource
 import org.yaml.snakeyaml.Yaml
-
-import java.util.regex.Pattern
-
 
 /**
  * A {@link CommandFactory} that can discover commands defined in YAML or JSON
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class YamlCommandFactory extends ResourceResolvingCommandFactory<Map> {
-    protected Yaml yamlParser=new Yaml()
+    protected Yaml yamlParser = new Yaml()
     // LAX parser for JSON: http://mrhaki.blogspot.ie/2014/08/groovy-goodness-relax-groovy-will-parse.html
     protected JsonSlurper jsonSlurper = new JsonSlurper().setType(JsonParserType.LAX)
 
@@ -49,7 +47,7 @@ class YamlCommandFactory extends ResourceResolvingCommandFactory<Map> {
 
         try {
             is = resource.inputStream
-            if(resource.filename.endsWith('.json')) {
+            if (resource.filename.endsWith('.json')) {
                 data = jsonSlurper.parse(is, "UTF-8") as Map
             } else {
                 data = yamlParser.loadAs(is, Map)
@@ -61,10 +59,10 @@ class YamlCommandFactory extends ResourceResolvingCommandFactory<Map> {
     }
 
     protected Command createCommand(Profile profile, String commandName, Resource resource, Map data) {
-        if(!data.profile || profile.name == data.profile?.toString()) {
-            Command command = new DefaultMultiStepCommand( commandName, profile, data )
+        if (!data.profile || profile.name == data.profile?.toString()) {
+            Command command = new DefaultMultiStepCommand(commandName, profile, data)
             Object minArguments = data?.minArguments
-            command.minArguments = minArguments instanceof Integer ? (Integer)minArguments : 1
+            command.minArguments = minArguments instanceof Integer ? (Integer) minArguments : 1
             return command
         }
         return null
