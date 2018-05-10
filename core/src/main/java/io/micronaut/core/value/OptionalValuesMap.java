@@ -24,15 +24,20 @@ import java.util.Optional;
 /**
  * Default implementation of {@link OptionalValues}.
  *
+ * @param <T> the type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class OptionalValuesMap<T> implements OptionalValues<T> {
 
-    private final Class<?> type;
     protected final ValueResolver resolver;
     protected final Map<CharSequence, ?> values;
+    private final Class<?> type;
 
+    /**
+     * @param type   The type
+     * @param values The values
+     */
     protected OptionalValuesMap(Class<?> type, Map<CharSequence, ?> values) {
         this.type = type;
         this.values = values;

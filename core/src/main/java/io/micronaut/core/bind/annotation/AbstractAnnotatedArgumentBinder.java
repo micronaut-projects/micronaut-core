@@ -41,6 +41,7 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
 
     /**
      * Constructor.
+     *
      * @param conversionService conversionService
      */
     protected AbstractAnnotatedArgumentBinder(ConversionService<?> conversionService) {
@@ -49,8 +50,9 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
 
     /**
      * Do binding.
-     * @param context context
-     * @param values values
+     *
+     * @param context         context
+     * @param values          values
      * @param annotationValue annotationValue
      * @return result
      */
@@ -75,6 +77,10 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         return doConvert(value, context);
     }
 
+    /**
+     * @param argument The argument
+     * @return The fallback format
+     */
     protected String getFallbackFormat(Argument argument) {
         return NameUtils.hyphenate(argument.getName());
     }

@@ -19,10 +19,12 @@ package io.micronaut.core.type;
 /**
  * An {@link Argument} with a value.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ArgumentValue<V> extends Argument<V> {
+
     /**
      * @return The current value of the argument
      */

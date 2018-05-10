@@ -31,7 +31,6 @@ public interface ClassPathResourceLoader extends ResourceLoader {
     ClassLoader getClassLoader();
 
     /**
-     *
      * @param path The path to a resource including a prefix
      *             appended by a colon. Ex (classpath:, file:)
      * @return Whether the given resource loader supports the prefix
@@ -42,7 +41,8 @@ public interface ClassPathResourceLoader extends ResourceLoader {
     }
 
     /**
-     * Return the default {@link ClassPathResourceLoader} for the given class loader
+     * Return the default {@link ClassPathResourceLoader} for the given class loader.
+     *
      * @param classLoader The classloader
      * @return The default loader
      */

@@ -21,7 +21,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * <p>Naming convention utilities</p>.
+ * <p>Naming convention utilities.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -96,7 +96,7 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         char separatorChar = '-';
-        return separateCamelCase(name.replace('_','-'), lowerCase, separatorChar);
+        return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
     }
 
     /**
@@ -148,7 +148,7 @@ public class NameUtils {
      */
     public static String environmentName(String camelCase) {
         return separateCamelCase(camelCase.replace('-', '_').replace('.', '_'), false, '_')
-                        .toUpperCase(Locale.ENGLISH);
+            .toUpperCase(Locale.ENGLISH);
     }
 
     /**
@@ -205,7 +205,7 @@ public class NameUtils {
      */
     public static String decapitalize(String name) {
 
-        if (name == null){
+        if (name == null) {
             return null;
         }
 
@@ -233,7 +233,7 @@ public class NameUtils {
                     first = false;
                 } else {
                     if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
-                        if(c != separatorChar) {
+                        if (c != separatorChar) {
                             newName.append(separatorChar);
                         }
                         newName.append(c);
@@ -241,8 +241,8 @@ public class NameUtils {
                         if (c == '.') {
                             first = true;
                         }
-                        if(c != separatorChar) {
-                            if(last == separatorChar) {
+                        if (c != separatorChar) {
+                            if (last == separatorChar) {
                                 newName.append(separatorChar);
                             }
                             newName.append(c);
@@ -260,8 +260,8 @@ public class NameUtils {
             for (char c : chars) {
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
-                    if(c != separatorChar) {
-                        if(last == separatorChar) {
+                    if (c != separatorChar) {
+                        if (last == separatorChar) {
                             newName.append(separatorChar);
                         }
                         newName.append(c);
@@ -306,7 +306,8 @@ public class NameUtils {
     }
 
     /**
-     * The camel case version of the string with the first letter in lower case
+     * The camel case version of the string with the first letter in lower case.
+     *
      * @param str The string
      * @return The new string in camel case
      */
@@ -315,14 +316,16 @@ public class NameUtils {
     }
 
     /**
+     * .
      * The camel case version of the string with the first letter in lower case
-     * @param str The string
+     *
+     * @param str                  The string
      * @param lowerCaseFirstLetter Whether the first letter is in upper case or lower case
      * @return The new string in camel case
      */
     public static String camelCase(String str, boolean lowerCaseFirstLetter) {
         String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
-        if(lowerCaseFirstLetter) {
+        if (lowerCaseFirstLetter) {
             return decapitalize(result);
         }
         return result;
