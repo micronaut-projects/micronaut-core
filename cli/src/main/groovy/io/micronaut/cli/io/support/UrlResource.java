@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import java.io.File;
@@ -30,8 +31,8 @@ import java.net.URLConnection;
  * the "file:" protocol.
  *
  * @author Juergen Hoeller
- * @since 28.12.2003
  * @see java.net.URL
+ * @since 28.12.2003
  */
 public class UrlResource extends AbstractFileResolvingResource {
 
@@ -52,6 +53,7 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * Create a new UrlResource.
+     *
      * @param url a URL
      */
     public UrlResource(URL url) {
@@ -62,6 +64,7 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * Create a new UrlResource.
+     *
      * @param uri a URI
      * @throws java.net.MalformedURLException if the given URL path is not valid
      */
@@ -73,6 +76,7 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * Create a new UrlResource.
+     *
      * @param path a URL path
      * @throws MalformedURLException if the given URL path is not valid
      */
@@ -84,15 +88,15 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * Determine a cleaned URL for the given original URL.
-     * @param originalUrl the original URL
+     *
+     * @param originalUrl  the original URL
      * @param originalPath the original URL path
      * @return the cleaned URL
      */
     private URL getCleanedUrl(URL originalUrl, String originalPath) {
         try {
             return new URL(ResourceUtils.cleanPath(originalPath));
-        }
-        catch (MalformedURLException ex) {
+        } catch (MalformedURLException ex) {
             // Cleaned URL path cannot be converted to URL
             // -> take original URL.
             return originalUrl;
@@ -103,6 +107,9 @@ public class UrlResource extends AbstractFileResolvingResource {
      * This implementation opens an InputStream for the given URL.
      * It sets the "UseCaches" flag to <code>false</code>,
      * mainly to avoid jar file locking on Windows.
+     *
+     * @return The input stream
+     * @throws IOException if there is an error
      * @see java.net.URL#openConnection()
      * @see java.net.URLConnection#setUseCaches(boolean)
      * @see java.net.URLConnection#getInputStream()
@@ -112,8 +119,7 @@ public class UrlResource extends AbstractFileResolvingResource {
         useCachesIfNecessary(con);
         try {
             return con.getInputStream();
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             // Close the HTTP connection (if applicable).
             if (con instanceof HttpURLConnection) {
                 ((HttpURLConnection) con).disconnect();
@@ -128,6 +134,9 @@ public class UrlResource extends AbstractFileResolvingResource {
 
     /**
      * This implementation returns the underlying URL reference.
+     *
+     * @return The URL
+     * @throws IOException if there is an error
      */
     public URL getURL() throws IOException {
         return url;
@@ -137,8 +146,8 @@ public class UrlResource extends AbstractFileResolvingResource {
      * This implementation returns the underlying URI directly,
      * if possible.
      *
-     * @throws IOException if there was a problem getting the URI
      * @return The URI
+     * @throws IOException if there was a problem getting the URI
      */
     public URI getURI() throws IOException {
         if (uri != null) {
@@ -151,8 +160,8 @@ public class UrlResource extends AbstractFileResolvingResource {
      * This implementation returns a File reference for the underlying URL/URI,
      * provided that it refers to a file in the file system.
      *
-     * @throws IOException if there was a problem getting the file
      * @return The file
+     * @throws IOException if there was a problem getting the file
      */
     @Override
     public File getFile() throws IOException {
@@ -163,11 +172,11 @@ public class UrlResource extends AbstractFileResolvingResource {
      * This implementation creates a UrlResource, applying the given path
      * relative to the path of the underlying URL of this resource descriptor.
      *
-     * @see java.net.URL#URL(java.net.URL, String)
      * @param relativePath The path
      * @return The resource for the path
+     * @see java.net.URL#URL(java.net.URL, String)
      */
-    public Resource createRelative(String relativePath)  {
+    public Resource createRelative(String relativePath) {
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
         }
@@ -181,9 +190,9 @@ public class UrlResource extends AbstractFileResolvingResource {
     /**
      * This implementation returns the name of the file that this URL refers to.
      *
+     * @return The filename
      * @see java.net.URL#getFile()
      * @see java.io.File#getName()
-     * @return The filename
      */
     public String getFilename() {
         return new File(url.getFile()).getName();
@@ -204,7 +213,7 @@ public class UrlResource extends AbstractFileResolvingResource {
     @Override
     public boolean equals(Object obj) {
         return (obj == this ||
-                (obj instanceof UrlResource && cleanedUrl.equals(((UrlResource) obj).cleanedUrl)));
+            (obj instanceof UrlResource && cleanedUrl.equals(((UrlResource) obj).cleanedUrl)));
     }
 
     /**

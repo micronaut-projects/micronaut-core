@@ -15,11 +15,6 @@
  */
 package io.micronaut.http.client.rxjava2
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest

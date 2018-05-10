@@ -13,25 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers;
-
-import jline.console.completer.Completer;
-
-import java.util.*;
 
 import static jline.internal.Preconditions.checkNotNull;
 
+import jline.console.completer.Completer;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
 /**
- * Copied from jline AggregateCompleter
+ * Copied from jline AggregateCompleter.
+ * <p>
+ * Sorts aggregated completions.
  *
- * sorts aggregated completions
- *
+ * @since 1.0
  */
-public class SortedAggregateCompleter
-    implements Completer
-{
+public class SortedAggregateCompleter implements Completer {
     private final List<Completer> completers = new ArrayList<Completer>();
 
+    /**
+     * Default constructor.
+     */
     public SortedAggregateCompleter() {
         // empty
     }
@@ -66,12 +75,7 @@ public class SortedAggregateCompleter
         return completers;
     }
 
-    /**
-     * Perform a completion operation across all aggregated completers.
-     *
-     * @see Completer#complete(String, int, java.util.List)
-     * @return the highest completion return value from all completers
-     */
+    @Override
     public int complete(final String buffer, final int cursor, final List<CharSequence> candidates) {
         // buffer could be null
         checkNotNull(candidates);
@@ -114,11 +118,13 @@ public class SortedAggregateCompleter
             '}';
     }
 
-    private class Completion
-    {
-        public final List<CharSequence> candidates;
+    /**
+     * Completion.
+     */
+    private class Completion {
+        final List<CharSequence> candidates;
 
-        public int cursor;
+        int cursor;
 
         public Completion(final List<CharSequence> candidates) {
             checkNotNull(candidates);

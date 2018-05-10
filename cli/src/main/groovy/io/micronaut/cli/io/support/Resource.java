@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import java.io.File;
@@ -30,16 +31,18 @@ import java.net.URL;
  * certain resources. The actual behavior is implementation-specific.
  *
  * @author Juergen Hoeller
- * @since 28.12.2003
  * @see #getURL()
  * @see #getURI()
  * @see #getFile()
+ * @since 28.12.2003
  */
-public interface Resource  {
+public interface Resource {
 
     /**
-     * An input stream
+     * An input stream.
+     *
      * @return The input stream
+     * @throws IOException if there is an error
      */
     InputStream getInputStream() throws IOException;
 
@@ -48,6 +51,8 @@ public interface Resource  {
      * <p>This method performs a definitive existence check, whereas the
      * existence of a <code>Resource</code> handle only guarantees a
      * valid descriptor handle.
+     *
+     * @return Whether the resource exists
      */
     boolean exists();
 
@@ -58,64 +63,71 @@ public interface Resource  {
      * note that actual content reading may still fail when attempted.
      * However, a value of <code>false</code> is a definitive indication
      * that the resource content cannot be read.
+     *
+     * @return Where the contents can be read
      * @see #getInputStream()
      */
     boolean isReadable();
 
     /**
-     * Return a URL handle for this resource.
+     * @return A URL handle for this resource.
      * @throws java.io.IOException if the resource cannot be resolved as URL,
-     * i.e. if the resource is not available as descriptor
+     *                             i.e. if the resource is not available as descriptor
      */
     URL getURL() throws IOException;
 
     /**
-     * Return a URI handle for this resource.
+     * @return A URI handle for this resource.
      * @throws IOException if the resource cannot be resolved as URI,
-     * i.e. if the resource is not available as descriptor
+     *                     i.e. if the resource is not available as descriptor
      */
     URI getURI() throws IOException;
 
     /**
-     * Return a File handle for this resource.
+     * @return A File handle for this resource.
      * @throws IOException if the resource cannot be resolved as absolute
-     * file path, i.e. if the resource is not available in a file system
+     *                     file path, i.e. if the resource is not available in a file system
      */
     File getFile() throws IOException;
 
     /**
      * Determine the content length for this resource.
+     *
+     * @return The content length
      * @throws IOException if the resource cannot be resolved
-     * (in the file system or as some other known physical resource type)
+     *                     (in the file system or as some other known physical resource type)
      */
     long contentLength() throws IOException;
 
     /**
      * Determine the last-modified timestamp for this resource.
+     *
+     * @return The last-modified timestamp
      * @throws IOException if the resource cannot be resolved
-     * (in the file system or as some other known physical resource type)
+     *                     (in the file system or as some other known physical resource type)
      */
     long lastModified() throws IOException;
 
     /**
-     * Determine a filename for this resource, i.e. typically the last
-     * part of the path: for example, "myfile.txt".
-     * <p>Returns <code>null</code> if this type of resource does not
-     * have a filename.
+     * Determine a filename for this resource, i.e. typically the last part of the path: for example, "myfile.txt".
+     * <p>Returns <code>null</code> if this type of resource does not have a filename.
+     *
+     * @return The filename for this resource
      */
     String getFilename();
 
     /**
-     * Return a description for this resource,
-     * to be used for error output when working with the resource.
+     * Return a description for this resource, to be used for error output when working with the resource.
      * <p>Implementations are also encouraged to return this value
      * from their <code>toString</code> method.
+     *
+     * @return The description for this resouce
      * @see java.lang.Object#toString()
      */
     String getDescription();
 
     /**
-     * Creates a new resource relative to this one
+     * Creates a new resource relative to this one.
      *
      * @param relativePath The relative path
      * @return The new resource

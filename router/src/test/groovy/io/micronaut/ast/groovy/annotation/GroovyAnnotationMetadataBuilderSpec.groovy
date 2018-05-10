@@ -15,12 +15,6 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Error
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode

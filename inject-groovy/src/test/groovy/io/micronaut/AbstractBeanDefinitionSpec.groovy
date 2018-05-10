@@ -16,18 +16,10 @@
 package io.micronaut
 
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.builder.AstBuilder
-import org.codehaus.groovy.control.CompilerConfiguration
-import io.micronaut.ast.groovy.InjectTransform
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.core.annotation.AnnotationMetadata

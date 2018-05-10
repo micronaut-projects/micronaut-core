@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cli.util
 
+package io.micronaut.cli.util
 
 /**
  * Interface for classes that are described
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface Described {
 

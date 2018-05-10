@@ -13,20 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.templates
 
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
 
+/**
+ * @author James Kleeh
+ * @since 1.0
+ */
 @CompileStatic
 @Immutable
 class SimpleTemplate {
     String template
-    
+
     public String render(Map<String, String> variables) {
-        String result = template?:''
+        String result = template ?: ''
         variables.each { k, v ->
-            result = result.replace("@${k}@".toString(), v?:'')
+            result = result.replace("@${k}@".toString(), v ?: '')
         }
         result
     }

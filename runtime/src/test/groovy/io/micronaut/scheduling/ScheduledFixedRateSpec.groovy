@@ -17,8 +17,6 @@ package io.micronaut.scheduling
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
 import io.micronaut.scheduling.annotation.Scheduled
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
-import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.io.support.Resource
+import io.micronaut.cli.profile.Profile
 
 /**
- * @since 3.0
+ * @since 1.0
  * @author Graeme Rocher
  */
 interface CommandResourceResolver {

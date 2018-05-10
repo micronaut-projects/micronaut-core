@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.boot
 
 import groovy.grape.Grape
@@ -51,7 +52,7 @@ class DependencyVersions implements DependencyManagement {
     DependencyVersions(GrapeEngine grape, Map<String, String> bomCoords) {
         def results = grape.resolve(null, bomCoords)
 
-        for(URI u in results) {
+        for (URI u in results) {
             def pom = new XmlSlurper().parseText(u.toURL().text)
             addDependencyManagement(pom)
         }
@@ -99,7 +100,7 @@ class DependencyVersions implements DependencyManagement {
     @Override
     Dependency find(String artifactId) {
         def groupAndArtifact = artifactToGroupAndArtifact[artifactId]
-        if(groupAndArtifact)
+        if (groupAndArtifact)
             return groupAndArtifactToDependency[groupAndArtifact]
     }
 

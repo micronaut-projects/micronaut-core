@@ -22,8 +22,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup

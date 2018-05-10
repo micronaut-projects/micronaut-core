@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import java.io.File;
@@ -29,9 +30,8 @@ import java.net.URL;
  *
  * @author Juergen Hoeller
  * @author Graeme Rocher
- *
- * @since 28.12.2003
  * @see java.io.File
+ * @since 28.12.2003
  */
 public class FileSystemResource implements Resource {
 
@@ -61,7 +61,7 @@ public class FileSystemResource implements Resource {
     }
 
     /**
-     * Return the file path for this resource.
+     * @return The file path for this resource.
      */
     public final String getPath() {
         return path;
@@ -69,8 +69,10 @@ public class FileSystemResource implements Resource {
 
     /**
      * This implementation returns whether the underlying file exists.
+     *
      * @see java.io.File#exists()
      */
+    @Override
     public boolean exists() {
         return file.exists();
     }
@@ -78,33 +80,41 @@ public class FileSystemResource implements Resource {
     /**
      * This implementation checks whether the underlying file is marked as readable
      * (and corresponds to an actual file with content, not to a directory).
+     *
      * @see java.io.File#canRead()
      * @see java.io.File#isDirectory()
      */
+    @Override
     public boolean isReadable() {
         return file.canRead() && !file.isDirectory();
     }
 
     /**
      * This implementation opens a FileInputStream for the underlying file.
+     *
      * @see java.io.FileInputStream
      */
+    @Override
     public InputStream getInputStream() throws IOException {
         return new FileInputStream(file);
     }
 
     /**
      * This implementation returns a URL for the underlying file.
+     *
      * @see java.io.File#toURI()
      */
+    @Override
     public URL getURL() throws IOException {
         return file.toURI().toURL();
     }
 
     /**
      * This implementation returns a URI for the underlying file.
+     *
      * @see java.io.File#toURI()
      */
+    @Override
     public URI getURI() throws IOException {
         return file.toURI();
     }
@@ -112,6 +122,7 @@ public class FileSystemResource implements Resource {
     /**
      * This implementation returns the underlying File reference.
      */
+    @Override
     public File getFile() {
         return file;
     }
@@ -119,18 +130,22 @@ public class FileSystemResource implements Resource {
     /**
      * This implementation returns the underlying File's length.
      */
+    @Override
     public long contentLength() throws IOException {
         return file.length();
     }
 
+    @Override
     public long lastModified() throws IOException {
         return file.lastModified();
     }
 
     /**
      * This implementation returns the name of the file.
+     *
      * @see java.io.File#getName()
      */
+    @Override
     public String getFilename() {
         return file.getName();
     }
@@ -138,8 +153,10 @@ public class FileSystemResource implements Resource {
     /**
      * This implementation returns a description that includes the absolute
      * path of the file.
+     *
      * @see java.io.File#getAbsolutePath()
      */
+    @Override
     public String getDescription() {
         return "file [" + file.getAbsolutePath() + "]";
     }
@@ -148,6 +165,7 @@ public class FileSystemResource implements Resource {
      * This implementation creates a FileSystemResource, applying the given path
      * relative to the path of the underlying file of this resource descriptor.
      */
+    @Override
     public Resource createRelative(String relativePath) {
         String pathToUse = ResourceUtils.applyRelativePath(path, relativePath);
         return new FileSystemResource(pathToUse);
@@ -158,6 +176,8 @@ public class FileSystemResource implements Resource {
     /**
      * This implementation checks whether the underlying file is marked as writable
      * (and corresponds to an actual file with content, not to a directory).
+     *
+     * @return Whether the file is writable
      * @see java.io.File#canWrite()
      * @see java.io.File#isDirectory()
      */
@@ -167,6 +187,9 @@ public class FileSystemResource implements Resource {
 
     /**
      * This implementation opens a FileOutputStream for the underlying file.
+     *
+     * @return The FileOutputStream
+     * @throws IOException if there is an error
      * @see java.io.FileOutputStream
      */
     public OutputStream getOutputStream() throws IOException {
@@ -179,7 +202,7 @@ public class FileSystemResource implements Resource {
     @Override
     public boolean equals(Object obj) {
         return (obj == this ||
-                (obj instanceof FileSystemResource && path.equals(((FileSystemResource) obj).path)));
+            (obj instanceof FileSystemResource && path.equals(((FileSystemResource) obj).path)));
     }
 
     /**
@@ -190,6 +213,12 @@ public class FileSystemResource implements Resource {
         return path.hashCode();
     }
 
+    /**
+     * Assert that an object is not null.
+     *
+     * @param object  The object to check
+     * @param message The error message thrown if the object is null
+     */
     protected void assertNotNull(Object object, String message) {
         if (object == null) {
             throw new IllegalArgumentException(message);

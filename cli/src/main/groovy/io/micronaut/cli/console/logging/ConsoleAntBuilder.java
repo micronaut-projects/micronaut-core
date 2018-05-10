@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
 import groovy.util.AntBuilder;
-
 import org.apache.tools.ant.BuildEvent;
 import org.apache.tools.ant.BuildLogger;
 import org.apache.tools.ant.DefaultLogger;
@@ -29,14 +29,20 @@ import org.apache.tools.ant.util.StringUtils;
  * Silences ant builder output.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class ConsoleAntBuilder extends AntBuilder {
 
+    /**
+     * @param project The Ant {@link Project}
+     */
     public ConsoleAntBuilder(Project project) {
         super(project);
     }
 
+    /**
+     * Default constructor.
+     */
     public ConsoleAntBuilder() {
         super(createAntProject());
     }
@@ -59,6 +65,9 @@ public class ConsoleAntBuilder extends AntBuilder {
         return project;
     }
 
+    /**
+     * @param project The Ant {@link Project}
+     */
     public static void addMicronautConsoleBuildListener(Project project) {
         final BuildLogger logger = new MicronautConsoleLogger();
 
@@ -74,12 +83,15 @@ public class ConsoleAntBuilder extends AntBuilder {
         if (!instance.isVerbose()) {
             for (Object buildListener : project.getBuildListeners()) {
                 if (buildListener instanceof BuildLogger) {
-                    ((BuildLogger)buildListener).setMessageOutputLevel(LogLevel.ERR.getLevel());
+                    ((BuildLogger) buildListener).setMessageOutputLevel(LogLevel.ERR.getLevel());
                 }
             }
         }
     }
 
+    /**
+     * Micronaut console logger.
+     */
     private static class MicronautConsoleLogger extends DefaultLogger {
         /**
          * Name of the current target, if it should
@@ -125,8 +137,8 @@ public class ConsoleAntBuilder extends AntBuilder {
         @Override
         public void messageLogged(BuildEvent event) {
             if (event.getPriority() > msgOutputLevel ||
-                    null == event.getMessage() ||
-                    "".equals(event.getMessage().trim())) {
+                null == event.getMessage() ||
+                "".equals(event.getMessage().trim())) {
                 return;
             }
 

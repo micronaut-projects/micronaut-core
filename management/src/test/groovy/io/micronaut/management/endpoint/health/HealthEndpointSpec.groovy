@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.health
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator

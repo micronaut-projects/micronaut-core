@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.templates
 
 import groovy.transform.InheritConstructors
-
 
 /**
  * Exception thrown when an error in template rendering occurs
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @InheritConstructors
 class TemplateException extends RuntimeException {

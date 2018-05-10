@@ -17,8 +17,6 @@ package io.micronaut.inject.field.factoryinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 /**
  * Created by graemerocher on 12/05/2017.

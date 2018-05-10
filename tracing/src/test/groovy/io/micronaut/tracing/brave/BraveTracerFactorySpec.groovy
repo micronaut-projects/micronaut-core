@@ -20,8 +20,6 @@ import brave.http.HttpClientHandler
 import brave.http.HttpServerHandler
 import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer

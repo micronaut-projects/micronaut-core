@@ -15,14 +15,6 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest

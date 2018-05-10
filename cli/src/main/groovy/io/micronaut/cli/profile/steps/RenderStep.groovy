@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.steps
 
 import groovy.transform.CompileStatic
 import groovy.transform.InheritConstructors
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.interactive.completers.ClassNameCompleter
+import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.AbstractStep
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.commands.templates.SimpleTemplate
 import io.micronaut.cli.profile.support.ArtefactVariableResolver
-import io.micronaut.cli.io.support.Resource
-import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.util.NameUtils
 
 /**
@@ -33,7 +34,7 @@ import io.micronaut.cli.util.NameUtils
  * @author Lari Hotari
  * @author Graeme Rocher
  *
- * @since 3.0
+ * @since 1.0
  */
 @InheritConstructors
 @CompileStatic
@@ -55,13 +56,13 @@ class RenderStep extends AbstractStep {
         def nameAndPackage = resolveNameAndPackage(context, nameAsArgument)
         artifactName = nameAndPackage[0]
         artifactPackage = nameAndPackage[1]
-        def variableResolver = new ArtefactVariableResolver(artifactName, (String) parameters.convention,artifactPackage)
+        def variableResolver = new ArtefactVariableResolver(artifactName, (String) parameters.convention, artifactPackage)
         File destination = variableResolver.resolveFile(parameters.destination.toString(), context)
 
         try {
 
             String relPath = relativePath(context.baseDir, destination)
-            if(destination.exists() && !flag(commandLine, 'force')) {
+            if (destination.exists() && !flag(commandLine, 'force')) {
                 context.console.error("${relPath} already exists.")
                 return false
             }
@@ -77,16 +78,16 @@ class RenderStep extends AbstractStep {
     }
 
     protected Resource searchTemplateDepthFirst(Profile profile, String template) {
-        if(template.startsWith(TEMPLATES_DIR)) {
+        if (template.startsWith(TEMPLATES_DIR)) {
             return searchTemplateDepthFirst(profile, template.substring(TEMPLATES_DIR.length()))
         }
         Resource templateFile = profile.getTemplate(template)
-        if(templateFile.exists()) {
+        if (templateFile.exists()) {
             return templateFile
         } else {
-            for(parent in profile.extends) {
+            for (parent in profile.extends) {
                 templateFile = searchTemplateDepthFirst(parent, template)
-                if(templateFile) {
+                if (templateFile) {
                     return templateFile
                 }
             }
@@ -97,7 +98,7 @@ class RenderStep extends AbstractStep {
     protected void renderToDestination(File destination, Map variables) {
         Profile profile = command.profile
         Resource templateFile = searchTemplateDepthFirst(profile, parameters.template.toString())
-        if(!templateFile) {
+        if (!templateFile) {
             throw new IOException("cannot find template " + parameters.template)
         }
         destination.setText(new SimpleTemplate(templateFile.inputStream.getText("UTF-8")).render(variables), "UTF-8")
@@ -110,9 +111,9 @@ class RenderStep extends AbstractStep {
         String artifactName
         String artifactPackage
 
-        if(parts.size() == 1) {
+        if (parts.size() == 1) {
             artifactName = parts[0]
-            artifactPackage = context.navigateConfig('grails', 'codegen', 'defaultPackage')?:''
+            artifactPackage = context.navigateConfig('micronaut', 'codegen', 'defaultPackage') ?: ''
         } else {
             artifactName = parts[-1]
             artifactPackage = parts[0..-2].join('.')
@@ -120,7 +121,7 @@ class RenderStep extends AbstractStep {
 
         [NameUtils.getClassName(artifactName), artifactPackage]
     }
-    
+
     protected String relativePath(File relbase, File file) {
         def pathParts = []
         def currentFile = file
@@ -130,6 +131,6 @@ class RenderStep extends AbstractStep {
         }
         pathParts.reverse().join('/')
     }
-    
+
 
 }

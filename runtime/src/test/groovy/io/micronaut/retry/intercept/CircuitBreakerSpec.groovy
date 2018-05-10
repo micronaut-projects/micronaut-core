@@ -15,8 +15,6 @@
  */
 package io.micronaut.retry.intercept
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.event.ApplicationEventListener
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener

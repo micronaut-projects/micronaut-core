@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.io
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.io.support.DefaultResourceLoader
 import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.PathMatchingResourcePatternResolver
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.io.support.ResourceLoader
 import io.micronaut.cli.io.support.ResourceLocator
+import io.micronaut.cli.io.support.ResourceUtils
 import io.micronaut.cli.io.support.SpringIOUtils
+import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.util.CliSettings
-
 
 /**
  * Utility methods exposed to scripts for interacting with resources (found on the file system or jars) and the file system
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class FileSystemInteractionImpl implements FileSystemInteraction {
@@ -50,7 +50,6 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
         this.resourceLocator.setSearchLocation(executionContext.baseDir.absolutePath)
         this.resourcePatternResolver = new PathMatchingResourcePatternResolver(resourceLoader)
     }
-
 
     /**
      * Makes a directory
@@ -85,11 +84,10 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
         FileSystemInteraction.CopySpec spec = new FileSystemInteraction.CopySpec()
         callable.delegate = spec
         callable.call()
-        if(spec.from && spec.into) {
-            if(spec.from instanceof Iterable) {
-                copyAll((Iterable)spec.from, spec.into)
-            }
-            else {
+        if (spec.from && spec.into) {
+            if (spec.from instanceof Iterable) {
+                copyAll((Iterable) spec.from, spec.into)
+            } else {
                 copy(spec.from, spec.into)
             }
         }
@@ -118,7 +116,7 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
     @Override
     FileSystemInteractionImpl copyAll(Iterable resources, destination) {
         mkdir(destination)
-        for(path in resources) {
+        for (path in resources) {
             def from = resource(path)
             def to = file(destination)
             copy(from, to)
@@ -135,7 +133,7 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
      */
     @Override
     FileSystemInteractionImpl copy(Resource from, File to) {
-        if(!to?.exists()) mkdir(to)
+        if (!to?.exists()) mkdir(to)
         if (from && to) {
             if (to.isDirectory()) {
                 mkdir(to)
@@ -155,8 +153,8 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
      */
     @Override
     File file(Object path) {
-        if(path instanceof File) return (File)path
-        else if(path instanceof Resource) return ((Resource)path).file
+        if (path instanceof File) return (File) path
+        else if (path instanceof Resource) return ((Resource) path).file
         else {
             def baseDir = executionContext.baseDir
             new File(baseDir ?: new File("."), path.toString())
@@ -206,24 +204,21 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
      */
     @Override
     Resource resource(Object path) {
-        if(!path) return null
-        if(path instanceof Resource) return (Resource)path
+        if (!path) return null
+        if (path instanceof Resource) return (Resource) path
         def f = file(path)
-        if(f?.exists() && f.isFile()) {
+        if (f?.exists() && f.isFile()) {
             return new FileSystemResource(f)
-        }
-        else {
+        } else {
             def pathStr = path.toString()
             def resource = resourceLoader.getResource(pathStr)
-            if(resource.exists()) {
+            if (resource.exists()) {
                 return resource
-            }
-            else {
+            } else {
                 def allResources = resources(pathStr)
-                if(allResources) {
+                if (allResources) {
                     return allResources[0]
-                }
-                else {
+                } else {
                     return resource
                 }
             }
@@ -254,7 +249,7 @@ class FileSystemInteractionImpl implements FileSystemInteraction {
     @Override
     String projectPath(Object path) {
         def file = file(path)
-        if(file) {
+        if (file) {
             def basePath = executionContext.baseDir.canonicalPath
             return (file.canonicalPath - basePath).substring(1)
         }

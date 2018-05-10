@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup

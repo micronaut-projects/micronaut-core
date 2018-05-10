@@ -13,23 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
-import org.eclipse.aether.artifact.DefaultArtifact
-import org.eclipse.aether.graph.Dependency
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.io.support.Resource
+import org.eclipse.aether.artifact.DefaultArtifact
+import org.eclipse.aether.graph.Dependency
 import org.yaml.snakeyaml.Yaml
-
 
 /**
  * Default implementation of the {@link Feature} interface
  *
  * @author Graeme Rocher
- * @since 3.1
+ * @since 1.0
  */
 @EqualsAndHashCode(includes = ['name'])
 @ToString(includes = ['profile', 'name'])
@@ -53,22 +53,22 @@ class DefaultFeature implements Feature {
         def dependencyMap = configuration.get("dependencies")
         dependentFeatures.addAll((List) configuration.get("dependentFeatures", Collections.emptyList()))
 
-        if(dependencyMap instanceof Map) {
-            for(entry in ((Map)dependencyMap)) {
+        if (dependencyMap instanceof Map) {
+            for (entry in ((Map) dependencyMap)) {
                 def scope = entry.key
                 def value = entry.value
-                if(value instanceof List) {
-                    for(dep in ((List)value)) {
+                if (value instanceof List) {
+                    for (dep in ((List) value)) {
                         String coords = dep.toString()
-                        if(coords.count(':') == 1) {
+                        if (coords.count(':') == 1) {
                             coords = "$coords:BOM"
                         }
-                        dependencies.add new Dependency(new DefaultArtifact(coords),scope.toString())
+                        dependencies.add new Dependency(new DefaultArtifact(coords), scope.toString())
                     }
                 }
             }
         }
-        this.buildPlugins = (List<String>)configuration.get("build.plugins", [])
+        this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
     }
 
     @Override

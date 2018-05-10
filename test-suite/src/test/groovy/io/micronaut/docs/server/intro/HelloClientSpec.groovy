@@ -16,7 +16,6 @@
 package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
 
 
 // tag::imports[]

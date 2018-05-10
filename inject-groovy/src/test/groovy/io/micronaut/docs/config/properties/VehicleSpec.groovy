@@ -16,10 +16,6 @@
 package io.micronaut.docs.config.properties
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.env.MapPropertySource
 import spock.lang.Specification
 
 /**
