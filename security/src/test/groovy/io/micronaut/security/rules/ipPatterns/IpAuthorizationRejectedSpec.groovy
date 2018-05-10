@@ -2,10 +2,7 @@ package io.micronaut.security.rules.ipPatterns
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -16,26 +13,23 @@ class IpAuthorizationRejectedSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.authentication': true,
+            'spec.name': 'ipPatterns',
             'micronaut.security.enabled': true,
-            'micronaut.security.ipPatterns': ['10.10.0.48']
+            'micronaut.security.ipPatterns': ['10.10.0.48', '127.0.0.*']
+
     ], "test")
 
     @Shared
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    private HttpResponse get(String path) {
-        HttpRequest req = HttpRequest.GET(path)
-        client.toBlocking().exchange(req, String)
-    }
-
-    void "test accessing a non sensitive endpoint without authentication"() {
+    void "if you are in the correct ip range, accessing the secured controller with authentication should be successful"() {
         when:
-        get("/nonSensitive")
+        HttpRequest req = HttpRequest.GET("/secured/authenticated")
+                .basicAuth("user", "password")
+        client.toBlocking().exchange(req, String)
 
         then:
-        HttpClientResponseException e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        noExceptionThrown()
     }
 }
