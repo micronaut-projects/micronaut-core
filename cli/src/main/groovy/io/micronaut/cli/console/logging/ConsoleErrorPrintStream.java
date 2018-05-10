@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
 import java.io.PrintStream;
@@ -25,12 +26,18 @@ import java.io.PrintStream;
  */
 public class ConsoleErrorPrintStream extends PrintStream {
 
+    /**
+     * @param out The print stream
+     */
     public ConsoleErrorPrintStream(PrintStream out) {
         super(out, true);
     }
 
+    /**
+     * @return The print stream
+     */
     public PrintStream getTargetOut() {
-        return (PrintStream)out;
+        return (PrintStream) out;
     }
 
     @Override

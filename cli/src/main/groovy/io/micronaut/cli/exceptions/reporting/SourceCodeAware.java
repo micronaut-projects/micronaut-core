@@ -13,18 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.exceptions.reporting;
 
 import java.io.Serializable;
 
 /**
- * An interface that represents an exception that is capable of providing more information about the source code
+ * An interface that represents an exception that is capable of providing more information about the source code.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface SourceCodeAware extends Serializable {
+
+    /**
+     * @return The file name
+     */
     String getFileName();
 
+    /**
+     * @return The line number
+     */
     int getLineNumber();
 }
