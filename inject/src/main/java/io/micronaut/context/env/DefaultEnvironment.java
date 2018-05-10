@@ -83,6 +83,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
+    private static final String HEROKU_DYNO = "DYNO";
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -545,10 +546,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             // deduce k8s
             if(StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
                 enviroments.add(Environment.KUBERNETES);
+                enviroments.add(Environment.CLOUD);
             }
             // deduce CF
             if(StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
                 enviroments.add(Environment.CLOUD_FOUNDRY);
+                enviroments.add(Environment.CLOUD);
+            }
+
+            // deduce heroku
+            if(StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                enviroments.add(Environment.HEROKU);
+                enviroments.add(Environment.CLOUD);
             }
 
             ComputePlatform computePlatform = determineCloudProvider();
@@ -557,18 +566,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     case GOOGLE_COMPUTE:
                         //instantiate bean for GC metadata discovery
                         enviroments.add(GOOGLE_COMPUTE);
+                        enviroments.add(Environment.CLOUD);
                         break;
                     case AMAZON_EC2:
                         //instantiate bean for ec2 metadata discovery
                         enviroments.add(AMAZON_EC2);
+                        enviroments.add(Environment.CLOUD);
                         break;
                     case AZURE:
                         // not yet implemented
                         enviroments.add(AZURE);
+                        enviroments.add(Environment.CLOUD);
                         break;
                     case IBM:
                         // not yet implemented
                         enviroments.add(IBM);
+                        enviroments.add(Environment.CLOUD);
                         break;
                     case OTHER:
                         // do nothing here

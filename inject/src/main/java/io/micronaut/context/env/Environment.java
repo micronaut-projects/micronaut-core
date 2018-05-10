@@ -128,6 +128,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String CLOUD_FOUNDRY = "pcf";
 
     /**
+     * Running on Heroku
+     */
+    String HEROKU = "heroku";
+
+    /**
      * @return The active environment names
      */
     Set<String> getActiveNames();
