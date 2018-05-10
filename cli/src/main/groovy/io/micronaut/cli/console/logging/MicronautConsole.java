@@ -58,7 +58,7 @@ import java.util.Stack;
  * Utility class for delivering console output in a nicely formatted way.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class MicronautConsole implements ConsoleLogger {
 

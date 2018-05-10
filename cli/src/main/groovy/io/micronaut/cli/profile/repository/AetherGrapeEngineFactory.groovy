@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.repository
 
 import groovy.transform.CompileStatic
@@ -40,7 +41,7 @@ import org.springframework.boot.cli.compiler.grape.RepositorySystemSessionAutoCo
  *  Created to support repositories with authentication.
  *
  * @author James Kleeh
- * @since 3.2
+ * @since 1.0
  */
 @CompileStatic
 class AetherGrapeEngineFactory {
@@ -50,54 +51,54 @@ class AetherGrapeEngineFactory {
                                     DependencyResolutionContext dependencyResolutionContext) {
 
         RepositorySystem repositorySystem = createServiceLocator()
-                .getService(RepositorySystem.class)
+            .getService(RepositorySystem.class)
 
         DefaultRepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
-                .newSession()
+            .newSession()
 
         ServiceLoader<RepositorySystemSessionAutoConfiguration> autoConfigurations = ServiceLoader
-                .load(RepositorySystemSessionAutoConfiguration.class)
+            .load(RepositorySystemSessionAutoConfiguration.class)
 
         for (RepositorySystemSessionAutoConfiguration autoConfiguration : autoConfigurations) {
             autoConfiguration.apply(repositorySystemSession, repositorySystem)
         }
 
         new DefaultRepositorySystemSessionAutoConfiguration()
-                .apply(repositorySystemSession, repositorySystem)
+            .apply(repositorySystemSession, repositorySystem)
 
         return new AetherGrapeEngine(classLoader, repositorySystem,
-                repositorySystemSession, createRepositories(repositoryConfigurations),
-                dependencyResolutionContext, false)
+                                     repositorySystemSession, createRepositories(repositoryConfigurations),
+                                     dependencyResolutionContext, false)
     }
 
     private static ServiceLocator createServiceLocator() {
         DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator()
         locator.addService(RepositorySystem.class, DefaultRepositorySystem.class)
         locator.addService(RepositoryConnectorFactory.class,
-                BasicRepositoryConnectorFactory.class)
+                           BasicRepositoryConnectorFactory.class)
         locator.addService(TransporterFactory.class, HttpTransporterFactory.class)
         locator.addService(TransporterFactory.class, FileTransporterFactory.class)
         return locator
     }
 
     private static List<RemoteRepository> createRepositories(
-            List<RepositoryConfiguration> repositoryConfigurations) {
+        List<RepositoryConfiguration> repositoryConfigurations) {
         List<RemoteRepository> repositories = new ArrayList<RemoteRepository>(
-                repositoryConfigurations.size())
+            repositoryConfigurations.size())
         for (RepositoryConfiguration repositoryConfiguration : repositoryConfigurations) {
             RemoteRepository.Builder builder = new RemoteRepository.Builder(
-                    repositoryConfiguration.getName(), "default",
-                    repositoryConfiguration.getUri().toASCIIString())
+                repositoryConfiguration.getName(), "default",
+                repositoryConfiguration.getUri().toASCIIString())
             if (repositoryConfiguration.hasCredentials()) {
                 builder.authentication = new AuthenticationBuilder()
-                        .addUsername(repositoryConfiguration.username)
-                        .addPassword(repositoryConfiguration.password)
-                        .build()
+                    .addUsername(repositoryConfiguration.username)
+                    .addPassword(repositoryConfiguration.password)
+                    .build()
             }
             if (!repositoryConfiguration.getSnapshotsEnabled()) {
                 builder.setSnapshotPolicy(
-                        new RepositoryPolicy(false, RepositoryPolicy.UPDATE_POLICY_NEVER,
-                                RepositoryPolicy.CHECKSUM_POLICY_IGNORE))
+                    new RepositoryPolicy(false, RepositoryPolicy.UPDATE_POLICY_NEVER,
+                                         RepositoryPolicy.CHECKSUM_POLICY_IGNORE))
             }
             repositories.add(builder.build())
         }

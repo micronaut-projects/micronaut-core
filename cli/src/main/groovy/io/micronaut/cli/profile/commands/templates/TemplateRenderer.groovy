@@ -13,20 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.templates
 
-import grails.codegen.model.Model
 import groovy.transform.CompileDynamic
 import io.micronaut.cli.codegen.model.Model
 import io.micronaut.cli.io.support.Resource
-
-
 
 /**
  * API for locating and rendering templates in the code generation layer
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface TemplateRenderer {
 
@@ -53,7 +51,7 @@ interface TemplateRenderer {
      * @param destination The destination
      * @param model The model
      */
-    void render(CharSequence template, File destination )
+    void render(CharSequence template, File destination)
 
     /**
      * Render the given template to the given destination
@@ -62,7 +60,7 @@ interface TemplateRenderer {
      * @param destination The destination
      * @param model The model
      */
-    void render(CharSequence template, File destination, Map model )
+    void render(CharSequence template, File destination, Map model)
     /**
      * Render the given template to the given destination
      *
@@ -97,7 +95,7 @@ interface TemplateRenderer {
      * @param destination The destination
      * @param model The model
      */
-    void render(File template, File destination, Map model )
+    void render(File template, File destination, Map model)
 
     /**
      * Render the given template to the given destination
@@ -106,7 +104,7 @@ interface TemplateRenderer {
      * @param destination The destination
      * @param model The model
      */
-    void render(File template, File destination, Map model , boolean overwrite)
+    void render(File template, File destination, Map model, boolean overwrite)
 
     /**
      * Render the given template to the give destination for the given model
@@ -116,7 +114,6 @@ interface TemplateRenderer {
      * @param model The model
      */
     void render(Resource template, File destination, Model model)
-
 
     /**
      * Render the given template to the give destination for the given model

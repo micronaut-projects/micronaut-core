@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.util
-
-
 
 /**
  * A interface for objects that have been assigned a name
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface Named {
     /**

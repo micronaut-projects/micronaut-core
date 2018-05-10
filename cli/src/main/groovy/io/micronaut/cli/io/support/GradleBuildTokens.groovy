@@ -4,6 +4,10 @@ import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
 
+/**
+ * @author James Kleeh
+ * @sicen 1.0
+ */
 class GradleBuildTokens {
 
     Map getTokens(Profile profile, List<Feature> features) {
@@ -25,9 +29,9 @@ class GradleBuildTokens {
             dep.scope == 'build'
         }
 
-        for(Feature f in features) {
-            dependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope != 'build'}
-            buildDependencies.addAll f.dependencies.findAll(){ Dependency dep -> dep.scope == 'build'}
+        for (Feature f in features) {
+            dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
+            buildDependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope == 'build' }
         }
 
         dependencies = dependencies.unique()
@@ -48,7 +52,7 @@ class GradleBuildTokens {
             "apply plugin:\"$name\""
         }
 
-        for(Feature f in features) {
+        for (Feature f in features) {
             buildPlugins.addAll f.buildPlugins.collect() { String name ->
                 "apply plugin:\"$name\""
             }

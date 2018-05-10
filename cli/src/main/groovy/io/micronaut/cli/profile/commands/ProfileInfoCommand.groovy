@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.config.CodeGenConfig
 import io.micronaut.cli.config.ConfigMap
+import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
@@ -28,12 +29,11 @@ import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.profile.ProjectContext
 
-
 /**
  * A command to find out information about the given profile
  *
  * @author Graeme Rocher
- * @since 3.1
+ * @since 1.0
  */
 @CompileStatic
 class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
@@ -46,7 +46,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
     ProfileRepository profileRepository
 
     ProfileInfoCommand() {
-        description.argument(name:"Profile Name", description: "The name or coordinates of the profile", required:true)
+        description.argument(name: "Profile Name", description: "The name or coordinates of the profile", required: true)
     }
 
     void setProfileRepository(ProfileRepository profileRepository) {
@@ -56,28 +56,26 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
     @Override
     boolean handle(ExecutionContext executionContext) {
         def console = executionContext.console
-        if(profileRepository == null) {
+        if (profileRepository == null) {
             console.error("No profile repository provided")
             return false
-        }
-        else {
+        } else {
 
             def profileName = executionContext.commandLine.remainingArgs[0]
 
             def profile = profileRepository.getProfile(profileName)
-            if(profile == null) {
+            if (profile == null) {
                 console.error("Profile not found for name [$profileName]")
-            }
-            else {
+            } else {
                 console.log("Profile: ${profile.name}")
                 console.log('--------------------')
                 console.log(profile.description)
                 console.log('')
                 console.log('Provided Commands:')
                 console.log('--------------------')
-                Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name}
+                Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name }
 
-                for(cmd in commands) {
+                for (cmd in commands) {
                     def description = cmd.description
                     console.log("* ${description.name} - ${description.description}")
                 }
@@ -86,7 +84,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 console.log('--------------------')
                 def features = profile.features
 
-                for(feature in features) {
+                for (feature in features) {
                     console.log("* ${feature.name} - ${feature.description}")
                 }
             }
@@ -102,7 +100,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
             String name = lastOption.get(0)
             profileNames = profileNames.findAll { String pn ->
                 pn.startsWith(name)
-            }.collect { it.substring(name.size())}
+            }.collect { it.substring(name.size()) }
         }
         candidates.addAll profileNames.join(' ')
         return cursor

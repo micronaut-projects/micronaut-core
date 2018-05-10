@@ -5,6 +5,10 @@ import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
 
+/**
+ * @author James Kleeh
+ * @since 1.0
+ */
 class MavenBuildTokens {
 
     public static Map<String, String> scopeConversions = [:]
@@ -54,11 +58,11 @@ class MavenBuildTokens {
         }
 
         dependencies = dependencies.unique()
-                .findAll { scopeConversions.containsKey(it.scope) }
-                .collect { convertScope(it) }
-                .sort { it.scope }
-                .groupBy { it.artifact }
-                .collect { k, deps -> deps.size() == 1 ? deps.first() : resolveScopeDuplicate(deps) }
+            .findAll { scopeConversions.containsKey(it.scope) }
+            .collect { convertScope(it) }
+            .sort { it.scope }
+            .groupBy { it.artifact }
+            .collect { k, deps -> deps.size() == 1 ? deps.first() : resolveScopeDuplicate(deps) }
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
@@ -92,16 +96,16 @@ class MavenBuildTokens {
 
         ["services": prettyPrint(modulesWriter.toString(), 8)]
     }
-  
+
     Dependency convertScope(Dependency dependency) {
         dependency.setScope(scopeConversions.getOrDefault(dependency.scope, dependency.scope))
     }
 
     Dependency resolveScopeDuplicate(List<Dependency> dependencies) {
         dependencies.find { it.scope == 'compile' } ?:
-                dependencies.find { it.scope == 'provided' } ?:
-                        dependencies.find { it.scope = 'runtime' } ?:
-                                dependencies.find { it.scope = 'test' }
+            dependencies.find { it.scope == 'provided' } ?:
+                dependencies.find { it.scope = 'runtime' } ?:
+                    dependencies.find { it.scope = 'test' }
 
     }
 
