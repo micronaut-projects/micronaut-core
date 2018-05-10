@@ -52,7 +52,7 @@ public interface StackTraceFilterer {
     Throwable filter(Throwable source, boolean recursive);
 
     /**
-     * Remove all apparently Grails-internal trace entries from the exception instance. This modifies the original
+     * Remove all apparently Micronaut-internal trace entries from the exception instance. This modifies the original
      * instance and returns it, it does not clone.
      *
      * @param source The source exception

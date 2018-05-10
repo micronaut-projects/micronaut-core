@@ -45,7 +45,7 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
 /**
- * Command for creating Grails applications
+ * Command for creating Micronaut applications
  *
  * @author Graeme Rocher
  * @author Lari Hotari

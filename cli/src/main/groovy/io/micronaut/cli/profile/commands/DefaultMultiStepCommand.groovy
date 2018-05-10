@@ -17,6 +17,7 @@
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.AbstractStep
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.MultiStepCommand
@@ -87,7 +88,7 @@ class DefaultMultiStepCommand extends MultiStepCommand {
                 return true
             }
         } catch (Throwable e) {
-            GrailsConsole.getInstance().error("Invalid $name found in [$profile.name] profile ${map}: ${e.message}", e)
+            MicronautConsole.getInstance().error("Invalid $name found in [$profile.name] profile ${map}: ${e.message}", e)
         }
         return false
     }
