@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers
 
 import groovy.transform.CompileStatic
@@ -22,12 +23,11 @@ import io.micronaut.cli.io.support.Resource
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 
-
 /**
  * A completer that completes class names
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ClassNameCompleter extends StringsCompleter {

@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
 /**
- * Interface containing methods for logging to the Grails console
+ * Interface containing methods for logging to the Micronaut console.
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 public interface ConsoleLogger {
+
     /**
-     * Indicates progress with the default progress indicator
+     * Indicates progress with the default progress indicator.
      */
     void indicateProgress();
 
     /**
-     * Indicate progress for a number and total
+     * Indicate progress for a number and total.
      *
      * @param number The current number
      * @param total  The total number
@@ -36,7 +38,7 @@ public interface ConsoleLogger {
     void indicateProgress(int number, int total);
 
     /**
-     * Indicates progress as a percentage for the given number and total
+     * Indicates progress as a percentage for the given number and total.
      *
      * @param number The number
      * @param total  The total
@@ -44,89 +46,88 @@ public interface ConsoleLogger {
     void indicateProgressPercentage(long number, long total);
 
     /**
-     * Indicates progress by number
+     * Indicates progress by number.
      *
      * @param number The number
      */
     void indicateProgress(int number);
 
     /**
-     * Updates the current state message
+     * Updates the current state message.
      *
      * @param msg The message
      */
     void updateStatus(String msg);
 
     /**
-     * Adds a new message that won't be overwritten by {#updateStatus(String)}
+     * Adds a new message that won't be overwritten by {#updateStatus(String)}.
      *
      * @param msg The message
      */
     void addStatus(String msg);
 
     /**
-     * Prints an error message
+     * Prints an error message.
      *
      * @param msg The error message
      */
     void error(String msg);
 
     /**
-     * Prints a warning message
+     * Prints a warning message.
      *
      * @param msg The warning message
      */
     void warning(String msg);
 
     /**
-     * Prints a warning message
+     * Prints a warning message.
      *
      * @param msg The warning message
      */
     void warn(String msg);
 
     /**
-     * Use to log an error
+     * Use to log an error.
      *
-     * @param msg The message
+     * @param msg   The message
      * @param error The error
      */
     void error(String msg, Throwable error);
 
     /**
-     * Log an error with a specific error label
+     * Log an error with a specific error label.
      *
-     * @param label The label
+     * @param label   The label
      * @param message The message
      */
     void error(String label, String message);
 
     /**
-     * Use to log an error
+     * Use to log an error.
      *
      * @param error The error
      */
     void error(Throwable error);
 
     /**
-     * Logs a message below the current status message
+     * Logs a message below the current status message.
      *
      * @param msg The message to log
      */
     void log(String msg);
 
     /**
-     * Synonym for #log
+     * Synonym for #log.
      *
      * @param msg The message to log
      */
     void info(String msg);
 
     /**
-     * Outputs a verbose message
+     * Outputs a verbose message.
+     *
      * @param msg The message
      */
     void verbose(String msg);
-
-
 }

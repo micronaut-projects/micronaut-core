@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
 import groovy.transform.CompileStatic
@@ -20,19 +21,17 @@ import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileCommand
 
-
-
 /**
  * Uses the service registry pattern to locate commands
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ServiceCommandFactory implements CommandFactory {
     @Override
     Collection<Command> findCommands(Profile profile, boolean inherited) {
-        if(inherited) return Collections.emptyList()
+        if (inherited) return Collections.emptyList()
         ServiceLoader.load(Command).findAll() { Command cmd ->
             cmd instanceof ProfileCommand
         }

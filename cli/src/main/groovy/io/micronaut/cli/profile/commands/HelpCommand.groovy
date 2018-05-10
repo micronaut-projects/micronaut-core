@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
-import jline.console.completer.Completer
 import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.console.parsing.CommandLineParser
 import io.micronaut.cli.profile.Command
@@ -28,12 +28,12 @@ import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.profile.ProjectCommand
 import io.micronaut.cli.profile.ProjectContext
 import io.micronaut.cli.profile.ProjectContextAware
-
+import jline.console.completer.Completer
 
 /**
  * @author Graeme Rocher
  */
-class HelpCommand implements ProfileCommand, Completer, ProjectContextAware, ProfileRepositoryAware{
+class HelpCommand implements ProfileCommand, Completer, ProjectContextAware, ProfileRepositoryAware {
 
     public static final String NAME = "help"
 
@@ -55,32 +55,32 @@ class HelpCommand implements ProfileCommand, Completer, ProjectContextAware, Pro
     boolean handle(ExecutionContext executionContext) {
         def console = executionContext.console
         def commandLine = executionContext.commandLine
-        Collection<CommandDescription> allCommands=findAllCommands()
+        Collection<CommandDescription> allCommands = findAllCommands()
         String remainingArgs = commandLine.getRemainingArgsString()
-        if(remainingArgs?.trim()) {
+        if (remainingArgs?.trim()) {
             CommandLine remainingArgsCommand = cliParser.parseString(remainingArgs)
             String helpCommandName = remainingArgsCommand.getCommandName()
             for (CommandDescription desc : allCommands) {
-                if(desc.name == helpCommandName) {
+                if (desc.name == helpCommandName) {
                     console.addStatus("Command: $desc.name")
                     console.addStatus("Description:")
-                    console.println "${desc.description?:''}"
-                    if(desc.usage) {
+                    console.println "${desc.description ?: ''}"
+                    if (desc.usage) {
                         console.println()
                         console.addStatus("Usage:")
                         console.println "${desc.usage}"
                     }
-                    if(desc.arguments) {
+                    if (desc.arguments) {
                         console.println()
                         console.addStatus("Arguments:")
-                        for(arg in desc.arguments) {
-                            console.println "* ${arg.name} - ${arg.description?:''} (${arg.required ? 'REQUIRED' : 'OPTIONAL'})"
+                        for (arg in desc.arguments) {
+                            console.println "* ${arg.name} - ${arg.description ?: ''} (${arg.required ? 'REQUIRED' : 'OPTIONAL'})"
                         }
                     }
-                    if(desc.flags) {
+                    if (desc.flags) {
                         console.println()
                         console.addStatus("Flags:")
-                        for(arg in desc.flags) {
+                        for (arg in desc.flags) {
                             console.println "* ${arg.name} - ${arg.description ?: ''}"
                         }
                     }
@@ -119,13 +119,12 @@ mn [target] [arguments]*'
     int complete(String buffer, int cursor, List<CharSequence> candidates) {
         def allCommands = findAllCommands().collect() { CommandDescription desc -> desc.name }
 
-        for(cmd in allCommands) {
-            if(buffer) {
-                if(cmd.startsWith(buffer)) {
+        for (cmd in allCommands) {
+            if (buffer) {
+                if (cmd.startsWith(buffer)) {
                     candidates << cmd.substring(buffer.size())
                 }
-            }
-            else {
+            } else {
                 candidates << cmd
             }
         }
@@ -135,18 +134,17 @@ mn [target] [arguments]*'
 
     protected Collection<CommandDescription> findAllCommands() {
         Iterable<Command> commands
-        if(profile) {
+        if (profile) {
             commands = profile.getCommands(projectContext)
-        }
-        else {
+        } else {
             commands = CommandRegistry.findCommands(profileRepository).findAll() { Command cmd ->
                 !(cmd instanceof ProjectCommand)
             }
         }
         return commands
-                    .collect() { Command cmd -> cmd.description }
-                    .unique() { CommandDescription cmd -> cmd.name }
-                    .sort(false) { CommandDescription itDesc ->  itDesc.name }
+            .collect() { Command cmd -> cmd.description }
+            .unique() { CommandDescription cmd -> cmd.name }
+            .sort(false) { CommandDescription itDesc -> itDesc.name }
     }
 
 

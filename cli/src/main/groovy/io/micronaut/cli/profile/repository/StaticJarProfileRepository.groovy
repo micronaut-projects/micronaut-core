@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.repository
+
 import groovy.transform.CompileStatic
-import org.eclipse.aether.artifact.DefaultArtifact
 import io.micronaut.cli.profile.Profile
+import org.eclipse.aether.artifact.DefaultArtifact
 
 /**
  * A JAR file repository that resolves profiles from a static array of JAR file URLs
  *
  * @author Graeme Rocher
- * @since 3.1
+ * @since 1.0
  */
 @CompileStatic
 class StaticJarProfileRepository extends AbstractJarProfileRepository {
@@ -30,16 +32,16 @@ class StaticJarProfileRepository extends AbstractJarProfileRepository {
 
     final URL[] urls
 
-    StaticJarProfileRepository(ClassLoader parent, URL...urls) {
+    StaticJarProfileRepository(ClassLoader parent, URL... urls) {
         this.urls = urls
-        for(url in urls) {
+        for (url in urls) {
             registerProfile(url, parent)
         }
     }
 
     Profile getProfile(String profileName) {
         def profile = super.getProfile(profileName)
-        if(profile == null && profileName.contains(':')) {
+        if (profile == null && profileName.contains(':')) {
             def art = new DefaultArtifact(profileName)
             profile = super.getProfile(art.artifactId)
         }

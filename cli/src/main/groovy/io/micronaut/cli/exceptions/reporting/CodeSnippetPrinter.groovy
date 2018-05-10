@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.exceptions.reporting
 
 /**
  * Interfaces for classes to implement that print code snippets
  *
  * @author Graeme Rocher
- * @since 2.2
+ * @since 1.0
  */
 interface CodeSnippetPrinter {
 

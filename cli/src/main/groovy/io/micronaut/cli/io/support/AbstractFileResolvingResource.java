@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import java.io.File;
@@ -29,52 +30,21 @@ import java.net.URLConnection;
  *
  * <p>Detects the "file" protocol as well as the JBoss "vfs" protocol in URLs,
  * resolving file system references accordingly.
+ * <p>
+ * Based on https://github.com/spring-projects/spring-framework/blob/master/spring-core/src/main/java/org/springframework/core/io/AbstractFileResolvingResource.java
  *
  * @author Juergen Hoeller
- * @since 3.0
+ * @since 1.0
  */
 public abstract class AbstractFileResolvingResource implements Resource {
 
-    /**
-     * This implementation returns a File reference for the underlying class path
-     * resource, provided that it refers to a file in the file system.
-     */
+    @Override
     public File getFile() throws IOException {
         URL url = getURL();
         return ResourceUtils.getFile(url, getDescription());
     }
 
-    /**
-     * This implementation determines the underlying File
-     * (or jar file, in case of a resource in a jar/zip).
-     */
-    protected File getFileForLastModifiedCheck() throws IOException {
-        URL url = getURL();
-        if (ResourceUtils.isJarURL(url)) {
-            URL actualUrl = ResourceUtils.extractJarFileURL(url);
-            return ResourceUtils.getFile(actualUrl, "Jar URL");
-        }
-        return getFile();
-    }
-
-    /**
-     * This implementation returns a File reference for the underlying class path
-     * resource, provided that it refers to a file in the file system.
-     */
-    protected File getFile(URI uri) throws IOException {
-        return ResourceUtils.getFile(uri, getDescription());
-    }
-
-    /**
-     * Set the {@link URLConnection#setUseCaches "useCaches"} flag on the
-     * given connection, preferring <code>false</code> but leaving the
-     * flag at <code>true</code> for JNLP based resources.
-     * @param con the URLConnection to set the flag on
-     */
-    private static void useCachesIfNecessary(URLConnection con) {
-        con.setUseCaches(con.getClass().getName().startsWith("JNLP"));
-    }
-
+    @Override
     public boolean exists() {
         try {
             URL url = getURL();
@@ -87,7 +57,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
             URLConnection con = url.openConnection();
             useCachesIfNecessary(con);
             HttpURLConnection httpCon =
-                    (con instanceof HttpURLConnection ? (HttpURLConnection) con : null);
+                (con instanceof HttpURLConnection ? (HttpURLConnection) con : null);
             if (httpCon != null) {
                 httpCon.setRequestMethod("HEAD");
                 int code = httpCon.getResponseCode();
@@ -111,12 +81,12 @@ public abstract class AbstractFileResolvingResource implements Resource {
             InputStream is = getInputStream();
             is.close();
             return true;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             return false;
         }
     }
 
+    @Override
     public boolean isReadable() {
         try {
             URL url = getURL();
@@ -126,12 +96,12 @@ public abstract class AbstractFileResolvingResource implements Resource {
                 return (file.canRead() && !file.isDirectory());
             }
             return true;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             return false;
         }
     }
 
+    @Override
     public long contentLength() throws IOException {
         URL url = getURL();
         if (ResourceUtils.isFileURL(url)) {
@@ -147,6 +117,7 @@ public abstract class AbstractFileResolvingResource implements Resource {
         return con.getContentLength();
     }
 
+    @Override
     public long lastModified() throws IOException {
         URL url = getURL();
         if (ResourceUtils.isFileURL(url) || ResourceUtils.isJarURL(url)) {
@@ -160,5 +131,44 @@ public abstract class AbstractFileResolvingResource implements Resource {
             ((HttpURLConnection) con).setRequestMethod("HEAD");
         }
         return con.getLastModified();
+    }
+
+
+    /**
+     * This implementation determines the underlying File (or jar file, in case of a resource in a jar/zip).
+     *
+     * @return The file
+     * @throws IOException if there is an error
+     */
+    protected File getFileForLastModifiedCheck() throws IOException {
+        URL url = getURL();
+        if (ResourceUtils.isJarURL(url)) {
+            URL actualUrl = ResourceUtils.extractJarFileURL(url);
+            return ResourceUtils.getFile(actualUrl, "Jar URL");
+        }
+        return getFile();
+    }
+
+    /**
+     * This implementation returns a File reference for the underlying class path
+     * resource, provided that it refers to a file in the file system.
+     *
+     * @param uri The URI
+     * @return The file
+     * @throws IOException if there is an error
+     */
+    protected File getFile(URI uri) throws IOException {
+        return ResourceUtils.getFile(uri, getDescription());
+    }
+
+    /**
+     * Set the {@link URLConnection#setUseCaches "useCaches"} flag on the
+     * given connection, preferring <code>false</code> but leaving the
+     * flag at <code>true</code> for JNLP based resources.
+     *
+     * @param con the URLConnection to set the flag on
+     */
+    private static void useCachesIfNecessary(URLConnection con) {
+        con.setUseCaches(con.getClass().getName().startsWith("JNLP"));
     }
 }

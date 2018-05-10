@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
-
-
 
 /**
  * Represents argument to a command
  *
  * @author Graeme Rocher
- * @since
+ * @since 1.0
  */
 @CompileStatic
 class CommandArgument {
@@ -45,5 +44,4 @@ class CommandArgument {
      * The string argument this argument translates into
      */
     String target
-
 }

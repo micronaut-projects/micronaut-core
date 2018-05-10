@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.parsing;
 
 import java.util.List;
@@ -23,7 +24,7 @@ import java.util.Properties;
  * Represents the parsed command line options.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public interface CommandLine {
 
@@ -38,7 +39,6 @@ public interface CommandLine {
     String NOANSI_ARGUMENT = "plain-output";
     String NON_INTERACTIVE_ARGUMENT = "non-interactive";
 
-
     /**
      * @return The command name specified
      */
@@ -48,7 +48,6 @@ public interface CommandLine {
      * @return The remaining arguments after the command name
      */
     List<String> getRemainingArgs();
-
 
     /**
      * @return The remaining arguments as an array
@@ -67,7 +66,8 @@ public interface CommandLine {
     boolean hasOption(String name);
 
     /**
-     * The value of an option
+     * The value of an option.
+     *
      * @param name The option
      * @return The value
      */
@@ -88,22 +88,31 @@ public interface CommandLine {
      */
     String getRemainingArgsWithOptionsString();
 
-
     /**
      * @return The remaining args separated by the line separator char
      */
     String getRemainingArgsLineSeparated();
 
+    /**
+     * @return The undeclared options
+     */
     Map<String, Object> getUndeclaredOptions();
 
+    /**
+     * @param scriptName The script name
+     */
     void setCommand(String scriptName);
 
     /**
-     * Parses a new {@link CommandLine} instance that combines this instance with the given arguments
+     * Parses a new {@link CommandLine} instance that combines this instance with the given arguments.
+     *
      * @param args The arguments
      * @return A new {@link CommandLine} instance
      */
     CommandLine parseNew(String[] args);
 
+    /**
+     * @return The raw arguments
+     */
     String[] getRawArguments();
 }
