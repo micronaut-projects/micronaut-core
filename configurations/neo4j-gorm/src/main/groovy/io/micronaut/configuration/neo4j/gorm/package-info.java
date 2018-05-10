@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * This configuration contains setup class for GORM for Neo4j
+ * This configuration contains setup class for GORM for Neo4j.
  *
  * @author graemerocher
  * @since 1.0

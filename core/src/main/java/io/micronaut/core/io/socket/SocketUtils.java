@@ -36,6 +36,7 @@ public class SocketUtils {
     // no unsigned short type in Java so use constant
     private static final int MAX_PORT_RANGE = 65535;
 
+    @SuppressWarnings("ConstantName")
     private static final Random random = new Random(System.currentTimeMillis());
 
     /**

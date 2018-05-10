@@ -29,6 +29,7 @@ import java.util.function.Supplier;
 /**
  * Adapts a {@link CompletableFuture} to a {@link org.reactivestreams.Publisher}.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -63,15 +64,24 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
         subscriber.onSubscribe(new CompletableFutureSubscription(subscriber));
     }
 
+    /**
+     * CompletableFuture subscription.
+     */
     class CompletableFutureSubscription implements Subscription {
         private final Subscriber<? super T> subscriber;
         private final AtomicBoolean completed = new AtomicBoolean(false);
         private CompletableFuture<T> future; // to allow cancellation
 
+        /**
+         * @param subscriber The subscriber
+         */
         CompletableFutureSubscription(Subscriber<? super T> subscriber) {
             this.subscriber = subscriber;
         }
 
+        /**
+         * @param n Number of elements to request to the upstream
+         */
         public synchronized void request(long n) {
             if (n != 0 && !completed.get()) {
                 if (n < 0) {
@@ -102,6 +112,9 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
             }
         }
 
+        /**
+         * Request the publisher to stop sending data and clean up resources.
+         */
         public synchronized void cancel() {
             if (completed.compareAndSet(false, true)) {
                 if (future != null) {

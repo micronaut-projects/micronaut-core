@@ -34,8 +34,10 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of META-INF/services classes</p>.
+ * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of
+ * META-INF/services classes.</p>
  *
+ * @param <S> The service type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -127,6 +129,9 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
         return Optional.empty();
     }
 
+    /**
+     * @return The iterator
+     */
     @Override
     public Iterator<ServiceDefinition<S>> iterator() {
         return new Iterator<ServiceDefinition<S>>() {
@@ -161,6 +166,19 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
         };
     }
 
+    /**
+     * @param name        The name
+     * @param loadedClass The loaded class
+     * @return The service definition
+     */
+    @SuppressWarnings("unchecked")
+    protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
+        return new DefaultServiceDefinition(name, loadedClass);
+    }
+
+    /**
+     * A service loader iterator implementation.
+     */
     private final class ServiceLoaderIterator implements Iterator<ServiceDefinition<S>> {
         private Enumeration<URL> serviceConfigs = null;
         private Iterator<String> unprocessed = null;
@@ -214,10 +232,5 @@ public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
             Optional<Class> loadedClass = ClassUtils.forName(nextName, classLoader);
             return newService(nextName, loadedClass);
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
-        return new DefaultServiceDefinition(name, loadedClass);
     }
 }

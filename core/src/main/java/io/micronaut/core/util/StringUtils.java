@@ -17,7 +17,15 @@
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 
 /**
@@ -205,16 +213,16 @@ public class StringUtils {
      * transform to uppercase based on given flag.
      *
      * @param dottedProperty The property with dots, example - a.b.c
-     * @param uppercase To transform to uppercase string
+     * @param uppercase      To transform to uppercase string
      * @return The converted value
      */
     public static String convertDotToUnderscore(String dottedProperty, boolean uppercase) {
         if (dottedProperty == null) {
-            return  dottedProperty;
+            return dottedProperty;
         }
         Optional<String> converted = Optional.of(dottedProperty)
-                .map(value -> value.replace('.','_'))
-                .map(value -> uppercase ? value.toUpperCase() : value);
+            .map(value -> value.replace('.', '_'))
+            .map(value -> uppercase ? value.toUpperCase() : value);
         return converted.get();
     }
 }

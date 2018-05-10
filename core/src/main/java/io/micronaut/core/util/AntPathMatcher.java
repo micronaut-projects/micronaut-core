@@ -69,11 +69,17 @@ public class AntPathMatcher implements PathMatcher {
     /**
      * Set the path separator to use for pattern parsing.
      * Default is "/", as in Ant.
+     *
+     * @param pathSeparator The path separator for the pattern parsing
      */
     public void setPathSeparator(String pathSeparator) {
         this.pathSeparator = (pathSeparator != null ? pathSeparator : DEFAULT_PATH_SEPARATOR);
     }
 
+    /**
+     * @param path The path
+     * @return Whether is pattern
+     */
     public boolean isPattern(String path) {
         return (path.indexOf('*') != -1 || path.indexOf('?') != -1);
     }
@@ -230,6 +236,7 @@ public class AntPathMatcher implements PathMatcher {
      * @return <code>true</code> if the string matches against the
      * pattern, or <code>false</code> otherwise.
      */
+    @SuppressWarnings("InnerAssignment")
     private boolean matchStrings(String pattern, String str) {
         char[] patArr = pattern.toCharArray();
         char[] strArr = str.toCharArray();
@@ -256,7 +263,8 @@ public class AntPathMatcher implements PathMatcher {
                 ch = patArr[i];
                 if (ch != '?') {
                     if (ch != strArr[i]) {
-                        return false;// Character mismatch
+                        // Character mismatch
+                        return false;
                     }
                 }
             }
@@ -272,7 +280,8 @@ public class AntPathMatcher implements PathMatcher {
         while ((ch = patArr[patIdxStart]) != '*' && strIdxStart <= strIdxEnd) {
             if (ch != '?') {
                 if (ch != strArr[strIdxStart]) {
-                    return false;// Character mismatch
+                    // Character mismatch
+                    return false;
                 }
             }
             patIdxStart++;
@@ -293,7 +302,8 @@ public class AntPathMatcher implements PathMatcher {
         while ((ch = patArr[patIdxEnd]) != '*' && strIdxStart <= strIdxEnd) {
             if (ch != '?') {
                 if (ch != strArr[strIdxEnd]) {
-                    return false;// Character mismatch
+                    // Character mismatch
+                    return false;
                 }
             }
             patIdxEnd--;
@@ -379,6 +389,10 @@ public class AntPathMatcher implements PathMatcher {
      * </ul>
      * <p>Assumes that {@link #matches(String, String)} returns <code>true</code> for '<code>pattern</code>'
      * and '<code>path</code>', but does <strong>not</strong> enforce this.
+     *
+     * @param pattern The pattern
+     * @param path    The path
+     * @return The pattern-mapped part
      */
     public String extractPathWithinPattern(String pattern, String path) {
         String[] patternParts = StringUtils.tokenizeToStringArray(pattern, this.pathSeparator);

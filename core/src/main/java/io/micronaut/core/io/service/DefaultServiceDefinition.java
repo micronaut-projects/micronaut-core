@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 /**
  * Default implementation of {@link ServiceDefinition}.
  *
+ * @param <S> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -32,6 +33,10 @@ class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
     private final String name;
     private final Optional<Class<S>> loadedClass;
 
+    /**
+     * @param name        The name
+     * @param loadedClass The loaded class
+     */
     DefaultServiceDefinition(String name, Optional<Class<S>> loadedClass) {
         this.name = name;
         this.loadedClass = loadedClass;

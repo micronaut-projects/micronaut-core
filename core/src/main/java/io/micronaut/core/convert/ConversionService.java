@@ -24,6 +24,7 @@ import java.util.function.Function;
 /**
  * A service for allowing conversion from one type to another.
  *
+ * @param <Impl> The type
  * @author Graeme Rocher
  * @since 1.0
  */
