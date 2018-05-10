@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.io.support.Resource
+
 /**
  * A profile that operates against abstract {@link Resource} references
  *
  *
- * @since 3.0
+ * @since 1.0
  * @author Lari Hotari
  * @author Graeme Rocher
  */
 @CompileStatic
 class ResourceProfile extends AbstractProfile implements Profile {
-
 
     ResourceProfile(ProfileRepository repository, String name, Resource profileDir) {
         super(profileDir)
@@ -46,14 +47,19 @@ class ResourceProfile extends AbstractProfile implements Profile {
         return profile
     }
 
-
     boolean equals(o) {
-        if (this.is(o)) return true
-        if (getClass() != o.class) return false
+        if (this.is(o)) {
+            return true
+        }
+        if (getClass() != o.class) {
+            return false
+        }
 
         ResourceProfile that = (ResourceProfile) o
 
-        if (name != that.name) return false
+        if (name != that.name) {
+            return false
+        }
 
         return true
     }

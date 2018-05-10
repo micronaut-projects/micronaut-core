@@ -22,7 +22,7 @@ import java.io.PrintStream;
  * Used to replace default System.out with one that routes calls through GrailsConsole.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class ConsolePrintStream extends PrintStream {
 

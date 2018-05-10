@@ -13,42 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.MicronautCli
+import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.io.IOUtils
+import io.micronaut.cli.io.support.FileSystemResource
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
+import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.io.support.XmlMerger
-import io.micronaut.cli.util.NameUtils
-import org.eclipse.aether.graph.Dependency
-import io.micronaut.cli.console.logging.ConsoleAntBuilder
-import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
-import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.Resource
+import io.micronaut.cli.util.NameUtils
+
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.Paths
 
 /**
  * Command for creating Grails applications
  *
  * @author Graeme Rocher
  * @author Lari Hotari
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
@@ -80,7 +81,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             description.flag(name: INPLACE_FLAG, description: "Used to create a service using the current directory")
         }
         if (flags.contains(BUILD_FLAG)) {
-            description.flag(name: BUILD_FLAG, description: "Which build tool to configure. Possible values: ${BUILD_OPTIONS.collect({"\"${it}\""}).join(', ')}.", required: false)
+            description.flag(name: BUILD_FLAG, description: "Which build tool to configure. Possible values: ${BUILD_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
         if (flags.contains(PROFILE_FLAG)) {
             description.flag(name: PROFILE_FLAG, description: "The profile to use", required: false)
@@ -106,16 +107,15 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     @Override
     protected int complete(CommandLine commandLine, CommandDescription desc, List<CharSequence> candidates, int cursor) {
         def lastOption = commandLine.lastOption()
-        if(lastOption != null) {
+        if (lastOption != null) {
             def profileNames = profileRepository.allProfiles.collect() { Profile p -> p.name }
-            if(lastOption.key == PROFILE_FLAG) {
+            if (lastOption.key == PROFILE_FLAG) {
                 def val = lastOption.value
                 // if value == true it means no profile is specified and only the flag is present
-                if( val == true) {
+                if (val == true) {
                     candidates.addAll(profileNames)
                     return cursor
-                }
-                else if(!profileNames.contains(val)) {
+                } else if (!profileNames.contains(val)) {
                     def valStr = val.toString()
 
                     def candidateProfiles = profileNames.findAll { String pn ->
@@ -126,18 +126,16 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     candidates.addAll candidateProfiles
                     return cursor
                 }
-            }
-            else if(lastOption.key == FEATURES_FLAG) {
+            } else if (lastOption.key == FEATURES_FLAG) {
                 def val = lastOption.value
                 def profile = profileRepository.getProfile(commandLine.hasOption(PROFILE_FLAG) ? commandLine.optionValue(PROFILE_FLAG).toString() : getDefaultProfile())
                 def featureNames = profile.features.collect() { Feature f -> f.name }
-                if( val == true) {
+                if (val == true) {
                     candidates.addAll(featureNames)
                     return cursor
-                }
-                else if(!profileNames.contains(val)) {
+                } else if (!profileNames.contains(val)) {
                     def valStr = val.toString()
-                    if(valStr.endsWith(',')) {
+                    if (valStr.endsWith(',')) {
                         def specified = valStr.split(',')
                         candidates.addAll(featureNames.findAll { String f ->
                             !specified.contains(f)
@@ -153,14 +151,13 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                     candidates.addAll candidatesFeatures
                     return cursor
                 }
-            }
-            else if (lastOption.key == BUILD_FLAG) {
+            } else if (lastOption.key == BUILD_FLAG) {
                 def val = lastOption.value
                 if (val == true) {
-                    candidates.addAll(BUILD_OPTIONS.collect {"$it "})
+                    candidates.addAll(BUILD_OPTIONS.collect { "$it " })
                 } else if (!BUILD_OPTIONS.contains(val)) {
                     def valStr = val.toString()
-                    candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect {"$it "})
+                    candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
                 }
                 return cursor
             }
@@ -176,7 +173,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             destDir = targetDirectory
         } else {
             int index = srcDir.absolutePath.lastIndexOf(searchDir) + searchDir.size() + 1
-            String relativePath = (srcDir.absolutePath - srcDir.absolutePath.substring(0,index))
+            String relativePath = (srcDir.absolutePath - srcDir.absolutePath.substring(0, index))
             if (relativePath.startsWith("gradle-build")) {
                 relativePath = relativePath.substring("gradle-build".size())
             }
@@ -220,13 +217,13 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 File destDir = getDestinationDirectory(srcFile)
                 File destFile = new File(destDir, BUILD_GRADLE)
 
-                ant.copy(file:"${srcDir}/.gitignore", todir: destDir, failonerror:false)
+                ant.copy(file: "${srcDir}/.gitignore", todir: destDir, failonerror: false)
 
                 if (!destFile.exists()) {
-                    ant.copy file:srcFile, tofile:destFile
+                    ant.copy file: srcFile, tofile: destFile
                 } else if (allowMerge) {
                     def concatFile = "${destDir}/concat.gradle"
-                    ant.move(file:destFile, tofile: concatFile)
+                    ant.move(file: destFile, tofile: concatFile)
                     ant.concat([destfile: destFile, fixlastline: true], {
                         path {
                             pathelement location: concatFile
@@ -245,10 +242,10 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 File destDir = getDestinationDirectory(srcFile)
                 File destFile = new File(destDir, POM_XML)
 
-                ant.copy(file:"${srcDir}/.gitignore", todir: destDir, failonerror:false)
+                ant.copy(file: "${srcDir}/.gitignore", todir: destDir, failonerror: false)
 
                 if (!destFile.exists()) {
-                    ant.copy file:srcFile, tofile:destFile
+                    ant.copy file: srcFile, tofile: destFile
                 } else if (allowMerge) {
                     ant.echo(file: destFile, message: new XmlMerger().merge(srcFile, destFile))
                 }
@@ -272,12 +269,12 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
 
     Set<File> findAllFilesByName(File projectDir, String fileName) {
-        Set<File> files = (Set)[]
+        Set<File> files = (Set) []
         if (projectDir.exists()) {
             Files.walkFileTree(projectDir.absoluteFile.toPath(), new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes mainAtts)
-                        throws IOException {
+                    throws IOException {
                     if (path.fileName.toString() == fileName) {
                         files.add(path.toFile())
                     }
@@ -320,7 +317,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             Map<Profile, File> targetDirs = [:]
             buildTargetFolders(profileInstance, targetDirs, projectTargetDirectory)
 
-            for(Profile p : profiles) {
+            for (Profile p : profiles) {
                 Set<File> ymlFiles = findAllFilesByName(projectTargetDirectory, APPLICATION_YML)
                 Map<File, String> ymlCache = [:]
 
@@ -336,21 +333,20 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 copySkeleton(profileInstance, p, cmd)
 
                 ymlCache.each { File applicationYmlFile, String previousApplicationYml ->
-                    if(applicationYmlFile.exists()) {
+                    if (applicationYmlFile.exists()) {
                         appendToYmlSubDocument(applicationYmlFile, previousApplicationYml)
                     }
                 }
             }
             def ant = new ConsoleAntBuilder()
 
-            for(Feature f in features) {
+            for (Feature f in features) {
                 def location = f.location
 
                 File skeletonDir
-                if(location instanceof FileSystemResource) {
+                if (location instanceof FileSystemResource) {
                     skeletonDir = location.createRelative("skeleton").file
-                }
-                else {
+                } else {
                     File tmpDir = unzipProfile(ant, location)
                     skeletonDir = new File(tmpDir, "META-INF/profile/features/$f.name/skeleton")
                 }
@@ -359,7 +355,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
                 appendFeatureFiles(skeletonDir, cmd.build)
 
-                if(skeletonDir.exists()) {
+                if (skeletonDir.exists()) {
                     copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                     copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                 }
@@ -375,8 +371,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             }
             MicronautCli.tiggerAppLoad()
             return true
-        }
-        else {
+        } else {
             System.err.println "Cannot find profile $profileName"
             return false
         }
@@ -435,7 +430,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
     protected boolean validateBuild(String buildName) {
         if (!BUILD_OPTIONS.contains(buildName)) {
-            MicronautConsole.instance.error("Build not one of the supported types [$buildName]. Supported types are ${BUILD_OPTIONS.collect({"\"${it}\""}).join(', ')}.")
+            MicronautConsole.instance.error("Build not one of the supported types [$buildName]. Supported types are ${BUILD_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.")
             return false
         }
         return true
@@ -449,7 +444,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         def url = location.URL
         def tmpDir = unzippedDirectories.get(url)
 
-        if(tmpDir == null) {
+        if (tmpDir == null) {
             def jarFile = IOUtils.findJarFile(url)
             tmpDir = File.createTempDir()
             tmpDir.deleteOnExit()
@@ -509,7 +504,8 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 MicronautConsole.getInstance().warn(warning.toString())
             }
 
-            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }// as List<Feature>
+            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }
+// as List<Feature>
             features.addAll(validFeatures)
         } else {
             features.addAll(profile.defaultFeatures)
@@ -525,7 +521,6 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
 
-
     protected String getDefaultProfile() {
         ProfileRepository.DEFAULT_PROFILE_NAME
     }
@@ -534,7 +529,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         def ln = System.getProperty("line.separator")
         if (newYml != previousYml) {
             StringBuilder appended = new StringBuilder(previousYml.length() + newYml.length() + 30)
-            if(!previousYml.startsWith("---")) {
+            if (!previousYml.startsWith("---")) {
                 appended.append('---' + ln)
             }
             appended.append(previousYml).append(ln + "---" + ln)
@@ -551,7 +546,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
     private void appendToYmlSubDocument(File applicationYmlFile, String previousApplicationYml, File setTo) {
         String newApplicationYml = applicationYmlFile.text
-        if(previousApplicationYml && newApplicationYml != previousApplicationYml) {
+        if (previousApplicationYml && newApplicationYml != previousApplicationYml) {
             setTo.text = createNewApplicationYml(previousApplicationYml, newApplicationYml)
         }
     }
@@ -562,21 +557,21 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             return false
         }
         String groupAndAppName = appName
-        if(inplace) {
+        if (inplace) {
             appname = new File(".").canonicalFile.name
-            if(!groupAndAppName) {
+            if (!groupAndAppName) {
                 groupAndAppName = appname
             }
         }
 
-        if(!groupAndAppName) {
+        if (!groupAndAppName) {
             MicronautConsole.getInstance().error("Specify an application name or use --inplace to create an application in the current directory")
             return false
         }
 
         try {
             defaultpackagename = establishGroupAndAppName(groupAndAppName)
-        } catch (IllegalArgumentException e ) {
+        } catch (IllegalArgumentException e) {
             MicronautConsole.instance.error(e.message)
             return false
         }
@@ -616,7 +611,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
     private String createValidPackageName() {
         String defaultPackage = appname.split(/[-]+/).collect { String token -> (token.toLowerCase().toCharArray().findAll { char ch -> Character.isJavaIdentifierPart(ch) } as char[]) as String }.join('.')
-        if(!NameUtils.isValidJavaPackage(defaultPackage)) {
+        if (!NameUtils.isValidJavaPackage(defaultPackage)) {
             throw new IllegalArgumentException("Cannot create a valid package name for [$appname]. Please specify a name that is also a valid Java package.")
         }
         return defaultPackage
@@ -636,10 +631,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
         def skeletonResource = participatingProfile.profileDir.createRelative("skeleton")
         File skeletonDir
-        if(skeletonResource instanceof FileSystemResource) {
+        if (skeletonResource instanceof FileSystemResource) {
             skeletonDir = skeletonResource.file
-        }
-        else {
+        } else {
             // establish the JAR file name and extract
             def tmpDir = unzipProfile(ant, skeletonResource)
             skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
@@ -664,8 +658,8 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 for (exc in excludes) {
                     exclude name: exc
                 }
-                exclude name: "**/"+BUILD_GRADLE
-                exclude name: "**/"+POM_XML
+                exclude name: "**/" + BUILD_GRADLE
+                exclude name: "**/" + POM_XML
                 exclude name: "maven-build/"
                 exclude name: "gradle-build/"
                 binaryFileExtensions.each { ext ->
@@ -693,8 +687,8 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 for (exc in excludes) {
                     exclude name: exc
                 }
-                exclude name: "**/"+BUILD_GRADLE
-                exclude name: "**/"+POM_XML
+                exclude name: "**/" + BUILD_GRADLE
+                exclude name: "**/" + POM_XML
                 exclude name: "maven-build/"
                 exclude name: "gradle-build/"
             }

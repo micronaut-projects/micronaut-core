@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.util
 
 import groovy.transform.CompileStatic
-
 
 /**
  * CLI settings and configuration
@@ -56,12 +56,10 @@ class CliSettings {
      */
     public static final String PROFILE_REPOSITORIES = "micronaut.profiles.repositories"
 
-
     /**
      * The base directory of the application
      */
     public static final String APP_BASE_DIR = "base.dir"
-
 
     /**
      * The name of the system property for the project classes directory. Must be set if changed from build/main/classes.

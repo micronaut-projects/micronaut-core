@@ -29,7 +29,7 @@ import org.apache.tools.ant.util.StringUtils;
  * Silences ant builder output.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class ConsoleAntBuilder extends AntBuilder {
 

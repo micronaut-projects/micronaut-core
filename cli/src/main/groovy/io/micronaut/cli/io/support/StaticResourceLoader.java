@@ -20,7 +20,7 @@ package io.micronaut.cli.io.support;
  * Loads relative to a static base resource.
  *
  * @author Graeme Rocher
- * @since 3.1
+ * @since 1.0
  */
 public class StaticResourceLoader implements ResourceLoader {
 

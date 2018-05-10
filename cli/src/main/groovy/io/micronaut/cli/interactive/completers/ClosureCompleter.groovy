@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers
 
 import groovy.transform.CompileStatic
 import jline.console.completer.Completer
 
-
-
 /**
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ClosureCompleter implements Completer {
@@ -34,7 +33,7 @@ class ClosureCompleter implements Completer {
     }
 
     Completer getCompleter() {
-        if(completer == null) {
+        if (completer == null) {
             completer = new jline.console.completer.StringsCompleter(closure.call())
         }
         completer

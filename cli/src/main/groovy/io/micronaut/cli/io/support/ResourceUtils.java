@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  *
  * @author Graeme Rocher
  * @author Juergen Hoeller
- * @since 2.0
+ * @since 1.0
  */
 @SuppressWarnings("MagicNumber")
 public class ResourceUtils {

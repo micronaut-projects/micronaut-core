@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers
 
 import jline.console.completer.Completer
 import jline.console.completer.StringsCompleter
-
 
 /**
  * JLine Completor that mixes a fixed set of options with file path matches.
  * Fixed options that match will appear first, followed by file path matches.
  *
  * @author Peter Ledbrook
- * @since 2.0
+ * @since 1.0
  */
 class SimpleOrFileNameCompletor implements Completer {
     private simpleCompletor
@@ -52,7 +52,9 @@ class SimpleOrFileNameCompletor implements Completer {
         // both simple completor and file path completor candidates appear
         // correctly in the command prompt. If neither competors have matches,
         // we of course return -1.
-        if (retval == -1) retval = fileRetval
+        if (retval == -1) {
+            retval = fileRetval
+        }
         return candidates ? retval : -1
     }
 }

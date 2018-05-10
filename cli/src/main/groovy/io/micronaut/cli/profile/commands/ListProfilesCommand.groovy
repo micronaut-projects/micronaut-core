@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
@@ -27,7 +28,7 @@ import io.micronaut.cli.profile.ProfileRepositoryAware
  * Lists the available {@link io.micronaut.cli.profile.Profile} instances 
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ListProfilesCommand implements Command, ProfileRepositoryAware {
@@ -43,7 +44,7 @@ class ListProfilesCommand implements Command, ProfileRepositoryAware {
         def console = executionContext.console
         console.addStatus("Available Profiles")
         console.log('--------------------')
-        for(Profile p in allProfiles) {
+        for (Profile p in allProfiles) {
             console.log("* $p.name - ${p.description}")
         }
 

@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.io.support.PathMatchingResourcePatternResolver
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.io.support.StaticResourceLoader
-
+import io.micronaut.cli.profile.Profile
 
 /**
  * A {@link CommandResourceResolver} that resolves from the file system
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class FileSystemCommandResourceResolver implements CommandResourceResolver {
@@ -40,10 +40,10 @@ class FileSystemCommandResourceResolver implements CommandResourceResolver {
     @Override
     Collection<Resource> findCommandResources(Profile profile) {
         Resource commandsDir = getCommandsDirectory(profile)
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(new StaticResourceLoader(commandsDir))
-        if(commandsDir.exists()) {
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(new StaticResourceLoader(commandsDir))
+        if (commandsDir.exists()) {
             Collection<Resource> commandFiles = []
-            for(ext in matchingFileExtensions) {
+            for (ext in matchingFileExtensions) {
                 commandFiles.addAll resolver.getResources("*.$ext")
             }
             commandFiles = commandFiles.sort(false) { Resource file -> file.filename }

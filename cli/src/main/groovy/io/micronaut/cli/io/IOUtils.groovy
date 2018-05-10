@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io
 
 import groovy.transform.CompileStatic
@@ -24,7 +25,7 @@ import java.nio.file.Paths
  * Utility methods for performing I/O operations.
  *
  * @author Graeme Rocher
- * @since 2.4
+ * @since 1.0
  */
 @CompileStatic
 class IOUtils extends SpringIOUtils {
@@ -36,7 +37,7 @@ class IOUtils extends SpringIOUtils {
      * @return The JAR file or null if it can't be found
      */
     static File findJarFile(URL resource) {
-        if(resource?.protocol == 'jar') {
+        if (resource?.protocol == 'jar') {
             def absolutePath = resource?.path
             if (absolutePath) {
                 try {

@@ -20,7 +20,7 @@ package io.micronaut.cli.console.logging;
  * Interface containing methods for logging to the Grails console.
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 public interface ConsoleLogger {
 

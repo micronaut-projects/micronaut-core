@@ -32,7 +32,6 @@ import java.net.URL;
  * @author Graeme Rocher
  * @see java.io.File
  * @since 28.12.2003
- * @since 1.0
  */
 public class FileSystemResource implements Resource {
 

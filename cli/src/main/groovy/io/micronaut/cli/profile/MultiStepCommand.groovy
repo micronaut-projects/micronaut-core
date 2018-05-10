@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import io.micronaut.cli.profile.commands.events.CommandEvents
@@ -21,7 +22,7 @@ import io.micronaut.cli.profile.commands.events.CommandEvents
  * A command that executes multiple steps
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 abstract class MultiStepCommand implements ProfileCommand, CommandEvents {
 
@@ -40,14 +41,14 @@ abstract class MultiStepCommand implements ProfileCommand, CommandEvents {
 
     @Override
     boolean handle(io.micronaut.cli.profile.ExecutionContext context) {
-        if(minArguments > 0 && (!context.commandLine.getRemainingArgs() || context.commandLine.getRemainingArgs().size() < minArguments)) {
+        if (minArguments > 0 && (!context.commandLine.getRemainingArgs() || context.commandLine.getRemainingArgs().size() < minArguments)) {
             context.console.error("Expecting ${minArguments ? 'an argument' : minArguments + ' arguments'} to $name.")
             context.console.info("${description.usage}")
             return true
         }
         notify("${name}Start", context)
-        for(AbstractStep step : getSteps()) {
-            if(!step.handle(context)) {
+        for (AbstractStep step : getSteps()) {
+            if (!step.handle(context)) {
                 break
             }
         }

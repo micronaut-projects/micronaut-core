@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
-import org.eclipse.aether.graph.Dependency
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.io.support.Resource
-
+import org.eclipse.aether.graph.Dependency
 
 /**
  * An interface that describes a feature of a profile. Different profiles may share many common features even if the profile itself is different.
  *
  * @author Graeme Rocher
- * @since 3.1
+ * @since 1.0
  */
 interface Feature {
 

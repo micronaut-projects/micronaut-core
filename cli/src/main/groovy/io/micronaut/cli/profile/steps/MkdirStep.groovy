@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.steps
 
 import groovy.transform.CompileStatic
@@ -26,7 +27,7 @@ import io.micronaut.cli.profile.support.ArtefactVariableResolver
  * A step that makes a directory
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class MkdirStep extends AbstractStep {
@@ -38,7 +39,7 @@ class MkdirStep extends AbstractStep {
     MkdirStep(ProfileCommand command, Map<String, Object> parameters) {
         super(command, parameters)
         location = parameters.location
-        if(!location) {
+        if (!location) {
             throw new CommandException("Location not specified for mkdir step")
         }
     }
@@ -49,13 +50,12 @@ class MkdirStep extends AbstractStep {
     @Override
     boolean handle(ExecutionContext context) {
         def args = context.commandLine.remainingArgs
-        if(args) {
+        if (args) {
             def name = args[0]
             def variableResolver = new ArtefactVariableResolver(name)
             File destination = variableResolver.resolveFile(location, context)
             return destination.mkdirs()
-        }
-        else {
+        } else {
             return new File(context.baseDir, location).mkdirs()
         }
     }

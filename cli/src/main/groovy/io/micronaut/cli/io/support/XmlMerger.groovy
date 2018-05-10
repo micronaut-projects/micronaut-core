@@ -4,6 +4,10 @@ import groovy.util.slurpersupport.GPathResult
 import groovy.util.slurpersupport.NodeChildren
 import groovy.xml.XmlUtil
 
+/**
+ * @author James Kleeh
+ * @since 1.0
+ */
 class XmlMerger {
 
     List<String> appendNodes = ['dependencies', 'plugins', 'pluginRepositories', 'repositories']

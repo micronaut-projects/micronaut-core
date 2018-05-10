@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.codegen.model
 
 /**
  * The model of the naming conventions of a class used for Codegen
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface Model {
 
@@ -55,7 +56,6 @@ interface Model {
      */
     String getPropertyName()
 
-
     /**
      * A property name version of the class name. For example 'FooBar' becomes 'fooBar'
      *
@@ -85,7 +85,6 @@ interface Model {
      * @return The given name without the convention
      */
     String trimConvention(String name, String conventionName)
-
 
     /**
      * @return The model as a map

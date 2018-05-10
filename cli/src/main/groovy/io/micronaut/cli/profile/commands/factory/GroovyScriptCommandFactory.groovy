@@ -13,42 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.util.NameUtils
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
-import org.codehaus.groovy.control.customizers.ImportCustomizer
+import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommandTransform
-import io.micronaut.cli.io.support.Resource
-
-/*
- * Copyright 2014 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+import io.micronaut.cli.util.NameUtils
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
+import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 /**
  * A {@link CommandFactory} that creates {@link Command} instances from Groovy scripts
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class GroovyScriptCommandFactory extends ResourceResolvingCommandFactory<GroovyScriptCommand> {
@@ -74,7 +59,8 @@ class GroovyScriptCommandFactory extends ResourceResolvingCommandFactory<GroovyS
         return createClassLoaderForBaseClass(configuration, baseClassName)
     }
 
-    private static GroovyClassLoader createClassLoaderForBaseClass(CompilerConfiguration configuration, String baseClassName) {
+    private
+    static GroovyClassLoader createClassLoaderForBaseClass(CompilerConfiguration configuration, String baseClassName) {
         configuration.setScriptBaseClass(baseClassName)
 
 
@@ -82,7 +68,7 @@ class GroovyScriptCommandFactory extends ResourceResolvingCommandFactory<GroovyS
         importCustomizer.addStarImports("io.micronaut.cli.interactive.completers")
         importCustomizer.addStarImports("io.micronaut.cli.util")
         importCustomizer.addStarImports("io.micronaut.cli.codegen.model")
-        configuration.addCompilationCustomizers(importCustomizer,new ASTTransformationCustomizer(new GroovyScriptCommandTransform()))
+        configuration.addCompilationCustomizers(importCustomizer, new ASTTransformationCustomizer(new GroovyScriptCommandTransform()))
         def classLoader = new GroovyClassLoader(Thread.currentThread().contextClassLoader, configuration)
         return classLoader
     }
