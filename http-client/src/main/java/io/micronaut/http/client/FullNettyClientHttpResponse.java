@@ -85,24 +85,21 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
-            if(HttpResponse.class.isAssignableFrom(bodyType.getType())) {
+            if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
-                if(responseBodyType.isPresent()) {
+                if (responseBodyType.isPresent()) {
                     Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
                     this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
-                }
-                else {
+                } else {
                     this.body = null;
                 }
-            }
-            else {
+            } else {
                 this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
             }
         } else {
             this.body = null;
         }
     }
-
 
     @Override
     public String reason() {

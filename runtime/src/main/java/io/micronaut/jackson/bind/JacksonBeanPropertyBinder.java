@@ -54,7 +54,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     private final int arraySizeThreshhold;
 
     /**
-     * @param objectMapper To read/write JSON
+     * @param objectMapper  To read/write JSON
      * @param configuration The configuration for Jackson JSON parser
      */
     public JacksonBeanPropertyBinder(ObjectMapper objectMapper, JacksonConfiguration configuration) {
@@ -111,7 +111,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
      * @return The new conversion error
      */
     protected ConversionErrorException newConversionError(Object object, Exception e) {
-        if(e instanceof InvalidFormatException) {
+        if (e instanceof InvalidFormatException) {
             InvalidFormatException ife = (InvalidFormatException) e;
             Object originalValue = ife.getValue();
             ConversionError conversionError = new ConversionError() {
@@ -128,15 +128,13 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
             Class type = object != null ? object.getClass() : Object.class;
             List<JsonMappingException.Reference> path = ife.getPath();
             String name;
-            if(!path.isEmpty()) {
-                name = path.get(path.size()-1).getFieldName();
-            }
-            else {
+            if (!path.isEmpty()) {
+                name = path.get(path.size() - 1).getFieldName();
+            } else {
                 name = NameUtils.decapitalize(type.getSimpleName());
             }
             return new ConversionErrorException(Argument.of(ife.getTargetType(), name), conversionError);
-        }
-        else {
+        } else {
 
             ConversionError conversionError = new ConversionError() {
                 @Override

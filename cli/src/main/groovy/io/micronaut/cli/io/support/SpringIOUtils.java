@@ -425,7 +425,7 @@ public class SpringIOUtils {
     /**
      * @return A new {@link SAXParser}
      * @throws ParserConfigurationException If there is a parser error
-     *                                      * @throws SAXException If there is an error with SAXO
+     * @throws SAXException                 If there is an error with SAXO
      */
     public static SAXParser newSAXParser() throws ParserConfigurationException, SAXException {
         SAXParserFactory factory = createParserFactory();
