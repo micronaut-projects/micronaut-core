@@ -1,1 +1,3 @@
-See: https://github.com/micronaut-projects/micronaut-core/issues/95
+https://github.com/Netflix/eureka[Netflix Eureka] is a popular discovery server deployed at scale at organizations like Netflix.
+
+Micronaut features a native

@@ -95,8 +95,9 @@ httpClient:
   clientFilter: HTTP Client Filters
 cloud:
   title: Cloud Native Features
-  distributedConfiguration:
-    title: Distributed Configuration
+  cloudConfiguration:
+    title: Cloud Configuration
+    distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
 #    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:

@@ -1,0 +1,52 @@
+Applications that are built for the Cloud often need adapt to running in a Cloud environment, read and share configuration in a distributed manner and externalize configuration to the environment where necessary.
+
+Micronaut's <<environments, Environment>> concept is by default Cloud platform aware and will make a best effort to detect the underlying active environment.
+
+You can then use the api:context.annotation.Requires[] annotation to <<conditionalBeans,conditionally load bean definitions>>.
+
+The following table summarizes the constants provided by the api:context.env.Environment[] interface and provides an example:
+
+.Micronaut Environment Detection
+|===
+|Constant|Description |Requires Example
+
+|api:context.env.Environment#ANDROID[]
+|The application is running as an Android application
+|`@Requires(env = Environment.ANDROID)`
+
+|api:context.env.Environment#TEST[]
+|The application is running within a JUnit or Spock test
+|`@Requires(env = Environment.TEST)`
+
+|api:context.env.Environment#CLOUD[]
+|The application is running in a Cloud environment (present for all other cloud platform types)
+|`@Requires(env = Environment.CLOUD)`
+
+|api:context.env.Environment#AMAZON_EC2[]
+|Running on https://aws.amazon.com/ec2[Amazon EC2]
+|`@Requires(env = Environment.AMAZON_EC2)`
+
+|api:context.env.Environment#GOOGLE_COMPUTE[]
+|Running on https://cloud.google.com/compute/[Google Compute]
+|`@Requires(env = Environment.GOOGLE_COMPUTE)`
+
+|api:context.env.Environment#KUBERNETES[]
+|Running on https://www.kubernetes.io[Kubernetes]
+|`@Requires(env = Environment.KUBERNETES)`
+
+|api:context.env.Environment#HEROKU[]
+|Running on https://heroku.com[Heroku]
+|`@Requires(env = Environment.HEROKU)`
+
+|api:context.env.Environment#CLOUD_FOUNDRY[]
+|Running on https://www.cloudfoundry.org[Cloud Foundry]
+|`@Requires(env = Environment.CLOUD_FOUNDRY)`
+
+|===
+
+Note that it may be that case that you have multiple active environment names since you may run Kubernetes on AWS for example.
+
+In addition, using the value of the constants defined in the table above you can create environment specific configuration files. For example if you create a `src/main/resources/application-gcp.yml` file then that configuration will only be loaded when running on Google Compute.
+
+TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
+
