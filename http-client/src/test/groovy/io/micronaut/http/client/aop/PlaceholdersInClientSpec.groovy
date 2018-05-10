@@ -29,11 +29,16 @@ import spock.lang.Specification
  */
 class PlaceholdersInClientSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'books.uri':'/blocking',
             'my.path':'{id}'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test placeholder in @Client value"() {
         given:

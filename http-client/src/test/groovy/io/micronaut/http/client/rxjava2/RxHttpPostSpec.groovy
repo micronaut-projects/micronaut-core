@@ -35,9 +35,17 @@ import spock.lang.Specification
  */
 class RxHttpPostSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
 
     void "test simple post exchange request with JSON"() {
         when:

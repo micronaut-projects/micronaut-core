@@ -183,6 +183,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.size() == 5
         result == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
+
+        cleanup:
+        client.close()
     }
 
     @Controller('/stream/request')

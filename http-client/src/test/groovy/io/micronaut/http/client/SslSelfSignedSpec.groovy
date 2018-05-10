@@ -35,6 +35,7 @@ class SslSelfSignedSpec extends Specification {
             'micronaut.ssl.buildSelfSigned': true
     ])
 
+    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 

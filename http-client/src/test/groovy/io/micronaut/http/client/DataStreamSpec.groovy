@@ -40,8 +40,13 @@ import java.nio.charset.StandardCharsets
  */
 class DataStreamSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test read bytebuffer stream"() {
         given:
