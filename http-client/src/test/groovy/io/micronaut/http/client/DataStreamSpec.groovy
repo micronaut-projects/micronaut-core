@@ -15,15 +15,8 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
 import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
-import io.reactivex.internal.subscribers.BlockingFirstSubscriber
-import io.reactivex.internal.subscribers.BlockingSubscriber
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest

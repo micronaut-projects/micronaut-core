@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.ApplicationContext
 import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single

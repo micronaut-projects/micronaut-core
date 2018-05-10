@@ -15,12 +15,7 @@
  */
 package io.micronaut.runtime.executor
 
-import com.sun.xml.internal.ws.util.CompletedFuture
 import grails.gorm.transactions.Transactional
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Executable
-import io.micronaut.core.annotation.NonBlocking
-import io.micronaut.inject.ExecutableMethod
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable

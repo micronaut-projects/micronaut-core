@@ -20,11 +20,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.sql.ResultSet

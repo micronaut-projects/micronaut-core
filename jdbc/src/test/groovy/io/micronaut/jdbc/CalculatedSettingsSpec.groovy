@@ -16,7 +16,6 @@
 package io.micronaut.jdbc
 
 import io.micronaut.context.exceptions.ConfigurationException
-import io.micronaut.context.exceptions.ConfigurationException
 import spock.lang.Specification
 
 class CalculatedSettingsSpec extends Specification {

@@ -15,13 +15,9 @@
  */
 package io.micronaut.aop.lazy
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.aop.Intercepted
-import io.micronaut.aop.factory.ConcreteClass
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 import spock.lang.Unroll
 

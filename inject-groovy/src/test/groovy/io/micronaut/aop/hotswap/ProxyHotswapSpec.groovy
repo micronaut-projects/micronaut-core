@@ -15,8 +15,6 @@
  */
 package io.micronaut.aop.hotswap
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.aop.HotSwappableInterceptedProxy
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext

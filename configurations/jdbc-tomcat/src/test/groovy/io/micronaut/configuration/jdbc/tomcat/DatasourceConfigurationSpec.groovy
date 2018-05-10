@@ -15,10 +15,6 @@
  */
 package io.micronaut.configuration.jdbc.tomcat
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.inject.qualifiers.Qualifiers
 import org.apache.tomcat.jdbc.pool.DataSource
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext

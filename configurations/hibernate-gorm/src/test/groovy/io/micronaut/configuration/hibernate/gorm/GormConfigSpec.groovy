@@ -18,19 +18,13 @@ package io.micronaut.configuration.hibernate.gorm
 import grails.gorm.annotation.Entity
 import grails.gorm.services.Service
 import grails.gorm.transactions.TransactionService
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Value
-import io.micronaut.context.env.PropertySource
 import org.grails.datastore.mapping.validation.ValidationException
 import org.grails.orm.hibernate.cfg.Settings
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Value
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import org.springframework.transaction.PlatformTransactionManager
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import javax.inject.Singleton

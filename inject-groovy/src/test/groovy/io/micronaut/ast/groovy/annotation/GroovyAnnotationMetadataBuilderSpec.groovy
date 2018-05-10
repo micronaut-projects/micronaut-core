@@ -16,11 +16,6 @@
 package io.micronaut.ast.groovy.annotation
 
 import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Infrastructure
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.inject.annotation.AnnotationValue
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
