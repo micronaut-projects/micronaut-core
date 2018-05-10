@@ -209,7 +209,11 @@ public interface RouteBuilder {
      * @return The route
      */
     default ErrorRoute error(Class<? extends Throwable> error, Object instance) {
-        return error(error, instance.getClass(), NameUtils.decapitalize(NameUtils.trimSuffix(error.getSimpleName(), "Exception", "Error")), ReflectionUtils.EMPTY_CLASS_ARRAY);
+        return error(
+                error,
+                instance.getClass(),
+                NameUtils.decapitalize(NameUtils.trimSuffix(error.getSimpleName(), "Exception", "Error")),
+                error);
     }
 
     /**
@@ -221,9 +225,21 @@ public interface RouteBuilder {
      * @return The route
      */
     default ErrorRoute error(Class<? extends Throwable> error, Object instance, String method) {
-        return error(error, instance.getClass(), method, ReflectionUtils.EMPTY_CLASS_ARRAY);
+        return error(error, instance.getClass(), method, error);
     }
 
+    /**
+     * Register a route to handle the error.
+     *
+     * @param error    The error
+     * @param instance The instance
+     * @param method   The method
+     * @param parameterTypes The parameter types
+     * @return The route
+     */
+    default ErrorRoute error(Class<? extends Throwable> error, Object instance, String method, Class...parameterTypes) {
+        return error(error, instance.getClass(), method, parameterTypes);
+    }
     /**
      * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
      * specified "index" is used by default.
@@ -256,7 +272,7 @@ public interface RouteBuilder {
      */
     default UriRoute GET(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return GET(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.SHOW.methodName());
+        return GET(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.SHOW.methodName(), Object.class);
     }
 
     /**
@@ -277,7 +293,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute GET(Class type, PropertyConvention id) {
-        return GET(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.SHOW.methodName());
+        return GET(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.SHOW.methodName(), Object.class);
     }
 
     /**
@@ -447,7 +463,7 @@ public interface RouteBuilder {
      */
     default UriRoute PUT(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return PUT(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.UPDATE.methodName());
+        return PUT(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -457,7 +473,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute PUT(Class type) {
-        return PUT(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName());
+        return PUT(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -468,7 +484,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute PUT(Class type, PropertyConvention id) {
-        return PUT(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName());
+        return PUT(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -542,7 +558,7 @@ public interface RouteBuilder {
      */
     default UriRoute PATCH(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return PATCH(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.UPDATE.methodName());
+        return PATCH(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -552,7 +568,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute PATCH(Class type) {
-        return PATCH(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName());
+        return PATCH(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -563,7 +579,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute PATCH(Class type, PropertyConvention id) {
-        return PATCH(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName());
+        return PATCH(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
@@ -614,7 +630,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute DELETE(String uri, Object target) {
-        return DELETE(uri, target, MethodConvention.DELETE.methodName());
+        return DELETE(uri, target, MethodConvention.DELETE.methodName(), Object.class);
     }
 
     /**
@@ -637,7 +653,7 @@ public interface RouteBuilder {
      */
     default UriRoute DELETE(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return DELETE(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.DELETE.methodName());
+        return DELETE(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.DELETE.methodName(), Object.class);
     }
 
     /**
@@ -647,7 +663,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute DELETE(Class type) {
-        return DELETE(getUriNamingStrategy().resolveUri(type), type, MethodConvention.DELETE.methodName());
+        return DELETE(getUriNamingStrategy().resolveUri(type), type, MethodConvention.DELETE.methodName(), Object.class);
     }
 
     /**
@@ -658,7 +674,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default UriRoute DELETE(Class type, PropertyConvention id) {
-        return DELETE(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.DELETE.methodName());
+        return DELETE(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.DELETE.methodName(), Object.class);
     }
 
     /**
