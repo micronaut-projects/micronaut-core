@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 

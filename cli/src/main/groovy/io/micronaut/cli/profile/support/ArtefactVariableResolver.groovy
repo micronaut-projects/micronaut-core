@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.support
 
 import groovy.transform.CompileStatic
@@ -20,10 +21,9 @@ import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.commands.templates.SimpleTemplate
 import io.micronaut.cli.util.NameUtils
 
-
 /**
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ArtefactVariableResolver {
@@ -49,12 +49,12 @@ class ArtefactVariableResolver {
     }
 
     Map createVariables() {
-        if(artifactPackage) {
+        if (artifactPackage) {
             variables['artifact.package.name'] = artifactPackage
-            variables['artifact.package.path'] = artifactPackage?.replace('.','/')
+            variables['artifact.package.path'] = artifactPackage?.replace('.', '/')
             variables['artifact.package'] = "package $artifactPackage\n".toString()
         }
-        if(convention && artifactName.endsWith(convention)) {
+        if (convention && artifactName.endsWith(convention)) {
             artifactName = artifactName.substring(0, artifactName.length() - convention.length())
         }
         variables['artifact.name'] = artifactName
@@ -66,7 +66,7 @@ class ArtefactVariableResolver {
         String destinationName = new SimpleTemplate(pathToResolve).render(variables)
         File destination = new File(context.baseDir, destinationName).absoluteFile
 
-        if(!destination.getParentFile().exists()) {
+        if (!destination.getParentFile().exists()) {
             destination.getParentFile().mkdirs()
         }
         return destination

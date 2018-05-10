@@ -15,17 +15,11 @@
  */
 package io.micronaut.configurations.hystrix
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxStreamingHttpClient
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxStreamingHttpClient
-import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription

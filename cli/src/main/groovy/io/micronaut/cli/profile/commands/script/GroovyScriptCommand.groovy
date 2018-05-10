@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.script
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
-import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.boot.SpringInvoker
+import io.micronaut.cli.codegen.model.ModelBuilder
+import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.ConsoleLogger
 import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.codegen.model.ModelBuilder
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
@@ -40,7 +41,7 @@ import io.micronaut.cli.util.NameUtils
  * A base class for Groovy scripts that implement commands
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 abstract class GroovyScriptCommand extends Script implements ProfileCommand, ProfileRepositoryAware, ConsoleLogger, ModelBuilder, FileSystemInteraction, TemplateRenderer, CommandEvents, ServerInteraction {
@@ -49,15 +50,20 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
     ProfileRepository profileRepository
     String name = getClass().name.contains('-') ? getClass().name : NameUtils.getScriptName(getClass().name)
     CommandDescription description = new CommandDescription(name)
-    @Delegate ExecutionContext executionContext
-    @Delegate TemplateRenderer templateRenderer
-    @Delegate ConsoleLogger consoleLogger = MicronautConsole.getInstance()
-    @Delegate FileSystemInteraction fileSystemInteraction
+    @Delegate
+    ExecutionContext executionContext
+    @Delegate
+    TemplateRenderer templateRenderer
+    @Delegate
+    ConsoleLogger consoleLogger = MicronautConsole.getInstance()
+    @Delegate
+    FileSystemInteraction fileSystemInteraction
 
     /**
      * Allows invoking of Spring Boot's CLI
      */
     SpringInvoker spring = SpringInvoker.getInstance()
+
     /**
      * Access to Ant via AntBuilder
      */
@@ -67,10 +73,11 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      * The location of the user.home directory
      */
     String userHome = System.getProperty('user.home')
+
     /**
-     * The version of Grails being used
+     * The version of Micronaut being used
      */
-    String grailsVersion = getClass().getPackage()?.getImplementationVersion()
+    String micronautVersion = getClass().getPackage()?.getImplementationVersion()
 
     /**
      * Provides a description for the command
@@ -99,10 +106,9 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      * @return The flag information, or null if it isn't set by the user
      */
     def flag(String name) {
-        if(commandLine.hasOption(name)) {
+        if (commandLine.hasOption(name)) {
             return commandLine.optionValue(name)
-        }
-        else {
+        } else {
             def value = commandLine?.undeclaredOptions?.get(name)
             return value ?: null
         }
@@ -125,7 +131,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
     /**
      * @return The {@link MicronautConsole} instance
      */
-    MicronautConsole getGrailsConsole() { executionContext.console }
+    MicronautConsole getMicronautConsole() { executionContext.console }
 
     /**
      * Implementation of the handle method that runs the script
@@ -139,8 +145,8 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
         notify("${name}Start", executionContext)
         def result = run()
         notify("${name}End", executionContext)
-        if(result instanceof Boolean) {
-            return ((Boolean)result)
+        if (result instanceof Boolean) {
+            return ((Boolean) result)
         }
         return true
     }
@@ -152,17 +158,16 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      * @param args The arguments to the command
      */
     def methodMissing(String name, args) {
-        Object[] argsArray = (Object[])args
+        Object[] argsArray = (Object[]) args
         def commandName = NameUtils.getScriptName(name)
         def context = executionContext
-        if(profile?.hasCommand(context, commandName )) {
+        if (profile?.hasCommand(context, commandName)) {
             def commandLine = context.commandLine
             def newArgs = [commandName]
             newArgs.addAll argsArray.collect() { it.toString() }
             def newContext = new MicronautCli.ExecutionContextImpl(commandLine.parseNew(newArgs as String[]), context)
             return profile.handleCommand(newContext)
-        }
-        else {
+        } else {
             throw new MissingMethodException(name, getClass(), argsArray)
         }
     }
@@ -172,7 +177,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
         this.consoleLogger = executionContext.console
         this.templateRenderer = new TemplateRendererImpl(executionContext, profile, profileRepository)
         this.fileSystemInteraction = new FileSystemInteractionImpl(executionContext)
-        setDefaultPackage( executionContext.navigateConfig('defaultPackage') )
+        setDefaultPackage(executionContext.navigateConfig('defaultPackage'))
     }
 
     ExecutionContext getExecutionContext() {

@@ -15,8 +15,6 @@
  */
 package io.micronaut.docs.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Value
 import io.reactivex.Flowable
 import io.reactivex.functions.Consumer
 

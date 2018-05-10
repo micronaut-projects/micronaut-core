@@ -17,8 +17,6 @@ package io.micronaut.inject.field.streaminjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 class FieldStreamInjectionSpec extends Specification {

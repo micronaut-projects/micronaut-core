@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.steps
 
 import io.micronaut.cli.profile.AbstractStep
@@ -25,7 +26,7 @@ import io.micronaut.cli.profile.ProfileCommand
  * A {@link io.micronaut.cli.profile.Step} that can execute another command
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 class ExecuteStep extends AbstractStep {
 
@@ -42,14 +43,13 @@ class ExecuteStep extends AbstractStep {
         try {
             String className = parameters.get(CLASS_NAME)
             def cmd = className ? Class.forName(className, true, Thread.currentThread().contextClassLoader)
-                                  .newInstance() : null
-            if(cmd instanceof Command) {
-                if(cmd instanceof ProfileCommand) {
-                    ((ProfileCommand)cmd).profile = command.profile
+                .newInstance() : null
+            if (cmd instanceof Command) {
+                if (cmd instanceof ProfileCommand) {
+                    ((ProfileCommand) cmd).profile = command.profile
                 }
                 this.target = cmd
-            }
-            else {
+            } else {
                 throw new CommandException("Invalid command class [$className] specified")
             }
         } catch (Throwable e) {

@@ -18,10 +18,6 @@ package io.micronaut.inject.constructor.nullableinjection
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
 class ConstructorNullableInjectionSpec extends Specification {

@@ -17,10 +17,6 @@ package io.micronaut.context.router
 
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.http.annotation.Controller
 import io.micronaut.web.router.Router
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post

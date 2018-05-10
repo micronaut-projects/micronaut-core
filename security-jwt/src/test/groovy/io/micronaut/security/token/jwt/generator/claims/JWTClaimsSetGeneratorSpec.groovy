@@ -1,10 +1,7 @@
 package io.micronaut.security.token.jwt.generator.claims
 
 import io.micronaut.security.authentication.UserDetails
-import io.micronaut.security.config.SecurityConfiguration
 import io.micronaut.security.token.config.TokenConfiguration
-import io.micronaut.security.token.jwt.generator.claims.JWTClaimsSetGenerator
-import io.micronaut.security.token.jwt.generator.claims.JwtClaims
 import spock.lang.Specification
 
 class JWTClaimsSetGeneratorSpec extends Specification {

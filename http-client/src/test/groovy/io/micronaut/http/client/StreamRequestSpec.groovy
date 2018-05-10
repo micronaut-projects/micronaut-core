@@ -16,7 +16,6 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -24,24 +23,19 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.StreamRequestSpec.Book
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
-import io.reactivex.Emitter
 import io.reactivex.Flowable
 import io.reactivex.FlowableEmitter
 import io.reactivex.FlowableOnSubscribe
 import io.reactivex.Single
 import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.print.attribute.standard.Media
 import java.nio.charset.StandardCharsets
 
 /**

@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.method.setinjection
 
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification

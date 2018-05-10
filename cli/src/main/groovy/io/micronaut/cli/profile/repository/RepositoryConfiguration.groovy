@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.repository
 
 import org.springframework.util.ObjectUtils
@@ -22,7 +23,7 @@ import org.springframework.util.ObjectUtils
  *  Created to support configuration with authentication
  *
  * @author James Kleeh
- * @since 3.2
+ * @since 1.0
  */
 class RepositoryConfiguration {
 
@@ -33,7 +34,8 @@ class RepositoryConfiguration {
     final String password
 
     /**
-     * Creates a new {@code GrailsRepositoryConfiguration} instance.
+     * Creates a new {@code RepositoryConfiguration} instance.
+     *
      * @param name The name of the repository
      * @param uri The uri of the repository
      * @param snapshotsEnabled {@code true} if the repository should enable access to snapshots, {@code false} otherwise
@@ -44,9 +46,9 @@ class RepositoryConfiguration {
         this.snapshotsEnabled = snapshotsEnabled
     }
 
-
     /**
-     * Creates a new {@code GrailsRepositoryConfiguration} instance.
+     * Creates a new {@code RepositoryConfiguration} instance.
+     *
      * @param name The name of the repository
      * @param uri The uri of the repository
      * @param snapshotsEnabled {@code true} if the repository should enable access to snapshots, {@code false} otherwise

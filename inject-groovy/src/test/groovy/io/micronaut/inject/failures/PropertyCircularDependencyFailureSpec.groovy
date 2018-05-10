@@ -18,9 +18,6 @@ package io.micronaut.inject.failures
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.CircularDependencyException
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
 import javax.inject.Inject

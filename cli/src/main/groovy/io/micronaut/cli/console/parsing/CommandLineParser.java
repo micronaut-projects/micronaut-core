@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.parsing;
 
 import java.util.ArrayList;
@@ -20,46 +21,49 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-
 /**
- * Command line parser that parses arguments to the command line. Written as a
- * replacement for Commons CLI because it doesn't support unknown arguments and
- * requires all arguments to be declared up front.
- *
+ * Command line parser that parses arguments to the command line. Written as a replacement for Commons CLI because it
+ * doesn't support unknown arguments and requires all arguments to be declared up front.
+ * <p>
  * It also doesn't support command options with hyphens. This class gets around those problems.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class CommandLineParser {
 
+    @SuppressWarnings("StaticVariableName")
     private static CommandLine CURRENT = null;
     private static final String DEFAULT_PADDING = "        ";
 
-    private Map<String, Option> declaredOptions = new HashMap<String, Option> ();
+    private Map<String, Option> declaredOptions = new HashMap<String, Option>();
     private int longestOptionNameLength = 0;
     private String usageMessage;
 
+    /**
+     * @return The current command line
+     */
     public static CommandLine getCurrentCommandLine() {
         return CURRENT;
     }
 
     /**
-     * Adds a declared option
+     * Adds a declared option.
      *
-     * @param name The name of the option
+     * @param name        The name of the option
      * @param description The description
      */
     public void addOption(String name, String description) {
         int length = name.length();
-        if (length >longestOptionNameLength) {
+        if (length > longestOptionNameLength) {
             longestOptionNameLength = length;
         }
         declaredOptions.put(name, new Option(name, description));
     }
 
     /**
-     * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String..args)
+     * Parses a string of all the command line options converting them into an array of arguments to pass
+     * to #parse(String..args).
      *
      * @param string The string
      * @return The command line
@@ -72,6 +76,7 @@ public class CommandLineParser {
 
     /**
      * Crack a command line.
+     *
      * @param toProcess the command line to process.
      * @return the command line broken into strings.
      * An empty or null toProcess parameter results in a zero sized array.
@@ -137,11 +142,12 @@ public class CommandLineParser {
         return result.toArray(new String[result.size()]);
     }
 
-   /**
-     * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String..args)
+    /**
+     * Parses a string of all the command line options converting them into an array of arguments to pass to
+     * #parse(String..args).
      *
-    *  @param commandName The command name
-     * @param args The string
+     * @param commandName The command name
+     * @param args        The string
      * @return The command line
      */
     public CommandLine parseString(String commandName, String args) {
@@ -153,10 +159,11 @@ public class CommandLineParser {
         parseInternal(cl, argArray, false);
         return cl;
     }
+
     /**
      * Parses the given list of command line arguments. Arguments starting with -D become system properties,
      * arguments starting with -- or - become either declared or undeclared options. All other arguments are
-     * put into a list of remaining arguments
+     * put into a list of remaining arguments.
      *
      * @param args The arguments
      * @return The command line state
@@ -166,6 +173,11 @@ public class CommandLineParser {
         return parse(cl, args);
     }
 
+    /**
+     * @param cl   The default command line
+     * @param args The arguments
+     * @return The command line
+     */
     public CommandLine parse(DefaultCommandLine cl, String[] args) {
         parseInternal(cl, args, true);
         return cl;
@@ -175,17 +187,18 @@ public class CommandLineParser {
         cl.setRawArguments(args);
         String lastWasOption = null;
         for (String arg : args) {
-            if (arg == null) continue;
+            if (arg == null) {
+                continue;
+            }
             String trimmed = arg.trim();
-            if (trimmed != null && trimmed.length()>0) {
+            if (trimmed != null && trimmed.length() > 0) {
                 if (trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {
                     trimmed = trimmed.substring(1, trimmed.length() - 1);
                 }
                 if (trimmed.charAt(0) == '-') {
                     lastWasOption = processOption(cl, trimmed);
-                }
-                else {
-                    if(lastWasOption != null) {
+                } else {
+                    if (lastWasOption != null) {
                         cl.addUndeclaredOption(lastWasOption, trimmed);
                         lastWasOption = null;
                         continue;
@@ -194,8 +207,7 @@ public class CommandLineParser {
                     if (firstArgumentIsCommand) {
                         cl.setCommandName(trimmed);
                         firstArgumentIsCommand = false;
-                    }
-                    else {
+                    } else {
                         cl.addRemainingArg(trimmed);
                     }
                 }
@@ -203,6 +215,9 @@ public class CommandLineParser {
         }
     }
 
+    /**
+     * @return The options for the help message
+     */
     public String getOptionsHelpMessage() {
         String ls = System.getProperty("line.separator");
         usageMessage = "Available options:";
@@ -221,12 +236,20 @@ public class CommandLineParser {
         return sb.toString();
     }
 
+    /**
+     * @return A new {@link DefaultCommandLine}
+     */
     protected DefaultCommandLine createCommandLine() {
         DefaultCommandLine defaultCommandLine = new DefaultCommandLine();
         CURRENT = defaultCommandLine;
         return defaultCommandLine;
     }
 
+    /**
+     * @param cl  The default command line
+     * @param arg The arguments
+     * @return The arguments processed
+     */
     protected String processOption(DefaultCommandLine cl, String arg) {
         if (arg.length() < 2) {
             return null;
@@ -246,8 +269,7 @@ public class CommandLineParser {
             String value = split[1].trim();
             if (declaredOptions.containsKey(name)) {
                 cl.addDeclaredOption(name, declaredOptions.get(name), value);
-            }
-            else {
+            } else {
                 cl.addUndeclaredOption(name, value);
             }
             return null;
@@ -256,21 +278,26 @@ public class CommandLineParser {
         validateOptionName(arg);
         if (declaredOptions.containsKey(arg)) {
             cl.addDeclaredOption(arg, declaredOptions.get(arg));
-        }
-        else {
+        } else {
             cl.addUndeclaredOption(arg);
         }
         return arg;
     }
 
     private void validateOptionName(String name) {
-        if (name.contains(" ")) throw new ParseException("Invalid argument: " + name);
+        if (name.contains(" ")) {
+            throw new ParseException("Invalid argument: " + name);
+        }
     }
 
+    /**
+     * @param cl  The default command line
+     * @param arg The arguments
+     */
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
         int i = arg.indexOf("=");
         String name = arg.substring(2, i);
-        String value = arg.substring(i+1,arg.length());
+        String value = arg.substring(i + 1, arg.length());
         cl.addSystemProperty(name, value);
     }
 }

@@ -18,9 +18,6 @@ package io.micronaut.inject.qualifiers.secondary
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Secondary
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.context.BeanContext
-import io.micronaut.context.annotation.Secondary
-import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 /**

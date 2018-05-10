@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.stop
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient

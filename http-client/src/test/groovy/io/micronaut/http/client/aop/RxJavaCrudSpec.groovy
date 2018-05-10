@@ -15,19 +15,11 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
-import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
 import io.micronaut.http.annotation.Get
@@ -35,7 +27,6 @@ import io.micronaut.http.annotation.Patch
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

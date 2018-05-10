@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
-import static org.fusesource.jansi.Ansi.ansi;
+import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Color.DEFAULT;
 import static org.fusesource.jansi.Ansi.Color.RED;
-import static org.fusesource.jansi.Ansi.Color.BLUE;
 import static org.fusesource.jansi.Ansi.Erase.FORWARD;
+import static org.fusesource.jansi.Ansi.ansi;
 
-import java.io.*;
-import java.util.Collection;
-import java.util.List;
-import java.util.Stack;
-
+import io.micronaut.cli.console.interactive.CandidateListCompletionHandler;
 import jline.Terminal;
 import jline.TerminalFactory;
 import jline.UnixTerminal;
@@ -36,9 +33,7 @@ import jline.console.history.History;
 import jline.internal.Log;
 import jline.internal.ShutdownHooks;
 import jline.internal.TerminalLineSettings;
-
 import org.apache.tools.ant.BuildException;
-import io.micronaut.cli.console.interactive.CandidateListCompletionHandler;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.StackTraceUtils;
 import org.codehaus.groovy.runtime.typehandling.NumberMath;
@@ -46,18 +41,29 @@ import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Color;
 import org.fusesource.jansi.AnsiConsole;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.Flushable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Collection;
+import java.util.List;
+import java.util.Stack;
+
 /**
  * Utility class for delivering console output in a nicely formatted way.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class MicronautConsole implements ConsoleLogger {
 
-    private static MicronautConsole instance;
-
-    public static final String ENABLE_TERMINAL = "grails.console.enable.terminal";
-    public static final String ENABLE_INTERACTIVE = "grails.console.enable.interactive";
+    public static final String ENABLE_TERMINAL = "micronaut.console.enable.terminal";
+    public static final String ENABLE_INTERACTIVE = "micronaut.console.enable.interactive";
     public static final String LINE_SEPARATOR = System.getProperty("line.separator");
     public static final String CATEGORY_SEPARATOR = "|";
     public static final String PROMPT = "mn> ";
@@ -68,37 +74,22 @@ public class MicronautConsole implements ConsoleLogger {
     public static final String STACKTRACE_FILTERED_MESSAGE = " (NOTE: Stack trace has been filtered. Use --verbose to see entire trace.)";
     public static final String STACKTRACE_MESSAGE = " (Use --stacktrace to see the full trace)";
     public static final Character SECURE_MASK_CHAR = new Character('*');
-    private PrintStream originalSystemOut;
-    private PrintStream originalSystemErr;
-    private StringBuilder maxIndicatorString;
-    private int cursorMove;
-    private Thread shutdownHookThread;
-    private Character defaultInputMask = null;
-    
-    /**
-     * Whether to enable verbose mode
-     */
-    private boolean verbose = Boolean.getBoolean("grails.verbose");
+
+    private static MicronautConsole instance;
 
     /**
-     * Whether to show stack traces
-     */
-    private boolean stacktrace = Boolean.getBoolean("grails.show.stacktrace");
-
-    private boolean progressIndicatorActive = false;
-
-    /**
-     * The progress indicator to use
+     * The progress indicator to use.
      */
     String indicator = ".";
+
     /**
-     * The last message that was printed
+     * The last message that was printed.
      */
     String lastMessage = "";
 
     Ansi lastStatus = null;
     /**
-     * The reader to read info from the console
+     * The reader to read info from the console.
      */
     ConsoleReader reader;
 
@@ -110,27 +101,72 @@ public class MicronautConsole implements ConsoleLogger {
     History history;
 
     /**
-     * The category of the current output
+     * The category of the current output.
      */
     @SuppressWarnings("serial")
     Stack<String> category = new Stack<String>() {
         @Override
         public String toString() {
-            if (size() == 1) return peek() + CATEGORY_SEPARATOR;
-            return DefaultGroovyMethods.join((Iterable)this, CATEGORY_SEPARATOR) + CATEGORY_SEPARATOR;
+            if (size() == 1) {
+                return peek() + CATEGORY_SEPARATOR;
+            }
+            return DefaultGroovyMethods.join((Iterable) this, CATEGORY_SEPARATOR) + CATEGORY_SEPARATOR;
         }
     };
 
+    private PrintStream originalSystemOut;
+    private PrintStream originalSystemErr;
+    private StringBuilder maxIndicatorString;
+    private int cursorMove;
+    private Thread shutdownHookThread;
+    private Character defaultInputMask = null;
+
     /**
-     * Whether ANSI should be enabled for output
+     * Whether ANSI should be enabled for output.
      */
     private boolean ansiEnabled = true;
 
     /**
-     * Whether user input is currently active
+     * Whether user input is currently active.
      */
     private boolean userInputActive;
 
+    /**
+     * Whether to enable verbose mode.
+     */
+    private boolean verbose = Boolean.getBoolean("micronaut.verbose");
+
+    /**
+     * Whether to show stack traces.
+     */
+    private boolean stacktrace = Boolean.getBoolean("micronaut.show.stacktrace");
+
+    private boolean progressIndicatorActive = false;
+
+    /**
+     * Logs a message below the current status message.
+     *
+     * @param msg The message to log
+     */
+    private boolean appendCalled = false;
+
+    /**
+     * Default constructor for the Micronaut console.
+     *
+     * @throws IOException if there is an error
+     */
+    protected MicronautConsole() throws IOException {
+        cursorMove = 1;
+
+        initialize(System.in, System.out, System.err);
+
+        // bit of a WTF this, but see no other way to allow a customization indicator
+        maxIndicatorString = new StringBuilder(indicator).append(indicator).append(indicator).append(indicator).append(indicator);
+    }
+
+    /**
+     * Add a shutdown hook.
+     */
     public void addShutdownHook() {
         shutdownHookThread = new Thread(new Runnable() {
             @Override
@@ -140,42 +176,44 @@ public class MicronautConsole implements ConsoleLogger {
         });
         Runtime.getRuntime().addShutdownHook(shutdownHookThread);
     }
-    
+
+    /**
+     * Remove a shutdown hook.
+     */
     public void removeShutdownHook() {
-        if(shutdownHookThread != null) {
+        if (shutdownHookThread != null) {
             Runtime.getRuntime().removeShutdownHook(shutdownHookThread);
         }
     }
-    
-    
-    protected MicronautConsole() throws IOException {
-        cursorMove = 1;
 
-        initialize(System.in, System.out, System.err);
-
-        // bit of a WTF this, but see no other way to allow a customization indicator
-        maxIndicatorString = new StringBuilder(indicator).append(indicator).append(indicator).append(indicator).append(indicator);
-
-    }
-    
     /**
-     * Use in testing when System.out, System.err or System.in change
-     * @throws IOException
+     * Use in testing when System.out, System.err or System.in change.
+     *
+     * @param systemIn  The system in
+     * @param systemOut The system out
+     * @param systemErr The system err
+     * @throws IOException if there is an error
      */
     public void reinitialize(InputStream systemIn, PrintStream systemOut, PrintStream systemErr) throws IOException {
-        if(reader != null) {
+        if (reader != null) {
             reader.shutdown();
         }
         initialize(systemIn, systemOut, systemErr);
     }
 
+    /**
+     * @param systemIn  The system in
+     * @param systemOut The system out
+     * @param systemErr The system err
+     * @throws IOException if there is an error
+     */
     protected void initialize(InputStream systemIn, PrintStream systemOut, PrintStream systemErr) throws IOException {
         bindSystemOutAndErr(systemOut, systemErr);
 
         redirectSystemOutAndErr(true);
 
         System.setProperty(ShutdownHooks.JLINE_SHUTDOWNHOOK, "false");
-        
+
         if (isInteractiveEnabled()) {
             reader = createConsoleReader(systemIn);
             reader.setBellEnabled(false);
@@ -188,50 +226,69 @@ public class MicronautConsole implements ConsoleLogger {
             if (history != null) {
                 reader.setHistory(history);
             }
-        }
-        else if (isActivateTerminal()) {
+        } else if (isActivateTerminal()) {
             terminal = createTerminal();
         }
     }
 
+    /**
+     * @param systemOut The system out
+     * @param systemErr The system error
+     */
     protected void bindSystemOutAndErr(PrintStream systemOut, PrintStream systemErr) {
         originalSystemOut = unwrapPrintStream(systemOut);
         out = wrapInPrintStream(originalSystemOut);
         originalSystemErr = unwrapPrintStream(systemErr);
         err = wrapInPrintStream(originalSystemErr);
     }
-    
+
     private PrintStream unwrapPrintStream(PrintStream printStream) {
-        if(printStream instanceof ConsolePrintStream) {
-            return ((ConsolePrintStream)printStream).getTargetOut();
+        if (printStream instanceof ConsolePrintStream) {
+            return ((ConsolePrintStream) printStream).getTargetOut();
         }
-        if(printStream instanceof ConsoleErrorPrintStream) {
-            return ((ConsoleErrorPrintStream)printStream).getTargetOut();
+        if (printStream instanceof ConsoleErrorPrintStream) {
+            return ((ConsoleErrorPrintStream) printStream).getTargetOut();
         }
         return printStream;
     }
 
     private PrintStream wrapInPrintStream(PrintStream printStream) {
         OutputStream ansiWrapped = ansiWrap(printStream);
-        if(ansiWrapped instanceof PrintStream) {
-            return (PrintStream)ansiWrapped;
+        if (ansiWrapped instanceof PrintStream) {
+            return (PrintStream) ansiWrapped;
         } else {
             return new PrintStream(ansiWrapped, true);
         }
     }
 
+    /**
+     * @return The err stream
+     */
     public PrintStream getErr() {
         return err;
     }
 
+    /**
+     * Sets the err stream.
+     *
+     * @param err The err print stream
+     */
     public void setErr(PrintStream err) {
         this.err = err;
     }
 
+    /**
+     * Sets the out stream.
+     *
+     * @param out The out print stream
+     */
     public void setOut(PrintStream out) {
         this.out = out;
     }
 
+    /**
+     * @return Whether interactive mode is enabled
+     */
     public boolean isInteractiveEnabled() {
         return readPropOrTrue(ENABLE_INTERACTIVE);
     }
@@ -245,6 +302,13 @@ public class MicronautConsole implements ConsoleLogger {
         return property == null ? true : Boolean.valueOf(property);
     }
 
+    /**
+     * Create a console reader.
+     *
+     * @param systemIn The input stream
+     * @return The console reader
+     * @throws IOException if there is an error
+     */
     protected ConsoleReader createConsoleReader(InputStream systemIn) throws IOException {
         // need to swap out the output to avoid logging during init
         final PrintStream nullOutput = new PrintStream(new ByteArrayOutputStream());
@@ -260,21 +324,26 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Creates the instance of Terminal used directly in GrailsConsole. Note that there is also
-     * another terminal instance created implicitly inside of ConsoleReader. That instance
-     * is controlled by the jline.terminal system property.
+     * Creates the instance of Terminal used directly in MicronautConsole. Note that there is also another terminal
+     * instance created implicitly inside of ConsoleReader. That instance is controlled by the jline.terminal system
+     * property.
+     *
+     * @return the new {@link Terminal}
      */
     protected Terminal createTerminal() {
         terminal = TerminalFactory.create();
-        if(isWindows()) {
+        if (isWindows()) {
             terminal.setEchoEnabled(true);
         }
         return terminal;
     }
 
+    /**
+     * Reset the completers.
+     */
     public void resetCompleters() {
         final ConsoleReader reader = getReader();
-        if(reader != null) {
+        if (reader != null) {
             Collection<Completer> completers = reader.getCompleters();
             for (Completer completer : completers) {
                 reader.removeCompleter(completer);
@@ -287,17 +356,20 @@ public class MicronautConsole implements ConsoleLogger {
             }
         }
     }
+
     /**
      * Prepares a history file to be used by the ConsoleReader. This file
      * will live in the home directory of the user.
+     *
+     * @return The {@link History}
+     * @throws IOException if there is an error
      */
     protected History prepareHistory() throws IOException {
         File file = new File(System.getProperty("user.home"), HISTORYFILE);
         if (!file.exists()) {
             try {
                 file.createNewFile();
-            }
-            catch (IOException ignored) {
+            } catch (IOException ignored) {
                 // can't create the file, so no history for you
             }
         }
@@ -309,15 +381,24 @@ public class MicronautConsole implements ConsoleLogger {
      * AnsiConsole.wrapOutputStream. Unfortunately, Eclipse consoles will look to the AnsiWrap
      * like they do not understand ansi, even if we were to implement support in Eclipse to'
      * handle it and the wrapped stream will not pass the ansi chars on to Eclipse).
+     *
+     * @param out The output stream
+     * @return The output stream wrapped an as {@link AnsiConsole}
      */
     protected OutputStream ansiWrap(OutputStream out) {
         return AnsiConsole.wrapOutputStream(out);
     }
 
+    /**
+     * @return Whether is Windows OS
+     */
     public boolean isWindows() {
         return System.getProperty("os.name").toLowerCase().indexOf("windows") != -1;
     }
 
+    /**
+     * @return The Micronaut console
+     */
     public static synchronized MicronautConsole getInstance() {
         if (instance == null) {
             try {
@@ -330,30 +411,39 @@ public class MicronautConsole implements ConsoleLogger {
         }
         return instance;
     }
-    
+
+    /**
+     * Remove the Micronaut console.
+     */
     public static synchronized void removeInstance() {
         if (instance != null) {
             instance.removeShutdownHook();
             instance.restoreOriginalSystemOutAndErr();
-            if(instance.getReader() != null) {
+            if (instance.getReader() != null) {
                 instance.getReader().shutdown();
             }
             instance = null;
         }
     }
 
+    /**
+     * Execute before shutdown the console.
+     */
     public void beforeShutdown() {
         persistHistory();
         restoreTerminal();
     }
 
+    /**
+     * Restore the terminal.
+     */
     protected void restoreTerminal() {
         try {
             terminal.restore();
         } catch (Exception e) {
             // ignore
         }
-        if(terminal instanceof UnixTerminal) {
+        if (terminal instanceof UnixTerminal) {
             // workaround for GRAILS-11494
             try {
                 new TerminalLineSettings().set("sane");
@@ -363,22 +453,32 @@ public class MicronautConsole implements ConsoleLogger {
         }
     }
 
+    /**
+     * Persist the history.
+     */
     protected void persistHistory() {
-        if(history instanceof Flushable) {
+        if (history instanceof Flushable) {
             try {
-                ((Flushable)history).flush();
-            }
-            catch (IOException e) {
+                ((Flushable) history).flush();
+            } catch (IOException e) {
                 // ignore exception
             }
         }
     }
 
+    /**
+     * @param newConsole The new Micronaut console
+     */
     public static void setInstance(MicronautConsole newConsole) {
         instance = newConsole;
         instance.redirectSystemOutAndErr(false);
     }
 
+    /**
+     * Redirect system out and error to the console.
+     *
+     * @param force Whether to force the redirect
+     */
     protected void redirectSystemOutAndErr(boolean force) {
         if (force || !(System.out instanceof ConsolePrintStream)) {
             System.setOut(new ConsolePrintStream(out));
@@ -388,8 +488,14 @@ public class MicronautConsole implements ConsoleLogger {
         }
     }
 
+    /**
+     * Create a new Micronaut console instance.
+     *
+     * @return The Micronaut console
+     * @throws IOException if there is an error
+     */
     public static MicronautConsole createInstance() throws IOException {
-        String className = System.getProperty("grails.console.class");
+        String className = System.getProperty("micronaut.console.class");
         if (className != null) {
             try {
                 @SuppressWarnings("unchecked")
@@ -402,6 +508,9 @@ public class MicronautConsole implements ConsoleLogger {
         return new MicronautConsole();
     }
 
+    /**
+     * @param ansiEnabled Whether to enable ansi support
+     */
     public void setAnsiEnabled(boolean ansiEnabled) {
         this.ansiEnabled = ansiEnabled;
     }
@@ -413,7 +522,7 @@ public class MicronautConsole implements ConsoleLogger {
         if (verbose) {
             // enable big traces in verbose mode
             // note - can't use StackTraceFilterer#SYS_PROP_DISPLAY_FULL_STACKTRACE as it is in grails-core
-            System.setProperty("grails.full.stacktrace", "true");
+            System.setProperty("micronaut.full.stacktrace", "true");
         }
         this.verbose = verbose;
     }
@@ -433,7 +542,6 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     *
      * @return Whether to show stack traces
      */
     public boolean isStacktrace() {
@@ -470,28 +578,45 @@ public class MicronautConsole implements ConsoleLogger {
         return lastMessage;
     }
 
+    /**
+     * Sets the last message logged.
+     *
+     * @param lastMessage The last message logged
+     */
     public void setLastMessage(String lastMessage) {
         this.lastMessage = lastMessage;
     }
 
+    /**
+     * @return The console reader
+     */
     public ConsoleReader getReader() {
         return reader;
     }
 
+    /**
+     * @return The terminal
+     */
     public Terminal getTerminal() {
         return terminal;
     }
 
+    /**
+     * @return The output stream
+     */
     public PrintStream getOut() {
         return out;
     }
 
+    /**
+     * @return The category
+     */
     public Stack<String> getCategory() {
         return category;
     }
 
     /**
-     * Indicates progress with the default progress indicator
+     * Indicates progress with the default progress indicator.
      */
     @Override
     public void indicateProgress() {
@@ -503,14 +628,13 @@ public class MicronautConsole implements ConsoleLogger {
                     updateStatus(lastMessage + indicator);
                 }
             }
-        }
-        else {
+        } else {
             out.print(indicator);
         }
     }
 
     /**
-     * Indicate progress for a number and total
+     * Indicate progress for a number and total.
      *
      * @param number The current number
      * @param total  The total number
@@ -520,18 +644,19 @@ public class MicronautConsole implements ConsoleLogger {
         progressIndicatorActive = true;
         String currMsg = lastMessage;
         try {
-            updateStatus(currMsg + ' '+ number + " of " + total);
+            updateStatus(currMsg + ' ' + number + " of " + total);
         } finally {
             lastMessage = currMsg;
         }
     }
 
     /**
-     * Indicates progress as a percentage for the given number and total
+     * Indicates progress as a percentage for the given number and total.
      *
      * @param number The number
      * @param total  The total
      */
+    @SuppressWarnings("MagicNumber")
     @Override
     public void indicateProgressPercentage(long number, long total) {
         verifySystemOut();
@@ -543,8 +668,7 @@ public class MicronautConsole implements ConsoleLogger {
             if (!isAnsiEnabled()) {
                 out.print("..");
                 out.print(percentage + '%');
-            }
-            else {
+            } else {
                 updateStatus(currMsg + ' ' + percentage + '%');
             }
         } finally {
@@ -553,7 +677,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Indicates progress by number
+     * Indicates progress by number.
      *
      * @param number The number
      */
@@ -565,8 +689,7 @@ public class MicronautConsole implements ConsoleLogger {
         try {
             if (isAnsiEnabled()) {
                 updateStatus(currMsg + ' ' + number);
-            }
-            else {
+            } else {
                 out.print("..");
                 out.print(number);
             }
@@ -576,7 +699,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Updates the current state message
+     * Updates the current state message.
      *
      * @param msg The message
      */
@@ -587,20 +710,24 @@ public class MicronautConsole implements ConsoleLogger {
 
     private void outputMessage(String msg, int replaceCount) {
         verifySystemOut();
-        if (msg == null || msg.trim().length() == 0) return;
+        if (msg == null || msg.trim().length() == 0) {
+            return;
+        }
         try {
             if (isAnsiEnabled()) {
                 if (replaceCount > 0) {
                     out.print(erasePreviousLine(CATEGORY_SEPARATOR));
                 }
                 lastStatus = outputCategory(ansi(), CATEGORY_SEPARATOR)
-                        .fg(Color.DEFAULT).a(msg).reset();
+                    .fg(Color.DEFAULT).a(msg).reset();
                 out.println(lastStatus);
                 if (!userInputActive) {
                     cursorMove = replaceCount;
                 }
             } else {
-                if (lastMessage != null && lastMessage.equals(msg)) return;
+                if (lastMessage != null && lastMessage.equals(msg)) {
+                    return;
+                }
 
                 if (progressIndicatorActive) {
                     out.println();
@@ -616,9 +743,9 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     private Ansi moveDownToSkipPrompt() {
-           return ansi()
-                   .cursorDown(1)
-                   .cursorLeft(PROMPT.length());
+        return ansi()
+            .cursorDown(1)
+            .cursorLeft(PROMPT.length());
     }
 
     private void postPrintMessage() {
@@ -630,7 +757,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Keeps doesn't replace the status message
+     * Keeps doesn't replace the status message.
      *
      * @param msg The message
      */
@@ -641,7 +768,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Prints an error message
+     * Prints an error message.
      *
      * @param msg The error message
      */
@@ -651,7 +778,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Prints an error message
+     * Prints an error message.
      *
      * @param msg The error message
      */
@@ -661,7 +788,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Prints a warn message
+     * Prints a warn message.
      *
      * @param msg The message
      */
@@ -679,24 +806,26 @@ public class MicronautConsole implements ConsoleLogger {
         out.println(msg);
     }
 
+    /**
+     * @return Whether ansi is enabled
+     */
     public boolean isAnsiEnabled() {
         return Ansi.isEnabled() && (terminal != null && terminal.isAnsiSupported()) && ansiEnabled;
     }
 
     /**
-     * Use to log an error
+     * Use to log an error.
      *
-     * @param msg The message
+     * @param msg   The message
      * @param error The error
      */
     @Override
     public void error(String msg, Throwable error) {
         try {
-            if ((verbose||stacktrace) && error != null) {
+            if ((verbose || stacktrace) && error != null) {
                 printStackTrace(msg, error);
                 error(ERROR, msg);
-            }
-            else {
+            } else {
                 error(ERROR, msg + STACKTRACE_MESSAGE);
             }
         } finally {
@@ -705,7 +834,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Use to log an error
+     * Use to log an error.
      *
      * @param error The error
      */
@@ -718,7 +847,7 @@ public class MicronautConsole implements ConsoleLogger {
         if ((error instanceof BuildException) && error.getCause() != null) {
             error = error.getCause();
         }
-        if (!isVerbose() && !Boolean.getBoolean("grails.full.stacktrace")) {
+        if (!isVerbose() && !Boolean.getBoolean("micronaut.full.stacktrace")) {
             StackTraceUtils.deepSanitize(error);
         }
         StringWriter sw = new StringWriter();
@@ -733,7 +862,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Logs a message below the current status message
+     * Logs a message below the current status message.
      *
      * @param msg The message to log
      */
@@ -747,8 +876,7 @@ public class MicronautConsole implements ConsoleLogger {
             }
             if (msg.endsWith(LINE_SEPARATOR)) {
                 printStream.print(msg);
-            }
-            else {
+            } else {
                 printStream.println(msg);
             }
             cursorMove = 0;
@@ -760,16 +888,14 @@ public class MicronautConsole implements ConsoleLogger {
 
     private void erasePrompt(PrintStream printStream) {
         printStream.print(ansi()
-                .eraseLine(Ansi.Erase.BACKWARD).cursorLeft(PROMPT.length()));
+            .eraseLine(Ansi.Erase.BACKWARD).cursorLeft(PROMPT.length()));
     }
 
     /**
-     * Logs a message below the current status message
+     * Append a message.
      *
-     * @param msg The message to log
+     * @param msg The message
      */
-    private boolean appendCalled = false;
-
     public void append(String msg) {
         verifySystemOut();
         PrintStream printStream = out;
@@ -780,8 +906,7 @@ public class MicronautConsole implements ConsoleLogger {
             }
             if (msg.endsWith(LINE_SEPARATOR)) {
                 printStream.print(msg);
-            }
-            else {
+            } else {
                 printStream.println(msg);
             }
             cursorMove = 0;
@@ -791,7 +916,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Synonym for #log
+     * Synonym for #log.
      *
      * @param msg The message to log
      */
@@ -814,7 +939,7 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Replays the last status message
+     * Replays the last status message.
      */
     public void echoStatus() {
         if (lastStatus != null) {
@@ -823,9 +948,9 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Replacement for AntBuilder.input() to eliminate dependency of
-     * GrailsScriptRunner on the Ant libraries. Prints a message and
-     * returns whatever the user enters (once they press &lt;return&gt;).
+     * Replacement for AntBuilder.input() to eliminate dependency of GrailsScriptRunner on the Ant libraries.
+     * Prints a message and returns whatever the user enters (once they press &lt;return&gt;).
+     *
      * @param msg The message/question to display.
      * @return The line of text entered by the user. May be a blank
      * string.
@@ -862,7 +987,8 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Shows the prompt to request user input
+     * Shows the prompt to request user input.
+     *
      * @param prompt The prompt to use
      * @return The user input prompt
      */
@@ -892,7 +1018,8 @@ public class MicronautConsole implements ConsoleLogger {
     }
 
     /**
-     * Shows the prompt to request user input
+     * Shows the prompt to request user input.
+     *
      * @return The user input prompt
      */
     public String showPrompt() {
@@ -902,31 +1029,32 @@ public class MicronautConsole implements ConsoleLogger {
 
     private Ansi ansiPrompt(String prompt) {
         return ansi()
-                .a(Ansi.Attribute.INTENSITY_BOLD)
-                .fg(BLUE)
-                .a(prompt)
-                .a(Ansi.Attribute.INTENSITY_BOLD_OFF)
-                .fg(DEFAULT);
+            .a(Ansi.Attribute.INTENSITY_BOLD)
+            .fg(BLUE)
+            .a(prompt)
+            .a(Ansi.Attribute.INTENSITY_BOLD_OFF)
+            .fg(DEFAULT);
     }
 
+    /**
+     * @param message        The message
+     * @param validResponses The valid response
+     * @return The line of text entered by the user
+     */
     public String userInput(String message, List<String> validResponses) {
         return userInput(message, validResponses.toArray(new String[validResponses.size()]));
     }
 
     /**
-     * Replacement for AntBuilder.input() to eliminate dependency of
-     * GrailsScriptRunner on the Ant libraries. Prints a message and
-     * list of valid responses, then returns whatever the user enters
-     * (once they press &lt;return&gt;). If the user enters something
-     * that is not in the array of valid responses, the message is
-     * displayed again and the method waits for more input. It will
-     * display the message a maximum of three times before it gives up
-     * and returns <code>null</code>.
-     * @param message The message/question to display.
-     * @param validResponses An array of responses that the user is
-     * allowed to enter. Displayed after the message.
-     * @return The line of text entered by the user, or <code>null</code>
-     * if the user never entered a valid string.
+     * Replacement for AntBuilder.input() to eliminate dependency of GrailsScriptRunner on the Ant libraries.
+     * Prints a message and list of valid responses, then returns whatever the user enters
+     * (once they press &lt;return&gt;). If the user enters something that is not in the array of valid responses,
+     * the message is displayed again and the method waits for more input. It will display the message a maximum of
+     * three times before it gives up and returns <code>null</code>.
+     *
+     * @param message        The message/question to display.
+     * @param validResponses An array of responses that the user is allowed to enter. Displayed after the message.
+     * @return The line of text entered by the user, or <code>null</code> if the user never entered a valid string.
      */
     public String userInput(String message, String[] validResponses) {
         if (validResponses == null) {
@@ -950,37 +1078,39 @@ public class MicronautConsole implements ConsoleLogger {
 
     private Ansi outputCategory(Ansi ansi, String categoryName) {
         return ansi
-                .a(Ansi.Attribute.INTENSITY_BOLD)
-                .fg(BLUE)
-                .a(categoryName)
-                .a(SPACE)
-                .a(Ansi.Attribute.INTENSITY_BOLD_OFF);
+            .a(Ansi.Attribute.INTENSITY_BOLD)
+            .fg(BLUE)
+            .a(categoryName)
+            .a(SPACE)
+            .a(Ansi.Attribute.INTENSITY_BOLD_OFF);
     }
 
     private Ansi outputErrorLabel(Ansi ansi, String label) {
         return ansi
-                .a(Ansi.Attribute.INTENSITY_BOLD)
-                .fg(RED)
-                .a(CATEGORY_SEPARATOR)
-                .a(SPACE)
-                .a(label)
-                .a(" ")
-                .a(Ansi.Attribute.INTENSITY_BOLD_OFF)
-                .fg(Color.DEFAULT);
+            .a(Ansi.Attribute.INTENSITY_BOLD)
+            .fg(RED)
+            .a(CATEGORY_SEPARATOR)
+            .a(SPACE)
+            .a(label)
+            .a(" ")
+            .a(Ansi.Attribute.INTENSITY_BOLD_OFF)
+            .fg(Color.DEFAULT);
     }
 
     private Ansi erasePreviousLine(String categoryName) {
         int cursorMove = this.cursorMove;
-        if (userInputActive) cursorMove++;
+        if (userInputActive) {
+            cursorMove++;
+        }
         if (cursorMove > 0) {
             int moveLeftLength = categoryName.length() + lastMessage.length();
             if (userInputActive) {
                 moveLeftLength += PROMPT.length();
             }
             return ansi()
-                    .cursorUp(cursorMove)
-                    .cursorLeft(moveLeftLength)
-                    .eraseLine(FORWARD);
+                .cursorUp(cursorMove)
+                .cursorLeft(moveLeftLength)
+                .eraseLine(FORWARD);
 
         }
         return ansi();
@@ -996,16 +1126,14 @@ public class MicronautConsole implements ConsoleLogger {
         cursorMove = 0;
         try {
             if (isAnsiEnabled()) {
-                Ansi ansi = outputErrorLabel(userInputActive ? moveDownToSkipPrompt()  : ansi(), label).a(message).reset();
+                Ansi ansi = outputErrorLabel(userInputActive ? moveDownToSkipPrompt() : ansi(), label).a(message).reset();
 
                 if (message.endsWith(LINE_SEPARATOR)) {
                     out.print(ansi);
-                }
-                else {
+                } else {
                     out.println(ansi);
                 }
-            }
-            else {
+            } else {
                 out.print(label);
                 out.print(" ");
                 logSimpleError(message);
@@ -1019,20 +1147,27 @@ public class MicronautConsole implements ConsoleLogger {
         // something bad may have overridden the system out
         redirectSystemOutAndErr(false);
     }
-    
+
+    /**
+     * Restore the original system output and error.
+     */
     public void restoreOriginalSystemOutAndErr() {
         System.setOut(originalSystemOut);
         System.setErr(originalSystemErr);
     }
 
+    /**
+     * Flush before exit.
+     *
+     * @param status The exit status
+     */
     public void cleanlyExit(int status) {
         flush();
         System.exit(status);
     }
 
     /**
-     * Makes sure that the console has been reset to the default state and that
-     * the out stream has been flushed.
+     * Makes sure that the console has been reset to the default state and that the out stream has been flushed.
      */
     public void flush() {
         if (isAnsiEnabled()) {
@@ -1041,10 +1176,18 @@ public class MicronautConsole implements ConsoleLogger {
         out.flush();
     }
 
+    /**
+     * @return The default input mask
+     */
     public Character getDefaultInputMask() {
         return defaultInputMask;
     }
 
+    /**
+     * Set the default input mask.
+     *
+     * @param defaultInputMask The default input mask
+     */
     public void setDefaultInputMask(Character defaultInputMask) {
         this.defaultInputMask = defaultInputMask;
     }

@@ -18,10 +18,8 @@ package io.micronaut.configuration.mongo.reactive
 
 import com.mongodb.MongoClient
 import com.mongodb.MongoClientOptions
-import com.mongodb.client.MongoCollection
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
-import io.reactivex.Flowable
 import org.bson.Document
 import spock.lang.IgnoreIf
 import spock.lang.Specification

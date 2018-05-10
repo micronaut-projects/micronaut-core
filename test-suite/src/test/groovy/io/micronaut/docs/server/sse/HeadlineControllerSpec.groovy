@@ -20,8 +20,6 @@ import com.launchdarkly.eventsource.EventSource
 import com.launchdarkly.eventsource.MessageEvent
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.sse.Event
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared

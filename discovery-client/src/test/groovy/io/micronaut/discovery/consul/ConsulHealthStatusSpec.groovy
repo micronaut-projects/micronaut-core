@@ -15,9 +15,6 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.consul.client.v1.ConsulClient
-import io.micronaut.http.HttpStatus
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.consul.client.v1.ConsulClient

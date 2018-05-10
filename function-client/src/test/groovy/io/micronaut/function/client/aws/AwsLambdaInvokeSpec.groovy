@@ -16,11 +16,6 @@
 
 package io.micronaut.function.client.aws
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.core.type.Argument
-import io.micronaut.function.client.FunctionClient
-import io.micronaut.function.client.FunctionDefinition
-import io.micronaut.http.annotation.Body
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument

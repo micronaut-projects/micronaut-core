@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
-import groovy.transform.TypeCheckingMode
-import groovy.xml.MarkupBuilder
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
-import io.micronaut.cli.io.support.FileSystemResource
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
-import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
+
 import java.nio.file.Paths
 
 /**
@@ -81,30 +79,30 @@ class CreateFederationCommand extends CreateServiceCommand {
 
         final File serviceDir = inPlace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
 
-        for(String service: services) {
+        for (String service : services) {
             final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-                    appName: service,
-                    baseDir: serviceDir,
-                    profileName: profileName,
-                    micronautVersion: micronautVersion,
-                    features: features,
-                    inplace: false,
-                    build: build,
-                    console: executionContext.console,
-                    skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
+                appName: service,
+                baseDir: serviceDir,
+                profileName: profileName,
+                micronautVersion: micronautVersion,
+                features: features,
+                inplace: false,
+                build: build,
+                console: executionContext.console,
+                skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
             )
             super.handle(cmd)
         }
 
         final CreateServiceCommandObject parent = new CreateServiceCommandObject(
-                appName: federationName,
-                baseDir: executionContext.baseDir,
-                profileName: 'federation',
-                micronautVersion: micronautVersion,
-                features: features,
-                inplace: inPlace,
-                build: build,
-                console: executionContext.console
+            appName: federationName,
+            baseDir: executionContext.baseDir,
+            profileName: 'federation',
+            micronautVersion: micronautVersion,
+            features: features,
+            inplace: inPlace,
+            build: build,
+            console: executionContext.console
         )
         super.handle(parent)
     }

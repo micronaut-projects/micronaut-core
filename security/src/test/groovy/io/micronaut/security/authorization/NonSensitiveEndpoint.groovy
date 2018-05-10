@@ -8,7 +8,7 @@ import javax.annotation.Nullable
 import java.security.Principal
 
 @Requires(property = 'spec.name', value = 'authorization')
-@Endpoint("nonSensitive")
+@Endpoint(id = "nonSensitive", defaultSensitive = false)
 class NonSensitiveEndpoint {
 
     @Read

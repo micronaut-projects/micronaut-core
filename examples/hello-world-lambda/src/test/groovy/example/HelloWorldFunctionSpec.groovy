@@ -16,8 +16,6 @@
 package example
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
 import spock.lang.Specification

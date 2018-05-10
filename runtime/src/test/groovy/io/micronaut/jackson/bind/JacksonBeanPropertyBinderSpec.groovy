@@ -18,9 +18,6 @@ package io.micronaut.jackson.bind
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.jackson.bind.JacksonBeanPropertyBinder
 import spock.lang.Specification
 import spock.lang.Unroll
 

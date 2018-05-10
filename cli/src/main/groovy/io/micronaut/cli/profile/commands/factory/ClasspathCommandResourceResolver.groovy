@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.factory
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.io.support.PathMatchingResourcePatternResolver
 import io.micronaut.cli.io.support.Resource
-
+import io.micronaut.cli.profile.Profile
 
 /**
  * A {@link CommandResourceResolver} that resolves commands from the classpath under the directory META-INF/commands
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ClasspathCommandResourceResolver implements CommandResourceResolver {
@@ -40,13 +40,13 @@ class ClasspathCommandResourceResolver implements CommandResourceResolver {
 
     @Override
     Collection<Resource> findCommandResources(Profile profile) {
-        if(resources != null) return resources
+        if (resources != null) return resources
         def classLoader = classLoader ?: Thread.currentThread().contextClassLoader
         PathMatchingResourcePatternResolver resourcePatternResolver = new PathMatchingResourcePatternResolver(classLoader)
 
         try {
-           resources = []
-            for(String ext in matchingFileExtensions) {
+            resources = []
+            for (String ext in matchingFileExtensions) {
                 resources.addAll resourcePatternResolver.getResources("classpath*:META-INF/commands/*.$ext").toList()
             }
             return resources

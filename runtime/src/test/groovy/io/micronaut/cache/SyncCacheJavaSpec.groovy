@@ -16,7 +16,6 @@
 package io.micronaut.cache
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 /**

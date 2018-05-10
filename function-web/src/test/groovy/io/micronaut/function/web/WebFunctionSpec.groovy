@@ -17,14 +17,6 @@ package io.micronaut.function.web
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
-import io.micronaut.function.LocalFunctionRegistry
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.context.ApplicationContext
 import io.micronaut.function.FunctionBean
 import io.micronaut.function.LocalFunctionRegistry
 import io.micronaut.http.HttpHeaders
