@@ -65,12 +65,12 @@
 
     <!-- Miscellaneous other checks.                   -->
     <!-- See http://checkstyle.sf.net/config_misc.html -->
-<!--     <module name="RegexpSingleline">
-        <property name="format" value="\s+$"/>
-        <property name="minimum" value="0"/>
-        <property name="maximum" value="0"/>
-        <property name="message" value="Line has trailing spaces."/>
-    </module> -->
+    <!--     <module name="RegexpSingleline">
+            <property name="format" value="\s+$"/>
+            <property name="minimum" value="0"/>
+            <property name="maximum" value="0"/>
+            <property name="message" value="Line has trailing spaces."/>
+        </module> -->
 
     <!-- Be able to ignore violations with @SuppressWarnings -->
     <!-- See http://checkstyle.sf.net/config_filters.html#SuppressWarningsFilter -->
@@ -82,7 +82,7 @@
         <property name="optional" value="false"/>
     </module>
 
-     <module name="TreeWalker">
+    <module name="TreeWalker">
 
         <!-- Needed for SuppressWarningsFilter -->
         <module name="SuppressWarningsHolder"/>
@@ -124,7 +124,7 @@
         <!-- Checks for whitespace                               -->
         <!-- See http://checkstyle.sf.net/config_whitespace.html -->
         <!-- <module name="EmptyForIteratorPad"/> -->
-         <module name="GenericWhitespace"/>
+        <module name="GenericWhitespace"/>
         <!-- <module name="MethodParamPad"/> -->
         <!-- <module name="NoWhitespaceAfter"/> -->
         <!-- <module name="NoWhitespaceBefore"/> -->
@@ -137,7 +137,7 @@
             <property name="allowNoEmptyLineBetweenFields" value="true"/>
             <property name="allowMultipleEmptyLines" value="false"/>
         </module>
-        <module name="NoLineWrap" />
+        <module name="NoLineWrap"/>
 
         <!-- Modifier Checks                                    -->
         <!-- See http://checkstyle.sf.net/config_modifiers.html -->
@@ -168,13 +168,13 @@
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 
-         <!-- Checks for Inner assigment -->
-         <!-- See http://checkstyle.sourceforge.net/config_coding.html#InnerAssignment -->
-         <module name="InnerAssignment">
-             <property name="tokens" value="ASSIGN,PLUS_ASSIGN,MINUS_ASSIGN"/>
-         </module>
+        <!-- Checks for Inner assigment -->
+        <!-- See http://checkstyle.sourceforge.net/config_coding.html#InnerAssignment -->
+        <module name="InnerAssignment">
+            <property name="tokens" value="ASSIGN,PLUS_ASSIGN,MINUS_ASSIGN"/>
+        </module>
 
-         <!-- Checks for class design                         -->
+        <!-- Checks for class design                         -->
         <!-- See http://checkstyle.sf.net/config_design.html -->
         <module name="DesignForExtension">
             <property name="ignoredAnnotations" value="Override"/>
