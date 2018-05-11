@@ -32,8 +32,13 @@ import java.security.Principal;
  * @author James Kleeh
  * @since 1.0
  */
-@Endpoint(value = HealthEndpoint.NAME, defaultSensitive = false)
+@Endpoint(value = HealthEndpoint.NAME, defaultSensitive = HealthEndpoint.DEFAULT_SENSITIVE)
 public class HealthEndpoint {
+
+    /**
+     * If the endpoint is sensitive if no configuration is provided
+     */
+    public static final boolean DEFAULT_SENSITIVE = false;
 
     /**
      * Constant for health.
@@ -68,8 +73,7 @@ public class HealthEndpoint {
      */
     @Read
     Single getHealth(@Nullable Principal principal) {
-
-        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators,
-            healthLevelOfDetailResolver.levelOfDetail(principal)));
+        HealthLevelOfDetail detail = healthLevelOfDetailResolver.levelOfDetail(principal);
+        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators, detail));
     }
 }
