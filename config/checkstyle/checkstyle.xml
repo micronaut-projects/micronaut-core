@@ -195,6 +195,11 @@
         <module name="TodoComment"/>
         <module name="UpperEll"/>
 
+        <!-- TodoComments -->
+        <!-- See http://checkstyle.sourceforge.net/config_misc.html#TodoComment -->
+        <module name="TodoComment">
+            <property name="severity" value="warning"/>
+        </module>
     </module>
 
 </module>
