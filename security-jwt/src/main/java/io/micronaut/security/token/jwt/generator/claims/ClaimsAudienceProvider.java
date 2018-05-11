@@ -19,7 +19,8 @@ package io.micronaut.security.token.jwt.generator.claims;
 import java.util.List;
 
 /**
- * Identifies the recipients that the JWT is intented for.
+ * Identifies the recipients that the JWT is intended for.
+ *
  * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1.3">aud (Audience) Claim</a>
  * @author Sergio del Amo
  * @since 1.0

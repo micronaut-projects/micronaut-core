@@ -38,6 +38,7 @@ import java.util.Optional;
 
 /**
  * JWT Token Generation.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
