@@ -83,6 +83,12 @@ public @interface Endpoint {
     boolean defaultSensitive() default SENSITIVE;
 
     /**
+     *
+     * @return If the endpoint should bypass the restrictions (e.g. security filters) imposed by sensitive configuration.
+     */
+    boolean bypassSensitive() default false;
+
+    /**
      * @return The configuration key to look for when no configuration is provided
      */
     String defaultConfigurationId() default "all";
