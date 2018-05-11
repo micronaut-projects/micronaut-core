@@ -1,1 +1,44 @@
+When operating Microservices in production it can be challenging to troubleshoot interactions between Microservices in a distributed architecture.
+
+To solve this problem a way to visualize interactions between Microservices in a distributed manner can be critical. Currently, there are various distributed tracing solutions, the most popular of which are https://zipkin.io[Zipkin] and https://zipkin.io[Jaeger] both of which provide different levels of support for the http://opentracing.io[Open Tracing] API.
+
+Micronaut features integration with both Zipkin and Jaeger (via the Open Tracing API).
+
+
+To enable tracing you should add the `tracing` module to your `build.gradle` or `pom.xml` file:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:tracing"
+----
+
+==== Tracing Annotations
+
+The pkg:tracing.annotation[] package contains annotations that can be declared on methods to create new spans or continue existing spans.
+
+The available annotations are:
+
+* The ann:tracing.annotation.NewSpan[] annotation will create a new span, wrapping the method call or reactive type.
+* The ann:tracing.annotation.ContinueSpan[] annotation will continue an existing span, wrapping the method call or reactive type.
+* The ann:tracing.annotation.SpanTag[] annotation can be used on method arguments to include the value of each argument within a Span's tags
+
+The following snippet presents an example of using the annotations:
+
+.Using Trace Annotations
+[source,java]
+----
 TODO
+----
+
+==== Tracing Instrumentation
+
+In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
+
+These instrumentations are found in the pkg:tracing.instrument[] package and include HTTP <<clientFilters, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
+
+==== Tracing Beans
+
+If the Tracing annotations and existing instrumentations are not enough, Micronaut's tracing integration registers a `io.opentracing.Tracer` bean that can be injected into any class and exposes the Open Tracing API.
+
+Depending on the implementation you choose there are also additional beans. For example for Zipkin `brave.Tracing` and `brave.SpanCustomizer` beans are available too.

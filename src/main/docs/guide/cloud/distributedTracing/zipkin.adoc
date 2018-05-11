@@ -1,1 +1,76 @@
-https://github.com/micronaut-projects/micronaut-core/issues/99[TODO]
+https://zipkin.io[Zipkin] is a distributed tracing system. It helps gather timing data needed to troubleshoot latency problems in microservice architectures. It manages both the collection and lookup of this data.
+
+==== Running Zipkin
+
+The quickest way to get up and started with Zipkin is with Docker:
+
+.Running Zipkin with Docker
+[source,bash]
+----
+$ docker run -d -p 9411:9411 openzipkin/zipkin
+----
+
+You can then open a browser tab to the location `http://localhost:9411` to view traces.
+
+==== Sending Traces to Zipkin
+
+To send tracing spans to Zipkin the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
+
+.Adding Zipkin Dependencies
+[source,groovy]
+----
+runtime 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
+runtime 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
+compile 'io.opentracing.brave:brave-opentracing:0.30.0'
+----
+
+Then you need to enable ZipKin tracing in your configuration (potentially only your production configuration):
+
+.application.yml
+[source,yaml]
+----
+tracing:
+    zipkin:
+        enabled: true
+----
+
+==== Customizing the Zipkin Sender
+
+By default a api:tracing.brave.sender.HttpClientSender[] that sends Spans asynchronously using Micronaut's native HTTP client to `http://localhost:9411/api/v2/spans` will be configured.
+
+It is unlikely that sending spans to localhost will be suitable for production deployment so you generally will want to configure the location of one or many Zipkin servers for production:
+
+.Configuring Multiple Zipkin Servers
+[source,yaml]
+----
+tracing:
+    zipkin:
+        enabled: true
+        urls:
+            - http://foo:9411
+            - http://bar:9411
+----
+
+TIP: In production, setting `TRACING_ZIPKIN_URLS` environment variable with a comma separated list of URLs will also work.
+
+Alternatively if you wish to use a different `zipkin2.reporter.Sender` implementation, you can simply define a bean that is of type `zipkin2.reporter.Sender` and it will be picked up.
+
+==== Zipkin Configuration
+
+There are many configuration options available for the Brave client that sends Spans to Zipkin and they are generally exposed via the api:tracing.brave.BraveTracerConfiguration[] class. You can refer to the javadoc for all the available options.
+
+Below is an example of customizing Zipkin configuration:
+
+.Customizing Zipkin Configuration
+[source,yaml]
+----
+tracing:
+    zipkin:
+        enabled: true
+        traceId128Bit: true
+        sampler:
+            probability: 1
+----
+
+You can also optionally dependency inject common configuration classes into api:tracing.brave.BraveTracerConfiguration[] such as `brave.sampler.Sampler` just by defining them as beans. See the API for api:tracing.brave.BraveTracerConfiguration[] for available injection points.
+
