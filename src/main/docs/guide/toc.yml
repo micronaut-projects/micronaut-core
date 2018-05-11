@@ -93,6 +93,7 @@ httpClient:
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
+    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
 cloud:
   title: Cloud Native Features
