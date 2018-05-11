@@ -81,6 +81,16 @@ public interface Router {
     <T> Optional<RouteMatch<T>> route(HttpStatus status);
 
     /**
+     * Found a {@link RouteMatch} for the given {@link HttpStatus} code.
+     *
+     * @param originatingClass The class the error originates from
+     * @param status The HTTP status
+     * @param <T>    The matched route
+     * @return The {@link RouteMatch}
+     */
+    <T> Optional<RouteMatch<T>> route(Class originatingClass, HttpStatus status);
+
+    /**
      * Match a route to an error.
      *
      * @param error The error

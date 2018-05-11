@@ -174,9 +174,28 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
+        // do not allow multiple local status routes in the same controller
+        // locally declared @Error routes will be allowed and will take precedence over globally defined ones
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass)) {
+            throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
+        }
+        Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+
+        MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
+                new RoutingException("No such route: " + type.getName() + "." + method)
+        );
+
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(originatingClass, status, executableHandle, conversionService);
+        this.statusRoutes.add(statusRoute);
+        return statusRoute;
+    }
+
+    @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
+        // do not allow multiple @Error global routes defined for one status
         if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status)) {
-            throw new RoutingException("Attempted to register multiple routes for http status " + String.valueOf(status.getCode()));
+            throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
@@ -543,9 +562,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link HttpStatus} code.
      */
-    class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
+    class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute> {
 
         private final HttpStatus status;
+        private final Class originatingClass;
 
         /**
          * @param status The HTTP Status
@@ -553,8 +573,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            this(null, status, targetMethod, conversionService);
+        }
+
+        /**
+         * @param originatingClass The originating class
+         * @param status The HTTP Status
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
+            this.originatingClass = originatingClass;
             this.status = status;
+        }
+
+        @Override
+        public Class<?> originatingType() {
+            return originatingClass;
         }
 
         @Override
@@ -564,8 +600,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @SuppressWarnings("unchecked")
         @Override
+        public <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status) {
+            if (originatingClass == this.originatingClass && this.status == status) {
+                return Optional.of(new StatusRouteMatch(status, this, conversionService));
+            }
+            return Optional.empty();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
         public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
-            if (this.status == status) {
+            if (this.originatingClass == null && this.status == status) {
                 return Optional.of(new StatusRouteMatch(status, this, conversionService));
             }
             return Optional.empty();
@@ -609,12 +654,32 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
             DefaultStatusRoute that = (DefaultStatusRoute) o;
 
-            return status == that.status;
+            if (status != null ? !status.equals(that.status) : that.status != null) {
+                return false;
+            }
+            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
         }
 
         @Override
         public int hashCode() {
-            return status.hashCode();
+            int result = status != null ? status.hashCode() : 0;
+            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
+            return result;
+        }
+
+        @Override
+        public int compareTo(StatusRoute o) {
+            if (o == this) {
+                return 0;
+            }
+            Class<?> thatType = o.originatingType();
+            Class<?> thisType= this.originatingType();
+
+            if (thisType == thatType && this.status().equals(o.status())) {
+                return 0;
+            } else {
+                return -1;
+            }
         }
     }
 

@@ -190,7 +190,13 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 Class declaringType = method.getDeclaringType();
                 if (method.isPresent(Error.class, "status")) {
                     Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
-                    value.ifPresent(httpStatus -> status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes()));
+                    value.ifPresent(httpStatus -> {
+                        if (isGlobal) {
+                            status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        } else {
+                            status(declaringType, httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        }
+                    });
                 } else if (method.isPresent(Error.class, "value")) {
                     Optional<Class> aClass = method.classValue(Error.class);
                     aClass.ifPresent(exceptionType -> {

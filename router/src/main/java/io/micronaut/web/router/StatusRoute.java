@@ -30,6 +30,10 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface StatusRoute extends MethodBasedRoute {
+    /**
+     * @return The type the exception originates from. Null if the error route is global.
+     */
+    Class<?> originatingType();
 
     /**
      * @return The status
@@ -44,6 +48,16 @@ public interface StatusRoute extends MethodBasedRoute {
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(HttpStatus status);
+
+    /**
+     * Match the given HTTP status.
+     *
+     * @param originatingClass The class where the error originates from
+     * @param status The status to match
+     * @param <T>    The matched route
+     * @return The route match
+     */
+    <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status);
 
     @Override
     StatusRoute consumes(MediaType... mediaType);

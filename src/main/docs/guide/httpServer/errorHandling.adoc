@@ -37,3 +37,7 @@ include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=
 <1> The api:http.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
 <2> A api:http.hateos.VndError[] instance is returned for all 404 responses
 <3> An api:http.HttpStatus#NOT_FOUND[] response is returned
+
+IMPORTANT: A few things to note about the api:http.annotation.Error[] annotation. Two id@entical Error annotations that are
+global cannot be declared. Two identical Error annotations that are non-global cannot be declared in the same controller.
+If an Error annotation with the same parameter exists as global and another as a local, the local one will take precedence.

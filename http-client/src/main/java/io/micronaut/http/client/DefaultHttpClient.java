@@ -103,6 +103,7 @@ import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.Future;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Emitter;
 import io.reactivex.Flowable;
@@ -289,13 +290,24 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     @Override
     @PreDestroy
     public HttpClient stop() {
-        if (isRunning()) {
-            this.group.shutdownGracefully().addListener(f -> {
+        if (isRunning() ) {
+            Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
+            Future<?> future = this.group.shutdownGracefully(
+                    1,
+                    shutdownTimeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+            );
+            future.addListener(f -> {
                 if (!f.isSuccess() && LOG.isErrorEnabled()) {
                     Throwable cause = f.cause();
                     LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
                 }
             });
+            try {
+                future.await(shutdownTimeout.toMillis());
+            } catch (InterruptedException e) {
+                // ignore
+            }
         }
         return this;
     }
@@ -1012,7 +1024,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             .orElse(null);
                     }
                     if (bodyContent == null) {
-                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElse(null);
+                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElseThrow(()->
+                            new HttpClientException("Body ["+bodyValue+"] cannot be encoded to content type ["+requestContentType+"]. No possible codecs or converters found.")
+                        );
                     }
                 }
                 nettyRequest = clientHttpRequest.getFullRequest(bodyContent);
