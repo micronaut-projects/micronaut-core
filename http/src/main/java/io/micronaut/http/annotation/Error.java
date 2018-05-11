@@ -41,6 +41,7 @@ public @interface Error {
     /**
      * @return The exception to map to
      */
+    @AliasFor("exception")
     Class<? extends Throwable> value() default Throwable.class;
 
     /**

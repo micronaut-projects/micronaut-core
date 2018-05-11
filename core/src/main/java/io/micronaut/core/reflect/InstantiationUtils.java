@@ -93,8 +93,8 @@ public class InstantiationUtils {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Tried, but could not instantiate type: " + type, e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Tried, but could not instantiate type: " + type, e);
             }
             return Optional.empty();
         }
