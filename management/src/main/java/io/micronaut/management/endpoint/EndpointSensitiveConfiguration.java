@@ -38,8 +38,6 @@ import java.util.Optional;
 @Singleton
 public class EndpointSensitiveConfiguration implements ExecutableMethodProcessor<Endpoint> {
 
-    private final List<String> ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES = Collections.singletonList("health");
-
     private final EndpointConfiguration[] endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;
     private Map<Method, Boolean> endpointMethods = new HashMap<>();
@@ -77,7 +75,8 @@ public class EndpointSensitiveConfiguration implements ExecutableMethodProcessor
                     .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
 
 
-            boolean sensitive = ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES.contains(configuration.getId()) ? false :
+            Optional<Boolean> bypassSensitiveRestriction = beanDefinition.getValue(Endpoint.class, "bypassSensitive", Boolean.class);
+            boolean sensitive = (bypassSensitiveRestriction.isPresent() && bypassSensitiveRestriction.get()) ? false :
                     configuration.isSensitive().orElseGet(() -> beanDefinition
                             .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
                             .orElse(Endpoint.SENSITIVE));

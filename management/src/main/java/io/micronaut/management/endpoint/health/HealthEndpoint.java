@@ -32,7 +32,7 @@ import java.security.Principal;
  * @author James Kleeh
  * @since 1.0
  */
-@Endpoint(HealthEndpoint.NAME)
+@Endpoint(value = HealthEndpoint.NAME, bypassSensitive = true)
 public class HealthEndpoint {
 
     /**
