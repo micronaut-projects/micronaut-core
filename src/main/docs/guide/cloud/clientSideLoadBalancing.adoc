@@ -1,1 +1,15 @@
-TODO
+When <<serviceDiscovery, discovering services>> from Consul, Eureka or other Service Discovery servers the api:discovery.DiscoveryClient[] will emits a list of available api:discovery.ServiceInstance[].
+
+Micronaut by default will automatically perform Round Robin client-side load balancing using the servers in this list. This combined with <<retryAdvice, Retry Advice>> adds extra resiliency to your Microservice infrastructure.
+
+The load balancing itself is handled by the api:http.client.LoadBalancer[] interface which defines a  api:http.client.LoadBalancer.select()[] method that returns a `Publisher` that emits a api:discovery.ServiceInstance[].
+
+The rs:Publisher[] is returned because the process for selecting a api:discovery.ServiceInstance[] may result in a network operation depending on the <<serviceDiscovery, Service Discovery>> strategy employed.
+
+The default implementation of the api:http.client.LoadBalancer[] interface is api:http.client.loadbalance.DiscoveryClientRoundRobinLoadBalancer[]. You can replace this strategy for another implementation if you wish to customize how client side load balancing is handled in Micronaut since there are many different ways you may wish to optimize load balancing.
+
+For example, you may wish to load balance between services in a particular zone or you may wish to load balance between servers that have the best overall response time.
+
+To replace the api:http.client.LoadBalancer[] used you should define a bean that <<replaces, replaces>> the api:http.client.loadbalance.DiscoveryClientLoadBalancerFactory[].
+
+In fact that is exactly what the Netflix Ribbon support does, described in the next section.
