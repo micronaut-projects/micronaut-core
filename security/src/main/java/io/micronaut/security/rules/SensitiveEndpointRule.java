@@ -17,7 +17,7 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
-import io.micronaut.management.endpoint.EndpointSensitiveConfiguration;
+import io.micronaut.management.endpoint.EndpointSensitivityProcessor;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 
@@ -42,25 +42,29 @@ public class SensitiveEndpointRule implements SecurityRule {
      */
     public static final Integer ORDER = 0;
 
-    protected final EndpointSensitiveConfiguration endpointSensitiveConfiguration;
+    /**
+     * A map where the key represents the method of an endpoint
+     * and the value represents the endpoints sensitivity.
+     */
+    protected final Map<Method, Boolean> endpointMethods;
 
     /**
      * Constructs the rule with the existing and default endpoint
      * configurations used to determine if a given endpoint is
      * sensitive.
      *
-     * @param endpointSensitiveConfiguration The endpoint configurations
+     * @param endpointSensitivityProcessor The endpoint configurations
      */
-    SensitiveEndpointRule(EndpointSensitiveConfiguration endpointSensitiveConfiguration) {
-        this.endpointSensitiveConfiguration = endpointSensitiveConfiguration;
+    SensitiveEndpointRule(EndpointSensitivityProcessor endpointSensitivityProcessor) {
+        this.endpointMethods = endpointSensitivityProcessor.getEndpointMethods();
     }
 
     @Override
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
         if (routeMatch instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch).getTargetMethod();
-            if (endpointSensitiveConfiguration.getEndpointMethods().containsKey(method)) {
-                Boolean sensitive = endpointSensitiveConfiguration.getEndpointMethods().get(method);
+            if (endpointMethods.containsKey(method)) {
+                Boolean sensitive = endpointMethods.get(method);
                 if (claims == null && sensitive) {
                     return SecurityRuleResult.REJECTED;
                 } else {

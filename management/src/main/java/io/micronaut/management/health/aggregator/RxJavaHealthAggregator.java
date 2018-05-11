@@ -53,9 +53,9 @@ import java.util.stream.Collectors;
 @Requires(beans = HealthEndpoint.class)
 public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
-    private static final String KEY_STATUS = "status";
-    private static final String KEY_DESCRIPTION = "description";
-    private static final String KEY_DETAILS = "details";
+    private final static String STATUS = "status";
+    private final static String DESCRIPTION = "description";
+    private final static String DETAILS = "details";
 
     @Override
     public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
@@ -121,13 +121,13 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
     @SuppressWarnings("MagicNumber")
     protected Map<String, Object> buildResult(HealthStatus status, Object details, HealthLevelOfDetail healthLevelOfDetail) {
         if (healthLevelOfDetail == HealthLevelOfDetail.STATUS) {
-            return Collections.singletonMap(KEY_STATUS, status.getName());
+            return Collections.singletonMap(STATUS, status.getName());
         }
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
-        healthStatus.put(KEY_STATUS, status.getName());
-        status.getDescription().ifPresent(description -> healthStatus.put(KEY_DESCRIPTION, description));
+        healthStatus.put(STATUS, status.getName());
+        status.getDescription().ifPresent(description -> healthStatus.put(DESCRIPTION, description));
         if (details != null) {
-            healthStatus.put(KEY_DETAILS, details);
+            healthStatus.put(DETAILS, details);
         }
         return healthStatus;
     }

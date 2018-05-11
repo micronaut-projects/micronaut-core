@@ -31,6 +31,7 @@ import io.micronaut.web.router.RouteMatchUtils;
 import org.reactivestreams.Publisher;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -43,15 +44,15 @@ import java.util.Optional;
 @Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
-    protected final EndpointSensitiveConfiguration endpointSensitiveConfiguration;
+    protected final Map<Method, Boolean> endpointMethods;
 
     /**
      * Constructor.
      *
-     * @param endpointSensitiveConfiguration Contains a Map with Endpoint Sensitive information
+     * @param endpointSensitivityProcessor The processor that resolves endpoint sensitivity
      */
-    public EndpointsFilter(EndpointSensitiveConfiguration endpointSensitiveConfiguration) {
-        this.endpointSensitiveConfiguration = endpointSensitiveConfiguration;
+    public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor) {
+        this.endpointMethods = endpointSensitivityProcessor.getEndpointMethods();
     }
 
     /**
@@ -67,8 +68,8 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch.get()).getTargetMethod();
-            if (endpointSensitiveConfiguration.getEndpointMethods().containsKey(method)) {
-                if (endpointSensitiveConfiguration.getEndpointMethods().get(method)) {
+            if (endpointMethods.containsKey(method)) {
+                if (endpointMethods.get(method)) {
                     return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 }
             }

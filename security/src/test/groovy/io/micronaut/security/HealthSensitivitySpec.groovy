@@ -72,19 +72,18 @@ class HealthSensitivitySpec extends Specification {
     }
 
     @Unroll
-    void "#description => #expected"(boolean setSensitive, boolean sensitive, boolean security, boolean authenticated, HealthLevelOfDetail expected, String description) {
+    void "#description => #expected"(boolean sensitive, boolean security, boolean authenticated, HealthLevelOfDetail expected, String description) {
         given:
         Map m = [
                 'spec.name': 'healthsensitivity',
                 'endpoints.health.enabled': true,
+                'endpoints.health.sensitive': sensitive,
                 'endpoints.health.disk-space.threshold': '9999GB',
         ]
         if (security) {
             m['micronaut.security.enabled'] = security
         }
-        if (setSensitive) {
-            m['endpoints.health.sensitive'] = sensitive
-        }
+
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m)
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
@@ -113,15 +112,12 @@ class HealthSensitivitySpec extends Specification {
         rxClient.close()
 
         where:
-        setSensitive | sensitive | security | authenticated | expected
-        false        | false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false        | false     | true     | false         | HealthLevelOfDetail.STATUS
-        true         | true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true         | false     | true     | false         | HealthLevelOfDetail.STATUS
-        true         | false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true         | false     | false    | false         | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false        | false     | false    | false         | HealthLevelOfDetail.STATUS
-        description = setSensitive ? "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated': 'not authenticated') : '') : (security ? 'micronaut.security.enabled=true '  + (authenticated ? 'authenticated': 'not authenticated')  : 'default settings')
+        sensitive | security | authenticated | expected
+        true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        false     | true     | false         | HealthLevelOfDetail.STATUS
+        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        false     | false    | false         | HealthLevelOfDetail.STATUS
+        description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated': 'not authenticated') : '')
     }
 
     @Singleton

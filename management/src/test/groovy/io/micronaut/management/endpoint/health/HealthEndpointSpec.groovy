@@ -16,15 +16,22 @@
 package io.micronaut.management.endpoint.health
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
 import io.micronaut.management.health.indicator.diskspace.DiskSpaceIndicator
 import io.micronaut.management.health.indicator.jdbc.JdbcIndicator
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
+import javax.inject.Singleton
 import javax.sql.DataSource
+import java.security.Principal
 
 class HealthEndpointSpec extends Specification {
 
@@ -119,6 +126,7 @@ class HealthEndpointSpec extends Specification {
     void "test health endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
                 'endpoints.health.sensitive': false,
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:h2:mem:twoDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
@@ -153,7 +161,10 @@ class HealthEndpointSpec extends Specification {
 
     void "test health endpoint with a high diskspace threshold"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.health.sensitive': false, 'endpoints.health.disk-space.threshold': '9999GB'])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': false,
+                'endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
@@ -175,6 +186,7 @@ class HealthEndpointSpec extends Specification {
     void "test health endpoint with a non response jdbc datasource"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
                 'endpoints.health.sensitive': false,
                 'datasources.one.url': 'jdbc:h2:mem:oneDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:mysql://localhost:59654/foo'
@@ -198,5 +210,31 @@ class HealthEndpointSpec extends Specification {
         cleanup:
         embeddedServer.close()
 
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'HealthEndpointSpec')
+    static class TestPrincipalBinder implements TypedRequestArgumentBinder<Principal> {
+
+        @Override
+        Argument<Principal> argumentType() {
+            return Argument.of(Principal)
+        }
+
+        @Override
+        BindingResult<Principal> bind(ArgumentConversionContext<Principal> context, HttpRequest<?> source) {
+            return new BindingResult<Principal>() {
+                @Override
+                Optional<Principal> getValue() {
+                    Optional.of(new Principal() {
+
+                        @Override
+                        String getName() {
+                            return "Test class"
+                        }
+                    })
+                }
+            }
+        }
     }
 }

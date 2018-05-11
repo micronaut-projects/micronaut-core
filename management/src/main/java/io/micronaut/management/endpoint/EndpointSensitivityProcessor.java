@@ -34,7 +34,7 @@ import java.util.Optional;
  * @version 1.0
  */
 @Singleton
-public class EndpointSensitiveConfiguration implements ExecutableMethodProcessor<Endpoint> {
+public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<Endpoint> {
 
     private final EndpointConfiguration[] endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;
@@ -47,8 +47,8 @@ public class EndpointSensitiveConfiguration implements ExecutableMethodProcessor
      * @param endpointConfigurations The endpoint configurations
      * @param defaultConfiguration   The default endpoint configuration
      */
-    public EndpointSensitiveConfiguration(EndpointConfiguration[] endpointConfigurations,
-                                          EndpointDefaultConfiguration defaultConfiguration) {
+    public EndpointSensitivityProcessor(EndpointConfiguration[] endpointConfigurations,
+                                        EndpointDefaultConfiguration defaultConfiguration) {
         this.endpointConfigurations = endpointConfigurations;
         this.defaultConfiguration = defaultConfiguration;
     }
