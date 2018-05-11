@@ -45,6 +45,7 @@ class BeansEndpointSpec extends Specification {
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
     }
 }

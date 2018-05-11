@@ -46,6 +46,7 @@ class SimpleEndpointSpec extends Specification {
         response.body() == 'test foo'
 
         cleanup:
+        rxClient.close()
         server.close()
     }
 
@@ -66,6 +67,7 @@ class SimpleEndpointSpec extends Specification {
         response.body() == 'test baz'
 
         cleanup:
+        rxClient.close()
         server.close()
     }
 
@@ -91,6 +93,7 @@ class SimpleEndpointSpec extends Specification {
         response.body() == 'test bar'
 
         cleanup:
+        rxClient.close()
         server.close()
     }
 
@@ -109,6 +112,7 @@ class SimpleEndpointSpec extends Specification {
         ex.response.code() == HttpStatus.NOT_FOUND.code
 
         cleanup:
+        rxClient.close()
         server.close()
     }
 }

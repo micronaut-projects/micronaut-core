@@ -41,6 +41,10 @@ class ServerStopEndpointSpec extends Specification {
         then:
         HttpClientResponseException ex = thrown()
         ex.response.code() == HttpStatus.NOT_FOUND.code
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
     void "test the server is stopped after exercising the endpoint"() {
@@ -58,5 +62,9 @@ class ServerStopEndpointSpec extends Specification {
         conditions.eventually {
             assert !embeddedServer.isRunning()
         }
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 }
