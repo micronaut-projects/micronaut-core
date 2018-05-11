@@ -50,8 +50,8 @@ public class HealthEndpoint {
     private HealthLevelOfDetailResolver healthLevelOfDetailResolver;
 
     /**
-     * @param healthAggregator The {@link HealthAggregator}
-     * @param healthIndicators The {@link HealthIndicator}
+     * @param healthAggregator            The {@link HealthAggregator}
+     * @param healthIndicators            The {@link HealthIndicator}
      * @param healthLevelOfDetailResolver The {@link HealthLevelOfDetailResolver}
      */
     public HealthEndpoint(HealthAggregator healthAggregator,
@@ -70,6 +70,6 @@ public class HealthEndpoint {
     Single getHealth(@Nullable Principal principal) {
 
         return Single.fromPublisher(healthAggregator.aggregate(healthIndicators,
-                healthLevelOfDetailResolver.levelOfDetail(principal)));
+            healthLevelOfDetailResolver.levelOfDetail(principal)));
     }
 }

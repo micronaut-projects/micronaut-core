@@ -53,9 +53,9 @@ import java.util.stream.Collectors;
 @Requires(beans = HealthEndpoint.class)
 public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
-    private final static String KEY_STATUS = "status";
-    private final static String KEY_DESCRIPTION = "description";
-    private final static String KEY_DETAILS = "details";
+    private static final String KEY_STATUS = "status";
+    private static final String KEY_DESCRIPTION = "description";
+    private static final String KEY_DETAILS = "details";
 
     @Override
     public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
@@ -115,6 +115,7 @@ public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Obje
     /**
      * @param status  A {@link HealthStatus}
      * @param details The health status details
+     * @param healthLevelOfDetail The {@link HealthLevelOfDetail}
      * @return A {@link Map} with the results from the health status
      */
     @SuppressWarnings("MagicNumber")
