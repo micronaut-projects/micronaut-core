@@ -73,7 +73,7 @@ public final class MultipartBody {
     /**
      * A builder class to add different {@link Part} to {@link MultipartBody}.
      */
-    public static class Builder {
+    public static final class Builder {
 
         /**
          * List of all parts.

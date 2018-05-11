@@ -290,7 +290,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     @Override
     @PreDestroy
     public HttpClient stop() {
-        if (isRunning() ) {
+        if (isRunning()) {
             Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
             Future<?> future = this.group.shutdownGracefully(
                     1,
@@ -1024,8 +1024,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             .orElse(null);
                     }
                     if (bodyContent == null) {
-                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElseThrow(()->
-                            new HttpClientException("Body ["+bodyValue+"] cannot be encoded to content type ["+requestContentType+"]. No possible codecs or converters found.")
+                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
+                            new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found.")
                         );
                     }
                 }

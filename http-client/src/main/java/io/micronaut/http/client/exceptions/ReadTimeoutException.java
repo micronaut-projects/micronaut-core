@@ -22,7 +22,7 @@ package io.micronaut.http.client.exceptions;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ReadTimeoutException extends HttpClientException {
+public final class ReadTimeoutException extends HttpClientException {
 
     public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException();
 
