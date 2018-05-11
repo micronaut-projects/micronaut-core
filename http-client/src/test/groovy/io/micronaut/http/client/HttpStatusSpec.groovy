@@ -31,8 +31,13 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 class HttpStatusSpec extends Specification {
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+
+    @AutoCleanup
+    @Shared
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     void "Simple default return HttpStatus OK"() {
         when:

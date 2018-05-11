@@ -46,7 +46,7 @@ class RefreshEventSpec extends Specification {
             'micronaut.server.port':port,
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     String getUrl() {
         "http://localhost:$port"
