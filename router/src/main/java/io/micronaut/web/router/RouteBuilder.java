@@ -168,6 +168,17 @@ public interface RouteBuilder {
     StatusRoute status(HttpStatus status, Class type, String method, Class... parameterTypes);
 
     /**
+     * Register a route to handle the returned status code. This implementation considers the originatingClass for matching.
+     *
+     * @param originatingClass The class where the error originates from
+     * @param status         The status code
+     * @param type           The type
+     * @param method         The method
+     * @param parameterTypes The parameter types for the target method
+     * @return The route
+     */
+    StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class... parameterTypes);
+    /**
      * Register a route to handle the error.
      *
      * @param error  The error

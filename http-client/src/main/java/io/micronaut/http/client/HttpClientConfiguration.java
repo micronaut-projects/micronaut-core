@@ -55,6 +55,8 @@ public abstract class HttpClientConfiguration {
 
     private Duration readTimeout = Duration.ofSeconds(10);
 
+    private Duration shutdownTimeout = Duration.ofMillis(100);
+
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
 
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
@@ -137,6 +139,22 @@ public abstract class HttpClientConfiguration {
      */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
+    }
+
+    /**
+     * The amount of time to wait for shutdown
+     * @return The shutdown timeout
+     */
+    public Optional<Duration> getShutdownTimeout() {
+        return Optional.ofNullable(shutdownTimeout);
+    }
+
+    /**
+     * Sets the amount of time to wait for shutdown of client thread pools
+     * @param shutdownTimeout The shutdown time
+     */
+    public void setShutdownTimeout(Duration shutdownTimeout) {
+        this.shutdownTimeout = shutdownTimeout;
     }
 
     /**

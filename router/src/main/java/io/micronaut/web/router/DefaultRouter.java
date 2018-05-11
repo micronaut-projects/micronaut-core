@@ -46,7 +46,7 @@ import java.util.stream.Stream;
 public class DefaultRouter implements Router {
 
     private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];
-    private final StatusRoute[] routesByStatus = new StatusRoute[HttpStatus.values().length];
+    private final SortedSet<StatusRoute> routesByStatus = new TreeSet<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
 
@@ -102,11 +102,7 @@ public class DefaultRouter implements Router {
                 }
             }
 
-            for (StatusRoute statusRoute : builder.getStatusRoutes()) {
-                HttpStatus status = statusRoute.status();
-                this.routesByStatus[status.ordinal()] = statusRoute;
-            }
-
+            this.routesByStatus.addAll(builder.getStatusRoutes());
             this.errorRoutes.addAll(builder.getErrorRoutes());
             this.filterRoutes.addAll(builder.getFilterRoutes());
         }
@@ -180,11 +176,26 @@ public class DefaultRouter implements Router {
 
     @Override
     public <T> Optional<RouteMatch<T>> route(HttpStatus status) {
-        StatusRoute routesByStatus = this.routesByStatus[status.ordinal()];
-        if (routesByStatus == null) {
-            return Optional.empty();
+        for (StatusRoute statusRoute : routesByStatus) {
+            if (statusRoute.originatingType() == null) {
+                Optional<RouteMatch<T>> match = statusRoute.match(status);
+                if (match.isPresent()) {
+                    return match;
+                }
+            }
         }
-        return routesByStatus.match(status);
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<RouteMatch<T>> route(Class originatingClass, HttpStatus status) {
+        for (StatusRoute statusRoute : routesByStatus) {
+            Optional<RouteMatch<T>> match = statusRoute.match(originatingClass, status);
+            if (match.isPresent()) {
+                return match;
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
