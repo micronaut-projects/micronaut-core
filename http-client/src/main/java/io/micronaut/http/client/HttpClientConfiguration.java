@@ -142,7 +142,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * The amount of time to wait for shutdown
+     * The amount of time to wait for shutdown.
+     *
      * @return The shutdown timeout
      */
     public Optional<Duration> getShutdownTimeout() {
@@ -150,7 +151,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the amount of time to wait for shutdown of client thread pools
+     * Sets the amount of time to wait for shutdown of client thread pools.
+     *
      * @param shutdownTimeout The shutdown time
      */
     public void setShutdownTimeout(Duration shutdownTimeout) {
