@@ -36,9 +36,8 @@ class RefreshEndpointSpec extends Specification {
     void "test refresh endpoint"() {
         given:
         System.setProperty("foo.bar", "test")
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], "test")
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
 
         when:
         def response = rxClient.exchange("/refreshTest", String).blockingFirst()
@@ -68,10 +67,9 @@ class RefreshEndpointSpec extends Specification {
         embeddedServer.close()
     }
 
-
     void "test refresh endpoint with all parameter"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], "test")
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -111,8 +109,7 @@ class RefreshEndpointSpec extends Specification {
         rxClient.close()
         embeddedServer.close()
     }
-
-
+    
     @Controller("/refreshTest")
     static class TestController {
         private final RefreshBean refreshBean
