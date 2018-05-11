@@ -34,8 +34,7 @@ class SimpleEndpointSpec extends Specification {
     void "test read simple endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
-                ['endpoints.simple.myValue':'foo']
-        )
+                ['endpoints.simple.myValue':'foo'], 'test')
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
@@ -78,7 +77,6 @@ class SimpleEndpointSpec extends Specification {
         )
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
-
         when:
         def response = rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String).blockingFirst()
 
@@ -117,7 +115,7 @@ class SimpleEndpointSpec extends Specification {
     }
 }
 
-@Endpoint('simple')
+@Endpoint(value = 'simple', defaultSensitive = false)
 class Simple implements Toggleable {
 
     private final ApplicationContext applicationContext

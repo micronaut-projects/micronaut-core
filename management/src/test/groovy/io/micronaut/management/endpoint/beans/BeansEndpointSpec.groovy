@@ -29,7 +29,7 @@ class BeansEndpointSpec extends Specification {
      */
     void "test beans endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.beans.sensitive': false], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
