@@ -46,7 +46,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Responsible for building {@link Route} instances for the annotations found in the {@link io.micronaut.http.annotation}
+ * Responsible for building {@link Route} instances for the annotations found in the {@code io.micronaut.http.annotation}
  * package.
  *
  * @author Graeme Rocher

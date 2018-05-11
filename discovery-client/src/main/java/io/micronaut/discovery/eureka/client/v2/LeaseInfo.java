@@ -64,7 +64,7 @@ public class LeaseInfo {
     }
 
     /**
-     * TODO: note about renewalTimestamp legacy:
+     * Note about renewalTimestamp legacy:
      * The previous change to use Jackson ser/deser changed the field name for lastRenewalTimestamp to renewalTimestamp
      * for serialization, which causes an incompatibility with the jacksonNG codec when the server returns data with
      * field renewalTimestamp and jacksonNG expects lastRenewalTimestamp. Remove this legacy field from client code

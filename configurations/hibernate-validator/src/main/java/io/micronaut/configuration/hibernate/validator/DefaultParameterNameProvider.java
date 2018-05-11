@@ -28,7 +28,12 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +50,7 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
 
     /**
      * Constructor.
+     *
      * @param beanContext beanContext
      */
     public DefaultParameterNameProvider(BeanContext beanContext) {
@@ -78,6 +84,7 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
 
     /**
      * Add the parameter types to a list of names.
+     *
      * @param parameterTypes parameterTypes
      * @return list of strings
      */
@@ -91,12 +98,12 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
 
     private List<String> doGetParameterNames(Executable executable) {
         Parameter[] parameters = executable.getParameters();
-        List<String> parameterNames = new ArrayList<>( parameters.length );
+        List<String> parameterNames = new ArrayList<>(parameters.length);
 
-        for ( Parameter parameter : parameters ) {
-            parameterNames.add( parameter.getName() );
+        for (Parameter parameter : parameters) {
+            parameterNames.add(parameter.getName());
         }
 
-        return Collections.unmodifiableList( parameterNames );
+        return Collections.unmodifiableList(parameterNames);
     }
 }

@@ -24,13 +24,17 @@ import org.slf4j.LoggerFactory;
 import java.util.Optional;
 
 /**
- * @autor Sergio del Amo
+ * @author Sergio del Amo
  * @since 1.0
  */
 public class RouteMatchUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteMatchUtils.class);
 
+    /**
+     * @param request The Http request
+     * @return The optional route match
+     */
     public static Optional<RouteMatch> findRouteMatchAtRequest(HttpRequest<?> request) {
         Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
         if (routeMatchAttribute.isPresent()) {
