@@ -7,7 +7,7 @@ dependencies {
     testCompile project(":inject-java")
     testCompile project(":tracing")
 
-    testCompile 'io.jaegertracing:jaeger-core:0.27.0-RC1'
+    testCompile 'io.jaegertracing:jaeger-core:0.27.0'
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
     testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
