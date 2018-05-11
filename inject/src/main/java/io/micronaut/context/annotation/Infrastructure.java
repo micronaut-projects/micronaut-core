@@ -24,11 +24,9 @@ import java.lang.annotation.Retention;
 /**
  * <p>Infrastructure scope represents a bean that cannot be overridden or replaced
  * because it is critical to the functioning of the system.</p>
- *
- * @see Context @Context
  */
-@Context
 @Documented
 @Retention(RUNTIME)
+@Bean
 public @interface Infrastructure {
 }

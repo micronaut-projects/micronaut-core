@@ -183,26 +183,6 @@ class Test {
         !metadata.hasStereotype(Singleton)
     }
 
-    void "test parse inherited stereotype data"() {
-
-        given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
-
-@io.micronaut.context.annotation.Infrastructure
-class Test {
-}
-''')
-
-        expect:
-        metadata != null
-        metadata.hasAnnotation(Infrastructure)
-        metadata.hasDeclaredAnnotation(Infrastructure)
-        metadata.hasStereotype(Singleton)
-        metadata.hasStereotype(Scope)
-        metadata.hasStereotype(Context)
-    }
-
     void "test parse inherited stereotype data attributes default values"() {
 
         given:
