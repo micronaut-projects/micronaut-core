@@ -1,1 +1,37 @@
-https://github.com/micronaut-projects/micronaut-core/issues/98[TODO]
+https://github.com/Netflix/ribbon[Netflix Ribbon] is a inter process communication library used at Netflix that has support for customizable load balancing strategies.
+
+If you need more flexibility in how your application performs client-side load balancing then you may wish use Micronaut's Netflix Ribbon support.
+
+To add Ribbon support to your application add the `netflix-ribbon` configuration to `build.gradle` or `pom.xml`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:netflix-ribbon"
+----
+
+The api:http.client.LoadBalancer[] implementations will now be api:configurations.ribbon.RibbonLoadBalancer[] instances.
+
+Ribbon's http://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in `application.yml`:
+
+.Configuring Ribbon
+[source,yaml]
+----
+ribbon:
+    VipAddress: test
+    ServerListRefreshInterval: 2000
+----
+
+Each discovered client can also be configured under `ribbon.clients`. For example given a `@Client(id="hello-world")` you can configure Ribbon settings with:
+
+.Per Client Ribbon Settings
+[source,yaml]
+----
+ribbon:
+    clients:
+        hello-world:
+            VipAddress: test
+            ServerListRefreshInterval: 2000
+----
+
+By default Micronaut registers a api:configurations.ribbon.DiscoveryClientServerList[] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].

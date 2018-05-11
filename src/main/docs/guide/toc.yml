@@ -19,6 +19,7 @@ ioc:
     metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
   conditionalBeans: Conditional Beans
+  replaces: Bean Replacement
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
