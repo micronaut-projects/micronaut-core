@@ -51,6 +51,7 @@ class RoutesEndpointSpec extends Specification {
         result['{[/test/post],method=[POST],produces=[application/json]}']['method'] == "io.micronaut.http.HttpResponse io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.post(java.lang.Integer number, java.lang.String text)"
 
         cleanup:
+        rxClient.close()
         embeddedServer?.close()
     }
 

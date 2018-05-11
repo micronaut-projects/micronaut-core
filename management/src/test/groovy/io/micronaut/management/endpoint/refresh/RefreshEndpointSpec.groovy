@@ -64,6 +64,7 @@ class RefreshEndpointSpec extends Specification {
         response.body() == 'changed changed'
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
     }
 
@@ -107,6 +108,7 @@ class RefreshEndpointSpec extends Specification {
         response.body() != firstResponse
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
     }
 

@@ -40,6 +40,10 @@ class InfoEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().test == "foo"
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 
@@ -55,6 +59,9 @@ class InfoEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
         response.body().ordered == "first"
 
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
     void "test info sources"() {
@@ -77,6 +84,9 @@ class InfoEndpointSpec extends Specification {
         response.body().build.group == "io.micronaut"
         response.body().build.name == "test"
 
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 
@@ -91,6 +101,10 @@ class InfoEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().git.branch == "master2"
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 
