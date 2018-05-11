@@ -30,7 +30,7 @@ public interface ProcessedTypes {
     String POST_CONSTRUCT = "javax.annotation.PostConstruct";
 
     /**
-     * Constant for {@link @{@link javax.annotation.PreDestroy}} annotation.
+     * Constant for {@link javax.annotation.PreDestroy}} annotation.
      */
     String PRE_DESTROY = "javax.annotation.PreDestroy";
 }

@@ -59,7 +59,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
      * Create a {@link Flowable} of ordered {@link PropertySource} from an array of {@link InfoSource}.
      *
      * @param sources Array of {@link InfoSource}
-     * @return An {@link Flowable} of {@link Map.Entry}, where the key is an {@link Integer} and value is the
+     * @return An {@link Flowable} of {@link java.util.Map.Entry}, where the key is an {@link Integer} and value is the
      * {@link PropertySource} returned by the {@link InfoSource}
      */
     protected Flowable<Map.Entry<Integer, PropertySource>> aggregateResults(InfoSource[] sources) {
