@@ -32,7 +32,7 @@ class HelloClientSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer) // <1>
 
-    @Shared HelloClient client = embeddedServer
+    @Shared @AutoCleanup HelloClient client = embeddedServer
                                         .applicationContext
                                         .getBean(HelloClient) // <2>
 

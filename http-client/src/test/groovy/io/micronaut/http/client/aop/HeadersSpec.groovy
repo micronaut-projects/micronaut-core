@@ -33,10 +33,15 @@ import spock.lang.Specification
  */
 
 class HeadersSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'foo.bar':'Another'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive header"() {
         given:

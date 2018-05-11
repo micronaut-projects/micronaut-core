@@ -38,8 +38,11 @@ class MultipartFileUploadSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
+
+    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
     @Shared
     @AutoCleanup
     HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())

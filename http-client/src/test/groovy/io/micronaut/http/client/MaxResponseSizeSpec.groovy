@@ -31,11 +31,20 @@ import spock.lang.Specification
  * @since 1.0
  */
 class MaxResponseSizeSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             "micronaut.http.client.maxContentLength":'1kb'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     void "test max content length setting"() {
         when:

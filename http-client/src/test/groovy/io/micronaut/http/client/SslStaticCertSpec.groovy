@@ -38,6 +38,7 @@ class SslStaticCertSpec extends Specification {
             'micronaut.ssl.ciphers': 'TLS_DH_anon_WITH_AES_128_CBC_SHA'
     ])
 
+    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 

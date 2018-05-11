@@ -35,12 +35,17 @@ import javax.inject.Singleton
  */
 class ClientScopeSpec extends Specification {
     @Shared int port = SocketUtils.findAvailableTcpPort()
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'micronaut.server.port':port,
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test client scope annotation"() {
         given:
