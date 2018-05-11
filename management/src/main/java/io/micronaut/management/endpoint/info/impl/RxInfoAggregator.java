@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
      * Create a {@link Flowable} of ordered {@link PropertySource} from an array of {@link InfoSource}.
      *
      * @param sources Array of {@link InfoSource}
-     * @return An {@link Flowable} of {@link Map.Entry}, where the key is an {@link Integer} and value is the
+     * @return An {@link Flowable} of {@link java.util.Map.Entry}, where the key is an {@link Integer} and value is the
      * {@link PropertySource} returned by the {@link InfoSource}
      */
     protected Flowable<Map.Entry<Integer, PropertySource>> aggregateResults(InfoSource[] sources) {

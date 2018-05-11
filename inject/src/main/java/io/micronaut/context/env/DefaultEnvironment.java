@@ -542,20 +542,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         }
 
-        if(!enviroments.contains(ANDROID)) {
+        if (!enviroments.contains(ANDROID)) {
             // deduce k8s
-            if(StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+            if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
                 enviroments.add(Environment.KUBERNETES);
                 enviroments.add(Environment.CLOUD);
             }
             // deduce CF
-            if(StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+            if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
                 enviroments.add(Environment.CLOUD_FOUNDRY);
                 enviroments.add(Environment.CLOUD);
             }
 
             // deduce heroku
-            if(StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+            if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
                 enviroments.add(Environment.HEROKU);
                 enviroments.add(Environment.CLOUD);
             }
@@ -591,7 +591,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
-
 
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
             System.getenv(ENVIRONMENTS_ENV))

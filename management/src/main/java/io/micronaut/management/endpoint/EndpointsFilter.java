@@ -34,8 +34,8 @@ import java.lang.reflect.Method;
 import java.util.Optional;
 
 /**
- *
  * Returns 401 for {@link Endpoint} requests which have sensitive false. Disabled if micronaut.security is enabled.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -47,6 +47,7 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     /**
      * Constructor.
+     *
      * @param endpointSensitiveConfiguration Contains a Map with Endpoint Sensitive information
      */
     public EndpointsFilter(EndpointSensitiveConfiguration endpointSensitiveConfiguration) {
@@ -55,9 +56,10 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     /**
      * Returns 401 if the route is a match for an endpoint with sensitive true.
+     *
      * @param request The {@link HttpRequest} instance
      * @param chain   The {@link ServerFilterChain} instance
-     * @return
+     * @return A {@link Publisher} for the Http response
      */
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {

@@ -118,17 +118,17 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String IBM = "ibm";
 
     /**
-     * Running on Kubernetes
+     * Running on Kubernetes.
      */
     String KUBERNETES = "k8s";
 
     /**
-     * Running on Cloud Foundry
+     * Running on Cloud Foundry.
      */
     String CLOUD_FOUNDRY = "pcf";
 
     /**
-     * Running on Heroku
+     * Running on Heroku.
      */
     String HEROKU = "heroku";
 

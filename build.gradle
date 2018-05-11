@@ -215,17 +215,14 @@ subprojects { subproject ->
             apply plugin: 'checkstyle'
             
             checkstyle {
-                toolVersion = 8.2
-                configFile = new File(project.rootDir, 'config/checkstyle/checkstyle.xml')
-                ignoreFailures = false
+                toolVersion = 8.10
+                configFile = rootProject.file('config/checkstyle/checkstyle.xml')
 
-                // TODO - We need to turn these down once
-                // the current issues are addressed.  Setting
-                // high thresholds for now to allow builds to pass
-                // until we can prioritize addressing the relevant
-                // issues.
-                maxErrors = 9_999
-                maxWarnings = 9_999
+                // Per submodule
+                maxErrors = 5
+                maxWarnings = 10
+
+                showViolations = true
             }
         }
     }

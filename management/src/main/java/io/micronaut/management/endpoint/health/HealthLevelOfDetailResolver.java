@@ -38,12 +38,12 @@ public class HealthLevelOfDetailResolver {
     protected final EndpointConfiguration endpointConfiguration;
 
     /**
-     *
-     * @param securityEnabled Wether micronaut security is enabled
+     * @param healthSensitive       Whether health endpoint is sensitive
+     * @param securityEnabled       Whether micronaut security is enabled
      * @param endpointConfiguration Health endpoint configuration
      */
     public HealthLevelOfDetailResolver(@Nullable @Value("${endpoints.health.sensitive}") Boolean healthSensitive,
-            @Value("${micronaut.security.enabled:false}") boolean securityEnabled,
+                                       @Value("${micronaut.security.enabled:false}") boolean securityEnabled,
                                        @Nullable @Named("health") EndpointConfiguration endpointConfiguration) {
         this.healthSensitive = healthSensitive;
         this.securityEnabled = securityEnabled;
@@ -51,23 +51,22 @@ public class HealthLevelOfDetailResolver {
     }
 
     /**
-     *
      * @param principal Authenticated user
      * @return The {@link HealthLevelOfDetail}
      */
     public HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
         if (
-                (securityEnabled && principal == null) ||
+            (securityEnabled && principal == null) ||
                 (
                     !securityEnabled &&
-                    endpointConfiguration != null &&
-                    (endpointConfiguration.isSensitive().isPresent() && endpointConfiguration.isSensitive().get())
+                        endpointConfiguration != null &&
+                        (endpointConfiguration.isSensitive().isPresent() && endpointConfiguration.isSensitive().get())
                 ) ||
                 (
                     !securityEnabled &&
-                    healthSensitive == null
+                        healthSensitive == null
                 )
-        ) {
+            ) {
             return HealthLevelOfDetail.STATUS;
         }
         return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;

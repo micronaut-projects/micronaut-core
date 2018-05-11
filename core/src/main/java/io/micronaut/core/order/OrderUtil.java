@@ -32,8 +32,6 @@ public class OrderUtil {
 
     /**
      * Provide a comparator for collections.
-     *
-     * @return the comparator
      */
     public static final Comparator<Object> COMPARATOR = (o1, o2) -> {
         int order1 = getOrder(o1);
@@ -43,8 +41,6 @@ public class OrderUtil {
 
     /**
      * Provide a comparator, in reversed order, for collections.
-     *
-     * @return the comparator
      */
     public static final Comparator<Object> REVERSE_COMPARATOR = Collections.reverseOrder(COMPARATOR);
 

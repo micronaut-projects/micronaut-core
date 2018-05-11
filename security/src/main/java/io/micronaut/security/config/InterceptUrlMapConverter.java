@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- *
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -54,11 +53,10 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
     }
 
     /**
-     *
-     * @param m a Map in the configuration
+     * @param m          a Map in the configuration
      * @param targetType The target type being converted to
      * @param context    The {@link ConversionContext}
-     * @return
+     * @return An optional InterceptUrlMapConverter
      */
     @Override
     public Optional<InterceptUrlMapPattern> convert(Map m, Class<InterceptUrlMapPattern> targetType, ConversionContext context) {
@@ -70,11 +68,11 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
             Optional<List<String>> optionalAccessList = conversionService.convert(m.get(ACCESS), List.class);
             optionalAccessList = optionalAccessList.map((list) -> {
                 return list.stream()
-                        .map((o) -> conversionService.convert(o, String.class))
-                        .filter(Optional::isPresent)
-                        .map(Optional::get)
-                        .map(String.class::cast)
-                        .collect(Collectors.toList());
+                    .map((o) -> conversionService.convert(o, String.class))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .map(String.class::cast)
+                    .collect(Collectors.toList());
             });
             if (optionalAccessList.isPresent()) {
                 Optional<HttpMethod> httpMethod;
