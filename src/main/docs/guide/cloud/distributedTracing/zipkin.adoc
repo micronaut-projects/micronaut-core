@@ -34,6 +34,8 @@ tracing:
         enabled: true
 ----
 
+TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-service hello-world -features tracing-zipkin`
+
 ==== Customizing the Zipkin Sender
 
 By default a api:tracing.brave.sender.HttpClientSender[] that sends Spans asynchronously using Micronaut's native HTTP client to `http://localhost:9411/api/v2/spans` will be configured.
