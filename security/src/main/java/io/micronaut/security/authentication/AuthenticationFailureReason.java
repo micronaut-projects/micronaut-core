@@ -24,31 +24,31 @@ package io.micronaut.security.authentication;
  */
 public enum AuthenticationFailureReason {
     /**
-     * Failure when the cause is the user is not found
+     * Failure when the cause is the user is not found.
      */
     USER_NOT_FOUND,
     /**
-     * Failure when the cause is the credentials don't match
+     * Failure when the cause is the credentials don't match.
      */
     CREDENTIALS_DO_NOT_MATCH,
     /**
-     * Failure when the cause is the user account is disabled
+     * Failure when the cause is the user account is disabled.
      */
     USER_DISABLED,
     /**
-     * Failure when the cause is the user account expired
+     * Failure when the cause is the user account expired.
      */
     ACCOUNT_EXPIRED,
     /**
-     * Failure when the cause is the user account was locked
+     * Failure when the cause is the user account was locked.
      */
     ACCOUNT_LOCKED,
     /**
-     * Failure when the cause is the user's password expired
+     * Failure when the cause is the user's password expired.
      */
     PASSWORD_EXPIRED,
     /**
-     * An unknown failure
+     * An unknown failure.
      */
     UNKNOWN
 }
