@@ -227,6 +227,8 @@ subprojects { subproject ->
                 maxErrors = 9_999
                 maxWarnings = 9_999
             }
+
+            checkstyleTest.enabled = false
         }
     }
 
