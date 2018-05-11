@@ -29,8 +29,8 @@ import java.util.Optional;
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
  * {@link javax.inject.Inject}.</p>
  * <p>
- * <p>Apart of the standard {@link javax.inject} annotations for dependency injection, additional annotations within
- * the {@link io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
+ * <p>Apart of the standard {@code javax.inject} annotations for dependency injection, additional annotations within
+ * the {@code io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
