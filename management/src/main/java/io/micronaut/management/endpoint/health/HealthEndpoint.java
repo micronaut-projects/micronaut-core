@@ -32,7 +32,7 @@ import java.security.Principal;
  * @author James Kleeh
  * @since 1.0
  */
-@Endpoint(HealthEndpoint.NAME)
+@Endpoint(value = HealthEndpoint.NAME, defaultSensitive = false)
 public class HealthEndpoint {
 
     /**
@@ -63,6 +63,7 @@ public class HealthEndpoint {
     }
 
     /**
+     * @param principal Authenticated user
      * @return The health information as a {@link Single}
      */
     @Read

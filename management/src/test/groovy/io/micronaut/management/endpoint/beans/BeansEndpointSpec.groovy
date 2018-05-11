@@ -29,7 +29,7 @@ class BeansEndpointSpec extends Specification {
      */
     void "test beans endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.beans.sensitive': false], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -45,6 +45,7 @@ class BeansEndpointSpec extends Specification {
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
     }
 }

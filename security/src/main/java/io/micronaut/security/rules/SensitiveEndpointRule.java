@@ -16,13 +16,8 @@
 
 package io.micronaut.security.rules;
 
-import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
+import io.micronaut.management.endpoint.EndpointSensitiveConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 
@@ -35,42 +30,37 @@ import java.util.*;
  * Finds any sensitive endpoints and processes requests that match their
  * id. The user must be authenticated to execute sensitive requests.
  *
+ * @author Sergio del Amo
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProcessor<Endpoint> {
+public class SensitiveEndpointRule implements SecurityRule {
 
     /**
      * The order of the rule.
      */
     public static final Integer ORDER = 0;
 
-    private final List<String> ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES = Collections.singletonList("health");
-    private final EndpointConfiguration[] endpointConfigurations;
-    private final EndpointDefaultConfiguration defaultConfiguration;
-    private Map<Method, Boolean> endpointMethods = new HashMap<>();
+    protected final EndpointSensitiveConfiguration endpointSensitiveConfiguration;
 
     /**
      * Constructs the rule with the existing and default endpoint
      * configurations used to determine if a given endpoint is
      * sensitive.
      *
-     * @param endpointConfigurations The endpoint configurations
-     * @param defaultConfiguration The default endpoint configuration
+     * @param endpointSensitiveConfiguration The endpoint configurations
      */
-    SensitiveEndpointRule(EndpointConfiguration[] endpointConfigurations,
-                          EndpointDefaultConfiguration defaultConfiguration) {
-        this.endpointConfigurations = endpointConfigurations;
-        this.defaultConfiguration = defaultConfiguration;
+    SensitiveEndpointRule(EndpointSensitiveConfiguration endpointSensitiveConfiguration) {
+        this.endpointSensitiveConfiguration = endpointSensitiveConfiguration;
     }
 
     @Override
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
         if (routeMatch instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch).getTargetMethod();
-            if (endpointMethods.containsKey(method)) {
-                Boolean sensitive = endpointMethods.get(method);
+            if (endpointSensitiveConfiguration.getEndpointMethods().containsKey(method)) {
+                Boolean sensitive = endpointSensitiveConfiguration.getEndpointMethods().get(method);
                 if (claims == null && sensitive) {
                     return SecurityRuleResult.REJECTED;
                 } else {
@@ -84,25 +74,5 @@ public class SensitiveEndpointRule implements SecurityRule, ExecutableMethodProc
     @Override
     public int getOrder() {
         return ORDER;
-    }
-
-    @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Optional<String> optionalId = beanDefinition.getValue(Endpoint.class, String.class);
-        optionalId.ifPresent((id) -> {
-
-            EndpointConfiguration configuration = Arrays.stream(endpointConfigurations)
-                    .filter((c) -> c.getId().equals(id))
-                    .findFirst()
-                    .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
-
-
-            boolean sensitive = ENDPOINTS_WHICH_HANDLE_SENSITIVITY_THEMSELVES.contains(configuration.getId()) ? false :
-                    configuration.isSensitive().orElseGet(() -> beanDefinition
-                    .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
-                    .orElse(Endpoint.SENSITIVE));
-
-            endpointMethods.put(method.getTargetMethod(), sensitive);
-        });
     }
 }
