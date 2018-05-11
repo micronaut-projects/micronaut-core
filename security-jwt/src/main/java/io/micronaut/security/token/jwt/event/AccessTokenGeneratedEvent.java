@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEvent;
 
 /**
  * Triggered when a JWT access token is generated.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
