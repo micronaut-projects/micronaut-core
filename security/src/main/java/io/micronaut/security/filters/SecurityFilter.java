@@ -16,7 +16,6 @@
 
 package io.micronaut.security.filters;
 
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -27,6 +26,7 @@ import io.micronaut.security.handlers.RejectionHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteMatchUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import io.reactivex.functions.Function;
@@ -99,7 +99,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         return authentication.toFlowable().flatMap((Function<Authentication, Publisher<MutableHttpResponse<?>>>) authentication1 -> {
             request.setAttribute(AUTHENTICATION, authentication1);
             Map<String, Object> attributes = authentication1.getAttributes();
-            Optional<RouteMatch> routeMatch = getRouteMatch(request);
+            Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Attributes: {}", attributes
                     .entrySet()
@@ -127,7 +127,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
             return rejectionHandler.reject(request, true);
         }).switchIfEmpty(Flowable.just(securityRules).flatMap(securityRules -> {
             request.setAttribute(AUTHENTICATION, null);
-            Optional<RouteMatch> routeMatch = getRouteMatch(request);
+            Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Failure to authenticate request. {} {}.", method, path);
             }
@@ -151,17 +151,5 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
             //no rule found for the given request, reject
             return rejectionHandler.reject(request, false);
         }));
-    }
-
-    private Optional<RouteMatch> getRouteMatch(HttpRequest<?> request) {
-        Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
-        if (routeMatchAttribute.isPresent()) {
-            return Optional.of((RouteMatch) routeMatchAttribute.get());
-        } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Route match attribute for request ({}) not found", request.getPath());
-            }
-            return Optional.empty();
-        }
     }
 }

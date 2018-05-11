@@ -32,7 +32,7 @@ class ServerStopEndpointSpec extends Specification {
 
     void "test the endpoint is disabled by default"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.sensitive': false], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -41,11 +41,15 @@ class ServerStopEndpointSpec extends Specification {
         then:
         HttpClientResponseException ex = thrown()
         ex.response.code() == HttpStatus.NOT_FOUND.code
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
     void "test the server is stopped after exercising the endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true, 'endpoints.stop.sensitive': false], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
         def conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
 
@@ -58,5 +62,9 @@ class ServerStopEndpointSpec extends Specification {
         conditions.eventually {
             assert !embeddedServer.isRunning()
         }
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 }
