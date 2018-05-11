@@ -28,11 +28,13 @@ import spock.lang.Specification
  */
 class SyncCacheSpec extends Specification{
 
+    //tag::start[]
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'redis.uri':"redis://localhost:${SocketUtils.findAvailableTcpPort()}",
             'redis.caches.counter.enabled':'true',
             'redis.caches.counter2.enabled':'true'
     )
+    //end::start[]
 
     void "test cacheable annotations"() {
 
