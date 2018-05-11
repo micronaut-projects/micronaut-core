@@ -44,6 +44,9 @@ tracing:
 
 By default Jaeger will be configured to send traces to a locally running Jaeger agent.
 
+TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-service hello-world -features tracing-jaeger`
+
+
 ==== Jaeger Configuration
 
 There are many configuration options available for the Jaeger client that sends Spans to Jaeger and they are generally exposed via the api:tracing.jaeger.JaegerConfiguration[] class. You can refer to the javadoc for all the available options.

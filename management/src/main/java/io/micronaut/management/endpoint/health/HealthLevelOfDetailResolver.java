@@ -42,9 +42,10 @@ public class HealthLevelOfDetailResolver {
      * @param securityEnabled Wether micronaut security is enabled
      * @param endpointConfiguration Health endpoint configuration
      */
-    public HealthLevelOfDetailResolver(@Nullable @Value("${endpoints.health.sensitive}") Boolean healthSensitive,
+    public HealthLevelOfDetailResolver(
+            @Nullable @Value("${endpoints.health.sensitive}") Boolean healthSensitive,
             @Value("${micronaut.security.enabled:false}") boolean securityEnabled,
-                                       @Nullable @Named("health") EndpointConfiguration endpointConfiguration) {
+            @Nullable @Named("health") EndpointConfiguration endpointConfiguration) {
         this.healthSensitive = healthSensitive;
         this.securityEnabled = securityEnabled;
         this.endpointConfiguration = endpointConfiguration;
