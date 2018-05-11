@@ -10,6 +10,7 @@ license {
         groovy = 'SLASHSTAR_STYLE'
     }
     ext.year = '2017-2018'
+
     exclude '**/*.txt'
     exclude '**/*.html'
     exclude '**/*.xml'
@@ -25,4 +26,7 @@ license {
     exclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     exclude '**/org/atinject/tck/auto/Tck.kt'
     exclude '**/io/micronaut/http/netty/stream/package-info.java'
+    exclude '**/build-info.properties'
+    exclude '**/git.properties'
+    exclude '**/othergit.properties'
 }
