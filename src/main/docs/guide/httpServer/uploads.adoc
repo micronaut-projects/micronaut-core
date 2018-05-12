@@ -8,13 +8,13 @@ To receive data from a multipart request, set the consumes argument of the metho
 HttpResponse upload( ... )
 ----
 
-== Route Arguments
+==== Route Arguments
 
 How the files are received by your method is determined by the type of the arguments. Data can be received a chunk at a time or when an upload is completed.
 
 TIP: If the route argument name can't or shouldn't match the name of the part in the request, simply add the api:http.annotation.Part[@Part] annotation to the argument and specify the name that is expected to be in the request.
 
-=== Chunk Data Types
+==== Chunk Data Types
 
 api:io.micronaut.http.multipart.PartData[] is the data type used to represent a chunk of data received in a multipart request. There are methods on the api:io.micronaut.http.multipart.PartData[] interface to convert the data to a `byte[]`, link:{javase}java/io/InputStream.html[InputStream], or a link:{javase}java/nio/ByteBuffer.html[ByteBuffer].
 
@@ -40,7 +40,7 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 <3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method is used to transfer the file to the server. The method returns a rs:Publisher[]
 <4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
-=== Whole Data Types
+==== Whole Data Types
 
 Route arguments that are not publishers will cause the route execution to be delayed until the upload has finished. The received data will attempt to be converted to the requested type. Conversions to a `String` or `byte[]` are supported by default. In addition, the file can be converted to a POJO if a media type codec has been registered that supports the media type of the file. A media type codec is included by default that allows conversion of JSON files to POJOs.
 
@@ -61,7 +61,7 @@ include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, i
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
 <3> The `CompletedFileUpload` instance gives access to metadata about the upload as well as access to the file's contents.
 
-== Multiple Uploads
+=== Multiple Uploads
 
 === Different Names
 
