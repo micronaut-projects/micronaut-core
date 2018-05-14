@@ -25,8 +25,8 @@ import io.micronaut.context.env.Environment;
  * This is the configuration class for the AWSParameterStoreConfigClient for AWS Parameter Store based configuration.
  */
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = "aws.client.systemManager.parameterStore.enabled", value = "true", defaultValue = "false")
-@ConfigurationProperties("systemManager.parameterStore")
+@Requires(property = "aws.client.system-manager.parameterstore.enabled", value = "true", defaultValue = "false")
+@ConfigurationProperties("system-manager.parameterstore")
 public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
 
     private static final String PREFIX = "config";

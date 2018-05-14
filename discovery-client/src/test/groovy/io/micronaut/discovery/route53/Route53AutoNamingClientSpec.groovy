@@ -118,7 +118,7 @@ class Route53AutoNamingClientSpec extends Specification {
     }
 
 
-    void "test register and de-register instance"() {
+    void "test register and de-register route 53 instance"() {
 
         given:
         PollingConditions conditions = new PollingConditions(timeout: 10)

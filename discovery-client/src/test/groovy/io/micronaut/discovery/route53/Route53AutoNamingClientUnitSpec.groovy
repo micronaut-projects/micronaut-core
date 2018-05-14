@@ -50,7 +50,6 @@ import spock.util.concurrent.PollingConditions
  */
 
 @Stepwise
-//@Ignore
 class Route53AutoNamingClientUnitSpec extends Specification {
 
 
@@ -110,13 +109,6 @@ class Route53AutoNamingClientUnitSpec extends Specification {
 
         client.discoveryClient.registerInstance(_) >> registerInstanceResult
         GetOperationRequest operationRequest = Mock(GetOperationRequest)
-/*
-        GetOperationResult operationResult = Mock(GetOperationResult)
-        Operation operation = new Operation()
-        operation.id = "123456"
-        operation.status = "SUCCESS"
-        operationResult.operation = operation
-*/
 
         client.discoveryClient.getOperation(_) >> { GetOperationRequest request ->
             GetOperationResult operationResult = new GetOperationResult()

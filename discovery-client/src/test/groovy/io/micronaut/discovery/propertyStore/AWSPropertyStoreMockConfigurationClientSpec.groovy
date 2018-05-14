@@ -40,7 +40,6 @@ import java.util.concurrent.FutureTask
  * Test for mocking of aws property store.
  * @author RVanderwerf
  */
-@Ignore
 class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
@@ -49,8 +48,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'aws.client.systemManager.parameterStore.enabled': true,
-                    'aws.systemManager.parameterStore.useSecureParameters' : false,
+                    'aws.client.system-manager.parameterstore.enabled': 'true',
+                    'aws.system-manager.parameterstore.useSecureParameters' : 'false',
                     'micronaut.application.name':'amazonTest'],
             Environment.AMAZON_EC2
 

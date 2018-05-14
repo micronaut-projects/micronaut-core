@@ -50,10 +50,10 @@ class AWSParameterStoreClientSpec extends Specification {
 
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'aws.client.systemManager.parameterStore.enabled': true,
-                    'aws.client.systemManager.parameterStore.useSecureParameters' : true,
+                    'aws.client.system-manager.parameterstore.enabled': 'true',
+                    'aws.client.system-manager.parameterstore.useSecureParameters' : 'true',
                     'micronaut.application.name':'amazonTest'],
-            Environment.AMAZON_EC2,Environment.TEST
+            Environment.AMAZON_EC2,Environment.TEST, Environment.CLOUD
 
     )
     @Shared AWSParameterStoreConfigClient client = embeddedServer.applicationContext.getBean(AWSParameterStoreConfigClient)

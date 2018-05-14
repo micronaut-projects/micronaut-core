@@ -37,9 +37,9 @@ configuration properties:
 .Configuration Properties Example
 [source,groovy]
 ----
-aws.client.systemManager.parameterStore.enabled - values true/false will turn on or off this feature
-aws.client.systemManager.parameterStore.useSecureParameters - true/false - ask AWS to automatically decrypt SecureString type with KMS
-aws.client.systemManager.parameterStore.rootHierarchyPath - String - you can use a custom root path the application will look for configurations in. The default is '/config/application'.
+aws.client.system-manager.parameterstore.enabled - values true/false will turn on or off this feature
+aws.client.system-manager.parameterstore.useSecureParameters - true/false - ask AWS to automatically decrypt SecureString type with KMS
+aws.client.system-manager.parameterstore.rootHierarchyPath - String - you can use a custom root path the application will look for configurations in. The default is '/config/application'.
 ----
 
 
