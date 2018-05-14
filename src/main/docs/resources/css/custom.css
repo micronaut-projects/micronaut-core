@@ -1,16 +1,36 @@
+#navigation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+}
+.navTitle {
+    width: auto;
+    padding-right: 5px !important;
+}
 .wiki-table th, #navigation {
     background: #000000 !important;
 }
 
 #navigation a {
     color: #FFFFFF !important;
+    text-shadow: none !important;
 }
 #navigation .selected a {
-    background: #255AA8 !important;
+    background: #4CAFDE !important;
 }
 #navigation a:hover {
-    background: #FFFFFF !important;
-    color: #000000 !important;
+    color: #FFFFFF !important;
+    background: #4CAFDE !important;
+}
+
+#navigation .navTitle a:hover {
+    background: #000000 !important;
+}
+
+#nav-summary #nav-summary-childs a:hover {
+    color: #FFFFFF !important;
 }
 
 #navigation .selected a:hover,
@@ -27,8 +47,7 @@ a:hover,
 #table-of-content a:hover strong,
 #table-of-content a strong,
 .menu a:hover,
-.local .local-title .toggle a,
-#navigation #nav-summary-childs a:hover {
+.local .local-title .toggle a {
     color: #255AA8 !important;
 }
 
@@ -54,3 +73,39 @@ a:hover,
     background: #000000 !important;
 }
 
+#main {
+    margin-top: 60px;
+}
+#table-of-content {
+    width: 20%;
+    margin-left: 3%;
+    max-width: 400px;
+    float: right;
+    z-index: 998;
+}
+
+.mobile {
+    display: block;
+}
+.desktop {
+    display: none;
+}
+@media screen and (min-width: 961px) {
+    .mobile {
+        display: none;
+    }
+    .desktop {
+        display: block;
+    }
+}
+
+@media screen and (min-width: 961px) {
+    #main img,
+    div.tip > table:nth-child(-n+5),
+    #main .listingblock pre:nth-child(-n+5) {
+        max-width: 73%;
+        border: 1px solid #FFFFFF;
+        z-index: 997;
+
+    }
+}

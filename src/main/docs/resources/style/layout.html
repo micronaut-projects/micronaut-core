@@ -21,7 +21,7 @@
 <body class="body" onload="addJsClass();">
 <div id="navigation">
     <div class="navTitle">
-        <span id="logo"><img src="${resourcesPath}/img/micronaut-logo-white.svg" alt="Micronaut"/></span>
+        <span id="logo"><a href="http://micronaut.io" title="Go to Micronaut Website"><img src="${resourcesPath}/img/micronaut-logo-white.svg" alt="Micronaut"/></a></span>
     </div>
     <div class="navLinks">
         <ul>
@@ -55,57 +55,45 @@
 </div>
 
 
-<table id="colset" border="0" cellpadding="0" cellspacing="0">
-    <tr>
-        <td id="col1">
-            <div id="main" class="corner-all">
+<% if(toc){ %>
+<div id="table-of-content" class="desktop">
+    <h2><abbr title="Table of Contents">ToC</abbr></h2>
+    <%
+    sectionWriter = { lvl, section, topSection, prefix ->
+    if (single) {
+    %>
+    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="#${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+    <%
+    }
+    else {
+    %>
+    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="${path}/guide/${topSection.name.encodeAsUrlPath().encodeAsHtml()}.html${ lvl == 0 ? '' : '#' + section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+    <%
+    }
 
+    lvl++
+    section.children.eachWithIndex { s, j ->
+    sectionWriter.call(lvl, s, topSection, prefix + '.' + (j + 1))
+    }
+    }
+
+    toc.children.eachWithIndex { topSection, i ->
+    sectionWriter.call(0, topSection, topSection, i + 1)
+    }
+    %>
+    <div style="clear:both" ></div>
+</div>
+<% } %>
+            <div id="main" class="corner-all">
                 <div class="project">
                     <h1>${title.encodeAsHtml()}</h1>
                     <p></p>
                     <p>${subtitle?.encodeAsHtml()}</p>
                     <p><strong>Version:</strong> ${version}</p>
-
                 </div>
-
                 ${content}
             </div>
-        </td>
-        <td id="col2">
-            <div class="local clearfix">
-                <% if(toc){ %>
-                <div id="table-of-content">
-                    <h2><abbr title="Table of Contents">ToC</abbr></h2>
-                    <%
-                    sectionWriter = { lvl, section, topSection, prefix ->
-                    if (single) {
-                    %>
-                    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="#${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
-                    <%
-                    }
-                    else {
-                    %>
-                    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="${path}/guide/${topSection.name.encodeAsUrlPath().encodeAsHtml()}.html${ lvl == 0 ? '' : '#' + section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
-                    <%
-                    }
 
-                    lvl++
-                    section.children.eachWithIndex { s, j ->
-                    sectionWriter.call(lvl, s, topSection, prefix + '.' + (j + 1))
-                    }
-                    }
-
-                    toc.children.eachWithIndex { topSection, i ->
-                    sectionWriter.call(0, topSection, topSection, i + 1)
-                    }
-                    %>
-                    <div style="clear:both" ></div>
-                </div>
-                <% } %>
-            </div>
-        </td>
-    </tr>
-</table>
 
 <div id="footer">
     ${copyright}
