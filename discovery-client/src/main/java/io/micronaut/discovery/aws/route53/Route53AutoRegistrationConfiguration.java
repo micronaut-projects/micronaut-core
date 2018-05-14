@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.aws.route53;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -26,15 +27,23 @@ import io.micronaut.runtime.ApplicationConfiguration;
  */
 @ConfigurationProperties("aws.route53.registration")
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
-//@Requires(property = "aws.route53.registration.awsServiceId")
 public class Route53AutoRegistrationConfiguration extends RegistrationConfiguration {
 
-    String awsServiceId; //ID of the service - REQUIRED
+    private String awsServiceId; //ID of the service - REQUIRED
 
+    /**
+     * Get gets the aws service id we are working with.
+     * You can only find this from the CLI or APIs as there is no UI for this yet.
+     * @return aws service id
+     */
     public String getAwsServiceId() {
         return awsServiceId;
     }
 
+    /**
+     * Setting for service id to make easier testing.
+     * @param awsServiceId service ID from AWS
+     */
     public void setAwsServiceId(String awsServiceId) {
         this.awsServiceId = awsServiceId;
     }

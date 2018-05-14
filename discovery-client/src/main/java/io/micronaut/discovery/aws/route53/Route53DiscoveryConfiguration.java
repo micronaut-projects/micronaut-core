@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.aws.route53;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -29,21 +30,37 @@ import io.micronaut.discovery.DiscoveryConfiguration;
 @ConfigurationProperties("aws.route53.discovery")
 public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
 
-    String awsServiceId;
+    private String awsServiceId;
 
+    /**
+     * AWS Service ID.
+     * @return service id
+     */
     public String getAwsServiceId() {
         return awsServiceId;
     }
 
+    /**
+     * set service ID for easier testing.
+     * @param awsServiceId aws service id
+     */
     public void setAwsServiceId(String awsServiceId) {
         this.awsServiceId = awsServiceId;
     }
 
+    /**
+     * enable/disable this feature.
+     * @return enabled
+     */
     @Override
     public boolean isEnabled() {
         return super.isEnabled();
     }
 
+    /**
+     * enable/disabled this feature.
+     * @param enabled Whether discovery is enabled
+     */
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
