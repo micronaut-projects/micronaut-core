@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.aws.route53.registration;
 
 import com.amazonaws.SdkClientException;
@@ -68,29 +69,30 @@ import java.util.Optional;
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 
     /**
-     * Constant for AWS instance port
+     * Constant for AWS instance port.
      */
     public static final String AWS_INSTANCE_PORT = "AWS_INSTANCE_PORT";
 
     /**
-     * Constant for AWS intance IPv4
+     * Constant for AWS intance IPv4.
      */
     public static final String AWS_INSTANCE_IPV4 = "AWS_INSTANCE_IPV4";
 
     /**
-     * Constant for AWS instance cname
+     * Constant for AWS instance cname.
      */
     public static final String AWS_INSTANCE_CNAME = "AWS_INSTANCE_CNAME";
 
     /**
-     * Constant for AWS instance IPv6
+     * Constant for AWS instance IPv6.
      */
     public static final String AWS_INSTANCE_IPV6 = "AWS_INSTANCE_IPV6";
 
     /**
-     * Constant for AWS alias dns name
+     * Constant for AWS alias dns name.
      */
     public static final String AWS_ALIAS_DNS_NAME = "AWS_ALIAS_DNS_NAME";
+    private static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
 
     private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
     private final Environment environment;
@@ -101,8 +103,17 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private final AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
 
-    protected static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
 
+
+    /**
+     * Constructor for setup.
+     * @param environment current environemnts
+     * @param heartbeatConfiguration heartbeat config
+     * @param route53AutoRegistrationConfiguration  config for auto registration
+     * @param idGenerator optional id generator (not used here)
+     * @param clientConfiguration general client configuraiton
+     * @param amazonComputeInstanceMetadataResolver resolver for aws compute metdata
+     */
     protected Route53AutoNamingRegistrationClient(
             Environment environment,
             HeartbeatConfiguration heartbeatConfiguration,
@@ -124,6 +135,12 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
     }
 
+    /**
+     * If custom health check is enabled, this sends a heartbeat to it.
+     * In most cases aws monitoring works off polling an application's endpoint
+     * @param instance The instance of the service
+     * @param status   The {@link HealthStatus}
+     */
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         // this only work if you create a health status check when you register it
@@ -143,6 +160,9 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     @Override
+    /**
+     * shutdown instance if it fails health check can gracefully stop.
+     */
     protected void deregister(ServiceInstance instance) {
 
         if (instance.getInstanceId().isPresent()) {
@@ -152,6 +172,10 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         }
     }
 
+    /**
+     * register new instance to the service registry.
+     * @param instance The {@link ServiceInstance}
+     */
     @Override
     protected void register(ServiceInstance instance) {
         // step 1 get domain from config
@@ -191,8 +215,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                     }
                 }
             }
-        } else {
-            //TODO we can call ec2 service and find the info we need but this may be overkill
         }
 
         assert instance.getInstanceId().isPresent();
@@ -206,9 +228,9 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     /**
-     * these are convenience methods to help cleanup things like integration test data
+     * These are convenience methods to help cleanup things like integration test data.
      *
-     * @param serviceId
+     * @param serviceId service id from AWS to delete
      */
     public void deleteService(String serviceId) {
 
@@ -218,9 +240,9 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     /**
-     * these are convenience methods to help cleanup things like integration test data
+     * these are convenience methods to help cleanup things like integration test data.
      *
-     * @param namespaceId
+     * @param namespaceId namespace ID from AWS to delete
      */
     public void deleteNamespace(String namespaceId) {
 
@@ -229,6 +251,14 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
 
     }
 
+    /**
+     * This is a helper method for integration tests to create a new namespace.
+     * Normally you would do this yourself with your own domain/subdomain on route53.
+     *
+     * @param serviceDiscovery service discovery object
+     * @param name name of the namespace in your route53
+     * @return id of the namespace
+     */
     public String createNamespace(AWSServiceDiscovery serviceDiscovery, String name) {
         if (serviceDiscovery == null) {
             serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
@@ -248,6 +278,15 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         return opResult.getOperation().getTargets().get("NAMESPACE");
     }
 
+    /**
+     * Create service, helper for integration tests.
+     * @param serviceDiscovery service discovery instance
+     * @param name name of the service
+     * @param description description of the service
+     * @param namespaceId namespaceId to attach it to (get via cli or api call)
+     * @param ttl time to live for checking pulse
+     * @return serviceId
+     */
     public String createService(AWSServiceDiscovery serviceDiscovery, String name, String description, String namespaceId, Long ttl) {
         if (serviceDiscovery == null) {
             serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
@@ -262,6 +301,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         return createdService.getId();
     }
 
+    /**
+     * loop for checking of the call to aws is complete or not. Need to replace with RxJava/future call.
+     * @param operationId operation ID we are polling for
+     * @return result of the operation, can be success or failure or ongoing
+     */
     private GetOperationResult checkOperation(String operationId) {
         String result = "";
         GetOperationResult opResult = null;
