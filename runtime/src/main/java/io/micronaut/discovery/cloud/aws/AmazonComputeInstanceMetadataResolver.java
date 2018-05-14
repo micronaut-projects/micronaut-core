@@ -181,9 +181,15 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @throws IOException Signals that an I/O exception of some sort has occurred
      */
     protected String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
+
         URLConnection urlConnection = url.openConnection();
 
         if (url.getProtocol().equalsIgnoreCase("file")) {
+            if (url.getPath().indexOf(':') != -1) {
+                //rebuild url path because windows can't have paths with colons
+                url = new URL(url.getProtocol(),url.getHost(),url.getFile().replace(':','_'));
+                urlConnection = url.openConnection();
+            }
             urlConnection.connect();
             try (BufferedReader in = new BufferedReader(
                 new InputStreamReader(urlConnection.getInputStream()))) {
