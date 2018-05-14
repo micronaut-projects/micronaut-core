@@ -89,7 +89,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * Get your PropertySources from AWS Parameter Store.
      * Property sources are expected to be set up in this way:
      * \ configuration \ micronaut \ environment name \ app name \
-     * If you want to change the base \configuration\micronaut set the property aws.systemManager.parameterStore.rootHierarchyPath
+     * If you want to change the base \configuration\micronaut set the property aws.system-manager.parameterStore.rootHierarchyPath
      *
      * @param environment The environment
      * @return property source objects by environment.
