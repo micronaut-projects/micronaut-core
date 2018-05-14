@@ -16,6 +16,12 @@ endpoints:
         id: String
 ----
 
+The `enabled` property is `true` by default; setting this property to `false` will disable the endpoint.
+
+The `sensitive` property is `false` by default; setting this property to `true` will cause the endpoint to return a 401 if the request is unauthenticated.
+
+NOTE: The `sensitive` property requires the `io.micronaut:security` dependency and the `micronaut.security.enabled` property to be set to `true`.
+
 === Customization
 
 The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.

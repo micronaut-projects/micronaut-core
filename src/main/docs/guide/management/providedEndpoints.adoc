@@ -1,1 +1,10 @@
-TODO
+The `io.micronaut:management` dependency supplies several endpoints for monitoring the state of your application, as well as refreshing and/or stopping the application.
+
+[source,groovy]
+----
+dependencies {
+    compile "io.micronaut:management"
+}
+----
+
+NOTE: All of the endpoints described in the following sections are only available if the `io.micronaut:management` is included in your project.
