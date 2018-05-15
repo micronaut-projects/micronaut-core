@@ -15,14 +15,10 @@
  */
 
 /**
- * Consul client service operations.
+ * Eureka health indicator.
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-@Configuration
-package io.micronaut.discovery.consul.client.v1;
+package io.micronaut.discovery.eureka.health;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.consul.condition.RequiresConsul;

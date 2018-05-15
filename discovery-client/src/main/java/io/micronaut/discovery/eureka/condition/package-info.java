@@ -15,14 +15,10 @@
  */
 
 /**
- * Consul client service operations.
+ * Eureka discovery annotation.
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-@Configuration
-package io.micronaut.discovery.consul.client.v1;
+package io.micronaut.discovery.eureka.condition;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.consul.condition.RequiresConsul;
