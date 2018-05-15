@@ -1024,9 +1024,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
             handler.invoke(requestReference.get(), nettyHttpResponse, context);
         } else {
-
-            context.writeAndFlush(nettyResponse)
-                    .addListener(new DefaultCloseHandler(context, requestReference.get(), nettyResponse.status().code()));
+            // close handled by HttpServerKeepAliveHandler
+            context.writeAndFlush(nettyResponse);
         }
     }
 
@@ -1280,19 +1279,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         HttpHeaders headers = streamedResponse.headers();
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        context.writeAndFlush(streamedResponse)
-            .addListener((ChannelFutureListener) future -> {
-                if (!future.isSuccess()) {
-                    ChannelPipeline pipeline = context.pipeline();
-                    HandlerPublisher handlerPublisher = pipeline.get(HandlerPublisher.class);
-                    if (handlerPublisher != null) {
-                        pipeline.remove(handlerPublisher);
-                    }
-                    pipeline.fireExceptionCaught(future.cause());
-                } else if (!request.getHeaders().isKeepAlive()) {
-                    future.channel().close();
-                }
-            });
+        context.writeAndFlush(streamedResponse);
     }
 
     @SuppressWarnings("unchecked")

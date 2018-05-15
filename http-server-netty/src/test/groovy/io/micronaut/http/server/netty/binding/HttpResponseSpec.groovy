@@ -56,10 +56,10 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         where:
         action                | status                        | body                       | headers
         "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
-        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain']
-        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'close', 'location': 'http://test.com']
         "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
         "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
@@ -87,10 +87,10 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         where:
         action                | status                       | body                       | headers
         "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
-        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain']
-        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'close', 'location': 'http://test.com']
         "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'close']
     }

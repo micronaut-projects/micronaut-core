@@ -57,6 +57,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -214,6 +215,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                 serverConfiguration.isValidateHeaders(),
                                 serverConfiguration.getInitialBufferSize()
                         ));
+                        pipeline.addLast(new HttpServerKeepAliveHandler());
                         pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration));

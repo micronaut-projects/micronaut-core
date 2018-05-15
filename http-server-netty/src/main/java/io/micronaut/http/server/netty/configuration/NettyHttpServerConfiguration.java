@@ -42,15 +42,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected Worker worker;
     protected Parent parent;
     @ReadableBytes
-    protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
-    @ReadableBytes
     protected int maxInitialLineLength = 4096;
-
+    @ReadableBytes
     protected int maxHeaderSize = 8192;
-
+    @ReadableBytes
     protected int maxChunkSize = 8192;
-
-
     protected boolean chunkedSupported = true;
     protected boolean validateHeaders = true;
     protected int initialBufferSize = 128;
@@ -67,11 +63,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
-    }
-
-    @Override
-    public long getMaxRequestSize() {
-        return maxRequestSize;
     }
 
     /**
