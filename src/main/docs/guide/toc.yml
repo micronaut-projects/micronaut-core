@@ -137,7 +137,7 @@ management:
   buildingEndpoints:
     title: Creating Endpoints
     endpointAnnotation: The Endpoint Annotation
-    endpointMethod: Executable Method
+    endpointMethod: Endpoint Methods
     endpointConfiguration: Endpoint Configuration
   providedEndpoints:
     title: Built-In Endpoints
