@@ -1,53 +1,28 @@
-# Micronaut Framework
+# Micronaut 
 
-## Running Tests
+Micronaut is a modern, JVM-based, full stack microservices framework designed for building modular, easily testable microservice applications.
 
-To run the tests use `./gradlew check`. 
+Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
 
-[Geb](http://gebish.org) functional tests are ignored unless you specify the geb environment via system property. 
+Micronaut aims to provide all the tools necessary to build microservice applications including:
 
-To run with Chrome `./gradlew -Dgeb.env=chrome check`.
+* Dependency Injection and Inversion of Control (IoC)
+* Sensible Defaults and Auto-Configuration
+* Configuration and Configuration Sharing
+* Service Discovery
+* HTTP Routing
+* HTTP Client with Client-Side Load Balancing
 
-To run with Firefox `./gradlew -Dgeb.env=firefox check`. 
+At the same time Micronaut aims to avoid the downsides of frameworks like Spring, Spring Boot and Grails by providing:
 
-## Building Documentation
+* Fast startup time
+* Reduced memory footprint
+* Minimal use of reflection
+* Minimal use of proxies
+* Easy Unit Testing
 
-The documentation sources are located at `src/main/docs/guide`.
+For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io) 
 
-To build the documentation run `./gradlew publishGuide` or `./gradlew pG` then open `build/docs/index.html`  
 
-## How to run Micronaut CLI
 
-- Clone [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles)
-- Install micronaut-profiles to Maven Local `micronaut-profiles$ ./gradlew clean publishToMavenLocal`
-- `micronaut-core$ ./gradlew cli:fatJar`
-- `micronaut-core$ cd cli/build/bin`
-- `micronaut-core/cli/build/bin$ ./mn`
-
-## Developer Guide ##
-
-We want to keep the code clean, following good practices about organization, javadoc and style as much homogeneous as
-possible. Micronaut uses [Checkstyle](http://checkstyle.sourceforge.net/) to make sure that all the code follows those
-standards. The configuration file is defined in `config/checkstyle/checkstyle.xml` and to execute the Checkstyle you
-need to run:
- 
-```
-./gradlew <module-name>:checkstyleMain
-```
-
-Before start contributing with new code it is recommended to install IntelliJ *checkstyle-IDEA* plugin and configure it 
-to use Micronaut's checkstyle configuration file.  
-Now IntelliJ will mark in red the issues.
-
-![](https://github.com/micronaut-projects/micronaut-core/raw/master/src/main/docs/resources/img/checkstyle-issue.png)
-
-In this case, to fix the issues, we need to:
-- Add one empty line before `package` in line 16
-- Add the Javadoc for the constructor in line 27
-- Add an space after `if` in line 34
-
-This is the fastest way to see the checkstyle issues as we modify or create new files.
-
-The plugin also adds a new tab in the bottom to run checkstyle report and see all the errors and warnings. It is recommended
-to run the report and fixing all the issues before submitting a pull request.
 
