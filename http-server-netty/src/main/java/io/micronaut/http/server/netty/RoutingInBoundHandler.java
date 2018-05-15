@@ -72,6 +72,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.DecoderResult;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -334,6 +336,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             LOG.debug("Matching route {} - {}", httpMethod, requestPath);
         }
 
+        NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) request;
+        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        // handle decoding failure
+        DecoderResult decoderResult = nativeRequest.decoderResult();
+        if (decoderResult.isFailure()) {
+            Throwable cause = decoderResult.cause();
+            HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(status),
+                    status.getReason()
+            );
+            return;
+        }
         Optional<UriRouteMatch<Object>> routeMatch = Optional.empty();
 
         List<UriRouteMatch<Object>> uriRoutes = router
@@ -370,34 +388,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), httpMethod);
                 }
-                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.METHOD_NOT_ALLOWED);
-                if (statusRoute.isPresent()) {
-                    route = statusRoute.get();
-                } else {
-                    JsonError error = newError(request, "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
 
-                    MutableHttpResponse<Object> defaultResponse = io.micronaut.http.HttpResponse.notAllowed(existingRoutes);
-
-                    if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod())) {
-                        defaultResponse.body(error);
-                    }
-
-
-                    AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-                    Flowable<? extends MutableHttpResponse<?>> responsePublisher = filterPublisher(
-                            requestReference,
-                            Flowable.just(defaultResponse),
-                            ctx.channel().eventLoop()
-                    );
-                    subscribeToResponsePublisher(
-                            ctx,
-                            MediaType.APPLICATION_JSON_TYPE,
-                            requestReference,
-                            responsePublisher
-                    );
-                    return;
-                }
-
+                handleStatusError(
+                        ctx,
+                        request,
+                        nettyHttpRequest,
+                        HttpResponse.notAllowed(existingRoutes),
+                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
+                return;
             } else {
                 Optional<? extends FileCustomizableResponseType> optionalFile = Optional.empty();
                 Optional<URL> optionalUrl = staticResourceResolver.resolve(requestPath);
@@ -435,24 +433,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 LOG.debug("Matched route is not a supported media type: {}", contentType);
             }
 
-            // we matched a route and it says we consume JSON and we sent in XML
-            // if route is a methodbased route, then get the declaringType and call router.route with it.
-            Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-            if (statusRoute.isPresent()) {
-                route = statusRoute.get();
-            } else {
-                JsonError error = newError(request, "Unsupported Media Type: " + contentType);
-                MutableHttpResponse<Object> res = io.micronaut.http.HttpResponse
-                    .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .body(error);
-                subscribeToResponsePublisher(
-                        ctx,
-                        MediaType.APPLICATION_JSON_TYPE,
-                        new AtomicReference<>(request),
-                        Flowable.just(res)
-                );
-                return;
-            }
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                    "Unsupported Media Type: " + contentType);
+            return;
         }
         if (LOG.isDebugEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
@@ -462,7 +449,40 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
         // all ok proceed to try and execute the route
-        handleRouteMatch(route, (NettyHttpRequest) request, ctx);
+        handleRouteMatch(route, nettyHttpRequest, ctx);
+    }
+
+    private void handleStatusError(
+            ChannelHandlerContext ctx,
+            HttpRequest<?> request,
+            NettyHttpRequest nettyHttpRequest,
+            MutableHttpResponse<Object> defaultResponse,
+            String message) {
+        Optional<RouteMatch<Object>> statusRoute = router.route(defaultResponse.status());
+        if (statusRoute.isPresent()) {
+            RouteMatch<Object> routeMatch = statusRoute.get();
+            handleRouteMatch(routeMatch, nettyHttpRequest, ctx);
+        } else {
+
+            if (HttpMethod.permitsRequestBody(request.getMethod())) {
+                JsonError error = newError(request, message);
+                defaultResponse.body(error);
+            }
+
+
+            AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
+            Flowable<? extends MutableHttpResponse<?>> responsePublisher = filterPublisher(
+                    requestReference,
+                    Flowable.just(defaultResponse),
+                    ctx.channel().eventLoop()
+            );
+            subscribeToResponsePublisher(
+                    ctx,
+                    MediaType.APPLICATION_JSON_TYPE,
+                    requestReference,
+                    responsePublisher
+            );
+        }
     }
 
     private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
@@ -1292,7 +1312,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     /**
-     * Used as a handle to the {@link NettyCustomizableResponseTypeHandler}
+     * Used as a handle to the {@link NettyCustomizableResponseTypeHandler}.
      */
     private static class NettyCustomizableResponseTypeHandlerInvoker {
         final NettyCustomizableResponseTypeHandler handler;
