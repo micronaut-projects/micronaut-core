@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.discovery.propertyStore
+package io.micronaut.discovery.propertystore
 
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync
 import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathRequest
@@ -31,7 +31,6 @@ import io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfigClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import java.util.concurrent.FutureTask
