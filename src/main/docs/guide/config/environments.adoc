@@ -19,6 +19,6 @@ Additional active environments can be specified using the `micronaut.environment
 $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 ----
 
-The above actives environments called `foo` and `bar.
+The above actives environments called `foo` and `bar`.
 
 Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
