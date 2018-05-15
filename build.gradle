@@ -17,8 +17,8 @@ plugins {
 }
 
 repositories {
-    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
     maven { url "https://repo.grails.org/grails/core" }
+    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
 version project.projectVersion
