@@ -2,7 +2,13 @@
 
 ## Running Tests
 
-To run the tests use `./gradlew check`
+To run the tests use `./gradlew check`. 
+
+[Geb](http://gebish.org) functional tests are ignored unless you specify the geb environment via system property. 
+
+To run with Chrome `./gradlew -Dgeb.env=chrome check`.
+
+To run with Firefox `./gradlew -Dgeb.env=firefox check`. 
 
 ## Building Documentation
 
