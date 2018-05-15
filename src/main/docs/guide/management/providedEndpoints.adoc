@@ -1,1 +1,39 @@
-TODO
+When the `management` dependency is added to your project, the following built-in endpoints are enabled by default:
+
+.Default Endpoints
+|===
+|Endpoint|URI|Description
+
+|api:management.endpoint.beans.BeansEndpoint[]
+| `/beans`
+|Returns information about the loaded bean definitions in the application (see <<beansEndpoint, BeansEndpoint>>)
+
+|api:management.endpoint.info.InfoEndpoint[]
+| `/info`
+|Returns static information from the state of the application (see <<infoEndpoint, InfoEndpoint>>)
+
+|api:management.endpoint.health.HealthEndpoint[]
+| `/health`
+|Returns information about the "health" of the application (see <<healthEndpoint, HealthEndpoint>>)
+
+|api:management.endpoint.refresh.RefreshEndpoint[]
+| `/refresh`
+|Refreshes the application state (see <<refreshEndpoint, RefreshEndpoint>>)
+
+|api:management.endpoint.routes.RoutesEndpoint[]
+| `/routes`
+|Returns information about URIs available to be called for your application (see <<routesEndpoint, RoutesEndpoint>>)
+
+|===
+
+In addition, the following built-in endpoint(s) are provided by the `management` dependency but are not enabled by default:
+
+.Disabled Endpoints
+|===
+|Endpoint|URI|Description
+
+|api:management.endpoint.stop.StopEndpoint[]
+| `/stop`
+|Shuts down the application server (see <<stopEndpoint, StopEndpoint>>)
+
+|===
