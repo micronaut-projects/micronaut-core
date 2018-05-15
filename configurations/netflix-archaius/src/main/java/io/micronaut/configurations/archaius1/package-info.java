@@ -15,15 +15,10 @@
  */
 
 /**
- * This configuration contains setup class for GORM for Neo4j.
+ * Netflix archaius configuration classes.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Requires(classes = Driver.class)
-@Requires(entities = Entity.class)
-package io.micronaut.configuration.neo4j.gorm;
+package io.micronaut.configurations.archaius1;
 
-import grails.gorm.annotation.Entity;
-import io.micronaut.context.annotation.Requires;
-import org.neo4j.driver.v1.Driver;
