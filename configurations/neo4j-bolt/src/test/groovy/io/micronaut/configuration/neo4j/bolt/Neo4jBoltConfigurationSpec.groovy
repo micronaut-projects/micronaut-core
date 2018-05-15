@@ -27,15 +27,19 @@ class Neo4jBoltConfigurationSpec extends Specification {
 
     void "test neo4j configuration"() {
         when:
+        // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.uri':'bolt://someserver:7687',
+                'neo4j.maxConnectionPoolSize': 80,
                 'neo4j.embedded.enabled':false
         )
+        // end::start[]
 
         then:
         applicationContext.containsBean(Neo4jBoltConfiguration)
         applicationContext.getBean(Neo4jBoltConfiguration).uris.size() == 1
         applicationContext.getBean(Neo4jBoltConfiguration).uris[0] == URI.create('bolt://someserver:7687')
+        applicationContext.getBean(Neo4jBoltConfiguration).getConfig().maxConnectionPoolSize() == 80
 
         cleanup:
         applicationContext?.stop()
