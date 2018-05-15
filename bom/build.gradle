@@ -15,7 +15,10 @@ publishing {
 
                     mkp.properties {
                         for(dep in dependencyVersions) {
-                            mkp."${dep.key}.version"(dep.value.version)
+                            def v = dep.value.version
+                            if(!v.toString().endsWith("-SNAPSHOT")) {
+                                mkp."${dep.key}.version"(v)
+                            }
                         }
                     }
 
@@ -49,6 +52,11 @@ publishing {
 
                             for (dep in dependencyVersions) {
                                 def info = dep.value
+                                // don't include snapshots
+                                if(info.version.toString().endsWith("-SNAPSHOT")) {
+                                    continue
+                                }
+
                                 def versionExpr = "\${${dep.key}.version}"
 
                                 mkp.dependency {
