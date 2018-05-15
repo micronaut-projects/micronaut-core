@@ -170,6 +170,9 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public NettyHttpResponse<B> body(B body) {
         this.body = body;
+        if (body instanceof ByteBuf) {
+            replace((ByteBuf) body);
+        }
         return this;
     }
 

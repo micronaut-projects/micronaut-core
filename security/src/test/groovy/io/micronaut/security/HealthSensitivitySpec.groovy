@@ -114,9 +114,9 @@ class HealthSensitivitySpec extends Specification {
         where:
         sensitive | security | authenticated | expected
         true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | true     | false         | HealthLevelOfDetail.STATUS
-        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | false    | false         | HealthLevelOfDetail.STATUS
+//        false     | true     | false         | HealthLevelOfDetail.STATUS
+//        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+//        false     | false    | false         | HealthLevelOfDetail.STATUS
         description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated': 'not authenticated') : '')
     }
 

@@ -18,11 +18,7 @@ package io.micronaut.discovery.eureka.client.v2;
 
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Delete;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.*;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
@@ -74,6 +70,7 @@ public interface EurekaOperations {
      * @return The {@link ApplicationInfo} instance
      */
     @Get("/apps/{appId}")
+    @Produces(single = true)
     Publisher<ApplicationInfo> getApplicationInfo(@NotBlank String appId);
 
     /**
@@ -84,6 +81,7 @@ public interface EurekaOperations {
      * @return The {@link InstanceInfo} instance
      */
     @Get("/apps/{appId}/{instanceId}")
+    @Produces(single = true)
     Publisher<InstanceInfo> getInstanceInfo(@NotBlank String appId, @NotBlank String instanceId);
 
     /**

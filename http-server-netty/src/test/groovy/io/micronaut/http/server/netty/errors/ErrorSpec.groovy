@@ -44,7 +44,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
         response.getBody(JsonError).get().message == 'Internal Server Error: bad'
 
 
@@ -59,7 +59,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.NOT_FOUND.code
-        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
 
 
         when:
@@ -80,7 +80,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
-        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
 
 
         when:

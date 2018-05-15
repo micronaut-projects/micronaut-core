@@ -86,8 +86,11 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                 //noinspection unchecked
                 return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
 
+                    Subscription s;
+
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
+                        this.s = subscription;
                         subscriber.onSubscribe(subscription);
                     }
 
@@ -101,18 +104,26 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
                         } else {
-                            Optional<ConversionError> lastError = conversionContext.getLastError();
-                            if (lastError.isPresent()) {
-                                subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
-                            } else {
-                                subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
+                            try {
+                                Optional<ConversionError> lastError = conversionContext.getLastError();
+                                if (lastError.isPresent()) {
+                                    subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
+                                } else {
+                                    subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
+                                }
+                            } finally {
+                                s.cancel();
                             }
                         }
                     }
 
                     @Override
                     protected void doOnError(Throwable t) {
-                        subscriber.onError(t);
+                        try {
+                            subscriber.onError(t);
+                        } finally {
+                            s.cancel();
+                        }
                     }
 
                     @Override

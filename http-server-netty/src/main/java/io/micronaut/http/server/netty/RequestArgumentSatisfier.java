@@ -140,8 +140,17 @@ class RequestArgumentSatisfier {
                         return result;
                     };
                 } else if (argument.getDeclaredAnnotation(Nullable.class) != null) {
-                    value = (UnresolvedArgument) () -> {
-                        return (ArgumentBinder.BindingResult) () -> getValueForArgument(argument, request, satisfyOptionals);
+                    value = (UnresolvedArgument) () ->
+                        new ArgumentBinder.BindingResult() {
+                            @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+                            Optional<?> v;
+                            @Override
+                            public Optional getValue() {
+                                if (v == null) {
+                                    v = getValueForArgument(argument, request, satisfyOptionals);
+                                }
+                                return v;
+                            }
                     };
                 }
             }

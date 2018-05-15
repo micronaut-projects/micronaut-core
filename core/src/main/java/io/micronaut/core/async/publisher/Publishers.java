@@ -18,6 +18,7 @@ package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -259,6 +260,30 @@ public class Publishers {
     }
 
     /**
+     * Attempts to convert the publisher to the given type.
+     *
+     * @param object The object to convert
+     * @param publisherType The publisher type
+     * @param <T> The generic type
+     * @return The Resulting in publisher
+     */
+    public static <T extends Publisher<?>> T convertPublisher(Object object, Class<T> publisherType) {
+        Objects.requireNonNull(object, "Invalid argument [object]: " + object);
+        Objects.requireNonNull(object, "Invalid argument [publisherType]: " + publisherType);
+        if (object instanceof CompletableFuture) {
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+            return ConversionService.SHARED.convert(futurePublisher, publisherType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+        }
+        else {
+
+            return ConversionService.SHARED.convert(object, publisherType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+        }
+    }
+
+
+    /**
      * Does the given reactive type emit a single result.
      *
      * @param type The type
@@ -296,7 +321,9 @@ public class Publishers {
                         return;
                     }
                     done = true;
-                    subscriber.onNext(value);
+                    if (value != null) {
+                        subscriber.onNext(value);
+                    }
                     subscriber.onComplete();
                 }
 

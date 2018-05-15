@@ -41,7 +41,7 @@ import org.reactivestreams.Publisher;
 @Requires(beans = HttpServerHandler.class)
 public class BraveTracingServerFilter extends AbstractBraveTracingFilter implements HttpServerFilter {
 
-    private final HttpServerHandler<HttpRequest<?>, HttpResponse<?>> serverHandler;
+    private final HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler;
     private final TraceContext.Extractor<HttpHeaders> extractor;
 
     /**
@@ -50,7 +50,7 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
      */
     public BraveTracingServerFilter(
             HttpTracing httpTracing,
-            HttpServerHandler<HttpRequest<?>, HttpResponse<?>> serverHandler) {
+            HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler) {
         super(httpTracing);
         this.serverHandler = serverHandler;
         this.extractor = httpTracing.tracing().propagation().extractor(ConvertibleMultiValues::get);
@@ -59,29 +59,13 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Span span = serverHandler.handleReceive(extractor, request.getHeaders(), request);
-        // place the span in scope such that down stream filters have access
-        try (Tracer.SpanInScope scope = httpTracing.tracing().tracer().withSpanInScope(span)) {
-            Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
-            Flowable<MutableHttpResponse<?>> responseFlowable = Flowable.fromPublisher(responsePublisher);
-            responseFlowable = responseFlowable.doOnRequest(amount -> {
-                if (amount > 0) {
-                    withSpanInScope(request, span);
-                }
-            });
-
-            responseFlowable = responseFlowable.map(response -> {
-                configuredSpan(request, response).ifPresent(s -> {
-                    Throwable error = request.getAttribute(HttpAttributes.ERROR, Throwable.class).orElse(null);
-                    serverHandler.handleSend(response, error, s);
-                });
-
-                return response;
-            });
-
-            return responseFlowable.doAfterTerminate(() ->
-                    afterTerminate(request)
-            );
-        }
+        return new HttpServerTracingPublisher(
+                chain.proceed(request),
+                request,
+                serverHandler,
+                httpTracing,
+                span
+        );
     }
 
 }

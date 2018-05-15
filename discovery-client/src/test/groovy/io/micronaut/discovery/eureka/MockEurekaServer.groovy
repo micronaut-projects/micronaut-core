@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
 import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
@@ -77,6 +78,7 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Get('/apps')
+    @Produces(single = true)
     Publisher<MockApplicationInfos> getApplicationInfosInternal() {
         return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->
             new MockApplicationInfo(it.key, it.value.values() as List<InstanceInfo>)
@@ -94,6 +96,7 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Get('/vips/{vipAddress}')
+    @Produces(single = true)
     Publisher<MockApplicationInfos> getApplicationVipsInternal(String vipAddress) {
         // this logic is wrong, i know.. we just test the call
         return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->
