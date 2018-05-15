@@ -14,18 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.naming;
-
 /**
- * An interface for components that are named.
+ * Micronaut core type conversion formatting.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface Named {
+package io.micronaut.core.convert.format;
 
-    /**
-     * @return The name of the component
-     */
-    String getName();
-}
