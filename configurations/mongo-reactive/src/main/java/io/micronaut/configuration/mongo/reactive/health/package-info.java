@@ -15,17 +15,9 @@
  */
 
 /**
- * GORM for MongoDB.
+ * MongoDB Health indicators.
  *
- * @author graemerocher
+ * @author James Kleeh
  * @since 1.0
  */
-@Configuration
-@RequiresMongo
-@Requires(entities = Entity.class)
-package io.micronaut.configuration.mongo.gorm;
-
-import grails.gorm.annotation.Entity;
-import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
+package io.micronaut.configuration.mongo.reactive.health;

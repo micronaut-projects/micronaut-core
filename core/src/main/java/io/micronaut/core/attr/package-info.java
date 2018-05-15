@@ -15,17 +15,10 @@
  */
 
 /**
- * GORM for MongoDB.
+ * Micronaut core attribute holder.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@RequiresMongo
-@Requires(entities = Entity.class)
-package io.micronaut.configuration.mongo.gorm;
+package io.micronaut.core.attr;
 
-import grails.gorm.annotation.Entity;
-import io.micronaut.configuration.mongo.reactive.condition.RequiresMongo;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
