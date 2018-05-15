@@ -45,20 +45,6 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
         this.futureSupplier = futureSupplier;
     }
 
-    /**
-     * Allow execution of callbacks when the publisher completes.
-     *
-     * @param action The action
-     * @return This publisher
-     */
-    public CompletableFuturePublisher<T> whenComplete(
-        BiConsumer<? super T, ? super Throwable> action) {
-        if (action != null) {
-            whenCompletes.add(action);
-        }
-        return this;
-    }
-
     @Override
     protected void doSubscribe(Subscriber<? super T> subscriber) {
         subscriber.onSubscribe(new CompletableFutureSubscription(subscriber));
@@ -101,8 +87,9 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
                                 if (throwable != null) {
                                     subscriber.onError(throwable);
                                 } else {
-
-                                    subscriber.onNext(s);
+                                    if (s != null) {
+                                        subscriber.onNext(s);
+                                    }
                                     subscriber.onComplete();
                                 }
                             }

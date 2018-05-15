@@ -32,6 +32,7 @@ import io.micronaut.discovery.eureka.EurekaServiceInstance;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -117,6 +118,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
      */
     @SuppressWarnings("WeakerAccess")
     @Get("/apps")
+    @Produces(single = true)
     public abstract Publisher<ApplicationInfos> getApplicationInfosInternal();
 
     /**
@@ -125,6 +127,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
      */
     @SuppressWarnings("WeakerAccess")
     @Get("/vips/{vipAddress}")
+    @Produces(single = true)
     public abstract Publisher<ApplicationInfos> getApplicationVipsInternal(String vipAddress);
 
     /**

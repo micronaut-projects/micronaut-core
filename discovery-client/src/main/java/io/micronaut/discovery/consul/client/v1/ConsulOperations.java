@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
@@ -47,7 +48,8 @@ public interface ConsulOperations {
      * @param value The value as a String
      * @return A {@link Publisher} that emits a boolean if the operation succeeded
      */
-    @Put(uri = "/kv/{key}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+    @Put(uri = "/kv/{key}", consumes = MediaType.TEXT_PLAIN)
+    @Produces(value = MediaType.TEXT_PLAIN, single = true)
     Publisher<Boolean> putValue(String key, @Body String value);
 
     /**
@@ -57,6 +59,7 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
     @Get("/kv/{key}?recurse")
+    @Produces(single = true)
     Publisher<List<KeyValue>> readValues(String key);
 
     /**
@@ -69,6 +72,7 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
     @Get("/kv/{key}?recurse=true{&dc}{&raw}{&seperator}")
+    @Produces(single = true)
     @Retryable(
         attempts = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
         delay = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
@@ -113,6 +117,7 @@ public interface ConsulOperations {
      * @return The current leader address
      */
     @Get("/status/leader")
+    @Produces(single = true)
     Publisher<String> status();
 
     /**
@@ -122,6 +127,7 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/catalog/register")
+    @Produces(single = true)
     Publisher<Boolean> register(@NotNull @Body CatalogEntry entry);
 
     /**
@@ -131,6 +137,7 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/catalog/deregister")
+    @Produces(single = true)
     Publisher<Boolean> deregister(@NotNull @Body CatalogEntry entry);
 
     /**
@@ -165,6 +172,7 @@ public interface ConsulOperations {
      * @return The {@link NewServiceEntry} instances
      */
     @Get("/agent/services")
+    @Produces(single = true)
     Publisher<Map<String, ServiceEntry>> getServices();
 
     /**
@@ -177,6 +185,7 @@ public interface ConsulOperations {
      * @return The {@link HealthEntry} instances
      */
     @Get("/health/service/{service}{?passing,tag,dc}")
+    @Produces(single = true)
     Publisher<List<HealthEntry>> getHealthyServices(
         @NotNull String service,
         Optional<Boolean> passing,
@@ -189,6 +198,7 @@ public interface ConsulOperations {
      * @return All the nodes
      */
     @Get("/catalog/nodes")
+    @Produces(single = true)
     Publisher<List<CatalogEntry>> getNodes();
 
     /**
@@ -198,6 +208,7 @@ public interface ConsulOperations {
      * @return A publisher that emits the nodes
      */
     @Get("/catalog/nodes?dc={datacenter}")
+    @Produces(single = true)
     Publisher<List<CatalogEntry>> getNodes(@NotNull String datacenter);
 
     /**
@@ -206,6 +217,7 @@ public interface ConsulOperations {
      * @return A Map where the keys are service names and the values are service tags
      */
     @Get("/catalog/services")
+    @Produces(single = true)
     Publisher<Map<String, List<String>>> getServiceNames();
 
     /**

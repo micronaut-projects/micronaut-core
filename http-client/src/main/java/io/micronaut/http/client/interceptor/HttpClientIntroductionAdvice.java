@@ -293,8 +293,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<Object> methodDeclaringType = context.getDeclaringType();
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Produces.class, "single", Boolean.class).orElse(false);
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+
+
                 Class<?> argumentType = publisherArgument.getType();
+
+                if (HttpResponse.class.isAssignableFrom(argumentType) || HttpStatus.class.isAssignableFrom(argumentType)) {
+                    isSingle = true;
+                }
+
+                if (!isSingle) {
+                    publisherArgument = Argument.of(List.class, publisherArgument);
+                }
+
                 Publisher<?> publisher;
 
                 MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
@@ -305,7 +317,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (HttpResponse.class.isAssignableFrom(argumentType)) {
                     request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                     publisher = httpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, publisherArgument
                     );
                 } else if (Void.class.isAssignableFrom(argumentType)) {
                     publisher = httpClient.exchange(
@@ -314,6 +326,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else {
                     MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                     request.accept(acceptTypes);
+
                     publisher = httpClient.retrieve(
                         request, publisherArgument
                     );

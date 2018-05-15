@@ -16,6 +16,7 @@
 
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
@@ -38,7 +39,14 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
+public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, AnnotationMetadataProvider {
+
+    /**
+     * The declaring type of the route.
+     *
+     * @return The declaring type
+     */
+    Class<?> getDeclaringType();
 
     /**
      * @return The variable values following a successful match.
@@ -151,4 +159,15 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
      * @return True if it is
      */
     boolean accept(@Nullable MediaType contentType);
+
+    /**
+     * Is the given input satisfied.
+     *
+     * @param name The name of the input
+     * @return True if it is
+     */
+    default boolean isSatisfied(String name) {
+        Object val = getVariables().get(name);
+        return val != null && !(val instanceof UnresolvedArgument);
+    }
 }

@@ -28,6 +28,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import spock.lang.Specification
+import zipkin2.Span
 
 import javax.inject.Inject
 
@@ -74,7 +75,13 @@ class HttpTracingSpec extends Specification {
         reporter.spans[0].tags().get('http.path') == '/traced/rxjava/John'
         reporter.spans[0].name() == 'get /traced/rxjava/{name}'
         reporter.spans[0].id() == reporter.spans[1].id()
-        reporter.spans[1].tags().get("foo") == 'bar'
+        reporter.spans[0].kind() == Span.Kind.SERVER
+        reporter.spans[0].tags().get("foo") == 'bar'
+
+        reporter.spans[1].tags().get('http.path') == '/traced/rxjava/John'
+        reporter.spans[1].id() == reporter.spans[1].id()
+        reporter.spans[1].kind() == Span.Kind.CLIENT
+
 
         cleanup:
         context.close()
