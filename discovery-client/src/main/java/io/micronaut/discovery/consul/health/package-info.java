@@ -15,14 +15,10 @@
  */
 
 /**
- * Consul client service operations.
+ * Consul health indicator.
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-@Configuration
-package io.micronaut.discovery.consul.client.v1;
+package io.micronaut.discovery.consul.health;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.consul.condition.RequiresConsul;

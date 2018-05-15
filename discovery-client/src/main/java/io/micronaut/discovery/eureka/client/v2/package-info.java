@@ -15,6 +15,8 @@
  */
 
 /**
+ * Eureka client classes
+ *
  * @author graemerocher
  * @since 1.0
  */
