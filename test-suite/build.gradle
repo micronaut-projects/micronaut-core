@@ -6,6 +6,7 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")
+    testCompile project(":management")
 
     testCompile 'io.jaegertracing:jaeger-core:0.27.0'
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
