@@ -1069,7 +1069,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     @SuppressWarnings("MagicNumber")
-    private <O> void addFullHttpResponseHandler(io.micronaut.http.HttpRequest<?> request, Channel channel, Emitter<io.micronaut.http.HttpResponse<O>> emitter, io.micronaut.core.type.Argument<O> bodyType) {
+    private <O> void addFullHttpResponseHandler(
+            io.micronaut.http.HttpRequest<?> request,
+            Channel channel,
+            Emitter<io.micronaut.http.HttpResponse<O>> emitter,
+            io.micronaut.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
 
             AtomicBoolean complete = new AtomicBoolean(false);
