@@ -2,7 +2,7 @@ The application created in the previous section contains a "main class" located 
 
 [source,java]
 ----
-package hello.world;
+package example.micronaut;
 
 import io.micronaut.runtime.Micronaut;
 
