@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -95,13 +96,15 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
         try {
             int connectionTimeoutMs = (int) configuration.getConnectTimeout().toMillis();
             int readTimeoutMs = (int) configuration.getReadTimeout().toMillis();
-            JsonNode projectResultJson = readGcMetadataUrl(new URL(configuration.getProjectMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs);
             JsonNode instanceMetadataJson = readGcMetadataUrl(new URL(configuration.getMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs);
 
             if (instanceMetadataJson != null) {
+                JsonNode projectResultJson = readGcMetadataUrl(new URL(configuration.getProjectMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs);
                 GoogleComputeInstanceMetadata instanceMetadata = new GoogleComputeInstanceMetadata();
                 instanceMetadata.instanceId = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.ID.getName()).asText();
-                instanceMetadata.account = projectResultJson.findValue(GoogleComputeMetadataKeys.PROJECT_ID.getName()).textValue();
+                if (projectResultJson != null) {
+                    instanceMetadata.account = projectResultJson.findValue(GoogleComputeMetadataKeys.PROJECT_ID.getName()).textValue();
+                }
                 instanceMetadata.availabilityZone = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.ZONE.getName()).textValue();
                 instanceMetadata.machineType = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.MACHINE_TYPE.getName()).textValue();
                 instanceMetadata.description = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.DESCRIPTION.getName()).textValue();
@@ -170,25 +173,29 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @throws IOException Failed or interrupted I/O operations while reading from input stream.
      */
     protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        URLConnection urlConnection = url.openConnection();
+        try {
+            URLConnection urlConnection = url.openConnection();
 
-        if (url.getProtocol().equalsIgnoreCase("file")) {
-            urlConnection.connect();
-            try (InputStream in = urlConnection.getInputStream()) {
-                return objectMapper.readTree(in);
-            }
-        } else {
-            HttpURLConnection uc = (HttpURLConnection) urlConnection;
+            if (url.getProtocol().equalsIgnoreCase("file")) {
+                urlConnection.connect();
+                try (InputStream in = urlConnection.getInputStream()) {
+                    return objectMapper.readTree(in);
+                }
+            } else {
+                HttpURLConnection uc = (HttpURLConnection) urlConnection;
 
-            uc.setConnectTimeout(connectionTimeoutMs);
-            uc.setRequestProperty(HEADER_METADATA_FLAVOR, "Google");
-            uc.setReadTimeout(readTimeoutMs);
-            uc.setRequestMethod(HttpMethod.GET.name());
-            uc.setDoOutput(true);
-            int responseCode = uc.getResponseCode();
-            try (InputStream in = uc.getInputStream()) {
-                return objectMapper.readTree(in);
+                uc.setConnectTimeout(connectionTimeoutMs);
+                uc.setRequestProperty(HEADER_METADATA_FLAVOR, "Google");
+                uc.setReadTimeout(readTimeoutMs);
+                uc.setRequestMethod(HttpMethod.GET.name());
+                uc.setDoOutput(true);
+                int responseCode = uc.getResponseCode();
+                try (InputStream in = uc.getInputStream()) {
+                    return objectMapper.readTree(in);
+                }
             }
+        } catch (FileNotFoundException e) {
+            return null;
         }
     }
 }
