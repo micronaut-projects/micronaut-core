@@ -21,7 +21,7 @@ import io.micronaut.management.endpoint.Read
 import javax.annotation.PostConstruct
 
 //tag::endpointClassBegin[]
-@Endpoint("message")
+@Endpoint(id = "message", defaultSensitive = false)
 class MessageEndpoint {
 //end::endpointClassBegin[]
 
