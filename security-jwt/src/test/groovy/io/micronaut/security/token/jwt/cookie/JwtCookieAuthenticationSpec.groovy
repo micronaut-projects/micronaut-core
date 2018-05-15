@@ -29,7 +29,7 @@ import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 
-@IgnoreIf({ System.getenv("JENKINS_URL") })
+@IgnoreIf({ !System.getProperty("geb.env") })
 class JwtCookieAuthenticationSpec extends GebSpec {
 
     @Shared
