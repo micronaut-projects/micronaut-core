@@ -14,18 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.naming;
-
 /**
- * An interface for components that are named.
+ * Micronaut core name conventions for properties and methods, etc.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface Named {
+package io.micronaut.core.naming.conventions;
 
-    /**
-     * @return The name of the component
-     */
-    String getName();
-}
