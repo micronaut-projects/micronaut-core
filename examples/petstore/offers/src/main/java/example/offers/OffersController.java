@@ -38,7 +38,6 @@ import java.util.List;
  * @since 1.0
  */
 @Controller("/${offers.api.version}/offers")
-@Singleton
 @Validated
 public class OffersController implements OffersOperations {
 

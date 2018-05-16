@@ -101,7 +101,6 @@ class ReactorCrudSpec extends Specification {
     }
 
     @Controller("/reactor/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

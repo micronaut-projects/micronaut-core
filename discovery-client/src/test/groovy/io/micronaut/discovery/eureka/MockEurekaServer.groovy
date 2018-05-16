@@ -36,7 +36,6 @@ import java.util.concurrent.ConcurrentHashMap
  * @since 1.0
  */
 @Controller('/eureka')
-@Singleton
 @Requires(property = MockEurekaServer.ENABLED)
 class MockEurekaServer implements EurekaOperations{
     public static Map<String, Map<String, Boolean>> heartbeats = new ConcurrentHashMap<>()

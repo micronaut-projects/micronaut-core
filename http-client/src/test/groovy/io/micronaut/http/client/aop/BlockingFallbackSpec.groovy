@@ -115,7 +115,6 @@ class BlockingFallbackSpec extends Specification {
     }
 
     @Controller("/blocking/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         @Override

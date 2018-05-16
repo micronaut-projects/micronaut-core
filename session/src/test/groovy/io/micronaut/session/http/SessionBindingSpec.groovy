@@ -188,7 +188,6 @@ class SessionBindingSpec extends Specification {
     }
 
     @Controller('/sessiontest')
-    @Singleton
     static class SessionController {
 
         @Get
