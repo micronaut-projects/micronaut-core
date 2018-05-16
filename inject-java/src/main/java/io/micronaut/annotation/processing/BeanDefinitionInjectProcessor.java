@@ -248,9 +248,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
                     }
                 }
+                AnnotationUtils.invalidateCache();
                 return true;
             }
         }
+        AnnotationUtils.invalidateCache();
         return false;
     }
 
