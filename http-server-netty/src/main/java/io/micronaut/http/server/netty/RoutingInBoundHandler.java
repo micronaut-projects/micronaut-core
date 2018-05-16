@@ -91,6 +91,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -476,18 +477,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         Optional<URL> optionalUrl = staticResourceResolver.resolve(path);
 
         if (optionalUrl.isPresent()) {
-            URL url = optionalUrl.get();
-            File file = new File(url.getPath());
-            System.out.println(url.getPath());
-            System.out.println(file.getAbsolutePath());
-            if (file.exists()) {
-                System.out.println("file exists");
-                if (!file.isDirectory() && file.canRead()) {
-                    return Optional.of(new NettySystemFileCustomizableResponseType(file));
+            try {
+                URL url = optionalUrl.get();
+                URI uri = url.toURI();
+                File file = new File(uri.getPath());
+                System.out.println(uri.getPath());
+                System.out.println(file.getAbsolutePath());
+                if (file.exists()) {
+                    System.out.println("file exists");
+                    if (!file.isDirectory() && file.canRead()) {
+                        return Optional.of(new NettySystemFileCustomizableResponseType(file));
+                    }
+                } else {
+                    System.out.println("file doesn't exist");
+                    return Optional.of(new NettyStreamedFileCustomizableResponseType(uri));
                 }
-            } else {
-                System.out.println("file doesn't exist");
-                return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
+            } catch (URISyntaxException e) {
+                //no-op
             }
         }
 
