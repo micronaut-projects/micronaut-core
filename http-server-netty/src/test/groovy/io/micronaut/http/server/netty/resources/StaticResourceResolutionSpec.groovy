@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -73,7 +74,6 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/index.html'), String
         ).blockingFirst()
-        System.out.println("got response " + response.code())
 
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
 
@@ -93,6 +93,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/'), String
         ).blockingFirst()
+        System.out.println("got response " + response.code())
 
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
 
