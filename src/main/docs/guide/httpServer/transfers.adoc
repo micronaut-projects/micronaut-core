@@ -1,1 +1,33 @@
-https://github.com/micronaut-projects/micronaut-core/issues/85[TODO]
+Micronaut supports the sending of files to the client in a couple easy ways.
+
+### File
+
+It is possible to simply return a `java.io.File` object from your controller method and the data will be returned to the client.
+
+For files that should be downloaded ("Content-Disposition" header set) construct an {api}/http/server/types/files/AttachedFile.html[] with the file object and the name you would like to be used.
+
+[source,java]
+----
+@Get
+public AttachedFile download() {
+    File file = ...
+    return new AttachedFile(file);
+}
+----
+
+### InputStream
+
+For cases where a reference to a file object is not possible, Micronaut supports transferring of input streams. To return a stream of data from the controller method, construct a {api}/http/server/types/files/StreamedFile.html[]. A constructor also exists that accepts a `java.net.URL` for your convenience.
+
+[source,java]
+----
+@Get
+public StreamedFile download() {
+    InputStream inputStream = ...
+    return new StreamedFile(inputStream, "download.txt")
+}
+----
+
+NOTE: The content type of file responses will be calculated based on the name of the file.
+
+The server supports return 304 (Not Modified) responses if the files being transferred have not changed and the request contains the appropriate header. In addition, if the client accepts encoded responses, Micronaut will encode the file if it is deemed appropriate. Encoding will happen if the file is text based and greater than 1 kilobyte.
