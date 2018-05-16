@@ -48,8 +48,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @param name The name
      * @return The header value
      */
-    default @Nullable
-    String header(@Nullable CharSequence name) {
+    default @Nullable String header(@Nullable CharSequence name) {
         if (name == null) {
             return null;
         }
@@ -59,8 +58,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The body or null
      */
-    default @Nullable
-    B body() {
+    default @Nullable B body() {
         return getBody().orElse(null);
     }
 

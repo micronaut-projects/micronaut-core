@@ -130,7 +130,7 @@ class RequestArgumentSatisfier {
                     }
                 } else if (bindingResult.isPresentAndSatisfied()) {
                     value = bindingResult.get();
-                } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
+                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.getDeclaredAnnotation(Nullable.class) != null) {
                     value = (UnresolvedArgument) () -> {
                         ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
                         Optional<ConversionError> lastError = conversionContext.getLastError();
@@ -138,19 +138,6 @@ class RequestArgumentSatisfier {
                             return (ArgumentBinder.BindingResult) () -> lastError;
                         }
                         return result;
-                    };
-                } else if (argument.getDeclaredAnnotation(Nullable.class) != null) {
-                    value = (UnresolvedArgument) () ->
-                        new ArgumentBinder.BindingResult() {
-                            @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-                            Optional<?> v;
-                            @Override
-                            public Optional getValue() {
-                                if (v == null) {
-                                    v = getValueForArgument(argument, request, satisfyOptionals);
-                                }
-                                return v;
-                            }
                     };
                 }
             }
