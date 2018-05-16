@@ -52,6 +52,16 @@ include::{testsclient}/basics/HelloController.java[tags=nonblocking, indent=0]
 
 TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which will limit the throughput and scalability of your application).
 
+==== Debugging / Tracing the HTTP Client
+
+To debug the requests being sent and received from the HTTP client you can enable tracing logging via your `logback.xml` file:
+
+.logback.xml
+[source,xml]
+----
+<logger name="io.micronaut.http.client" level="TRACE"/>
+----
+
 ==== Customizing the HTTP Request
 
 The previous example demonstrated using the static methods of the api:http.HttpRequest[] interface to construct a api:http.MutableHttpRequest[] instance. Like the name suggests a `MutableHttpRequest` can be mutated including the ability to add headers, customize the request body and so on. For example:
