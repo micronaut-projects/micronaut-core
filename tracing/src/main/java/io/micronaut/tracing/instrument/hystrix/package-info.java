@@ -15,16 +15,10 @@
  */
 
 /**
- * Configuration for Brave tracing.
+ * Tracing with hystrix.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@Requires(classes = { BraveTracer.class, Tracing.class})
-package io.micronaut.tracing.brave;
+package io.micronaut.tracing.instrument.hystrix;
 
-import brave.Tracing;
-import brave.opentracing.BraveTracer;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
