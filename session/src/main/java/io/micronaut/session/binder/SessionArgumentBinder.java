@@ -39,6 +39,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("unused")
 @Singleton
 @Requires(classes = HttpServerConfiguration.class)
 public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session> {
@@ -77,8 +78,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
                 Session newSession = sessionStore.newSession();
                 attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
                 return () -> Optional.of(newSession);
-            }
-            else {
+            } else {
                 //noinspection unchecked
                 return BindingResult.EMPTY;
             }
