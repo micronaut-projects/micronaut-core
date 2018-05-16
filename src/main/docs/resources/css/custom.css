@@ -4,6 +4,7 @@
     left: 0;
     width: 100%;
     z-index: 999;
+    transition: top 0.5s;
 }
 .navTitle {
     width: auto;
@@ -77,11 +78,13 @@ a:hover,
     margin-top: 60px;
 }
 #table-of-content {
-    width: 20%;
+    width: 28%;
     margin-left: 3%;
-    max-width: 400px;
+    margin-right: 3%;
+    max-width: 500px;
     float: right;
     z-index: 998;
+    text-align: left;
 }
 
 .mobile {
@@ -100,12 +103,7 @@ a:hover,
 }
 
 @media screen and (min-width: 961px) {
-    #main img,
-    div.tip > table:nth-child(-n+5),
-    #main .listingblock pre:nth-child(-n+5) {
-        max-width: 73%;
-        border: 1px solid #FFFFFF;
-        z-index: 997;
-
+    #main > div:nth-child(-n+45) {
+        max-width: 66%;
     }
 }
