@@ -76,6 +76,8 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
             } else {
                 body = parameterValueMap;
             }
+        } else if (len == 0) {
+            body = null;
         } else {
             body = parameterValueMap;
         }
