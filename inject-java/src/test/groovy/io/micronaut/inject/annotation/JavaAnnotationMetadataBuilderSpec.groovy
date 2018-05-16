@@ -64,6 +64,26 @@ class Test {
         metadata.getAnnotationNamesByStereotype(Around).contains(ScopedProxy.name)
     }
 
+    void "test multiple alias definitions with value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@MultipleAlias("test")
+class Test {
+}
+''')
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(ConfigurationReader)
+        metadata.getValue(ConfigurationReader, String).get() == 'test'
+        metadata.hasDeclaredAnnotation(MultipleAlias)
+        metadata.getValue(MultipleAlias, String).get() == 'test'
+        metadata.getValue(MultipleAlias, "id", String).get() == 'test'
+    }
+
     void "test alias for has correct value for aliased member"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
