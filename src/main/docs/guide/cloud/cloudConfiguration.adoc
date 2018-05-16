@@ -50,3 +50,46 @@ In addition, using the value of the constants defined in the table above you can
 
 TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
 
+
+==== Using the Cloud Configuration
+
+
+Environment.GOOGLE_COMPUTE &amp; Environment.AMAZON_EC2
+----
+
+When the system detects it is running on Google Compute or AWS EC2, upon startup the system will populate the interface ComputeInstanceMetadata backed by class  GoogleComputeInstanceMetadata/AmazonEC2InstanceMetadata with metadata found from Google or Amazon's metadata services.
+All of this data is merged together into the metaData properties for the running instance. If you need to access them simply get ahold of the embedded server instance NettyEmbeddedServerInstance, and call getMetadata() and you will get a map of all of the metadata for the EmbeddedServerInstance type of ServiceInstance.
+
+Depending on how you are using the service there are a few ways to get this metadata:
+    * as a client getting remote access via LoadBalancer and getting an server and it's metadata
+    * running code on the local server to access the servers metadata/environment
+
+Client Side via LoadBalancer and ServiceInstance
+----
+
+To use this is your class for client side load balancing like Netflix Ribbon see #clientSideLoadBalancing but
+when you have a LoadBalancer interface class, you can call select() and get a ServiceInstance back. From there you can call ServiceInstance.getMetadata() for a map of all of the metadata for the instance.
+Client Side
+[source,java]
+----
+LoadBalancer loadBalancer = loadBalancerResolver.resolve("some service")
+ConvertibleValues<String> metaData = loadBalancer.select().getMetadata()
+----
+
+
+Via local running server
+
+
+Local Server
+[source,java]
+----
+NettyEmbeddedServerInstance serverInstance = applicationContext.getBean(NettyEmbeddedServerInstance.class);
+ConvertibleValues<String> metaData = serverInstance.getMetadata();
+----
+
+
+
+
+
+
+
