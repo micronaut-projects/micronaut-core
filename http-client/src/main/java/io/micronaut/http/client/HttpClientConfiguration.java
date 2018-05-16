@@ -148,7 +148,7 @@ public abstract class HttpClientConfiguration {
      * @return The default connect timeout. Defaults to Netty default.
      */
     public Optional<Duration> getConnectTimeout() {
-        return Optional.of(connectTimeout);
+        return Optional.ofNullable(connectTimeout);
     }
 
     /**
