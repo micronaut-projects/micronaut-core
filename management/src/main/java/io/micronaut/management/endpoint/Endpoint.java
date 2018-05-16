@@ -58,12 +58,14 @@ public @interface Endpoint {
      * @return The ID of the endpoint
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(member = "id")
     String value() default "";
 
     /**
      * @return The ID of the endpoint
      */
     @AliasFor(member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = "value")
     String id() default "";
 
     /**
