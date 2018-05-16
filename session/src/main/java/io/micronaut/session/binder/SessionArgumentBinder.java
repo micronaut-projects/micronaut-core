@@ -29,6 +29,7 @@ import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
 import io.micronaut.session.http.HttpSessionFilter;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -62,6 +63,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
     public ArgumentBinder.BindingResult<Session> bind(ArgumentConversionContext<Session> context, HttpRequest<?> source) {
         if (!source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
             // the filter hasn't been executed
+            //noinspection unchecked
             return ArgumentBinder.BindingResult.EMPTY;
         }
 
@@ -71,9 +73,15 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
             return () -> existing;
         } else {
             // create a new session store it in the attribute
-            Session newSession = sessionStore.newSession();
-            attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
-            return () -> Optional.of(newSession);
+            if (context.getAnnotation(Nullable.class) == null) {
+                Session newSession = sessionStore.newSession();
+                attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
+                return () -> Optional.of(newSession);
+            }
+            else {
+                //noinspection unchecked
+                return BindingResult.EMPTY;
+            }
         }
     }
 }
