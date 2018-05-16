@@ -29,7 +29,6 @@ import static io.micronaut.http.HttpResponse.*; // <1>
  */
 // tag::class[]
 @Controller("/request")
-@Singleton
 public class MessageController {
 
     @Get("/hello") // <2>

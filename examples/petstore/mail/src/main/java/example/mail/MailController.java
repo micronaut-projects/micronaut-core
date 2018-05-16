@@ -13,7 +13,6 @@ import javax.inject.Singleton;
 import javax.validation.Valid;
 
 @Controller("/${mail.api.version}/mail")
-@Singleton
 public class MailController {
 
     private static final Logger log = LoggerFactory.getLogger(MailController.class);

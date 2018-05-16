@@ -15,7 +15,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @CompileStatic
-@Singleton
 @Controller('/mail')
 class MailController {
 

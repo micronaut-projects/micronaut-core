@@ -94,7 +94,6 @@ class BlockingPojoCrudSpec extends Specification {
     }
 
     @Controller("/blocking/pojo/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
