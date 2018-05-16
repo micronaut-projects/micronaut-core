@@ -594,7 +594,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
             System.getenv(ENVIRONMENTS_ENV))
-            .filter(Objects::nonNull)
+            .filter(StringUtils::isNotEmpty)
             .flatMap(s -> Arrays.stream(s.split(",")))
             .map(String::trim)
             .forEach(enviroments::add);
