@@ -475,17 +475,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
-                URI uri = url.toURI();
-                File file = new File(uri.getPath());
-                System.out.println(uri.getPath());
-                System.out.println(file.getAbsolutePath());
+                File file = new File(url.toURI().getPath());
                 if (file.exists()) {
-                    System.out.println("file exists");
                     if (!file.isDirectory() && file.canRead()) {
                         return Optional.of(new NettySystemFileCustomizableResponseType(file));
                     }
                 } else {
-                    System.out.println("file doesn't exist");
                     return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
                 }
             } catch (URISyntaxException e) {
@@ -839,7 +834,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             Object result;
                             try {
                                 result = newRoute.execute();
-                                System.out.println("executed route and returned " + result.toString());
                                 finalResponse = messageToResponse(newRoute, result);
                             } catch (Throwable e) {
                                 throw new InternalServerException("Error executing status route [" + newRoute + "]: " + e.getMessage(), e);
