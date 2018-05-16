@@ -62,6 +62,10 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
 
     @Override
     public void operationComplete(ChannelFuture future) {
+        System.out.println("close success " + future.isSuccess());
+        System.out.println("keep alive " + request.getHeaders().isKeepAlive());
+        System.out.println("status " + statusCode);
+
         if (!future.isSuccess()) {
             Throwable cause = future.cause();
             // swallow closed channel exception, nothing we can do about it if the client disconnects
