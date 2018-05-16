@@ -103,12 +103,7 @@ a:hover,
 }
 
 @media screen and (min-width: 961px) {
-    #main img,
-    div.tip > table:nth-child(-n+5),
-    #main .listingblock pre:nth-child(-n+5) {
-        max-width: 65%;
-        border: 1px solid #FFFFFF;
-        z-index: 997;
-
+    #main > div:nth-child(-n+45) {
+        max-width: 66%;
     }
 }
