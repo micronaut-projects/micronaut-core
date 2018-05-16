@@ -15,16 +15,10 @@
  */
 
 /**
- * Configuration for Brave tracing.
+ * Validation advice and interceptors.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@Requires(classes = { BraveTracer.class, Tracing.class})
-package io.micronaut.tracing.brave;
+package io.micronaut.validation;
 
-import brave.Tracing;
-import brave.opentracing.BraveTracer;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;

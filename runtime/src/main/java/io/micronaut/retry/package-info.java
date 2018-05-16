@@ -15,16 +15,10 @@
  */
 
 /**
- * Configuration for Brave tracing.
+ * Retry State containers.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@Requires(classes = { BraveTracer.class, Tracing.class})
-package io.micronaut.tracing.brave;
+package io.micronaut.retry;
 
-import brave.Tracing;
-import brave.opentracing.BraveTracer;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
