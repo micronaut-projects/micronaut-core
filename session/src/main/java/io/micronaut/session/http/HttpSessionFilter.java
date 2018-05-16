@@ -110,19 +110,16 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                     sessionAttr = routeMatch.flatMap((m) -> {
                         if (!m.hasAnnotation(SessionValue.class)) {
                             return Optional.empty();
-                        }
-                        else {
+                        } else {
                             String attributeName = m.getValue(SessionValue.class, String.class).orElse(null);
                             if (!StringUtils.isEmpty(attributeName)) {
                                 return Optional.of(attributeName);
-                            }
-                            else {
+                            } else {
                                 throw new InternalServerException("@SessionValue on a return type must specify an attribute name");
                             }
                         }
                     }).orElse(null);
-                }
-                else {
+                } else {
                     sessionAttr = null;
                 }
 
@@ -138,8 +135,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                             .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
                             .map((s) -> new SessionAndResponse(Optional.of(s), response));
                     }
-                }
-                else if (sessionAttr != null) {
+                } else if (sessionAttr != null) {
                     Session newSession = sessionStore.newSession();
                     newSession.put(sessionAttr, body.get());
                     return Flowable

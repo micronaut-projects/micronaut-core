@@ -26,7 +26,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.binders.AnnotatedRequestArgumentBinder;
-import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder;
 import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
 import io.micronaut.session.http.HttpSessionFilter;
@@ -41,6 +40,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@SuppressWarnings("unused")
 @Singleton
 @Requires(classes = HttpServerConfiguration.class)
 public class SessionValueArgumentBinder implements AnnotatedRequestArgumentBinder<SessionValue, Object> {
@@ -54,6 +54,7 @@ public class SessionValueArgumentBinder implements AnnotatedRequestArgumentBinde
         MutableConvertibleValues<Object> attrs = source.getAttributes();
         if (!attrs.contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
             // the filter hasn't been executed but the argument is not satisfied
+            //noinspection unchecked
             return ArgumentBinder.BindingResult.UNSATISFIED;
         }
 
@@ -69,6 +70,7 @@ public class SessionValueArgumentBinder implements AnnotatedRequestArgumentBinde
             Session session = existing.get();
             return () -> session.get(finalName, context);
         } else {
+            //noinspection unchecked
             return ArgumentBinder.BindingResult.EMPTY;
         }
     }
