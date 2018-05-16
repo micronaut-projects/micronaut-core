@@ -490,7 +490,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 } else {
                     System.out.println("file doesn't exist");
-                    return Optional.of(new NettyStreamedFileCustomizableResponseType(uri));
+                    return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
                 }
             } catch (URISyntaxException e) {
                 //no-op
