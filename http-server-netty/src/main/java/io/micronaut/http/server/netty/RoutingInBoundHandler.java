@@ -383,18 +383,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
                 return;
             } else {
-                Optional<? extends FileCustomizableResponseType> optionalFile = Optional.empty();
-                Optional<URL> optionalUrl = staticResourceResolver.resolve(requestPath);
-                if (optionalUrl.isPresent()) {
-                    URL url = optionalUrl.get();
-                    File file = new File(url.getPath());
-                    if (file.exists()) {
-                        if (!file.isDirectory() && file.canRead()) {
-                            optionalFile = Optional.of(new NettySystemFileCustomizableResponseType(file));
-                        }
-                    } else {
-                        optionalFile = Optional.of(new NettyStreamedFileCustomizableResponseType(url));
+                Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+
+                if (!optionalFile.isPresent()) {
+                    StringBuilder indexPath = new StringBuilder(requestPath);
+                    if (!requestPath.endsWith("/")) {
+                        indexPath.append("/");
                     }
+                    indexPath.append("index.html");
+                    optionalFile = matchFile(indexPath.toString());
                 }
 
                 if (optionalFile.isPresent()) {
@@ -469,6 +466,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     responsePublisher
             );
         }
+    }
+
+    private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
+        Optional<URL> optionalUrl = staticResourceResolver.resolve(path);
+
+        if (optionalUrl.isPresent()) {
+            URL url = optionalUrl.get();
+            File file = new File(url.getPath());
+            if (file.exists()) {
+                if (!file.isDirectory() && file.canRead()) {
+                    return Optional.of(new NettySystemFileCustomizableResponseType(file));
+                }
+            } else {
+                return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
+            }
+        }
+
+        return Optional.empty();
     }
 
     private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
