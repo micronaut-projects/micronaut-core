@@ -15,10 +15,10 @@
  */
 
 /**
- * Route based method matching classes derived from URIs.
+ * Qualifiers based on type.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.qualifier;
 
