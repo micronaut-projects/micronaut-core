@@ -147,11 +147,4 @@ public interface CommandLine {
         CommandLine parse(String... args);
     }
 
-    /**
-     * Default arguments.
-     */
-    interface Arguments {
-        Option VERSION = new Option("version", "Outputs the version");
-        Option HELP = new Option("help", "Outputs help information");
-    }
 }
