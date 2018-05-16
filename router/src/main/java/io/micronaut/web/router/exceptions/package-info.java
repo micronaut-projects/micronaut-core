@@ -15,10 +15,10 @@
  */
 
 /**
- * Route based method matching classes derived from URIs.
+ * Route exceptions.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.exceptions;
 

@@ -15,10 +15,10 @@
  */
 
 /**
- * Route based method matching classes derived from URIs.
+ * Route resource and configuration.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.resource;
 
