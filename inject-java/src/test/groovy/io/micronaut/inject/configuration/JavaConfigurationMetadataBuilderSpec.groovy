@@ -35,6 +35,73 @@ import static java.nio.charset.StandardCharsets.UTF_8
  */
 class JavaConfigurationMetadataBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test build configuration metadata with annotation aliases"() {
+        given:
+        TypeElement element = buildTypeElement('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.annotation.*;
+
+@MultipleAlias("foo")
+class MyProperties {
+    protected String fieldTest = "unconfigured";
+    private String internalField = "unconfigured";
+    
+    public void setSetterTest(String s) {
+        this.internalField = s;
+    }
+    
+    public String getSetter() { return this.internalField; } 
+}
+''')
+
+        when:
+        def builder = createBuilder()
+        def configurationMetadata = builder.visitProperties(element, "some description")
+        def propertyMetadata = builder.visitProperty(element, element, "java.lang.String", "setterTest", "some description", null)
+
+        then:
+        builder.configurations.size() == 1
+        configurationMetadata.name == 'foo'
+        configurationMetadata.description == 'some description'
+        configurationMetadata.type == 'test.MyProperties'
+
+        builder.properties.size() == 1
+        propertyMetadata.name == 'setterTest'
+        propertyMetadata.path == 'foo.setter-test'
+        propertyMetadata.type == 'java.lang.String'
+        propertyMetadata.declaringType == 'test.MyProperties'
+        propertyMetadata.description == 'some description'
+
+
+        when:"the config metadata is converted to JSON"
+        def sw = new StringWriter()
+        configurationMetadata.writeTo(sw)
+        def text = sw.toString()
+        def json = new JsonSlurper().parseText(text)
+
+        then:"the json is correct"
+        json.type == configurationMetadata.type
+        json.name == configurationMetadata.name
+        json.description == configurationMetadata.description
+
+
+        when:"the property metadata is converted to JSON "
+
+        sw = new StringWriter()
+        propertyMetadata.writeTo(sw)
+        text = sw.toString()
+        println "text = $text"
+        json = new JsonSlurper().parseText(text)
+
+        then:"the json is correct"
+        json.type == propertyMetadata.type
+        json.name == propertyMetadata.path
+        json.sourceType == propertyMetadata.declaringType
+        json.description == propertyMetadata.description
+    }
+
     void "test build configuration metadata for simple properties"() {
         given:
         TypeElement element = buildTypeElement('''
