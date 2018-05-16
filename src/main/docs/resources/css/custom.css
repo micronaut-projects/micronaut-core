@@ -78,8 +78,9 @@ a:hover,
     margin-top: 60px;
 }
 #table-of-content {
-    width: 25%;
+    width: 28%;
     margin-left: 3%;
+    margin-right: 3%;
     max-width: 500px;
     float: right;
     z-index: 998;
