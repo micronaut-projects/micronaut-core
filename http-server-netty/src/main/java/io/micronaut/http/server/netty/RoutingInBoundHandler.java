@@ -835,7 +835,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             Object result;
                             try {
                                 result = newRoute.execute();
-                                System.out.println("executed route and returned " + result.toString());
                                 finalResponse = messageToResponse(newRoute, result);
                             } catch (Throwable e) {
                                 throw new InternalServerException("Error executing status route [" + newRoute + "]: " + e.getMessage(), e);
@@ -978,6 +977,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Optional<MediaType> specifiedMediaType = response.getContentType();
             MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
 
+            System.out.println("inside subscribeToResponsePublisher");
+
             Optional<?> responseBody = response.getBody();
             if (responseBody.isPresent()) {
 
@@ -995,6 +996,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
                                                                                             .findTypeHandler(body.getClass());
                 if (typeHandler.isPresent()) {
+                    System.out.println("found type handler");
+
                     NettyCustomizableResponseTypeHandler th = typeHandler.get();
                     setBodyContent(response, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
                     return response;
@@ -1025,10 +1028,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
+        System.out.println("inside writeFinalNettyResponse");
+
         NettyHttpResponse nettyHttpResponse = (NettyHttpResponse) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
         Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
         if (customizableTypeBody.isPresent()) {
+            System.out.println("customizableTypeBody is present");
             NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
             handler.invoke(requestReference.get(), nettyHttpResponse, context);
         } else {
