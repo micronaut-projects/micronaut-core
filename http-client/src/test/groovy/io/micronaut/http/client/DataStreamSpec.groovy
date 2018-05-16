@@ -133,7 +133,6 @@ class DataStreamSpec extends Specification {
     }
 
     @Controller("/datastream/books")
-    @Singleton
     static class BookController {
 
         @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)

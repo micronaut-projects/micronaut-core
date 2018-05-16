@@ -141,7 +141,6 @@ class RxJavaFallbackSpec extends Specification{
     }
 
     @Controller("/rxjava/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

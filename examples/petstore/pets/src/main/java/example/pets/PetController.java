@@ -38,7 +38,6 @@ import static com.mongodb.client.model.Filters.eq;
  * @since 1.0
  */
 @Controller("/${pets.api.version}/pets")
-@Singleton
 @Validated
 public class PetController implements PetOperations<PetEntity> {
 

@@ -69,7 +69,6 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
     }
 
     @Controller('/errors')
-    @Singleton
     static class BookController {
 
         @Get('/')

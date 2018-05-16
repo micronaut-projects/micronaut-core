@@ -27,7 +27,6 @@ import javax.inject.Singleton;
  */
 // tag::class[]
 @Controller // <1>
-@Singleton
 public class IssuesController {
 
     @Get("/{number}") // <2>

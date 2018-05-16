@@ -131,7 +131,6 @@ class CompletableFutureFallbackSpec extends Specification {
     }
 
     @Controller("/future/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
