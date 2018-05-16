@@ -384,7 +384,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
                 return;
             } else {
-                System.out.println("attempting to find file at " + requestPath);
                 Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
 
                 if (!optionalFile.isPresent()) {
@@ -393,15 +392,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         indexPath.append("/");
                     }
                     indexPath.append("index.html");
-                    System.out.println("attempting to find file at " + indexPath.toString());
                     optionalFile = matchFile(indexPath.toString());
                 }
 
                 if (optionalFile.isPresent()) {
-                    System.out.println("found file");
                     route = new BasicObjectRouteMatch(optionalFile.get());
                 } else {
-                    System.out.println("could not find file");
                     Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
                     if (statusRoute.isPresent()) {
                         route = statusRoute.get();
