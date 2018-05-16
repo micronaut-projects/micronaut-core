@@ -4,6 +4,7 @@
     left: 0;
     width: 100%;
     z-index: 999;
+    transition: top 0.5s;
 }
 .navTitle {
     width: auto;
