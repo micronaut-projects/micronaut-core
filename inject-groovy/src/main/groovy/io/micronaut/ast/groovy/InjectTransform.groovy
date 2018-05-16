@@ -283,6 +283,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
         }
+
+        AstAnnotationUtils.invalidateCache()
     }
 
     @Override
