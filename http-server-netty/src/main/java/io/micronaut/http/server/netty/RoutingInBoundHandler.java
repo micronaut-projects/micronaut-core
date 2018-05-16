@@ -383,6 +383,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
                 return;
             } else {
+                System.out.println("attempting to find file at " + requestPath);
                 Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
 
                 if (!optionalFile.isPresent()) {
@@ -391,12 +392,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         indexPath.append("/");
                     }
                     indexPath.append("index.html");
+                    System.out.println("attempting to find file at " + indexPath.toString());
                     optionalFile = matchFile(indexPath.toString());
                 }
 
                 if (optionalFile.isPresent()) {
+                    System.out.println("found file");
                     route = new BasicObjectRouteMatch(optionalFile.get());
                 } else {
+                    System.out.println("could not find file");
                     Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
                     if (statusRoute.isPresent()) {
                         route = statusRoute.get();
@@ -779,6 +783,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             executor = context.channel().eventLoop();
         }
 
+        System.out.println("decorating route");
+
         route = route.decorate(finalRoute -> {
             MediaType defaultResponseMediaType = finalRoute
                 .getProduces()
@@ -971,6 +977,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Optional<MediaType> specifiedMediaType = response.getContentType();
             MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
 
+            System.out.println("inside subscribeToResponsePublisher");
+
             Optional<?> responseBody = response.getBody();
             if (responseBody.isPresent()) {
 
@@ -988,6 +996,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
                                                                                             .findTypeHandler(body.getClass());
                 if (typeHandler.isPresent()) {
+                    System.out.println("found type handler");
+
                     NettyCustomizableResponseTypeHandler th = typeHandler.get();
                     setBodyContent(response, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
                     return response;
@@ -1018,10 +1028,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
+        System.out.println("inside writeFinalNettyResponse");
+
         NettyHttpResponse nettyHttpResponse = (NettyHttpResponse) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
         Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
         if (customizableTypeBody.isPresent()) {
+            System.out.println("customizableTypeBody is present");
             NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
             handler.invoke(requestReference.get(), nettyHttpResponse, context);
         } else {
@@ -1133,6 +1146,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private MutableHttpResponse<?> messageToResponse(RouteMatch<?> finalRoute, Object message) {
         MutableHttpResponse<?> response;
+        System.out.println("inside message to response " + message.toString());
         if (message instanceof HttpResponse) {
             response = ConversionService.SHARED.convert(message, NettyHttpResponse.class)
                     .orElseThrow(() -> new InternalServerException("Emitted response is not mutable"));
