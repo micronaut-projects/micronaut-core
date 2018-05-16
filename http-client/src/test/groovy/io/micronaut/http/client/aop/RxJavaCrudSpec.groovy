@@ -112,7 +112,6 @@ class RxJavaCrudSpec extends Specification {
     }
 
     @Controller("/rxjava/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
