@@ -20,6 +20,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 
 import javax.lang.model.element.AnnotationMirror;
@@ -133,4 +134,13 @@ public class AnnotationUtils {
         }
         return false;
     }
+
+    /**
+     * Invalidates any cached metadata.
+     */
+    @Internal
+    static void invalidateCache() {
+        annotationMetadataCache.invalidateAll();
+    }
+
 }
