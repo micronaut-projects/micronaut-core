@@ -93,7 +93,6 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.GET('/'), String
         ).blockingFirst()
-        System.out.println("got response " + response.code())
 
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
 
