@@ -789,8 +789,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             executor = context.channel().eventLoop();
         }
 
-        System.out.println("decorating route");
-
         route = route.decorate(finalRoute -> {
             MediaType defaultResponseMediaType = finalRoute
                 .getProduces()
@@ -1152,7 +1150,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private MutableHttpResponse<?> messageToResponse(RouteMatch<?> finalRoute, Object message) {
         MutableHttpResponse<?> response;
-        System.out.println("inside message to response " + message.toString());
         if (message instanceof HttpResponse) {
             response = ConversionService.SHARED.convert(message, NettyHttpResponse.class)
                     .orElseThrow(() -> new InternalServerException("Emitted response is not mutable"));
