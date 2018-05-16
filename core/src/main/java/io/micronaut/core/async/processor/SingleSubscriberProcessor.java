@@ -21,6 +21,7 @@ import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -49,6 +50,7 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
 
     @Override
     public final void subscribe(Subscriber<? super R> subscriber) {
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
         if (!this.subscriber.compareAndSet(null, subscriber)) {
             subscriber.onSubscribe(EMPTY_SUBSCRIPTION);
             subscriber.onError(new IllegalStateException("Only one subscriber allowed"));

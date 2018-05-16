@@ -16,14 +16,13 @@
 
 package io.micronaut.core.async.publisher;
 
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.Queue;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -33,10 +32,9 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
+class CompletableFuturePublisher<T> implements Publisher<T> {
 
     private final Supplier<CompletableFuture<T>> futureSupplier;
-    private final Queue<BiConsumer<? super T, ? super Throwable>> whenCompletes = new ConcurrentLinkedDeque<>();
 
     /**
      * @param futureSupplier The function that supplies the future.
@@ -46,7 +44,8 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
     }
 
     @Override
-    protected void doSubscribe(Subscriber<? super T> subscriber) {
+    public final void subscribe(Subscriber<? super T> subscriber) {
+        Objects.requireNonNull(subscriber, "Subscriber cannot be null");
         subscriber.onSubscribe(new CompletableFutureSubscription(subscriber));
     }
 
@@ -78,9 +77,6 @@ class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
                     if (future == null) {
                         subscriber.onComplete();
                     } else {
-                        for (BiConsumer<? super T, ? super Throwable> whenComplete : whenCompletes) {
-                            future = future.whenComplete(whenComplete);
-                        }
                         this.future = future;
                         future.whenComplete((s, throwable) -> {
                             if (completed.compareAndSet(false, true)) {

@@ -80,6 +80,16 @@ public class Publishers {
     public static <T> Publisher<T> fromCompletableFuture(Supplier<CompletableFuture<T>> futureSupplier) {
         return new CompletableFuturePublisher<>(futureSupplier);
     }
+    /**
+     * Build a {@link Publisher} from a {@link CompletableFuture}.
+     *
+     * @param future The {@link CompletableFuture}
+     * @param <T>  The type of the publisher
+     * @return The {@link Publisher}
+     */
+    public static <T> Publisher<T> fromCompletableFuture(CompletableFuture<T> future) {
+        return new CompletableFuturePublisher<>(() -> future);
+    }
 
     /**
      * A {@link Publisher} that emits a fixed single value.
