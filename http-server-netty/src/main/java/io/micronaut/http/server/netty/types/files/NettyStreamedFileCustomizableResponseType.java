@@ -88,6 +88,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
                 .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
 
             System.out.println("writing response");
+            System.out.println(context.pipeline().names());
 
             // Write the request data
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
