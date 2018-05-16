@@ -15,7 +15,9 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
+import io.micronaut.inject.annotation.MultipleAlias
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -42,6 +44,25 @@ import javax.inject.Singleton
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
 
+    void "test multiple alias definitions with value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Multi', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@MultipleAlias("test")
+class Multi {
+}
+''', )
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(ConfigurationReader)
+        metadata.getValue(ConfigurationReader, String).get() == 'test'
+        metadata.hasDeclaredAnnotation(MultipleAlias)
+        metadata.getValue(MultipleAlias, String).get() == 'test'
+        metadata.getValue(MultipleAlias, "id", String).get() == 'test'
+    }
     void "test annotation names by stereotype"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\

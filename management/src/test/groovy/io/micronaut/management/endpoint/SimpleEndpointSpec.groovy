@@ -115,7 +115,7 @@ class SimpleEndpointSpec extends Specification {
     }
 }
 
-@Endpoint(value = 'simple', defaultSensitive = false)
+@Endpoint(id = 'simple', defaultSensitive = false)
 class Simple implements Toggleable {
 
     private final ApplicationContext applicationContext
