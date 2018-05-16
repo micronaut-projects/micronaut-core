@@ -55,13 +55,18 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
-
-        ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
+        ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
+    }
+
+    ClassNode buildClassNode(String source, String cls) {
+        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+
+        ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
+        return element
     }
 
 
