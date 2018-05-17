@@ -30,7 +30,6 @@ import javax.validation.constraints.Size;
  */
 // tag::class[]
 @Controller("/receive")
-@Singleton
 public class MessageController {
 // end::class[]
 

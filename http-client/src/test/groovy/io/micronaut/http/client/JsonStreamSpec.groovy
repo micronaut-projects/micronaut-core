@@ -126,7 +126,6 @@ class JsonStreamSpec  extends Specification {
 
     }
     @Controller("/jsonstream/books")
-    @Singleton
     static class BookController {
 
         @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)
