@@ -50,3 +50,49 @@ In addition, using the value of the constants defined in the table above you can
 
 TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
 
+
+== Using the Cloud Configuration
+
+
+api:context.env.Environment#GOOGLE_COMPUTE[] &amp; api:context.env.Environment#AMAZON_EC2[]
+
+
+When the system detects it is running on Google Compute or AWS EC2, upon startup the system will populate the interface ComputeInstanceMetadata backed by class api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
+All of this data is merged together into the metaData properties for the running instance. If you need to access them simply get the bean of the embedded server instance interface api:EmbeddedServerInstance, and call getMetadata() and you will get a map of all of the metadata for the api:io.micronaut.runtime.server.EmbeddedServerInstance[] type of api:io.micronaut.discovery.ServiceInstance[].
+If you are connecting remotely via client, this can be referenced once you have gotten a api:io.micronaut.discovery.ServiceInstance[] from the api:io.micronaut.http.client.LoadBalancer[] mechanism.
+
+Depending on how you are using the service there are a few ways to get this metadata:
+
+    * as a client getting remote access via api:io.micronaut.http.client.LoadBalancer[] and getting an server and its metadata
+    * running code on the local server to access the servers metadata/environment
+
+Client Side via api:io.micronaut.http.client.LoadBalancer[] and api:io.micronaut.discovery.ServiceInstance[]
+
+
+To use this in your class for client side load balancing like Netflix Ribbon see <<clientSideLoadBalancing,Client Side Load Balancing>> but
+when you have a api:io.micronaut.http.client.LoadBalancer[] interface class, you can call select() and get a ServiceInstance back. From there you can call api:io.micronaut.discovery.ServiceInstance.getMetadata()[] for a map of all of the metadata for the instance.
+
+Client Side
+[source,java]
+----
+LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service")
+ConvertibleValues<String> metaData = loadBalancer.select().getMetadata()
+----
+
+
+Via local running server
+
+
+Local Server
+[source,java]
+----
+EmbeddedServerInstance serverInstance = applicationContext.getBean(NettyEmbeddedServerInstance.class);
+ConvertibleValues<String> metaData = serverInstance.getMetadata();
+----
+
+
+
+
+
+
+
