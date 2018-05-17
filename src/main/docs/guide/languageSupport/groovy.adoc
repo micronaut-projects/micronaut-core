@@ -1,24 +1,28 @@
 Groovy has first class support in Micronaut. This is accomplished with the modules inject-groovy, function-groovy, and runtime-groovy.
-You can use Groovy for a tranditional standalone webapp, a client, or a Serverless function -
+You can use Groovy for a tranditional standalone application, a client, or a serverless function or any mix of them.
 
 To get started let's create a project with the CLI if you are building from source:
 
-    - clone Micronaut from github: https://github.com/micronaut-projects/micronaut-core.git
-    - from Micronaut root, run './gradlew cli:pTML' (PublishToMavenLocal)
-    - clone Micronaut profiles from github: https://github.com/micronaut-projects/micronaut-profiles.git
-    - from micronaut-profiles root, run './gradlew pTML'
-    - go back to micronaut root i.e. ~/micronaut-core/cli/bin
-    - run ./mn from here - now you are ready!
+    1. clone Micronaut from github: https://github.com/micronaut-projects/micronaut-core.git
+    1. from Micronaut root, run './gradlew cli:pTML' (PublishToMavenLocal)
+    1. clone Micronaut profiles from github: https://github.com/micronaut-projects/micronaut-profiles.git
+    1. from micronaut-profiles root, run './gradlew pTML'
+    1. go back to micronaut root i.e. ~/micronaut-core/cli/bin
+    1. run ./mn from here - now you are ready!
 
-TIP: In the future you can simply use Sdkman (sdkman.io) to skip all of these manual steps, and have the Micronaut CLI ready to go!
+TIP: You can install the the Micronaut CLI anywhere you want. Simply set the environment variable APP_HOME and copy the jar cli-1.0.0-SNAPSHOT.jar (from build/libs) into that directory. Also copy mn and mn.bat into somewhere in your system path (found in build/bin). Now you can run Micronaut CLI wherever you want!
+
+TIP: In the future you can simply use SDKMAN (sdkman.io) to skip all of these manual steps, and have the Micronaut CLI ready to go!
+
+Now time to make some Groovy Micronaut Apps!
 
 [source,bash]
-.Create a service Micraut application
+.Create a Micronaut application
 ----
-$ mn create-service hello-world --features groovy
+$ mn create-app hello-world --features groovy
 ----
 
-Above we run the CLI for Micronaut to create a new service application with Groovy. If you don't want to use the CLI, that's ok: you can manually create your project and set it up yourself.
+Above we run the CLI for Micronaut to create a new service application with Groovy. If you don't want to use the CLI, that's ok: you can also manually create your project and set it up yourself. Note because we created the project with '--features groovy' it will default to Groovy types going forward for this project.
 
 [source,groovy]
 .Example build.gradle
@@ -77,18 +81,20 @@ shadowJar {
 }
 
 ----
+<1> Groovy Dependencies
 
 The key element here is item <1> which is the groovy dependencies for a standard microservice project.
 
-Other things you can create with the Micronaut CLI:
-    * create-federation --services <service names> - this is for creating a group of services all at once
-    * create-profile <profileName> - this is for creating a new profile. See https://github.com/micronaut-projects/micronaut-profiles to a see a list of current profiles.
+Other things you can run with the Micronaut CLI:
+
+    * create-federation --services <service names> --features=groovy - this is for creating a group of apps/services all at once
+    * create-profile <profileName> --features=groovy - this is for creating a new profile. See https://github.com/micronaut-projects/micronaut-profiles to a see a list of current profiles.
     * list-profiles - list available profiles to the CLI
     * profile-info <profileName> - list the features available for a profile i.e. 'groovy'
     * help - help using the CLI
 
 
-Note that most profile have a 'groovy' feature that will include all of the needed Groovy language depdencies. Back to making Groovy applications, now that we have your new service 'hello-world' let us go into its root directory.
+Most profiles have a 'groovy' feature that will include all of the needed Groovy language depdencies. Back to making Groovy applications, now that we have your new service 'hello-world' let us go into its root directory.
 
 Now when we run the CLI we have a new set of options for our application:
 
@@ -221,7 +227,7 @@ class HelloControllerSpec extends Specification {
 
 Notice how we use Micronaut both as client and as a server to test itself, pretty cool!
 
-We can also use services, which is really the same as a bean that's a @Singleton. On top of that, we can use GORM like
+We can also use a service which is really the same as a bean that is a @Singleton. On top of that, we can use GORM like
 we do in Grails! Or you can make a GORM Data service like so:
 
 
@@ -273,10 +279,104 @@ class Vehicle {
     String name
 
     static hasMany = [drivers: Driver]
-
-
 }
 ----
+
+One more thing we can make in groovy, is a scheduled execution job. Please note this is just built-in Java scheduled executors and not a clustered type service like Quartz.
+
+
+[source,bash]
+.Create a scheduled job
+----
+mn> create-job helloJob
+| Rendered template Job.groovy to destination src/main/groovy/hello/world/HelloJob.groovy
+----
+
+Let's look at the soruce, you can just start coding away and scheduling tasks. You can repeat at fixed rate, cron type, and more info at api:java.util.concurrent.ScheduledExecutorService[]
+
+[source,groovy]
+----
+package hello.world
+
+import javax.inject.Singleton
+import io.micronaut.scheduling.annotation.Scheduled
+
+@Singleton
+class HelloJob {
+
+    @Scheduled(fixedRate = "5m")
+    void process() {}
+}
+----
+
+You may use types fixedRate, fixedDelay, initialDelay, and cron. You can see more information here api:package io.micronaut.scheduling.annotation.Scheduled[]
+
+
+= Serverless Groovy
+
+
+A microservice application is just one way to use Micronaut. You can also use it for serverless like on AWS Lambda.
+Micronaut has a built in facility called functions for making this easy with Groovy!
+
+Writing a Groovy function is half setup in build.gradle half in the code itself. Let's look at twitter example we make from the CLI:
+
+The quickest way to get an AWS lambda function is using the CLI:
+
+[source,bash]
+.Create a Groovy AWS Lambda function app
+----
+$ ./mn create-service hello-world-aws -profile function-aws -features groovy-function
+| Service created at /home/rvanderwerf/bitbucket/micronaut-core-groovydocs/cli/build/bin/hello-world-aws
+----
+
+So the source with Groovy is dead simple: a String is returns after the function is executed.
+
+[source,groovy]
+.HelloWorldAwsFunction.groovy
+----
+package hello.world.aws
+
+String index() {
+    "HelloWorldAws"
+}
+----
+
+To deploy it the build.gradle is generated to do all the legwork.
+
+[source,groovy]
+.build.gradle
+----
+mainClassName = "hello.world.aws.HelloWorldAwsFunction" //<1>
+applicationDefaultJvmArgs = [""]
+
+jar {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+}
+
+task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "hello-world-aws" //<2>
+    handler = "hello.world.aws.HelloWorldAwsFunction::index" //<3>
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    runtime = Runtime.Java8
+    zipFile = shadowJar.archivePath
+    memorySize = 256
+    timeout = 60
+}
+----
+<1> Class name the function will call
+<2> function name is just for display purposes in the console. ARN is the unique indicator for a Lambda function.
+<3> handler class/function called when invoked (in this case 'index')
+
+In the build file, 'mainClassName' <1> is the class that contains the function, in this case hello.world.aws.HelloWorldAwsFunction.
+The method that AWS Invokes when the Lambda is called is defined in the deploy task, marked 'handler' <3>.
+The other options in the build.gradle are just defaults for JVM version, memory size and IAM Role. It's important to note that the more memory you give the function, the faster it will start - even though you don't need it.
+Also the function can take several seconds when cold to warm up. If performance is a consideration you might want to have a monitor service 'ping' your function every few minutes to keep it alive.
+
+
+
+
 
 
 
