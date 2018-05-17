@@ -67,4 +67,14 @@ interface Feature {
      * @return The dependent feature names
      */
     Iterable<Feature> getDependentFeatures(Profile profile)
+
+    /**
+     * @param Whether the feature was requested on the command line
+     */
+    void setRequested(Boolean requested)
+
+    /**
+     * @return Whether the feature was requested on the command line
+     */
+    Boolean getRequested()
 }
