@@ -324,6 +324,11 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return Optional.empty();
     }
 
+    @Override
+    public String toString() {
+        return definition.toString();
+    }
+
     /**
      * @param definition The bean definition type
      * @param <T>        The type
