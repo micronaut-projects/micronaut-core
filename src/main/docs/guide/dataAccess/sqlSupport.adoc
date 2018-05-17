@@ -2,8 +2,8 @@ Java data sources can be configured for one of three currently provided implemen
 
 To get started, simply add a dependency to one of the JDBC configurations that corresponds to the implementation you would like to use.
 
-[source,groovy]
 .build.gradle
+[source,groovy]
 ----
 dependencies {
     // Choose one of the following
@@ -11,6 +11,14 @@ dependencies {
     compile "io.micronaut.configuration:jdbc-hikari"
     compile "io.micronaut.configuration:jdbc-dbcp"
 }
+----
+
+You also need to add a JDBC driver dependency to your classpath. For example to add the http://www.h2database.com[H2 In-Memory Database]:
+
+.build.gradle
+[source,groovy]
+----
+runtime "com.h2database:h2:1.4.196"
 ----
 
 All of the implementation specific parameters can be configured. Effort was made to allow basic configuration to be consistent across the implementations.
