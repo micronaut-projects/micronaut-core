@@ -50,3 +50,51 @@ In addition, using the value of the constants defined in the table above you can
 
 TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
 
+
+==== Using Cloud Instance Metadata
+
+
+When Micronaut detects it is running on Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
+
+TIP: Depending the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
+
+All of this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
+
+If you need to access the metadata for your application instance you can use the interface api:runtime.server.EmbeddedServerInstance[], and call `getMetadata()` which will get a map of all of the metadata.
+
+
+If you are connecting remotely via client, the instance metadata can be referenced once you have retrieved a api:io.micronaut.discovery.ServiceInstance[] from either the api:http.client.LoadBalancer[] or api:discovery.DiscoveryClient[] APIs.
+
+NOTE: The Netflix Ribbon client side load balancer can be configured to use the metadata to do zone aware client side load balancing. See <<clientSideLoadBalancing,Client Side Load Balancing>>
+
+To obtain metadata for a service via <<serviceDiscovery,Service Discovery>> use the api:http.client.LoadBalancerResolver[] interface to resolve a api:http.client.LoadBalancer[] and obtain a reference to a service by identifier:
+
+.Obtaining Metadata for a Service instance
+[source,java]
+----
+LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service");
+Flowable.fromPublisher(
+    loadBalancer.select()
+).subscribe((instance) ->
+    ConvertibleValues<String> metaData = instance.getMetadata();
+    ...
+);
+----
+
+
+To obtain metadata for the locally running server use the api:runtime.server.EmbeddedServiceInstance[] interface:
+
+
+.Obtaining Metadata for a Local Server
+[source,java]
+----
+EmbeddedServerInstance serverInstance = applicationContext.getBean(EmbeddedServerInstance.class);
+ConvertibleValues<String> metaData = serverInstance.getMetadata();
+----
+
+
+
+
+
+
+

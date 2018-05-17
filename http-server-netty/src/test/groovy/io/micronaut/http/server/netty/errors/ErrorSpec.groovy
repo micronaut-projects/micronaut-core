@@ -93,7 +93,6 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     }
     @Controller('/errors')
-    @Singleton
     static class ErrorController {
 
         @Get

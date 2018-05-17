@@ -140,7 +140,6 @@ class ReactorFallbackSpec extends Specification {
     }
 
     @Controller("/reactor/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

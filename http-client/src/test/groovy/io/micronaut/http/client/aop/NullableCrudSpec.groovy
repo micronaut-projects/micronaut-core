@@ -138,7 +138,6 @@ class NullableCrudSpec extends Specification {
     }
 
     @Controller("/blocking/nullableBooks")
-    @Singleton
     static class NullableBookController implements NullableBookApi {
 
         Map<Long, NullableBook> books = new LinkedHashMap<>()

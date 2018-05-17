@@ -65,7 +65,6 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     @Override
     public void handle(Object obj, HttpRequest<?> request, NettyHttpResponse<?> response, ChannelHandlerContext context) {
         NettyFileCustomizableResponseType type;
-        System.out.println("inside file handler");
         if (obj instanceof File) {
             type = new NettySystemFileCustomizableResponseType((File) obj);
         } else if (obj instanceof NettyFileCustomizableResponseType) {

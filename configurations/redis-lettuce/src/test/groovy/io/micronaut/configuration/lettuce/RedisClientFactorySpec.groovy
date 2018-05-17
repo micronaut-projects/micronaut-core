@@ -17,6 +17,7 @@
 package io.micronaut.configuration.lettuce
 
 import io.lettuce.core.api.StatefulRedisConnection
+import io.lettuce.core.api.sync.RedisCommands
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import redis.embedded.RedisServer
@@ -38,10 +39,12 @@ class RedisClientFactorySpec extends Specification{
         ApplicationContext applicationContext = ApplicationContext.run('redis.port':port)
         StatefulRedisConnection connection = applicationContext.getBean(StatefulRedisConnection)
 
-        def command = connection.sync()
         then:
-        command.set("foo", "bar")
-        command.get("foo") == "bar"
+        // tag::commands[]
+        RedisCommands<String, String> commands = connection.sync()
+        commands.set("foo", "bar")
+        commands.get("foo") == "bar"
+        // end::commands[]
 
         cleanup:redisServer.stop()
     }
