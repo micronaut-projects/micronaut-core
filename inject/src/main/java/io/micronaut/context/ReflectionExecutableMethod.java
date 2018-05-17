@@ -163,7 +163,6 @@ class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            // TODO: build via reflection
             return Collections.emptyMap();
         }
 

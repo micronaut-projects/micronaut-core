@@ -1619,8 +1619,7 @@ public class DefaultBeanContext implements BeanContext {
             if (!beanDefinition.isIterable()) {
                 BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                 singletonObjects.put(primaryBeanKey, registration);
-            }
-            else {
+            } else {
                 if (beanDefinition.isPrimary()) {
                     BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
                     singletonObjects.put(primaryBeanKey, registration);
