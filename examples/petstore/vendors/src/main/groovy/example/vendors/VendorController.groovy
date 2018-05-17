@@ -33,7 +33,6 @@ import javax.validation.constraints.NotBlank
  * @since 1.0
  */
 @Controller('/${vendors.api.version}/vendors')
-@Singleton
 @Validated
 class VendorController {
 

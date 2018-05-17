@@ -94,7 +94,6 @@ class HateosCrudSpec extends Specification {
     }
 
     @Controller("/hateos/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

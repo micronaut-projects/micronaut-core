@@ -230,8 +230,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                     }
                     readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
-                }
-                else {
+                } else {
                     OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
                     processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
                     readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);

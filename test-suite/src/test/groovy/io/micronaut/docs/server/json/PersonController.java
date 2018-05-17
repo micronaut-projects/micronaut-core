@@ -38,7 +38,6 @@ import java.util.concurrent.CompletableFuture;
  */
 // tag::class[]
 @Controller("/people")
-@Singleton
 public class PersonController {
 
     Map<String, Person> inMemoryDatastore = new LinkedHashMap<>();

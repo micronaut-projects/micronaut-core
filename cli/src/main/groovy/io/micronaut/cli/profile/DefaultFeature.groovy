@@ -42,6 +42,7 @@ class DefaultFeature implements Feature {
     final List<Dependency> dependencies = []
     final List<String> buildPlugins
     final List<String> dependentFeatures = []
+    private Boolean requested = false
 
     DefaultFeature(Profile profile, String name, Resource location) {
         this.profile = profile
@@ -79,5 +80,15 @@ class DefaultFeature implements Feature {
     @Override
     Iterable<Feature> getDependentFeatures(io.micronaut.cli.profile.Profile profile) {
         profile.getFeatures().findAll { Feature f -> dependentFeatures.contains(f.name) }
+    }
+
+    @Override
+    void setRequested(Boolean r) {
+        requested = r
+    }
+
+    @Override
+    Boolean getRequested() {
+        requested
     }
 }
