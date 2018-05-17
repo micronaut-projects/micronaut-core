@@ -1,0 +1,282 @@
+Groovy has first class support in Micronaut. This is accomplished with the modules inject-groovy, function-groovy, and runtime-groovy.
+You can use Groovy for a tranditional standalone webapp, a client, or a Serverless function -
+
+To get started let's create a project with the CLI if you are building from source:
+
+    - clone Micronaut from github: https://github.com/micronaut-projects/micronaut-core.git
+    - from Micronaut root, run './gradlew cli:pTML' (PublishToMavenLocal)
+    - clone Micronaut profiles from github: https://github.com/micronaut-projects/micronaut-profiles.git
+    - from micronaut-profiles root, run './gradlew pTML'
+    - go back to micronaut root i.e. ~/micronaut-core/cli/bin
+    - run ./mn from here - now you are ready!
+
+TIP: In the future you can simply use Sdkman (sdkman.io) to skip all of these manual steps, and have the Micronaut CLI ready to go!
+
+[source,bash]
+.Create a service Micraut application
+----
+$ mn create-service hello-world --features groovy
+----
+
+Above we run the CLI for Micronaut to create a new service application with Groovy. If you don't want to use the CLI, that's ok: you can manually create your project and set it up yourself.
+
+[source,groovy]
+.Example build.gradle
+----
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.4"
+        classpath "io.spring.gradle:dependency-management-plugin:1.0.5.RELEASE"
+        classpath "net.ltgt.gradle:gradle-apt-plugin:0.15"
+    }
+}
+
+version "0.1"
+group "hello.world"
+
+apply plugin:"io.spring.dependency-management"
+apply plugin:"com.github.johnrengelman.shadow"
+apply plugin:"application"
+apply plugin:"groovy"
+apply plugin:"java"
+apply plugin:"net.ltgt.apt-eclipse"
+apply plugin:"net.ltgt.apt-idea"
+
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'io.micronaut:bom:1.0.0-SNAPSHOT'
+    }
+}
+
+dependencies { //<1>
+    annotationProcessor "io.micronaut:inject-java"
+    compile "io.micronaut:runtime-groovy"
+    compile "io.micronaut:http-client"
+    compile "io.micronaut:inject"
+    compile "io.micronaut:runtime"
+    compile "io.micronaut:http-server-netty"
+    compileOnly "io.micronaut:inject-groovy"
+    compileOnly "io.micronaut:inject-java"
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+    testCompile "io.micronaut:inject-groovy"
+    testCompile "junit:junit:4.12"
+}
+
+shadowJar {
+    mergeServiceFiles()
+}
+
+----
+
+The key element here is item <1> which is the groovy dependencies for a standard microservice project.
+
+Other things you can create with the Micronaut CLI:
+    * create-federation --services <service names> - this is for creating a group of services all at once
+    * create-profile <profileName> - this is for creating a new profile. See https://github.com/micronaut-projects/micronaut-profiles to a see a list of current profiles.
+    * list-profiles - list available profiles to the CLI
+    * profile-info <profileName> - list the features available for a profile i.e. 'groovy'
+    * help - help using the CLI
+
+
+Note that most profile have a 'groovy' feature that will include all of the needed Groovy language depdencies. Back to making Groovy applications, now that we have your new service 'hello-world' let us go into its root directory.
+
+Now when we run the CLI we have a new set of options for our application:
+
+[source,bash]
+.Create a bean
+----
+$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn>
+
+create-bean          create-client        create-controller
+create-job           help
+
+mn> create-bean helloBean
+| Rendered template Bean.groovy to destination src/main/groovy/hello/world/HelloBean.groovy
+----
+
+Now we have created a Groovy bean we can use in other parts of our application/service.
+
+[source,groovy]
+.Micronaut Bean
+----
+package hello.world
+
+import javax.inject.Singleton
+
+@Singleton
+class HelloBean {
+
+}
+----
+
+We can also create a client - don't forget Micronaut can act as a client or a server!
+
+
+
+[source,bash]
+.Create a client
+----
+mn> create-client helloClient
+| Rendered template Client.groovy to destination src/main/groovy/hello/world/HelloClient.groovy
+
+----
+
+
+[source,groovy]
+.Micronaut Client
+----
+package hello.world
+
+import io.micronaut.http.client.Client
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+@Client("hello")
+interface HelloClient {
+
+    @Get("/")
+    HttpStatus index()
+}
+----
+
+
+Now let's create a controller:
+
+
+[source,bash]
+.Create a controller
+----
+mn> create-controller helloController
+| Rendered template Controller.groovy to destination src/main/groovy/hello/world/HelloController.groovy
+| Rendered template ControllerSpec.groovy to destination src/test/groovy/hello/world/HelloControllerSpec.groovy
+mn>
+----
+
+
+[source,groovy]
+.Micronaut Controller
+----
+package hello.world
+
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+
+@Controller("/hello")
+class HelloController {
+
+    @Get("/")
+    HttpStatus index() {
+        return HttpStatus.OK
+    }
+}
+----
+
+You will also see it automatically created a Spock test as well, just like in Grails!
+
+[source,groovy]
+.Micronaut Controller Test
+----
+package hello.world;
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
+
+class HelloControllerSpec extends Specification {
+
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+    void "test index"() {
+        given:
+        HttpResponse response = client.toBlocking().exchange("/hello")
+
+        expect:
+        response.status == HttpStatus.OK
+    }
+}
+----
+
+
+Notice how we use Micronaut both as client and as a server to test itself, pretty cool!
+
+We can also use services, which is really the same as a bean that's a @Singleton. On top of that, we can use GORM like
+we do in Grails! Or you can make a GORM Data service like so:
+
+
+
+[source,groovy]
+.Micronaut GORM Data Service VehicleService.groovy
+----
+@Service(Vehicle)
+abstract class VehicleService {
+    @PostConstruct
+    void init() {
+       // do something on initialization
+
+    }
+
+    abstract Vehicle findVehicle(@NotBlank String name)
+
+    abstract Vehicle saveVehicle(@NotBlank String name)
+
+}
+
+----
+
+You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
+The service handles a Vehicle domain shown below.:
+
+[source,groovy]
+.Micronaut GORM Domain Vehicle.groovy
+----
+import grails.gorm.annotation.Entity
+
+@Entity
+class Vehicle {
+    String name
+}
+----
+
+Just like in grails, your domain can have hasMany, static mapping = [ ] block. Constraints are different and are all handled with annotations like so:
+
+[source,groovy]
+.Micronaut GORM Domain Vehicle.groovy
+----
+import grails.gorm.annotation.Entity
+
+@Entity
+class Vehicle {
+
+    @NotBlank
+    String name
+
+    static hasMany = [drivers: Driver]
+
+
+}
+----
+
+
+
