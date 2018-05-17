@@ -25,6 +25,7 @@ import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
+import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 
 import java.nio.file.Paths
@@ -44,11 +45,11 @@ class CreateFederationCommand extends CreateServiceCommand {
 
     CreateFederationCommand() {
         description.description = "Creates a federation of services"
-        description.usage = "create-federation [NAME] --services [SERVICE_NAME,SERVICE_NAME,...]"
+        description.usage = "create-federation [NAME] --services [SERVICENAME-A SERVICENAME-B ...]"
 
         final List<String> flags = getFlags()
         if (flags.contains(SERVICES_FLAG)) {
-            description.flag(name: SERVICES_FLAG, description: "The names of the services to create")
+            description.flag(name: SERVICES_FLAG, description: "The names of the services to create", required:true)
         }
     }
 
@@ -72,6 +73,11 @@ class CreateFederationCommand extends CreateServiceCommand {
         final String federationName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
         final List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
         services = commandLine.optionValue(SERVICES_FLAG)?.toString()?.split(',')?.toList()
+        if (!services) {
+            StringBuilder warning = new StringBuilder("Missing required flag: --services= <service1 service2 service3 ..>")
+            executionContext.console.error(warning.toString())
+            return false
+        }
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
         final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
         final String micronautVersion = MicronautCli.getPackage().getImplementationVersion()
@@ -125,7 +131,7 @@ class CreateFederationCommand extends CreateServiceCommand {
 
     @Override
     protected List<String> getFlags() {
-        [BUILD_FLAG, FEATURES_FLAG, INPLACE_FLAG, SERVICES_FLAG, PROFILE_FLAG]
+        [BUILD_FLAG, FEATURES_FLAG, INPLACE_FLAG, SERVICES_FLAG, PROFILE_FLAG, SERVICES_FLAG]
     }
 
     @Override
