@@ -467,29 +467,26 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         }
 
         if(tokens) {
-            List<String> featureNames = features.findAll { it.requested }*.name
-            String testFramework, sourceLanguage
+            List<String> requestedFeatureNames = features.findAll { it.requested }*.name
+            List<String> allFeatureNames = features*.name
+            String testFramework = null
+            String sourceLanguage = null
 
-            if(featureNames) {
-                if(featureNames.contains("spock")) {
-                    testFramework = "spock"
-                } else if(featureNames.contains("junit")) {
-                    testFramework = "junit"
-                } else if(featureNames.contains("spek")) {
-                    testFramework = "spek"
-                }
-
-                if(featureNames.contains("groovy")) {
-                    sourceLanguage = "groovy"
-                } else if(featureNames.contains("kotlin")) {
-                    sourceLanguage = "kotlin"
-                } else if(featureNames.contains("java")) {
-                    sourceLanguage = "java"
-                }
-
-                if(testFramework) tokens.put("testFramework", testFramework)
-                if(sourceLanguage) tokens.put("sourceLanguage", sourceLanguage)
+            if(requestedFeatureNames) {
+                testFramework = evaulateTestFramework(requestedFeatureNames)
+                sourceLanguage = evaulateSourceLanguage(requestedFeatureNames)
             }
+
+            if(!testFramework) {
+                testFramework = evaulateTestFramework(allFeatureNames)
+            }
+
+            if(!sourceLanguage) {
+                sourceLanguage = evaulateSourceLanguage(allFeatureNames)
+            }
+
+            tokens.put("testFramework", testFramework)
+            tokens.put("sourceLanguage", sourceLanguage)
         }
 
         ant.replace(dir: targetDirectory) {
@@ -506,6 +503,30 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
                 }
             }
         }
+    }
+
+    protected String evaulateTestFramework(List<String> features) {
+        String testFramework = null
+        if(features.contains("spock"))
+            testFramework = "spock"
+        else if(features.contains("junit"))
+            testFramework = "junit"
+        else if(features.contains("spek"))
+            testFramework = "spek"
+
+        testFramework
+    }
+
+    protected String evaulateSourceLanguage(List<String> features) {
+        String sourceLanguage = null
+        if(features.contains("groovy"))
+            sourceLanguage = "groovy"
+        else if(features.contains("kotlin"))
+            sourceLanguage = "kotlin"
+        else if(features.contains("java"))
+            sourceLanguage = "java"
+
+        sourceLanguage
     }
 
     protected String evaluateProfileName(CommandLine mainCommandLine) {
@@ -545,13 +566,15 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
             features.addAll(features[i].getDependentFeatures(profile))
         }
 
-        features = features.collect { feature ->
-            if(validFeatureNames.contains(feature.name)) {
-                feature.setRequested(true)
-            }
+        if(validFeatureNames) {
+            features = features.collect { feature ->
+                if(validFeatureNames.contains(feature.name)) {
+                    feature.setRequested(true)
+                }
 
-            feature
-        }.toSet()
+                feature
+            }.toSet()
+        }
 
         features
     }
