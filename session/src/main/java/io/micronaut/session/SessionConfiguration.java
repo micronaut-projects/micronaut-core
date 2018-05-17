@@ -30,7 +30,6 @@ import java.util.OptionalInt;
 @ConfigurationProperties(SessionSettings.PREFIX)
 public class SessionConfiguration {
 
-    private static final long DEFAULT_MAX_INACTIVE_INTERVAL = 30;
     private Duration maxInactiveInterval = Duration.ofMinutes(30);
     private Integer maxActiveSessions;
 

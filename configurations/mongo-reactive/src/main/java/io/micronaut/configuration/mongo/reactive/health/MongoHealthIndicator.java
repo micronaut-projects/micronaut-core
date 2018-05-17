@@ -29,6 +29,8 @@ import javax.inject.Singleton;
 import java.util.Collections;
 
 /**
+ * A {@link HealthIndicator} for MongoDB.
+ *
  * @author graemerocher
  * @since 1.0
  */

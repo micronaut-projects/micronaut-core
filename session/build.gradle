@@ -11,6 +11,7 @@ dependencies {
     compileOnly project(":http-server")
 
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
 }

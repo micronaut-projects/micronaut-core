@@ -101,5 +101,21 @@
 </div>
 
 
+<script type="text/javascript">
+    var prevScrollpos = window.pageYOffset;
+    window.onscroll = function() {
+        var currentScrollPos = window.pageYOffset;
+        var show = false;
+        if ((prevScrollpos > currentScrollPos) || (currentScrollPos < 5)) {
+            show = true;
+        }
+        if (show) {
+            document.getElementById("navigation").style.top = "0";
+        } else {
+            document.getElementById("navigation").style.top = "-55px";
+        }
+        prevScrollpos = currentScrollPos;
+    }
+</script>
 </body>
 </html>

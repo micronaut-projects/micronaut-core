@@ -18,3 +18,5 @@ router:
             mapping: /static/**
             paths: classpath:public
 ----
+
+TIP: `index.html` will be resolved by default. In the above example a request to `/static` will attempt to retrieve `src/main/resources/public/index.html`.

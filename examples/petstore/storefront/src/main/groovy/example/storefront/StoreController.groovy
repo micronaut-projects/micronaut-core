@@ -42,7 +42,6 @@ import javax.inject.Singleton
  * @author graemerocher
  * @since 1.0
 */
-@Singleton
 @Controller("/")
 class StoreController {
 

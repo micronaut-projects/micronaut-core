@@ -101,7 +101,6 @@ class CompletableFutureCrudSpec extends Specification {
     }
 
     @Controller("/future/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

@@ -25,7 +25,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Introspector {
+public final class Introspector {
 
     /* The cache to store Bean Info objects that have been found or created */
     private static final int DEFAULT_CAPACITY = 128;

@@ -1147,7 +1147,7 @@ public class DefaultBeanContext implements BeanContext {
                                  Qualifier<T> qualifier,
                                  boolean isSingleton,
                                  Map<String, Object> argumentValues) {
-        BeanRegistration<T> beanRegistration = isSingleton ? singletonObjects.get(new BeanKey(beanDefinition.getBeanType(), qualifier)) : null;
+        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(new BeanKey(beanDefinition.getBeanType(), qualifier)) : null;
         T bean;
         if (beanRegistration != null) {
             return beanRegistration.bean;
@@ -1596,6 +1596,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         Class<?> createdType = createdBean.getClass();
+        boolean createdTypeDiffers = !createdType.equals(beanType);
+
         BeanKey createdBeanKey = new BeanKey(createdType, qualifier);
         Optional<Class<? extends Annotation>> qualifierAnn = beanDefinition.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
         if (qualifierAnn.isPresent()) {
@@ -1603,9 +1605,12 @@ public class DefaultBeanContext implements BeanContext {
             if (Primary.class == annotation) {
                 BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
                 singletonObjects.put(primaryBeanKey, registration);
+                if (createdTypeDiffers) {
+                    singletonObjects.put(new BeanKey<>(createdType, null), registration);
+                }
             } else {
 
-                BeanKey qualifierKey = new BeanKey(createdType, Qualifiers.byAnnotation(beanDefinition, annotation.getName()));
+                BeanKey qualifierKey = new BeanKey<>(createdType, Qualifiers.byAnnotation(beanDefinition, annotation.getName()));
                 if (!qualifierKey.equals(createdBeanKey)) {
                     singletonObjects.put(qualifierKey, registration);
                 }
@@ -1614,6 +1619,14 @@ public class DefaultBeanContext implements BeanContext {
             if (!beanDefinition.isIterable()) {
                 BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                 singletonObjects.put(primaryBeanKey, registration);
+            } else {
+                if (beanDefinition.isPrimary()) {
+                    BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
+                    singletonObjects.put(primaryBeanKey, registration);
+                    if (createdTypeDiffers) {
+                        singletonObjects.put(new BeanKey<>(createdType, null), registration);
+                    }
+                }
             }
         }
         singletonObjects.put(createdBeanKey, registration);

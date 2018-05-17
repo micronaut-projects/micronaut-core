@@ -42,7 +42,6 @@ import java.util.stream.Collectors
  * @since 1.0
  */
 @Controller("/v1")
-@Singleton
 @Requires(property = MockConsulServer.ENABLED)
 class MockConsulServer implements ConsulOperations {
     public static final String ENABLED = 'enable.mock.consul'

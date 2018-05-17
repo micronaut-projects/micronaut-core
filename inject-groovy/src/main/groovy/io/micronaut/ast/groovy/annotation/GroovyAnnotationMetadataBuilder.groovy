@@ -16,8 +16,10 @@
 package io.micronaut.ast.groovy.annotation
 
 import groovy.transform.CompileStatic
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationValue
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
@@ -30,6 +32,8 @@ import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
+
+import java.lang.reflect.Array
 
 /**
  * Groovy implementation of {@link AbstractAnnotationMetadataBuilder}
@@ -126,18 +130,29 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         } else if (annotationValue instanceof ListExpression) {
             ListExpression le = (ListExpression) annotationValue
             List converted = []
+            Class arrayType = Object.class
             for (exp in le.expressions) {
                 if (exp instanceof AnnotationConstantExpression) {
+                    arrayType = AnnotationValue
                     AnnotationConstantExpression ann = (AnnotationConstantExpression) exp
                     AnnotationNode value = (AnnotationNode) ann.getValue()
                     converted.add(readNestedAnnotationValue(value))
                 } else if (exp instanceof ConstantExpression) {
-                    converted.add(((ConstantExpression) exp).value)
+                    Object value = ((ConstantExpression) exp).value
+                    if(value != null) {
+                        if(value instanceof CharSequence) {
+                            value = value.toString()
+                        }
+                        arrayType = value.getClass()
+                        converted.add(value)
+                    }
                 } else if (exp instanceof ClassExpression) {
+                    arrayType = String
                     converted.add(((ClassExpression) exp).type.name)
                 }
             }
-            return converted
+            // for some reason this is necessary to produce correct array type in Groovy
+            return ConversionService.SHARED.convert(converted, Array.newInstance(arrayType, 0).getClass()).orElse(null)
         }
         return null
     }
@@ -183,7 +198,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             }
             classNode = classNode.getSuperClass()
             if (classNode != null) {
-                if (classNode.toString().equals(Object.class.getName())) {
+                if (classNode == ClassHelper.OBJECT_TYPE || classNode.name == Script.name || classNode.name == GroovyObjectSupport.name) {
                     break
                 } else {
                     hierarchy.add(classNode)

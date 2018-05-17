@@ -36,9 +36,9 @@ public class RouteMatchUtils {
      * @return The optional route match
      */
     public static Optional<RouteMatch> findRouteMatchAtRequest(HttpRequest<?> request) {
-        Optional<Object> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH);
+        Optional<RouteMatch> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
         if (routeMatchAttribute.isPresent()) {
-            return Optional.of((RouteMatch) routeMatchAttribute.get());
+            return routeMatchAttribute;
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Route match attribute for request ({}) not found", request.getPath());
