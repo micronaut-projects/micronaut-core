@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 
 import java.nio.file.Paths
 import java.time.Instant
