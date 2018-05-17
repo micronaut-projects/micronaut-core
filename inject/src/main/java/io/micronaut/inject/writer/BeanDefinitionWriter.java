@@ -746,7 +746,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             methodProxyShortName,
             isInterface,
             annotationMetadata);
-        // TODO: fix so that exec classes are static inner
 //        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);
         executableMethodWriter.visitMethod(
             declaringType,
