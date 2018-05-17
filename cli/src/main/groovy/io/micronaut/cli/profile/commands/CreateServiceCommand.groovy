@@ -455,7 +455,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List features, File targetDirectory) {
+    protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
 
         Map tokens
@@ -464,6 +464,32 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         }
         if (build == "maven") {
             tokens = new MavenBuildTokens().getTokens(profile, features)
+        }
+
+        if(tokens) {
+            List<String> featureNames = features.findAll { it.requested }*.name
+            String testFramework, sourceLanguage
+
+            if(featureNames) {
+                if(featureNames.contains("spock")) {
+                    testFramework = "spock"
+                } else if(featureNames.contains("junit")) {
+                    testFramework = "junit"
+                } else if(featureNames.contains("spek")) {
+                    testFramework = "spek"
+                }
+
+                if(featureNames.contains("groovy")) {
+                    sourceLanguage = "groovy"
+                } else if(featureNames.contains("kotlin")) {
+                    sourceLanguage = "kotlin"
+                } else if(featureNames.contains("java")) {
+                    sourceLanguage = "java"
+                }
+
+                if(testFramework) tokens.put("testFramework", testFramework)
+                if(sourceLanguage) tokens.put("sourceLanguage", sourceLanguage)
+            }
         }
 
         ant.replace(dir: targetDirectory) {
@@ -488,9 +514,11 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
         Set<Feature> features = []
+        List<String> validFeatureNames
+
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
-            List<String> validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
+            validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -516,6 +544,14 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         for (int i = 0; i < features.size(); i++) {
             features.addAll(features[i].getDependentFeatures(profile))
         }
+
+        features = features.collect { feature ->
+            if(validFeatureNames.contains(feature.name)) {
+                feature.setRequested(true)
+            }
+
+            feature
+        }.toSet()
 
         features
     }
