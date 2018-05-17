@@ -97,3 +97,9 @@ hibernate:
         use_query_cache: false
         region.factory_class: org.hibernate.cache.ehcache.EhCacheRegionFactory
 ----
+
+The following should be noted regarding using GORM for Hibernate in Micronaut:
+
+* Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
+* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present.
+* By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.
