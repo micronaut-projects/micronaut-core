@@ -16,12 +16,7 @@
 
 package io.micronaut.context.annotation;
 
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * <p>Allows specifying an annotation member alias. In other words, a value of an annotation member can be used to
@@ -36,6 +31,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Documented
+@Repeatable(Aliases.class)
 public @interface AliasFor {
 
     /**

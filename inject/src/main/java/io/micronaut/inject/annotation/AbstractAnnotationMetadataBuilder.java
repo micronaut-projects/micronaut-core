@@ -17,6 +17,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Aliases;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -170,10 +171,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : annotationValues.entrySet()) {
                 T member = entry.getKey();
-                OptionalValues<?> values = getAnnotationValues(member, AliasFor.class);
+                OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
                 Object annotationValue = entry.getValue();
-                Optional<?> aliasMember = values.get("member");
-                Optional<?> aliasAnnotation = values.get("annotation");
+                Optional<?> aliasMember = aliasForValues.get("member");
+                Optional<?> aliasAnnotation = aliasForValues.get("annotation");
                 if (aliasMember.isPresent() && !aliasAnnotation.isPresent()) {
                     String aliasedNamed = aliasMember.get().toString();
                     readAnnotationRawValues(aliasedNamed, annotationValue, resolvedValues);
@@ -208,45 +209,75 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
-                OptionalValues<?> values = getAnnotationValues(member, AliasFor.class);
-                Optional<?> aliasAnnotation = values.get("annotation");
+
+                Optional<?> aliases = getAnnotationValues(member, Aliases.class).get("value");
                 Object annotationValue = entry.getValue();
-                if (aliasAnnotation.isPresent()) {
-                    Optional<?> aliasMember = values.get("member");
-                    if (aliasMember.isPresent()) {
-                        String aliasedAnnotationName = aliasAnnotation.get().toString();
-                        String aliasedMemberName = aliasMember.get().toString();
-                        Object v = readAnnotationValue(aliasedMemberName, annotationValue);
-                        if (v != null) {
-                            if (isDeclared) {
-                                metadata.addDeclaredStereotype(
+
+                if (aliases.isPresent()) {
+                    Object value = aliases.get();
+                    if (value instanceof AnnotationValue[]) {
+                        AnnotationValue[] values = (AnnotationValue[]) value;
+                        for (AnnotationValue av : values) {
+                            OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
+                            processAnnotationAlias(
+                                    metadata,
+                                    isDeclared,
                                     parentAnnotations,
-                                    aliasedAnnotationName,
-                                    Collections.singletonMap(aliasedMemberName, v)
-                                );
-                            } else {
-                                metadata.addStereotype(
-                                    parentAnnotations,
-                                    aliasedAnnotationName,
-                                    Collections.singletonMap(aliasedMemberName, v)
-                                );
-                            }
+                                    annotationValues,
+                                    annotationValue,
+                                    aliasForValues
+                            );
                         }
                     }
+                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
                 } else {
-                    Optional<?> aliasMember = values.get("member");
-                    if (aliasMember.isPresent()) {
-                        String aliasedNamed = aliasMember.get().toString();
-                        Object v = readAnnotationValue(aliasedNamed, annotationValue);
-                        if (v != null) {
-                            annotationValues.put(aliasedNamed, v);
-                        }
-                        readAnnotationRawValues(aliasedNamed, annotationValue, annotationValues);
-                    }
+                    OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
+                    processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
+                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
                 }
-                readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
             }
             return annotationValues;
+        }
+    }
+
+    private void processAnnotationAlias(
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            Set<String> parentAnnotations,
+            Map<CharSequence, Object> annotationValues,
+            Object annotationValue,
+            OptionalValues<?> aliasForValues) {
+        Optional<?> aliasAnnotation = aliasForValues.get("annotation");
+        Optional<?> aliasMember = aliasForValues.get("member");
+
+        if (aliasAnnotation.isPresent()) {
+            if (aliasMember.isPresent()) {
+                String aliasedAnnotationName = aliasAnnotation.get().toString();
+                String aliasedMemberName = aliasMember.get().toString();
+                Object v = readAnnotationValue(aliasedMemberName, annotationValue);
+                if (v != null) {
+                    if (isDeclared) {
+                        metadata.addDeclaredStereotype(
+                                parentAnnotations,
+                                aliasedAnnotationName,
+                                Collections.singletonMap(aliasedMemberName, v)
+                        );
+                    } else {
+                        metadata.addStereotype(
+                                parentAnnotations,
+                                aliasedAnnotationName,
+                                Collections.singletonMap(aliasedMemberName, v)
+                        );
+                    }
+                }
+            }
+        } else if (aliasMember.isPresent()) {
+            String aliasedNamed = aliasMember.get().toString();
+            Object v = readAnnotationValue(aliasedNamed, annotationValue);
+            if (v != null) {
+                annotationValues.put(aliasedNamed, v);
+            }
+            readAnnotationRawValues(aliasedNamed, annotationValue, annotationValues);
         }
     }
 

@@ -104,7 +104,6 @@ class PublisherCrudSpec extends Specification {
     }
 
     @Controller("/publisher/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

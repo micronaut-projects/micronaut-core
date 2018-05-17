@@ -1,1 +1,105 @@
-https://github.com/micronaut-projects/micronaut-core/issues/103[TODO]
+==== Setting up a Hibernate/JPA EntityManager
+
+Micronaut features built in support for configuring a http://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
+
+Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate you need to add the `hibernate-jpa` dependency to your build configuration:
+
+.build.gradle
+----
+compile "io.micronaut.configuration:hibernate-jpa"
+----
+
+And that is it. For each registered SQL `DataSource`, Micronaut will configure the following beans using api:configuration.hibernate.jpa.EntityManagerFactoryBean[]:
+
+* link:{hibernateapi}/org/hibernate/boot/registry/StandardServiceRegistry.html[StandardServiceRegistry] - The Hibernate `StandardServiceRegistry`
+* link:{hibernateapi}/org/hibernate/boot/MetadataSources.html[MetadataSources] - The Hibernate `MetadataSources`
+* link:{hibernateapi}/org/hibernate/boot/SessionFactoryBuilder.html[SessionFactoryBuilder] - The Hibernate `SessionFactoryBuilder`
+* link:{hibernateapi}/org/hibernate/SessionFactory.html[SessionFactory] - The Hibernate `SessionFactory` bean which also implements the JPA `EntityManagerFactory` interface.
+
+
+==== Customizing Hibernate / JPA Configuration
+
+There are several different ways you can customize and configure how the `SessionFactory` is built. The easiest way is via configuration in `application.yml`. The following configuration demonstrates an example:
+
+.Configuring Hibernate Properties
+[source,yaml]
+----
+datasources:
+    default:
+        name: 'mydb'
+jpa:
+    default:
+        packages-to-scan:
+            - 'foo.bar'
+            - 'foo.baz'
+        properties:
+            hibernate:
+                hbm2ddl:
+                    auto: update
+                show_sql: true
+----
+
+The above example configures the packages to be scanned and sets properties to be passed to Hibernate. As you can see these are done on a per `DataSource` basis. Refer to the api:configuration.hibernate.jpa.JpaConfiguration[] configuration class for the possible options.
+
+If you need even further control over how the `SessionFactory` is built then you can register api:context.event.BeanCreatedEventListener[] beans that listen for the creation of the link:{hibernateapi}/org/hibernate/boot/SessionFactoryBuilder.html[SessionFactoryBuilder], link:{hibernateapi}/org/hibernate/boot/MetadataSources.html[MetadataSources] etc. and apply your custom configuration in the listener.
+
+You may also optionally create beans of type link:{hibernateapi}/org/hibernate/integrator/spi/Integrator.html[Integrator] and link:{hibernateapi}/org/hibernate/Interceptor.html[Interceptor] and these will be picked up and injected automatically.
+
+==== Using Spring Transaction Management
+
+Micronaut's Hibernate integration will also automatically provide a Spring `HibernateTransactionManager` bean so you can use Spring-based transaction management.
+
+You should use Micronaut's ann:spring.tx.annotation.Transactional[] annotation to ensure low-overhead, compile-time transaction management is applied to your classes.
+
+==== Understanding LazyInitializationException
+
+Micronaut is built on Netty which is based on a non-blocking, event loop model. JDBC and Hibernate are blocking APIs and hence when they are used in a Micronaut application the work is shifted to a blocking I/O thread pool.
+
+When using ann:spring.tx.annotation.Transactional[] the Hibernate `Session` will only be open for the duration of this method execution and then will automatically be closed. This ensures that the blocking operation is kept as short as possible.
+
+There is no notion of OpenSessionInView (OSIV) in Micronaut and never will be, since it is https://vladmihalcea.com/the-open-session-in-view-anti-pattern/[sub-optimal and not recommended]. You should optimize the queries that you write to return all the necessary data Micronaut will need to encode your objects into JSON.
+
+If you encounter a `LazyInitializationException` when returning a Hibernate entity from a method it is an indication that your query is suboptimal and you should perform a join.
+
+
+==== Using GORM for Hibernate
+
+For Groovy users and users familiar with Grails framework special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you should not include the Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
+
+Instead you should only define the `hibernate-gorm` dependency, a connection pool implementation and the necessary JDBC driver. For example:
+
+.Configuring GORM for Hibernate
+[source,groovy]
+----
+  compile "io.micronaut.configuration:hibernate-gorm"
+  // Use Tomcat connection pool
+  runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
+  // Use H2 database driver
+  runtime  'com.h2database:h2:1.4.196'
+----
+
+After that you should use the same http://gorm.grails.org/latest/hibernate/manual/index.html#configuration[configuration properties described in the GORM documentation]. For example:
+
+.Configuring GORM for Hibernate
+[source,yaml]
+----
+dataSource:
+    pooled: true
+    dbCreate: create-drop
+    url: jdbc:h2:mem:devDb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+hibernate:
+    cache:
+        queries: false
+        use_second_level_cache: true
+        use_query_cache: false
+        region.factory_class: org.hibernate.cache.ehcache.EhCacheRegionFactory
+----
+
+The following should be noted regarding using GORM for Hibernate in Micronaut:
+
+* Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
+* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present.
+* By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.

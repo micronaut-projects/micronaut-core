@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -87,6 +88,44 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
     }
 
+    void "test index.html will be resolved"() {
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/'), String
+        ).blockingFirst()
+
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.status == HttpStatus.OK
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
+    }
+
+    void "test index.html will be resolved in a sub directory"() {
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/foo'), String
+        ).blockingFirst()
+
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.status == HttpStatus.OK
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page from resources/foo</body></html>"
+    }
+
     void "test resources with configured mapping"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -111,6 +150,93 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test resources with configured mapping automatically resolves index.html"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'router.static.resources.enabled': true,
+                'router.static.resources.mapping': '/static/**'], 'test')
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET("/static"), String
+        ).blockingFirst()
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test resources with configured mapping automatically resolves index.html in subdirectory"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'router.static.resources.enabled': true,
+                'router.static.resources.mapping': '/static/**'], 'test')
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET("/static/foo"), String
+        ).blockingFirst()
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page from resources/foo</body></html>"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test resources with configured mapping automatically resolves index.html in path"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'router.static.resources.paths': ['classpath:foo'],
+                'router.static.resources.enabled': true,
+                'router.static.resources.mapping': '/static/**'], 'test')
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET("/static"), String
+        ).blockingFirst()
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page from resources/foo</body></html>"
 
         cleanup:
         embeddedServer.stop()

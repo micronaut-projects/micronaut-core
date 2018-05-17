@@ -1,1 +1,195 @@
-https://github.com/micronaut-projects/micronaut-core/issues/86[TODO]
+By default Micronaut is a stateless HTTP server, however depending on your application requirements you may need to notion of HTTP sessions.
+
+Micronaut comes with a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this that currently features two implementations:
+
+* In-Memory sessions - which you should combine with an a sticky sessions proxy if you plan to run multiple instances
+* Redis sessions - In this case https://redis.io[Redis] is used to store sessions and non-blocking I/O is used to read/write sessions to Redis.
+
+==== Enabling Sessions
+
+To enable support for in-memory sessions you just need the `session` dependency:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:session"
+----
+
+To enable sessions with Redis you must also have the `redis-lettuce` configuration on your classpath:
+
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:session"
+compile "io.micronaut.configuration:redis-lettuce"
+----
+
+And enable Redis sessions via configuration in `application.yml`:
+
+.Enabling Redis Sessions
+[source,yaml]
+----
+redis:
+    uri: redis://localhost:6379
+micronaut:
+    session:
+        http:
+            redis:
+                enabled: true
+----
+
+==== Configuring Session Resolution
+
+How the api:session.Session[] is resolved can be configured with api:session.http.HttpSessionConfiguration[].
+
+By default sessions are resolved using a api:session.http.HttpSessionFilter[] that looks up session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` header values) or via a Cookie called `SESSION`.
+
+If you wish to disable either header resolution or cookie resolution you can via configuration in `application.yml`:
+
+.Disabling Cookie Resolution
+[source,yaml]
+----
+micronaut:
+    session:
+        http:
+            cookie: false
+            header: true
+----
+
+The above configuration enables header resolution, but disables cookie resolution. You can also configure the header or cookie names as necessary.
+
+==== Working with Sessions
+
+A api:session.Session[] object can be retrieved simply by declaring the api:session.Session[] in a controller method signature. For example consider the following controller:
+
+.ShoppingController.java
+[source,java]
+----
+include::{testssession}/ShoppingController.java[tags=imports, indent=0]
+
+include::{testssession}/ShoppingController.java[tags=class, indent=0]
+
+include::{testssession}/ShoppingController.java[tags=add, indent=4]
+
+}
+----
+
+<1> The `ShoppingController` declares a api:session.Session[] attribute called `cart`
+<2> The api:session.Session[] is declared as a parameter to the method
+<3> The `cart` attribute is retrieved
+<4> Otherwise a new `Cart` instance is created and stored in the session
+
+Note that because the api:session.Session[] is declared as a required parameter to the execute the controller action, the api:session.Session[] will be created and saved to the api:session.SessionStore[].
+
+If you don't want to create unnecessary sessions then you can declare the api:session.Session[] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
+
+.Using @Nullable with Sessions
+[source,java]
+----
+include::{testssession}/ShoppingController.java[tags=clear, indent=0]
+----
+
+The above method will only create and inject a new api:session.Session[] if one already exists.
+
+==== Session Clients
+
+If the client is a web browser then sessions should just work if you have cookies is enabled. However for programmatic HTTP clients you need to make sure you propagate the session id between HTTP calls.
+
+For example, when invoking the `viewCart` method of the `StoreController` in the previous example the HTTP client will receive by default a `AUTHORIZATION_INFO` header. The following example, using a Spock test, demonstrates this:
+
+.Retrieving the AUTHORIZATION_INFO header
+[source,groovy]
+----
+include::{testssession}/ShoppingControllerSpec.groovy[tags=view, indent=0]
+----
+
+<1> A request is made to `/shopping/cart`
+<2> The `AUTHORIZATION_INFO` header is present in the response
+
+You can then pass this `AUTHORIZATION_INFO` in subsequent requests to re-use the existing api:session.Session[]:
+
+.Sending the AUTHORIZATION_INFO header
+[source,groovy]
+----
+include::{testssession}/ShoppingControllerSpec.groovy[tags=add, indent=0]
+----
+
+<1> The `AUTHORIZATION_INFO` is retrieved from the response
+<2> And then sent as a header in the subsequent request
+
+==== Using @SessionValue
+
+Rather than explicitly injecting the api:session.Session[] into a controller method you can instead use ann:session.annotation.SessionValue[]. For example:
+
+.Using @SessionValue
+[source,java]
+----
+include::{testssession}/ShoppingController.java[tags=view, indent=0]
+----
+
+<1> ann:session.annotation.SessionValue[] is declared on the method resulting in the return value being stored in the api:session.Session[]. Note that you must specify the attribute name when used on a return value
+<2> ann:session.annotation.SessionValue[] is used on a `@Nullable` parameter which results in looking up the value from the api:session.Session[] in a non-blocking way and supplying it if present. In the case a value is not specified to ann:session.annotation.SessionValue[] resulting in the parameter name being used to lookup the attribute.
+
+==== Session Events
+
+You can register api:context.event.ApplicationEventListener[] beans to listen for api:session.Session[] related events located in the pkg:session.event[] package.
+
+The following table summarizes the events:
+
+.Session Events
+|===
+|Type|Description
+
+|api:session.event.SessionCreatedEvent[]
+|Fired when a api:session.Session[] is created
+
+|api:session.event.SessionDeletedEvent[]
+|Fired when a api:session.Session[] is deleted
+
+|api:session.event.SessionExpiredEvent[]
+|Fired when a api:session.Session[] expires
+
+|api:session.event.SessionDestroyedEvent[]
+|Parent of both `SessionDeletedEvent` and `SessionExpiredEvent`
+
+|===
+
+==== Redis Sessions
+
+Storing api:session.Session[] instances is Redis requires special considerations.
+
+You can configure how sessions are stored in Redis using api:configuration.lettuce.session.RedisHttpSessionConfiguration[].
+
+The following represents an example configuration in `application.yml`.
+
+.Configuring Redis Sessions
+[source,yaml]
+----
+micronaut:
+    session:
+        http:
+            redis:
+                enabled: true
+                # The Redis namespace to write sessions to
+                namespace: 'myapp:sessions'
+                # Write session changes in the background
+                write-mode: BACKGROUND
+                # Disable programatic activation of keyspace events
+                enable-keyspace-events: false
+----
+
+NOTE: The api:configuration.lettuce.session.RedisSessionStore[] implementation uses https://redis.io/topics/notifications[keyspace events] to cleanup active sessions and fire api:session.event.SessionExpiredEvent[] and requires they are active.
+
+By default sessions values are serialized using Java serialization and stored in Redis hashes. You can configure serialization to instead use Jackson to serialize to JSON if desired:
+
+.Using Jackson Serialization
+[source,yaml]
+----
+micronaut:
+    session:
+        http:
+            redis:
+                enabled: true
+                valueSerializer: io.micronaut.jackson.serialize.JacksonObjectSerializer
+----

@@ -34,10 +34,10 @@ import javax.inject.Named
  * @author graemerocher
  * @since 1.0
  */
-//@IgnoreIf({
-//    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
-//})
-@Ignore
+@IgnoreIf({
+    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
+})
+//@Ignore
 class AwsLambdaInvokeSpec extends Specification {
 
 
@@ -71,6 +71,7 @@ class AwsLambdaInvokeSpec extends Specification {
         configuration.builder.region == 'us-east-1'
     }
 
+    @Ignore
     void "test invoke function"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
@@ -96,7 +97,7 @@ class AwsLambdaInvokeSpec extends Specification {
         book.title == "THE STAND"
     }
 
-
+    @Ignore
     void "test invoke client with @FunctionClient"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
@@ -133,6 +134,7 @@ class AwsLambdaInvokeSpec extends Specification {
 
     @FunctionClient
     static interface MyClient {
+
         Book micronautFunction(@Body Book book)
 
         @Named('micronaut-function')

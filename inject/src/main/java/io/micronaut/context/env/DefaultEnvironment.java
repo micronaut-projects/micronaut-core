@@ -57,7 +57,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -594,7 +593,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
             System.getenv(ENVIRONMENTS_ENV))
-            .filter(Objects::nonNull)
+            .filter(StringUtils::isNotEmpty)
             .flatMap(s -> Arrays.stream(s.split(",")))
             .map(String::trim)
             .forEach(enviroments::add);

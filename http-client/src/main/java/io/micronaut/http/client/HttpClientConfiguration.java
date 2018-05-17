@@ -20,6 +20,7 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 
+import javax.annotation.Nullable;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
@@ -52,6 +53,8 @@ public abstract class HttpClientConfiguration {
      * The thread factory to use for creating threads.
      */
     private Class<? extends ThreadFactory> threadFactory;
+
+    private Duration connectTimeout;
 
     private Duration readTimeout = Duration.ofSeconds(10);
 
@@ -142,6 +145,13 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * @return The default connect timeout. Defaults to Netty default.
+     */
+    public Optional<Duration> getConnectTimeout() {
+        return Optional.ofNullable(connectTimeout);
+    }
+
+    /**
      * The amount of time to wait for shutdown.
      *
      * @return The shutdown timeout
@@ -155,7 +165,7 @@ public abstract class HttpClientConfiguration {
      *
      * @param shutdownTimeout The shutdown time
      */
-    public void setShutdownTimeout(Duration shutdownTimeout) {
+    public void setShutdownTimeout(@Nullable Duration shutdownTimeout) {
         this.shutdownTimeout = shutdownTimeout;
     }
 
@@ -164,8 +174,17 @@ public abstract class HttpClientConfiguration {
      *
      * @param readTimeout The read timeout
      */
-    public void setReadTimeout(Duration readTimeout) {
+    public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets the connect timeout.
+     *
+     * @param connectTimeout The connect timeout
+     */
+    public void setConnectTimeout(@Nullable Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
     /**
@@ -180,7 +199,7 @@ public abstract class HttpClientConfiguration {
      *
      * @param numOfThreads The number of threads the client should use for requests
      */
-    public void setNumOfThreads(Integer numOfThreads) {
+    public void setNumOfThreads(@Nullable Integer numOfThreads) {
         this.numOfThreads = numOfThreads;
     }
 

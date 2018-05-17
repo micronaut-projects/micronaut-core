@@ -210,6 +210,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             .channel(NioSocketChannel.class)
             .option(ChannelOption.SO_KEEPALIVE, true);
 
+        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
+        connectTimeout.ifPresent(duration -> this.bootstrap.option(
+                ChannelOption.CONNECT_TIMEOUT_MILLIS,
+                Long.valueOf(duration.toMillis()).intValue()
+        ));
+
         for (Map.Entry<ChannelOption, Object> entry : configuration.getChannelOptions().entrySet()) {
             Object v = entry.getValue();
             if (v != null) {

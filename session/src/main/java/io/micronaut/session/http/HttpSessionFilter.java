@@ -18,13 +18,18 @@ package io.micronaut.session.http;
 
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
+import io.micronaut.session.annotation.SessionValue;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -94,18 +99,50 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
 
     private Publisher<MutableHttpResponse<?>> encodeSessionId(HttpRequest<?> request, Publisher<MutableHttpResponse<?>> responsePublisher) {
         Flowable<SessionAndResponse> responseFlowable = Flowable.fromPublisher(responsePublisher)
-            .switchMap(mutableHttpResponse -> {
+            .switchMap(response -> {
+
+                Optional<MethodExecutionHandle> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, MethodExecutionHandle.class);
+                Optional<?> body = response.getBody();
+
+                String sessionAttr;
+
+                if (body.isPresent()) {
+                    sessionAttr = routeMatch.flatMap((m) -> {
+                        if (!m.hasAnnotation(SessionValue.class)) {
+                            return Optional.empty();
+                        } else {
+                            String attributeName = m.getValue(SessionValue.class, String.class).orElse(null);
+                            if (!StringUtils.isEmpty(attributeName)) {
+                                return Optional.of(attributeName);
+                            } else {
+                                throw new InternalServerException("@SessionValue on a return type must specify an attribute name");
+                            }
+                        }
+                    }).orElse(null);
+                } else {
+                    sessionAttr = null;
+                }
 
                 Optional<Session> opt = request.getAttributes().get(SESSION_ATTRIBUTE, Session.class);
                 if (opt.isPresent()) {
                     Session session = opt.get();
+                    if (sessionAttr != null) {
+                       session.put(sessionAttr, body.get());
+                    }
+
                     if (session.isNew()) {
                         return Flowable
                             .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
-                            .map((s) -> new SessionAndResponse(Optional.of(s), mutableHttpResponse));
+                            .map((s) -> new SessionAndResponse(Optional.of(s), response));
                     }
+                } else if (sessionAttr != null) {
+                    Session newSession = sessionStore.newSession();
+                    newSession.put(sessionAttr, body.get());
+                    return Flowable
+                            .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(newSession)))
+                            .map((s) -> new SessionAndResponse(Optional.of(s), response));
                 }
-                return Flowable.just(new SessionAndResponse(opt, mutableHttpResponse));
+                return Flowable.just(new SessionAndResponse(opt, response));
             });
 
         return responseFlowable.map(sessionAndResponse -> {
