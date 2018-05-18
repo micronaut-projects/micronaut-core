@@ -15,9 +15,9 @@
  */
 
 /**
- * <p>Support classes that simplify writing standalone functions as Groovy scripts</p>.
+ * <p>CLI i/o support.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-package io.micronaut.function.groovy;
+package io.micronaut.cli.io.support;
