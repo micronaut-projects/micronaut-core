@@ -1,0 +1,50 @@
+For Java, Micronaut uses a Java api:annotation.processing.BeanDefinitionInjectProcessor[] annotation processor to process classes at compile time and produce api:inject.BeanDefinition[] classes.
+
+The major advantage here is that you pay a slight cost at compile time, but at runtime Micronaut is largely reflection-free, fast and consumes very little memory.
+
+=== IDE Considerations
+
+You can use any IDE to develop Micronaut, if you depend on your configured build tool (Gradle or Maven) to build the application.
+
+However, if you wish to run tests within the IDE that is currently only possible with http://jetbrains.com/idea[IntelliJ IDEA].
+
+For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
+
+image::intellij-annotation-processors.png[Intellij Settings,1024,768]
+
+As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
+
+=== Retaining Parameter Names
+
+By default with Java, the parameter name data for method parameters is not retained at compile time. This can be a problem for Micronaut if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
+
+Consider this interface:
+
+.Client Interface
+[source,java]
+----
+interface HelloOperations {
+    @Get("/hello/{name}")
+    String hello(String name);
+}
+----
+
+At compile time the parameter name `name` is lost and becomes simply `arg0` when compiled against or read via reflection later. To avoid this problem you have two options. You can either declare the parameter name explicitly:
+
+.Client Interface
+[source,java]
+----
+interface HelloOperations {
+    @Get("/hello/{name}")
+    String hello(@Parameter("name") String name);
+}
+----
+
+Or alternatively it is recommended that you compile all byte code with `-parameters` flag to `javac`. See https://docs.oracle.com/javase/tutorial/reflect/member/methodparameterreflection.html[Obtaining Names of Method Parameters]. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compileJava.options.compilerArgs += '-parameters'
+----
+

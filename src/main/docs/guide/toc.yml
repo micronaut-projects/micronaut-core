@@ -130,6 +130,7 @@ dataAccess:
   redisSupport: Configuring Redis
 languageSupport:
   title: Language Support
+  java: Micronaut for Java
   groovy: Micronaut for Groovy
   kotlin: Micronaut for Kotlin
 management:
