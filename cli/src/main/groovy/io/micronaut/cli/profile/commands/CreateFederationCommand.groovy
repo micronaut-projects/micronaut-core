@@ -25,7 +25,6 @@ import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
-import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 
 import java.nio.file.Paths
@@ -37,7 +36,7 @@ import java.nio.file.Paths
  * @since 1.0
  */
 @CompileStatic
-class CreateFederationCommand extends CreateServiceCommand {
+class CreateFederationCommand extends CreateAppCommand {
     public static final String NAME = "create-federation"
     public static final String SERVICES_FLAG = "services"
 

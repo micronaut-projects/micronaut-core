@@ -69,7 +69,7 @@ class MicronautCli {
     public static final String DEFAULT_PROFILE_NAME = ProfileRepository.DEFAULT_PROFILE_NAME
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
-    private static final String USAGE_MESSAGE = "create-service [NAME]"
+    private static final String USAGE_MESSAGE = "create-app [NAME]"
     private static
     final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
     private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original()
