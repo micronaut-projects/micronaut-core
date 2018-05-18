@@ -28,8 +28,24 @@ The following snippet presents an example of using the annotations:
 .Using Trace Annotations
 [source,java]
 ----
-TODO
+@Singleton
+class HelloService {
+
+    @NewSpan("hello-world") // <1>
+    public String hello(@SpanTag("person.name") String name) { // <2>
+        return greet("Hello " + name);
+    }
+
+    @ContinueSpan // <3>
+    public String greet(@SpanTag("hello.greeting") String greet) {
+        return greeting;
+    }
+}
 ----
+
+<1> The ann:tracing.annotation.NewSpan[] annotation is used to start a new span
+<2> You can use ann:tracing.annotation.SpanTag[] to include arguments of methods as tags for the span
+<3> The ann:tracing.annotation.ContinueSpan[] annotation can be used to continue as existing span and incorporate additional tags using `@SpanTag`
 
 ==== Tracing Instrumentation
 
