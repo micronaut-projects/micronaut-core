@@ -1,0 +1,229 @@
+The http://groovy-lang.org[Groovy language] has first class support in Micronaut.
+
+=== Groovy Specific Modules
+
+Additional modules exist specific to Groovy that improve the overall experience. These are detailed in the table below:
+
+.Groovy Specific Modules
+|===
+|Dependency|Description
+
+|`io.micronaut:inject-groovy`
+|Includes AST transformations to generate bean definitions. Should be `compileOnly` on your classpath.
+
+|`io.micronaut:runtime-groovy`
+|Adds the ability to specify configuration placed in `src/main/resources` in Groovy format (i.e. `application.groovy`)
+
+|`io.micronaut:function-groovy`
+|Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
+
+
+|===
+
+The most common module you will need is `inject-groovy`, which enables DI and AOP for classes written in Groovy.
+
+=== Groovy Support in the CLI
+
+The <<cli, Command Line Interface>> for Micronaut also includes special support for Micronaut. To create Groovy application use the `groovy` feature. For example:
+
+[source,bash]
+.Create a Micronaut Groovy application
+----
+$ mn create-app hello-world --features groovy
+----
+
+The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.
+
+Once you have created an application with the `groovy` feature commands like `create-controller`, `create-client` etc. will generate Groovy files instead of Java. The following example demonstrates this action when using interactive mode of the CLI:
+
+[source,bash]
+.Create a bean
+----
+$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn>
+
+create-bean          create-client        create-controller
+create-job           help
+
+mn> create-bean helloBean
+| Rendered template Bean.groovy to destination src/main/groovy/hello/world/HelloBean.groovy
+----
+
+The above example demonstrates creating a Groovy bean that looks like the following:
+
+[source,groovy]
+.Micronaut Bean
+----
+package hello.world
+
+import javax.inject.Singleton
+
+@Singleton
+class HelloBean {
+
+}
+----
+
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you include the `javax.inject.Singleton` import when declaring a singleton bean!
+
+We can also create a client - don't forget Micronaut can act as a client or a server!
+
+[source,bash]
+.Create a client
+----
+mn> create-client helloClient
+| Rendered template Client.groovy to destination src/main/groovy/hello/world/HelloClient.groovy
+----
+
+[source,groovy]
+.Micronaut Client
+----
+package hello.world
+
+import io.micronaut.http.client.Client
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+@Client("hello")
+interface HelloClient {
+
+    @Get("/")
+    HttpStatus index()
+}
+----
+
+
+Now let's create a controller:
+
+
+[source,bash]
+.Create a controller
+----
+mn> create-controller helloController
+| Rendered template Controller.groovy to destination src/main/groovy/hello/world/HelloController.groovy
+| Rendered template ControllerSpec.groovy to destination src/test/groovy/hello/world/HelloControllerSpec.groovy
+mn>
+----
+
+
+[source,groovy]
+.Micronaut Controller
+----
+package hello.world
+
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+
+@Controller("/hello")
+class HelloController {
+
+    @Get("/")
+    HttpStatus index() {
+        return HttpStatus.OK
+    }
+}
+----
+
+As you can see from the output from the CLI a http://spockframework.org[Spock] test was also generated for you demonstrating how to test the controller:
+
+[source,groovy]
+.HelloControllerSpec.groovy
+----
+...
+    void "test index"() {
+        given:
+        HttpResponse response = client.toBlocking().exchange("/hello")
+
+        expect:
+        response.status == HttpStatus.OK
+    }
+...
+----
+
+
+Notice how you use Micronaut both as client and as a server to test itself.
+
+=== Programmatic Routes with GroovyRouterBuilder
+
+If you prefer to build your routes programmatically (similar to Grails `UrlMappings`) then a special `io.micronaut.web.router.GroovyRouteBuilder` exists that has some enhancements to make the DSL better.
+
+The following example shows `GroovyRouteBuilder` in act:
+
+.Using GroovyRouteBuilder
+[source,groovy]
+----
+include::router/src/test/groovy/io/micronaut/context/router/GroovyRouteBuilderSpec.groovy[tag=routes, indent=0]
+----
+
+<1> You can use injected controllers to create routes by convention and Groovy method references to create routes to methods
+<2> The `ID` property can be used to reference include an `{id}` URI variable
+
+The above example results in the following routes:
+
+* `/book` - Maps to `BookController.index()`
+* `/book/hello/{message}` - Maps to `BookController.hello(String)`
+* `/book/{id}` - Maps to `BookController.show(String id)`
+* `/book/{id}/author` - Maps to `AuthorController.index`
+
+=== Using GORM in a Groovy application
+
+http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
+
+
+.GORM Modules
+|===
+|Dependency|Description
+
+|`io.micronaut.configuration:hibernate-gorm`
+|Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications. See the <<hibernateSupport, Hibernate Support>> docs
+
+|`io.micronaut.configuration:mongo-gorm`
+|Configures http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications. See the <<mongoSupport, Mongo Support>> docs.
+
+|`io.micronaut.configuration:neo4j-gorm`
+|Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications. See the <<neo4jSupport, Neo4j Support>> docs.
+
+|===
+
+Once you have configured a GORM implementation per the instructions linked in the table above you can use all features of GORM.
+
+http://gorm.grails.org/latest/hibernate/manual/index.html#dataServices[GORM Data Services] can also participate in dependency injection and life cycle methods:
+
+
+
+[source,groovy]
+.GORM Data Service VehicleService.groovy
+----
+@Service(Vehicle)
+abstract class VehicleService {
+    @PostConstruct
+    void init() {
+       // do something on initialization
+
+    }
+
+    abstract Vehicle findVehicle(@NotBlank String name)
+
+    abstract Vehicle saveVehicle(@NotBlank String name)
+
+}
+
+----
+
+You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
+
+
+=== Serverless Functions with Groovy
+
+
+A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.
+
+With the `function-groovy` module, Micronaut features enhanced support for functions written in Groovy.
+
+See the section on <<serverlessFunctions, Serverless Functions>> for more information.
+
+
