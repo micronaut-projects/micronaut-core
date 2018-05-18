@@ -169,6 +169,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
                 }
             }
+            TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
+            TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
             // accumulate all the class elements for all annotated elements
             annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
                 .stream()
@@ -176,6 +178,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 .filter(element -> element.getKind() != ANNOTATION_TYPE)
                 .forEach(element -> {
                     TypeElement typeElement = modelUtils.classElementFor(element);
+
+                    // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
+                    if (groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType)) {
+                        return;
+                    }
+
                     String name = typeElement.getQualifiedName().toString();
                     if (!beanDefinitionWriters.containsKey(name)) {
                         if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
