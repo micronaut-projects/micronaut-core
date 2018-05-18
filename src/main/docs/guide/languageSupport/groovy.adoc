@@ -147,6 +147,28 @@ As you can see from the output from the CLI a http://spockframework.org[Spock] t
 
 Notice how you use Micronaut both as client and as a server to test itself.
 
+=== Programmatic Routes with GroovyRouterBuilder
+
+If you prefer to build your routes programmatically (similar to Grails `UrlMappings`) then a special `io.micronaut.web.router.GroovyRouteBuilder` exists that has some enhancements to make the DSL better.
+
+The following example shows `GroovyRouteBuilder` in act:
+
+.Using GroovyRouteBuilder
+[source,groovy]
+----
+include::router/src/test/groovy/io/micronaut/context/router/GroovyRouteBuilderSpec.groovy[tag=routes, indent=0]
+----
+
+<1> You can use injected controllers to create routes by convention and Groovy method references to create routes to methods
+<2> The `ID` property can be used to reference include an `{id}` URI variable
+
+The above example results in the following routes:
+
+* `/book` - Maps to `BookController.index()`
+* `/book/hello/{message}` - Maps to `BookController.hello(String)`
+* `/book/{id}` - Maps to `BookController.show(String id)`
+* `/book/{id}/author` - Maps to `AuthorController.index`
+
 === Using GORM in a Groovy application
 
 http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
@@ -193,7 +215,6 @@ abstract class VehicleService {
 ----
 
 You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
-
 
 
 === Serverless Functions with Groovy

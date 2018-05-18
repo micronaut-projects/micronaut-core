@@ -64,6 +64,7 @@ class GroovyRouteBuilderSpec extends Specification {
         '/book/1/author'    | HttpMethod.GET    | true      | ResourceRoutes | ['author']
     }
 
+    // tag::routes[]
     @Singleton
     static class MyRoutes extends GroovyRouteBuilder {
 
@@ -74,13 +75,14 @@ class GroovyRouteBuilderSpec extends Specification {
         @Inject
         void bookResources(BookController bookController, AuthorController authorController) {
             GET(bookController) {
-                POST("/hello{/message}", bookController.&hello)
+                POST("/hello{/message}", bookController.&hello) // <1>
             }
-            GET(bookController, ID) {
+            GET(bookController, ID) { // <2>
                 GET(authorController)
             }
         }
     }
+    // end::routes[]
 
     @Singleton
     static class ResourceRoutes extends GroovyRouteBuilder {
