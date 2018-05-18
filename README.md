@@ -23,6 +23,7 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 
 For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io) 
 
+For information on how to build and contribute to Micronaut see the [CONTRIBUTING.md](https://github.com/micronaut-projects/micronaut-core/blob/master/CONTRIBUTING.md)
 
 
 

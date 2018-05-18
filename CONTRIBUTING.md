@@ -18,6 +18,8 @@ The documentation sources are located at `src/main/docs/guide`.
 
 To build the documentation run `./gradlew publishGuide` or `./gradlew pG` then open `build/docs/index.html`  
 
+To also build the javadocs instead run `./gradlew docs`.
+
 ## Building the CLI
 
 - Clone [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles)
