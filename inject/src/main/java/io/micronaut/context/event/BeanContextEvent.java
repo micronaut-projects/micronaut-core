@@ -37,4 +37,9 @@ public abstract class BeanContextEvent extends ApplicationEvent {
     public BeanContextEvent(BeanContext beanContext) {
         super(beanContext);
     }
+
+    @Override
+    public BeanContext getSource() {
+        return (BeanContext) super.getSource();
+    }
 }
