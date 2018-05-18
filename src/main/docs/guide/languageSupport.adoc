@@ -1,1 +1,8 @@
-TODO
+Micronaut supports any JVM language that implements the https://docs.oracle.com/javase/8/docs/api/javax/annotation/processing/package-summary.html[Java Annotation Processor] API.
+
+Although Groovy, does not in fact support this API, special support has been built via an AST transformation. The current list of supported languages is: Java, Groovy and Kotlin (via the kapt tool).
+
+NOTE: Theoretically any language that supports a way to analyze the AST at compile time could be supported. The pkg:inject.writer[] package includes classes that are language neutral and are used to build api:inject.BeanDefinition[] classes at compile time using the ASM tool.
+
+The following sections cover language specific features and considerations for using Micronaut.
+
