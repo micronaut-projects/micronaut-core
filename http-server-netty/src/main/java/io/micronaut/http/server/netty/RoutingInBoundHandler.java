@@ -475,8 +475,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
-                File file = new File(url.toURI().getPath());
-                if (file.exists()) {
+                String filePath = url.toURI().getPath();
+                File file = filePath != null ? new File(filePath) : null;
+                if (file != null && file.exists()) {
                     if (!file.isDirectory() && file.canRead()) {
                         return Optional.of(new NettySystemFileCustomizableResponseType(file));
                     }
