@@ -1,91 +1,40 @@
-Groovy has first class support in Micronaut. This is accomplished with the modules inject-groovy, function-groovy, and runtime-groovy.
-You can use Groovy for a tranditional standalone application, a client, or a serverless function or any mix of them.
+The http://groovy-lang.org[Groovy language] has first class support in Micronaut.
 
-TIP: Simply use SDKMAN (sdkman.io) to install Micronaut and have the Micronaut CLI ready to go!
+=== Groovy Specific Modules
 
-Now time to make some Groovy Micronaut Apps!
+Additional modules exist specific to Groovy that improve the overall experience. These are detailed in the table below:
+
+.Groovy Specific Modules
+|===
+|Dependency|Description
+
+|`io.micronaut:inject-groovy`
+|Includes AST transformations to generate bean definitions. Should be `compileOnly` on your classpath.
+
+|`io.micronaut:runtime-groovy`
+|Adds the ability to specify configuration placed in `src/main/resources` in Groovy format (i.e. `application.groovy`)
+
+|`io.micronaut:function-groovy`
+|Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
+
+
+|===
+
+The most common module you will need is `inject-groovy`, which enables DI and AOP for classes written in Groovy.
+
+=== Groovy Support in the CLI
+
+The <<cli, Command Line Interface>> for Micronaut also includes special support for Micronaut. To create Groovy application use the `groovy` feature. For example:
 
 [source,bash]
-.Create a Micronaut application
+.Create a Micronaut Groovy application
 ----
 $ mn create-app hello-world --features groovy
 ----
 
-Above we run the CLI for Micronaut to create a new service application with Groovy. If you don't want to use the CLI, that's ok: you can also manually create your project and set it up yourself. Note because we created the project with '--features groovy' it will default to Groovy types going forward for this project.
+The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.
 
-[source,groovy]
-.Example build.gradle
-----
-buildscript {
-    repositories {
-        mavenCentral()
-        maven { url "https://plugins.gradle.org/m2/" }
-    }
-    dependencies {
-        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.4"
-        classpath "io.spring.gradle:dependency-management-plugin:1.0.5.RELEASE"
-        classpath "net.ltgt.gradle:gradle-apt-plugin:0.15"
-    }
-}
-
-version "0.1"
-group "hello.world"
-
-apply plugin:"io.spring.dependency-management"
-apply plugin:"com.github.johnrengelman.shadow"
-apply plugin:"application"
-apply plugin:"groovy"
-apply plugin:"java"
-apply plugin:"net.ltgt.apt-eclipse"
-apply plugin:"net.ltgt.apt-idea"
-
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
-dependencyManagement {
-    imports {
-        mavenBom 'io.micronaut:bom:1.0.0-SNAPSHOT'
-    }
-}
-
-dependencies { //<1>
-    annotationProcessor "io.micronaut:inject-java"
-    compile "io.micronaut:runtime-groovy"
-    compile "io.micronaut:http-client"
-    compile "io.micronaut:inject"
-    compile "io.micronaut:runtime"
-    compile "io.micronaut:http-server-netty"
-    compileOnly "io.micronaut:inject-groovy"
-    compileOnly "io.micronaut:inject-java"
-    runtime "ch.qos.logback:logback-classic:1.2.3"
-    testCompile "io.micronaut:inject-groovy"
-    testCompile "junit:junit:4.12"
-}
-
-shadowJar {
-    mergeServiceFiles()
-}
-
-----
-<1> Groovy Dependencies
-
-The key element here is item <1> which is the groovy dependencies for a standard microservice project.
-
-Other things you can run with the Micronaut CLI:
-
-    * create-federation --services <service names> --features=groovy - this is for creating a group of apps/services all at once
-    * create-profile <profileName> --features=groovy - this is for creating a new profile. See https://github.com/micronaut-projects/micronaut-profiles to a see a list of current profiles.
-    * list-profiles - list available profiles to the CLI
-    * profile-info <profileName> - list the features available for a profile i.e. 'groovy'
-    * help - help using the CLI
-
-
-Most profiles have a 'groovy' feature that will include all of the needed Groovy language depdencies. Back to making Groovy applications, now that we have your new service 'hello-world' let us go into its root directory.
-
-Now when we run the CLI we have a new set of options for our application:
+Once you have created an application with the `groovy` feature commands like `create-controller`, `create-client` etc. will generate Groovy files instead of Java. The following example demonstrates this action when using interactive mode of the CLI:
 
 [source,bash]
 .Create a bean
@@ -102,7 +51,7 @@ mn> create-bean helloBean
 | Rendered template Bean.groovy to destination src/main/groovy/hello/world/HelloBean.groovy
 ----
 
-Now we have created a Groovy bean we can use in other parts of our application/service.
+The above example demonstrates creating a Groovy bean that looks like the following:
 
 [source,groovy]
 .Micronaut Bean
@@ -117,18 +66,16 @@ class HelloBean {
 }
 ----
 
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you include the `javax.inject.Singleton` import when declaring a singleton bean!
+
 We can also create a client - don't forget Micronaut can act as a client or a server!
-
-
 
 [source,bash]
 .Create a client
 ----
 mn> create-client helloClient
 | Rendered template Client.groovy to destination src/main/groovy/hello/world/HelloClient.groovy
-
 ----
-
 
 [source,groovy]
 .Micronaut Client
@@ -181,28 +128,12 @@ class HelloController {
 }
 ----
 
-You will also see it automatically created a Spock test as well, just like in Grails!
+As you can see from the output from the CLI a http://spockframework.org[Spock] test was also generated for you demonstrating how to test the controller:
 
 [source,groovy]
-.Micronaut Controller Test
+.HelloControllerSpec.groovy
 ----
-package hello.world;
-
-import io.micronaut.context.ApplicationContext
-import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import spock.lang.AutoCleanup
-import spock.lang.Shared
-import spock.lang.Specification
-
-class HelloControllerSpec extends Specification {
-
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
-
+...
     void "test index"() {
         given:
         HttpResponse response = client.toBlocking().exchange("/hello")
@@ -210,19 +141,40 @@ class HelloControllerSpec extends Specification {
         expect:
         response.status == HttpStatus.OK
     }
-}
+...
 ----
 
 
-Notice how we use Micronaut both as client and as a server to test itself, pretty cool!
+Notice how you use Micronaut both as client and as a server to test itself.
 
-We can also use a service which is really the same as a bean that is a @Singleton. On top of that, we can use GORM like
-we do in Grails! Or you can make a GORM Data service like so:
+=== Using GORM in a Groovy application
+
+http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
+
+
+.GORM Modules
+|===
+|Dependency|Description
+
+|`io.micronaut.configuration:hibernate-gorm`
+|Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications. See the <<hibernateSupport, Hibernate Support>> docs
+
+|`io.micronaut.configuration:mongo-gorm`
+|Configures http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications. See the <<mongoSupport, Mongo Support>> docs.
+
+|`io.micronaut.configuration:neo4j-gorm`
+|Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications. See the <<neo4jSupport, Neo4j Support>> docs.
+
+|===
+
+Once you have configured a GORM implementation per the instructions linked in the table above you can use all features of GORM.
+
+http://gorm.grails.org/latest/hibernate/manual/index.html#dataServices[GORM Data Services] can also participate in dependency injection and life cycle methods:
 
 
 
 [source,groovy]
-.Micronaut GORM Data Service VehicleService.groovy
+.GORM Data Service VehicleService.groovy
 ----
 @Service(Vehicle)
 abstract class VehicleService {
@@ -241,131 +193,16 @@ abstract class VehicleService {
 ----
 
 You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
-The service handles a Vehicle domain shown below.:
-
-[source,groovy]
-.Micronaut GORM Domain Vehicle.groovy
-----
-import grails.gorm.annotation.Entity
-
-@Entity
-class Vehicle {
-    String name
-}
-----
-
-Just like in grails, your domain can have hasMany, static mapping = [ ] block. Constraints are different and are all handled with annotations like so:
-
-[source,groovy]
-.Micronaut GORM Domain Vehicle.groovy
-----
-import grails.gorm.annotation.Entity
-
-@Entity
-class Vehicle {
-
-    @NotBlank
-    String name
-
-    static hasMany = [drivers: Driver]
-}
-----
-
-One more thing we can make in groovy, is a scheduled execution job. Please note this is just built-in Java scheduled executors and not a clustered type service like Quartz.
-
-
-[source,bash]
-.Create a scheduled job
-----
-mn> create-job helloJob
-| Rendered template Job.groovy to destination src/main/groovy/hello/world/HelloJob.groovy
-----
-
-Let's look at the soruce, you can just start coding away and scheduling tasks. You can repeat at fixed rate, cron type, and more info at api:java.util.concurrent.ScheduledExecutorService[]
-
-[source,groovy]
-----
-package hello.world
-
-import javax.inject.Singleton
-import io.micronaut.scheduling.annotation.Scheduled
-
-@Singleton
-class HelloJob {
-
-    @Scheduled(fixedRate = "5m")
-    void process() {}
-}
-----
-
-You may use types fixedRate, fixedDelay, initialDelay, and cron. You can see more information here api:package io.micronaut.scheduling.annotation.Scheduled[]
-
-
-= Serverless Groovy
-
-
-A microservice application is just one way to use Micronaut. You can also use it for serverless like on AWS Lambda.
-Micronaut has a built in facility called functions for making this easy with Groovy!
-
-Writing a Groovy function is half setup in build.gradle half in the code itself. Let's look at twitter example we make from the CLI:
-
-The quickest way to get an AWS lambda function is using the CLI:
-
-[source,bash]
-.Create a Groovy AWS Lambda function app
-----
-$ ./mn create-service hello-world-aws -profile function-aws -features groovy-function
-| Service created at /home/rvanderwerf/bitbucket/micronaut-core-groovydocs/cli/build/bin/hello-world-aws
-----
-
-So the source with Groovy is dead simple: a String is returns after the function is executed.
-
-[source,groovy]
-.HelloWorldAwsFunction.groovy
-----
-package hello.world.aws
-
-String index() {
-    "HelloWorldAws"
-}
-----
-
-To deploy it the build.gradle is generated to do all the legwork.
-
-[source,groovy]
-.build.gradle
-----
-mainClassName = "hello.world.aws.HelloWorldAwsFunction" //<1>
-applicationDefaultJvmArgs = [""]
-
-jar {
-    manifest {
-        attributes 'Main-Class': mainClassName
-    }
-}
-
-task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
-    functionName = "hello-world-aws" //<2>
-    handler = "hello.world.aws.HelloWorldAwsFunction::index" //<3>
-    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
-    runtime = Runtime.Java8
-    zipFile = shadowJar.archivePath
-    memorySize = 256
-    timeout = 60
-}
-----
-<1> Class name the function will call
-<2> function name is just for display purposes in the console. ARN is the unique indicator for a Lambda function.
-<3> handler class/function called when invoked (in this case 'index')
-
-In the build file, 'mainClassName' <1> is the class that contains the function, in this case hello.world.aws.HelloWorldAwsFunction.
-The method that AWS Invokes when the Lambda is called is defined in the deploy task, marked 'handler' <3>.
-The other options in the build.gradle are just defaults for JVM version, memory size and IAM Role. It's important to note that the more memory you give the function, the faster it will start - even though you don't need it.
-Also the function can take several seconds when cold to warm up. If performance is a consideration you might want to have a monitor service 'ping' your function every few minutes to keep it alive.
 
 
 
+=== Serverless Functions with Groovy
 
 
+A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.
+
+With the `function-groovy` module, Micronaut features enhanced support for functions written in Groovy.
+
+See the section on <<serverlessFunctions, Serverless Functions>> for more information.
 
 
