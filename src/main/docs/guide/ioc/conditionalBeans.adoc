@@ -47,24 +47,56 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |Require the presence of one ore more classes
 |`@Requires(classes=javax.servlet.Servlet)`
 
+|Require the absence of one ore more classes
+|`@Requires(missing=javax.servlet.Servlet)`
+
 |Require the presence one or more beans
 |`@Requires(beans=javax.sql.DataSource)`
 
 |Require the absence of one or more beans
 |`@Requires(missingBeans=javax.sql.DataSource)`
 
-|Require the presence of an environment variable
-|`@Requires(env='TRAVIS')`
+|Require the environment to be applied
+|`@Requires(env="test")`
+
+|Require the environment to not be applied
+|`@Requires(notEnv="test")`
 
 |Require the presence of another configuration package
-|`@Requires(configuration='foo.bar')`
+|`@Requires(configuration="foo.bar")`
+
+|Require the absence of another configuration package
+|`@Requires(missingConfigurations="foo.bar")`
 
 |Require particular SDK version
 |`@Requires(sdk=Sdk.JAVA, value="1.8")`
 
+|Requires classes annotated with the given annotations to be available to the application via package scanning
+|`@Requires(entities=javax.persistence.Entity)`
+
 |Require a property with an optional value
-|`@Requires(property='data-source.url')`
+|`@Requires(property="data-source.url")`
+
+|Require a property to not be part of the configuration
+|`@Requires(missingProperty="data-source.url")`
 |===
+
+==== Additional Notes on Property Requirements.
+
+Adding a requirement on a property has some additional functionality. You can require the property to be a certain value, not be a certain value, and use a default in those checks if its not set.
+
+[source,java]
+----
+@Requires(property="foo") //<1>
+@Requires(property="foo", value="John") //<2>
+@Requires(property="foo", value="John", defaultValue="John") //<3>
+@Requires(property="foo", notEquals="Sally") //<4>
+----
+
+<1> Requires the property to be "yes", "YES", "true", "TRUE", "y" or "Y"
+<2> Requires the property to be "John"
+<3> Requires the property to be "John" or not set
+<4> Requires the property to not be "Sally" or not set
 
 === Debugging Conditional Beans
 
