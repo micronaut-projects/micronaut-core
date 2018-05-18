@@ -12,31 +12,26 @@ import java.nio.file.Paths
 class CreateFunctionCommand extends CreateServiceCommand {
     public static final String NAME = "create-function"
 
-    public static final String LANG_JAVA = "java"
-    public static final String LANG_GROOVY = "groovy"
-    public static final String LANG_KOTLIN = "kotlin"
+    public static final String LANG_FLAG = "lang"
+    public static final String PROVIDER_FLAG = "provider"
 
-    public static final String PROVDER_AWS = "aws"
+    protected static final List<String> LANG_OPTIONS = ["java", "groovy", "kotlin"]
+    protected static final List<String> PROVIDER_OPTIONS = ["aws"]
 
-    public static final String PROFILE_DEFAULT = "function-aws"
-    public static final String FEATURE_DEFAULT = "java-function"
+    public static final String PROVIDER_DEFAULT = "aws"
+    public static final String LANG_DEFAULT = "java"
 
     CreateFunctionCommand() {
         description.description = "Creates a serverless function application"
-        description.usage = "create-function [NAME] -[LANG] (default: java, one of: groovy|kotlin|java) -[PROVIDER] (default: aws)"
+        description.usage = "create-function [NAME] -lang [LANG] -provider [PROVIDER]"
 
         final List<String> flags = getFlags()
-        if (flags.contains(LANG_JAVA)) {
-            description.flag(name: LANG_JAVA, description: "Create a Java function")
+        if (flags.contains(LANG_FLAG)) {
+            description.flag(name: LANG_FLAG, description: "Which language to use. Possible values: ${LANG_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
-        if (flags.contains(LANG_GROOVY)) {
-            description.flag(name: LANG_GROOVY, description: "Create a Groovy function")
-        }
-        if (flags.contains(LANG_KOTLIN)) {
-            description.flag(name: LANG_KOTLIN, description: "Create a Kotlin function")
-        }
-        if (flags.contains(PROVDER_AWS)) {
-            description.flag(name: PROVDER_AWS, description: "Create an AWS Lambda function")
+
+        if (flags.contains(PROVIDER_FLAG)) {
+            description.flag(name: PROVIDER_FLAG, description: "Which cloud provider to use. Possible values: ${PROVIDER_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
     }
 
@@ -54,7 +49,7 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
     @Override
     protected List<String> getFlags() {
-        [INPLACE_FLAG, BUILD_FLAG, FEATURES_FLAG, LANG_GROOVY, LANG_KOTLIN, LANG_JAVA, PROVDER_AWS]
+        [INPLACE_FLAG, BUILD_FLAG, FEATURES_FLAG, LANG_FLAG, PROVIDER_FLAG]
     }
 
     @Override
@@ -80,7 +75,7 @@ class CreateFunctionCommand extends CreateServiceCommand {
         }
 
         final String functionProfile = evaluateProfileName(commandLine)
-        final String langFeature = evaluateLangFeature(commandLine)
+        final String langFeature = evaluateLangFeature(commandLine, functionProfile)
 
         final List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
         List<String> features = [langFeature]
@@ -105,12 +100,10 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
     @Override
     protected String evaluateProfileName(CommandLine mainCommandLine) {
-        mainCommandLine.hasOption(PROVDER_AWS) ? "function-aws" : PROFILE_DEFAULT
+        "function-${mainCommandLine.optionValue(PROVIDER_FLAG) ?: PROVIDER_DEFAULT}"
     }
 
-    protected String evaluateLangFeature(CommandLine commandLine) {
-        commandLine.hasOption(LANG_GROOVY) ? "groovy-function" :
-                commandLine.hasOption(LANG_KOTLIN) ? "kotlin-function" :
-                        commandLine.hasOption(LANG_JAVA) ? "java-function" : FEATURE_DEFAULT
+    protected String evaluateLangFeature(CommandLine commandLine, String profile) {
+        "${profile}-${commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT}"
     }
 }
