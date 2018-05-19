@@ -52,8 +52,8 @@ import java.nio.file.attribute.BasicFileAttributes
  * @since 1.0
  */
 @CompileStatic
-class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
-    public static final String NAME = "create-service"
+class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
+    public static final String NAME = "create-app"
     public static final String PROFILE_FLAG = "profile"
     public static final String FEATURES_FLAG = "features"
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
@@ -72,9 +72,9 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     String defaultpackagename
     File targetDirectory
 
-    CommandDescription description = new CommandDescription(name, "Creates a service", "create-service [NAME]")
+    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME]")
 
-    CreateServiceCommand() {
+    CreateAppCommand() {
         populateDescription()
         List<String> flags = getFlags()
         if (flags.contains(INPLACE_FLAG)) {
@@ -96,7 +96,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     }
 
     protected void populateDescription() {
-        description.argument(name: "Service Name", description: "The name of the service to create.", required: false)
+        description.argument(name: "Application Name", description: "The name of the application to create.", required: false)
     }
 
     @Override
@@ -381,7 +381,7 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
     boolean handle(ExecutionContext executionContext) {
         CommandLine commandLine = executionContext.commandLine
 
-        String profileName = evaluateProfileName(commandLine)
+        String profileName = (commandLine)
 
         List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
@@ -492,8 +492,8 @@ class CreateServiceCommand extends ArgumentCompletingCommand implements ProfileR
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
                 replacefilter {
-                    replacetoken("@${k}@".toString())
-                    replacevalue(v)
+                    if (k) {replacetoken("@${k}@".toString()) }
+                    if (v) { replacevalue(v) }
                 }
             }
             variables.each { k, v ->

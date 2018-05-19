@@ -56,6 +56,21 @@ class CommandDescription {
     private Map<String, CommandArgument> arguments = new LinkedHashMap<>()
     private Map<String, CommandArgument> flags = new LinkedHashMap<>()
 
+    CommandDescription(String name) {
+        this.name = name
+    }
+
+    CommandDescription(String name, String description) {
+        this.name = name
+        this.description = description
+    }
+
+    CommandDescription(String name, String description, String usage) {
+        this.name = name
+        this.description = description
+        this.usage = usage
+    }
+
     /**
      * Returns an argument for the given name or null if it doesn't exist
      * @param name The name
