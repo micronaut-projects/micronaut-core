@@ -15,6 +15,8 @@
  */
 
 /**
+ * Consul client service operations.
+ *
  * @author graemerocher
  * @since 1.0
  */

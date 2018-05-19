@@ -72,6 +72,7 @@ class MicronautCli {
     private static final String USAGE_MESSAGE = "create-app [NAME]"
     private static
     final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
+    final String FUNCTION_USAGE_MESSAGE = "create-function [NAME]"
     private final SystemStreamsRedirector originalStreams = SystemStreamsRedirector.original()
     // store original System.in, System.out and System.err
     private static ExecutionContext currentExecutionContext = null
@@ -178,7 +179,7 @@ class MicronautCli {
     }
 
     private int getBaseUsage() {
-        System.out.println "Usage: \n\t $USAGE_MESSAGE \n\t $FEDERATION_USAGE_MESSAGE \n\n"
+        System.out.println "Usage: \n\t $USAGE_MESSAGE \n\t $FEDERATION_USAGE_MESSAGE \n\t $FUNCTION_USAGE_MESSAGE  \n\n"
         this.execute "list-profiles"
         System.out.println "\nType 'mn help' or 'mn -h' for more information."
 
