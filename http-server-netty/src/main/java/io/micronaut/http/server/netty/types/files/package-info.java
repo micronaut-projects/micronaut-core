@@ -15,15 +15,9 @@
  */
 
 /**
- * This configuration contains setup class for GORM for Neo4j.
+ * Netty file type and response handling.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(classes = Driver.class)
-@Requires(entities = Entity.class)
-package io.micronaut.configuration.neo4j.gorm;
-
-import grails.gorm.annotation.Entity;
-import io.micronaut.context.annotation.Requires;
-import org.neo4j.driver.v1.Driver;
+package io.micronaut.http.server.netty.types.files;
