@@ -15,6 +15,8 @@
  */
 
 /**
+ * Configuration for Brave tracing.
+ *
  * @author graemerocher
  * @since 1.0
  */

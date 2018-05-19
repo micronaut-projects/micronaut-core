@@ -22,7 +22,7 @@ package io.micronaut.cli.profile.commands
  * @author Graeme Rocher
  * @since 1.0
  */
-class CreateProfileCommand extends CreateServiceCommand {
+class CreateProfileCommand extends CreateAppCommand {
     public static final String NAME = "create-profile"
 
     CreateProfileCommand() {

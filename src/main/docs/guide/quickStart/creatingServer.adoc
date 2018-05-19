@@ -6,7 +6,7 @@ The following command creates a new "Hello World" server application in Java wit
 
 [source,bash]
 ----
-$ mn create-service hello-world
+$ mn create-app hello-world
 ----
 
 TIP: You can supply `--build maven` if you wish to create a Maven based build instead

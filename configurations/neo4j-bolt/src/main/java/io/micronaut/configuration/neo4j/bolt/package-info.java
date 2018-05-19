@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
+ * Neo4j Configuration classes.
+ *
  * @author graemerocher
  * @since 1.0
  */
