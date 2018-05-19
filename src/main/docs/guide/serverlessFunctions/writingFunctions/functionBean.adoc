@@ -1,0 +1,41 @@
+
+NOTE: This section applies to Java & Kotlin functions - for functions written in Groovy, see <<groovyFunctions,Groovy Functions>>
+
+To write your function's behavior, annotate your class with the link:{api}/io/micronaut/function/executor/FunctionBean.html[FunctionBean] annotation. Your class must also implement Java's link:{javase}java/util/function/Supplier.html[Supplier] functional interface.
+
+.Example Java Function
+[source,java]
+----
+package example;
+
+import io.micronaut.function.FunctionBean;
+import java.util.function.Supplier;
+
+@FunctionBean("hello-world-java")
+public class HelloJavaFunction implements Supplier<String> {
+
+    @Override
+    public String get() { //<1>
+        return "Hello world!";
+    }
+}
+----
+<1> Override the `get` method of link:{javase}java/util/function/Supplier.html[Supplier] to return the response from your function.
+
+.Example Kotlin Function
+[source,kotlin]
+----
+package example
+
+import io.micronaut.function.FunctionBean
+import java.util.function.Supplier
+
+@FunctionBean("hello-world-kotlin")
+class HelloKotlinFunction : Supplier<String> {
+
+    override fun get(): String { //<1>
+        return "Hello world!"
+    }
+}
+----
+<1> Override the `get` method of link:{javase}java/util/function/Supplier.html[Supplier] to return the response from your function.
