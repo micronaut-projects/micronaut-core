@@ -14,12 +14,18 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
     public static final String LANG_FLAG = "lang"
     public static final String PROVIDER_FLAG = "provider"
+    public static final String TEST_FLAG = "test"
 
     protected static final List<String> LANG_OPTIONS = ["java", "groovy", "kotlin"]
     protected static final List<String> PROVIDER_OPTIONS = ["aws"]
+    protected static final List<String> TEST_OPTIONS = ["junit", "spock", "spek"]
 
     public static final String PROVIDER_DEFAULT = "aws"
     public static final String LANG_DEFAULT = "java"
+
+    protected String provider
+    protected String lang
+    protected String test
 
     CreateFunctionCommand() {
         description.description = "Creates a serverless function application"
@@ -32,6 +38,10 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
         if (flags.contains(PROVIDER_FLAG)) {
             description.flag(name: PROVIDER_FLAG, description: "Which cloud provider to use. Possible values: ${PROVIDER_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
+        }
+
+        if (flags.contains(TEST_FLAG)) {
+            description.flag(name: TEST_FLAG, description: "Which test framework to use. Possible values: ${TEST_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
     }
 
@@ -49,7 +59,7 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
     @Override
     protected List<String> getFlags() {
-        [INPLACE_FLAG, BUILD_FLAG, FEATURES_FLAG, LANG_FLAG, PROVIDER_FLAG]
+        [INPLACE_FLAG, BUILD_FLAG, FEATURES_FLAG, LANG_FLAG, TEST_FLAG, PROVIDER_FLAG]
     }
 
     @Override
@@ -76,10 +86,13 @@ class CreateFunctionCommand extends CreateServiceCommand {
 
         final String functionProfile = evaluateProfileName(commandLine)
         final String langFeature = evaluateLangFeature(commandLine, functionProfile)
+        final String testFeature = evaluateTestFeature(commandLine)
+
+        checkInvalidSelections(executionContext, langFeature, testFeature)
 
         final List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        List<String> features = [langFeature]
-        if(commandLineFeatures) features.addAll(commandLineFeatures)
+        List<String> features = [langFeature, testFeature]
+        if (commandLineFeatures) features.addAll(commandLineFeatures)
 
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
         final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
@@ -99,11 +112,55 @@ class CreateFunctionCommand extends CreateServiceCommand {
     }
 
     @Override
-    protected String evaluateProfileName(CommandLine mainCommandLine) {
-        "function-${mainCommandLine.optionValue(PROVIDER_FLAG) ?: PROVIDER_DEFAULT}"
+    protected String evaluateProfileName(CommandLine commandLine) {
+        "function-${resolveProvider(commandLine)}"
     }
 
     protected String evaluateLangFeature(CommandLine commandLine, String profile) {
-        "${profile}-${commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT}"
+        "${profile}-${resolveLang(commandLine)}"
+    }
+
+    protected String evaluateTestFeature(CommandLine commandLine) {
+        "test-${resolveProvider(commandLine)}-${resolveTest(commandLine)}"
+    }
+
+    protected String resolveProvider(CommandLine commandLine) {
+        if(!provider) provider = commandLine.optionValue(PROVIDER_FLAG) ?: PROVIDER_DEFAULT
+        provider
+    }
+
+    protected String resolveLang(CommandLine commandLine) {
+        if(!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
+        lang
+    }
+
+    protected String resolveTest(CommandLine commandLine) {
+        if(!test) test = commandLine.optionValue(TEST_FLAG) ?: defaultTestFeature(resolveLang(commandLine))
+        test
+    }
+
+    protected static String defaultTestFeature(lang) {
+        String testFeature
+        switch (lang) {
+            case "java":
+                testFeature = "junit"
+                break
+            case "groovy":
+                testFeature = "spock"
+                break
+            case "kotlin":
+                testFeature = "spek"
+                break
+            default:
+                testFeature = "junit"
+        }
+
+        testFeature
+    }
+
+    protected void checkInvalidSelections(ExecutionContext executionContext, String langFeature, String testFeature) {
+        if(langFeature.contains("kotlin") && !testFeature.contains("spek")) {
+            executionContext.console.warn("Kotlin project may not support your chosen test framework")
+        }
     }
 }
