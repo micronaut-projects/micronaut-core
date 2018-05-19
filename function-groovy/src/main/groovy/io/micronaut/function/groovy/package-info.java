@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * <p>Support classes that simplify writing standalone functions as Groovy scripts</p>.
  *

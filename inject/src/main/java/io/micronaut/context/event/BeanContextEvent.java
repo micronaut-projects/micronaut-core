@@ -26,7 +26,7 @@ import java.util.EventObject;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class BeanContextEvent extends EventObject {
+public abstract class BeanContextEvent extends ApplicationEvent {
 
     /**
      * Constructs a prototypical Event.
