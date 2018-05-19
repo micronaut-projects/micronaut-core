@@ -1,6 +1,6 @@
 Java data sources can be configured for one of three currently provided implementations. Apache DBCP2, Hikari, and Tomcat are supported by default.
 
-==== Configuring a JDBC DataSource
+== Configuring a JDBC DataSource
 
 To get started, simply add a dependency to one of the JDBC configurations that corresponds to the implementation you would like to use.
 
@@ -23,7 +23,7 @@ You also need to add a JDBC driver dependency to your classpath. For example to 
 runtime "com.h2database:h2:1.4.196"
 ----
 
-==== Configuring JDBC Connection Pools
+== Configuring JDBC Connection Pools
 
 All of the implementation specific parameters can be configured. Effort was made to allow basic configuration to be consistent across the implementations.
 
@@ -72,7 +72,7 @@ For a list of other properties able to be configured, simply refer to the implem
 |Apache DBCP |link:http://commons.apache.org/proper/commons-dbcp/api-2.1.1/org/apache/commons/dbcp2/BasicDataSource.html[BasicDataSource]
 |=======
 
-==== Configuring Multiple Data Sources
+== Configuring Multiple Data Sources
 
 To register more than one data source, simply configure them under different names.
 
@@ -94,7 +94,7 @@ When injecting link:{javase}javax/sql/DataSource.html[DataSource] beans, the one
 @Inject @Named("warehouse") DataSource dataSource // "warehouse" will be injected
 ----
 
-==== JDBC Health Checks
+== JDBC Health Checks
 
 Once you have configured a JDBC `DataSource` the api:management.health.indicator.jdbc.JdbcIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the JDBC connection.
 

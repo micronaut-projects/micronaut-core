@@ -15,7 +15,7 @@ Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") re
 
 |===
 
-=== Read Methods
+== Read Methods
 
 Annotating a method with the api:management.endpoint.Read[] annotation will cause it to respond to `GET` requests.
 [source,groovy]
@@ -68,7 +68,7 @@ the_date_is: Fri May 11 19:24:21 CDT
 ----
 
 
-=== Write Methods
+== Write Methods
 
 Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
 [source,groovy]
@@ -122,7 +122,7 @@ Message updated
 ----
 
 
-=== Delete Methods
+== Delete Methods
 
 Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
 

@@ -1,6 +1,6 @@
 The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation used in the previous section is one of link:{api}/io/micronaut/web/router/annotation/package-summary.html[several annotations] that allow you to control the construction of HTTP routes.
 
-=== URI Paths
+== URI Paths
 
 In the previous example a value of `/hello` was specified as the path to the controller. If no value is specified to the `@Controller` action then the URI is formulated from the class name.
 
@@ -31,7 +31,7 @@ The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc65
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 
-=== URI Variables
+== URI Variables
 
 URI variables can be referenced via method arguments. For example:
 
@@ -109,7 +109,7 @@ The following table provides some examples of URI templates and what they match:
 
 |===
 
-=== Routing Annotations
+== Routing Annotations
 
 The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation to add method that accepted HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] requests. The following tables summarizes the available annotations and how they map to the different HTTP methods:
 
@@ -159,7 +159,7 @@ String hello() {
 }
 ----
 
-=== Building Routes Programmatically
+== Building Routes Programmatically
 
 If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 

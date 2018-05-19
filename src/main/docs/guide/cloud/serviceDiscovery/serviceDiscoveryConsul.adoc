@@ -1,6 +1,6 @@
 https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native non-blocking api:discovery.consul.client.v1.ConsulClient[] that is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
-==== Starting Consul
+== Starting Consul
 
 The quickest way to start using Consul is via Docker:
 
@@ -12,7 +12,7 @@ docker run -p 8500:8500 consul
 
 Alternatively you can https://www.consul.io/docs/install/index.html[install and run a local Consul instance].
 
-==== Auto Registering with Consul
+== Auto Registering with Consul
 
 To register a Micronaut application with Consul simply add the necessary api:discovery.consul.ConsulConfiguration[]. A minimal example can be seen below:
 
@@ -38,7 +38,7 @@ NOTE: You could also simply set `consul.client.host` and `consul.client.port`, h
 
 By default registering with Consul is disabled hence you should set `consul.client.registration.enabled` to `true`. Note that you may wish to do this only in your production configuration.
 
-==== Customizing Consul Service Registration
+== Customizing Consul Service Registration
 
 The api:discovery.consul.ConsulConfiguration[] class features a range of customization options for altering how an instance registers with Consul. You can customize the tags, the retry attempts, the fail fast behaviour and so on.
 
@@ -67,7 +67,7 @@ consul:
     defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
 ----
 
-==== Discovery Services from Consul
+== Discovery Services from Consul
 
 To discovery other services you could manually interact with the api:discovery.DiscoveryClient[], however typically instead you use the <<clientAnnotation, Client Annotation>> to declare how an HTTP client maps to a service.
 
@@ -94,8 +94,7 @@ Alternatively you can also use ann:http.client.Client[] as a qualifer to `@Injec
 RxHttpClient httpClient;
 ----
 
-
-==== Consul Health Checks
+== Consul Health Checks
 
 By default when registering with Consul Micronaut will register a https://www.consul.io/docs/agent/checks.html[TTL check]. A TTL check basically means that if the application does not send a heartbeat back to Consul after a period of time the service is put in a failing state.
 

@@ -2,7 +2,7 @@ In distributed systems and Microservice environments, failure is something you h
 
 With this in mind Micronaut comes with a api:retry.annotation.Retryable[] annotation out of the box that is integrated into the container.
 
-=== Simple Retry
+== Simple Retry
 
 The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with a delay of 1 second between each retry.
 
@@ -44,7 +44,7 @@ include::{testsuite}/aop/retry/BookService.java[tags=config, indent=0]
 
 With the above in place if `book.retry.attempts` is specified in configuration it wil be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
 
-=== Reactive Retry
+== Reactive Retry
 
 `@Retryable` advice can also be applied to methods that return reactive types, such as an RxJava `Flowable`. For example:
 
@@ -59,7 +59,7 @@ include::{testsuite}/aop/retry/BookService.java[tags=reactive, indent=0]
 
 In this case `@Retryable` advice will apply the retry policy to the reactive type.
 
-=== Circuit Breaker
+== Circuit Breaker
 
 In a Microservice environment retry is useful, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
 
@@ -77,7 +77,7 @@ include::{testsuite}/aop/retry/BookService.java[tags=circuit, indent=0]
 
 The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
 
-=== Bean Creation Retry
+== Bean Creation Retry
 
 As mentioned previously, `@Retryable` advice is integrated right at the container level. This is useful as it is common problem in Microservices and environments like Docker where there may be a delay in services becoming available.
 
@@ -100,7 +100,7 @@ public class Neo4jDriverFactory {
 <2> The `@Retryable` annotation is used try catch `ServiceUnavailableException` and retry creating the driver before failing startup.
 
 
-=== Retry Events
+== Retry Events
 
 You can register api:retry.event.RetryEventListener[] instances as beans in order to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
 
