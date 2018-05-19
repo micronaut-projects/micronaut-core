@@ -2,7 +2,7 @@ The health endpoint returns information about the "health" of the application. T
 
 To execute the health endpoint, send a GET request to /health.
 
-=== Configuration
+== Configuration
 
 To configure the health endpoint, supply configuration through `endpoints.health`.
 
@@ -16,7 +16,7 @@ endpoints:
         id: String
 ----
 
-=== Customization
+== Customization
 
 The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements link:{api}/io/micronaut/management/health/indicator/HealthIndicator.html[HealthIndicator]. A base class link:{api}/io/micronaut/management/health/indicator/AbstractHealthIndicator.html[AbstractHealthIndicator] has been provided for you to extend to make the process easier.
 
@@ -33,9 +33,9 @@ The default health aggregator returns an overall status that is calculated based
 
 The "worst" status will be returned as the overall status. A non operational status will be selected over an operational status. A higher severity will be selected over a lower severity.
 
-=== Provided Indicators
+== Provided Indicators
 
-==== Disk Space
+=== Disk Space
 
 A health indicator is provided that determines the health of the application based on the amount of free disk space. Configuration for the disk space health indicator can be provided under the `endpoints.health.disk-space` key.
 
@@ -52,6 +52,6 @@ endpoints:
 
 The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.
 
-==== JDBC
+=== JDBC
 
 The JDBC health indicator determines the health of your application based on the ability to successfully create connections to datasources in the application context. The only configuration option supported is to enable or disable the indicator by the `endpoints.health.jdbc.enabled` key.

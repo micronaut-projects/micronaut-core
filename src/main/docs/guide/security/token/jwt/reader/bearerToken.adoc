@@ -14,7 +14,7 @@ It is enabled by default but requires JWT Authentication to be enabled.
 
 |===
 
-=== Sending tokens in the request
+== Sending tokens in the request
 
 The token can be sent in the `Authorization` request header:
 

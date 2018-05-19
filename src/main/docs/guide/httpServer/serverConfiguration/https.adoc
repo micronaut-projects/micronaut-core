@@ -19,7 +19,7 @@ WARNING: Keep in mind that this configuration will generate a warning on the bro
 image::https-warning.jpg[]
 
 
-=== Using a valid x509 certificate
+== Using a valid x509 certificate
 
 It is also possible to configure Micronaut to use an existing valid x509 certificate, for example one created with
 https://letsencrypt.org/[Let's Encrypt]. You will need the `server.crt` and `server.key` files and convert them to a
@@ -79,7 +79,7 @@ Now we can connect to `https://my-domain.org:8443`:
 image::https-valid-certificate.jpg[]
 
 
-=== Using Java Keystore (JKS)
+== Using Java Keystore (JKS)
 
 It is not recommended using this type of certificate because it is a proprietary format and it's better to use a PKCS12
 format. In any case Micronaut also supports it.

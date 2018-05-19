@@ -13,7 +13,7 @@ To enable tracing you should add the `tracing` module to your `build.gradle` or 
 compile "io.micronaut:tracing"
 ----
 
-==== Tracing Annotations
+== Tracing Annotations
 
 The pkg:tracing.annotation[] package contains annotations that can be declared on methods to create new spans or continue existing spans.
 
@@ -31,13 +31,13 @@ The following snippet presents an example of using the annotations:
 TODO
 ----
 
-==== Tracing Instrumentation
+== Tracing Instrumentation
 
 In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
 
 These instrumentations are found in the pkg:tracing.instrument[] package and include HTTP <<clientFilters, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
 
-==== Tracing Beans
+== Tracing Beans
 
 If the Tracing annotations and existing instrumentations are not enough, Micronaut's tracing integration registers a `io.opentracing.Tracer` bean that can be injected into any class and exposes the Open Tracing API.
 

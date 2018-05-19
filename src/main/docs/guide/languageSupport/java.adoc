@@ -2,7 +2,7 @@ For Java, Micronaut uses a Java api:annotation.processing.BeanDefinitionInjectPr
 
 The major advantage here is that you pay a slight cost at compile time, but at runtime Micronaut is largely reflection-free, fast and consumes very little memory.
 
-=== IDE Considerations
+== IDE Considerations
 
 You can use any IDE to develop Micronaut, if you depend on your configured build tool (Gradle or Maven) to build the application.
 
@@ -14,7 +14,7 @@ image::intellij-annotation-processors.png[Intellij Settings,1024,768]
 
 As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
 
-=== Retaining Parameter Names
+== Retaining Parameter Names
 
 By default with Java, the parameter name data for method parameters is not retained at compile time. This can be a problem for Micronaut if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
 

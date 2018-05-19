@@ -36,7 +36,7 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 
 |===
 
-=== Example of custom Endpoint
+== Example of custom Endpoint
 
 The following example `Endpoint` class will create an endpoint accessible at `/date`:
 

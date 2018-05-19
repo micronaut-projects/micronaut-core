@@ -1,6 +1,6 @@
 The http://groovy-lang.org[Groovy language] has first class support in Micronaut.
 
-=== Groovy Specific Modules
+== Groovy Specific Modules
 
 Additional modules exist specific to Groovy that improve the overall experience. These are detailed in the table below:
 
@@ -17,12 +17,11 @@ Additional modules exist specific to Groovy that improve the overall experience.
 |`io.micronaut:function-groovy`
 |Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
 
-
 |===
 
 The most common module you will need is `inject-groovy`, which enables DI and AOP for classes written in Groovy.
 
-=== Groovy Support in the CLI
+== Groovy Support in the CLI
 
 The <<cli, Command Line Interface>> for Micronaut also includes special support for Micronaut. To create Groovy application use the `groovy` feature. For example:
 
@@ -147,7 +146,7 @@ As you can see from the output from the CLI a http://spockframework.org[Spock] t
 
 Notice how you use Micronaut both as client and as a server to test itself.
 
-=== Programmatic Routes with GroovyRouterBuilder
+== Programmatic Routes with GroovyRouterBuilder
 
 If you prefer to build your routes programmatically (similar to Grails `UrlMappings`) then a special `io.micronaut.web.router.GroovyRouteBuilder` exists that has some enhancements to make the DSL better.
 
@@ -169,7 +168,7 @@ The above example results in the following routes:
 * `/book/{id}` - Maps to `BookController.show(String id)`
 * `/book/{id}/author` - Maps to `AuthorController.index`
 
-=== Using GORM in a Groovy application
+== Using GORM in a Groovy application
 
 http://gorm.grails.org[GORM] is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.
 
@@ -217,7 +216,7 @@ abstract class VehicleService {
 You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don't want to add your own behaviors.
 
 
-=== Serverless Functions with Groovy
+== Serverless Functions with Groovy
 
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.

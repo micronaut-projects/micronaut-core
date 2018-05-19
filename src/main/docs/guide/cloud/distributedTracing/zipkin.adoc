@@ -1,6 +1,6 @@
 https://zipkin.io[Zipkin] is a distributed tracing system. It helps gather timing data needed to troubleshoot latency problems in microservice architectures. It manages both the collection and lookup of this data.
 
-==== Running Zipkin
+== Running Zipkin
 
 The quickest way to get up and started with Zipkin is with Docker:
 
@@ -12,7 +12,7 @@ $ docker run -d -p 9411:9411 openzipkin/zipkin
 
 You can then open a browser tab to the location `http://localhost:9411` to view traces.
 
-==== Sending Traces to Zipkin
+== Sending Traces to Zipkin
 
 To send tracing spans to Zipkin the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
 
@@ -36,7 +36,7 @@ tracing:
 
 TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-app hello-world -features tracing-zipkin`
 
-==== Customizing the Zipkin Sender
+== Customizing the Zipkin Sender
 
 By default a api:tracing.brave.sender.HttpClientSender[] that sends Spans asynchronously using Micronaut's native HTTP client to `http://localhost:9411/api/v2/spans` will be configured.
 
@@ -57,7 +57,7 @@ TIP: In production, setting `TRACING_ZIPKIN_URLS` environment variable with a co
 
 Alternatively if you wish to use a different `zipkin2.reporter.Sender` implementation, you can simply define a bean that is of type `zipkin2.reporter.Sender` and it will be picked up.
 
-==== Zipkin Configuration
+== Zipkin Configuration
 
 There are many configuration options available for the Brave client that sends Spans to Zipkin and they are generally exposed via the api:tracing.brave.BraveTracerConfiguration[] class. You can refer to the javadoc for all the available options.
 
