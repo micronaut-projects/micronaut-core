@@ -1,6 +1,6 @@
 Micronaut supports the sending of files to the client in a couple of easy ways.
 
-=== Sending File Objects
+== Sending File Objects
 
 It is possible to simply return a jdk:java.io.File[] object from your controller method and the data will be returned to the client.
 
@@ -16,7 +16,7 @@ public AttachedFile download() {
 }
 ----
 
-=== Sending an InputStream
+== Sending an InputStream
 
 For cases where a reference to a `File` object is not possible (for example resources contained within JAR files), Micronaut supports transferring of input streams. To return a stream of data from the controller method, construct a api:http.server.types.files.StreamedFile[].
 

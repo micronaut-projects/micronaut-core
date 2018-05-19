@@ -2,13 +2,13 @@ https://github.com/Netflix/eureka[Netflix Eureka] is a popular discovery server 
 
 Micronaut features a native non-blocking api:discovery.eureka.client.v2.EurekaClient[] as part of the `discovery-client` module that does not require any additional third-party dependencies and is built using Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
-==== Starting Eureka
+== Starting Eureka
 
 The quickest was to start a Eureka server is to use to use https://spring.io/guides/gs/service-registration-and-discovery/#initial[Spring Boot's Eureka starters].
 
 NOTE: As of this writing the Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
 
-==== Auto Registering with Eureka
+== Auto Registering with Eureka
 
 The process to register a Micronaut application with Eureka is very similar to with Consul, as seen in the previous section, simply add the necessary api:discovery.eureka.EurekaConfiguration[]. A minimal example can be seen below:
 
@@ -25,7 +25,7 @@ eureka:
     defaultZone: "${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}"
 ----
 
-==== Customizing Service Registration
+== Customizing Service Registration
 
 You can customize various aspects of registration with Eureka using the api:discovery.eureka.EurekaConfiguration[]. Notice that `EurekaConfiguration` extends api:discovery.client.DiscoveryClientConfiguration[]  which in turn extends api:http.client.HttpClientConfiguration[] allowing you to customize the settings for the Eureka client, including read timeout, proxy configuration and so on.
 
@@ -45,7 +45,7 @@ eureka:
             foo: bar
 ----
 
-==== Eureka Basic Authentication
+== Eureka Basic Authentication
 
 You can customize the Eureka credentials in the URI you specify to in `defaultZone`.
 
@@ -61,7 +61,7 @@ eureka:
 
 The above example externalizes configuration of the username and password Eureka to environment variables called `EUREKA_USERNAME` and `EUREKA_PASSWORD`.
 
-==== Eureka Health Checks
+== Eureka Health Checks
 
 Like Consul, the api:discovery.eureka.registration.EurekaAutoRegistration[] will send api:health.HeartbeatEvent[] instances with the api:health.HealthStatus[] of the Micronaut application to Eureka.
 

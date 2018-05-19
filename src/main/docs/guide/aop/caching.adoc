@@ -4,7 +4,7 @@ The link:{api}/io/micronaut/cache/CacheManager.html[CacheManager] interface allo
 
 The link:{api}/io/micronaut/cache/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{api}/io/micronaut/cache/AsyncCache.html[AsyncCache] API allows non-blocking operation.
 
-=== Cache Annotations
+== Cache Annotations
 
 The following cache annotations are supported:
 
@@ -20,7 +20,7 @@ If the return type of the method is a non-blocking type (either link:{jdkapi}/ja
 In addition if the underlying Cache implementation supports non-blocking cache operations then cache values will be read from the cache without blocking, resulting in the ability to implement completely non-blocking cache operations.
 
 
-=== Configuring Caches
+== Configuring Caches
 
 By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache definitions which can be configured via application configuration. For example with `application.yml`:
 
@@ -35,7 +35,7 @@ micronaut:
 
 The above example will configure a cache called "myCache" with a maximum size of 20.
 
-=== Caching with Redis
+== Caching with Redis
 
 If you wish to use Redis to cache results then you need to add the Lettuce configuration to your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Micronaut provides an implementation that allows cached results to be read reactively. To configure the Lettuce configuration add the following dependency to your application:
 

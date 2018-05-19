@@ -13,7 +13,7 @@ When executed without a body, the endpoint will first refresh the link:{api}/io/
 $ curl -X POST http://localhost:8080/refresh -H 'Content-Type: application/json' -d '{"force": true}'
 ----
 
-=== Configuration
+== Configuration
 
 To configure the refresh endpoint, supply configuration through `endpoints.refresh`.
 

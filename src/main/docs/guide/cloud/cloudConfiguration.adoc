@@ -51,7 +51,7 @@ In addition, using the value of the constants defined in the table above you can
 TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
 
 
-==== Using Cloud Instance Metadata
+== Using Cloud Instance Metadata
 
 
 When Micronaut detects it is running on Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].

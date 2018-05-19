@@ -1,6 +1,6 @@
 https://www.jaegertracing.io[Jaeger] is a another distributed tracing system developed at Uber that is more or less the reference implementation for http://opentracing.io[Open Tracing].
 
-==== Running Jaeger
+== Running Jaeger
 
 The easiest way to get started with Jaeger is to run Jaeger via Docker:
 
@@ -22,7 +22,7 @@ You can then navigate to `http://localhost:16686` to access the Jaeger UI.
 
 See https://www.jaegertracing.io/docs/getting-started/[Getting Started with Jaeger] for more information.
 
-==== Sending Traces to Jaeger
+== Sending Traces to Jaeger
 
 To send tracing spans to Jaeger the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
 
@@ -47,7 +47,7 @@ By default Jaeger will be configured to send traces to a locally running Jaeger 
 TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-app hello-world -features tracing-jaeger`
 
 
-==== Jaeger Configuration
+== Jaeger Configuration
 
 There are many configuration options available for the Jaeger client that sends Spans to Jaeger and they are generally exposed via the api:tracing.jaeger.JaegerConfiguration[] class. You can refer to the javadoc for all the available options.
 
