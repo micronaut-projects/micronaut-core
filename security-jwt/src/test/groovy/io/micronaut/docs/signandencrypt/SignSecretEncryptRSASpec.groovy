@@ -38,8 +38,8 @@ import spock.lang.Specification
 
 class SignSecretEncryptRSASpec extends Specification implements AuthorizationUtils, YamlAsciidocTagCleaner {
 
-    String yamlConfig = '''\
-//tag::yamlconfig[]
+    String yamlConfig = """
+#tag::yamlconfig[]
 micronaut:
   security:
     enabled: true
@@ -48,9 +48,10 @@ micronaut:
         enabled: true
         signatures:
           secret:
-            generator:
-              secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa
-'''//end::yamlconfig[]
+            generator: 
+              secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa #<1>
+#end::yamlconfig[]
+"""
 
     @Shared
     File pemFile = new File('src/test/resources/rsa-2048bit-key-pair.pem')

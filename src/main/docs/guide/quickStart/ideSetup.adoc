@@ -16,7 +16,7 @@ public class Application {
 
 This is the class that is run when running the application via Gradle or via deployment. You can also run the main class directly within your IDE if it is configured correctly.
 
-==== Configuring IntelliJ IDEA
+== Configuring IntelliJ IDEA
 
 The recommended IDE to use for Micronaut is Intellij IDEA. To import a Micronaut project into IntelliJ IDEA simply open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
 
@@ -26,7 +26,7 @@ image::intellij-annotation-processors.png[Intellij Settings,1024,768]
 
 Once you have enabled annotation processing in IntelliJ you can run the application and tests directly within the IDE without the need of an external build tool such as Gradle or Maven.
 
-==== Configuring Eclipse IDE
+== Configuring Eclipse IDE
 
 If you have no choice and have to use Eclipse, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 

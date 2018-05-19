@@ -48,7 +48,7 @@ include::{testsclient}/basics/HelloControllerTest.java[tags=poststring, indent=0
 <2> The content type and accepted type are set to `text/plain` (the default content type is `application/json`)
 <3> The expected response type is a `String`
 
-==== Sending JSON
+== Sending JSON
 
 The previous example sends plain text, if you wish send JSON you can simply pass the object you wish to encode as JSON, whether that be a map or a POJO. As long as Jackson is able to encode it.
 
@@ -73,7 +73,7 @@ With the above example the following JSON will be sent as the body of the reques
 
 The JSON itself can be customized however you want using https://github.com/FasterXML/jackson-annotations[Jackson Annotations].
 
-==== Using a URI Template
+== Using a URI Template
 
 If some of the properties of the object need to be in the URI being posted to you can use a URI template.
 
@@ -87,7 +87,7 @@ include::{testsclient}/basics/BookControllerTest.java[tags=posturitemplate, inde
 
 In the above case the `title` property of the passed object will be included in the URI being posted to.
 
-==== Sending Form Data
+== Sending Form Data
 
 You can also encode a POJO or a map as regular form data instead of JSON. Just set the content type to `application/x-www-form-urlencoded` on the post request:
 

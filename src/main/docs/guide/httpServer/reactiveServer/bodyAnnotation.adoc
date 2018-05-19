@@ -31,6 +31,7 @@ include::{testsuite}/server/body/MessageController.java[tags=echoReactive, inden
 ----
 
 <1> In this case the method is altered to receive and return an RxJava 2.x `Flowable` type
-<2> The `collect` method is used to accumulate the data in this simulated example, but it could for example write the data to logging service, database or whatever chunk by chunk
-<3> A rx:Single[] is returned so that Micronaut will only emit the response once the operation completes without blocking.
+<2> A rx:Single[] is returned so that Micronaut will only emit the response once the operation completes without blocking.
+<3> The `collect` method is used to accumulate the data in this simulated example, but it could for example write the data to logging service, database or whatever chunk by chunk
+
 
