@@ -9,7 +9,7 @@ import io.micronaut.cli.profile.ExecutionContext
 import java.nio.file.Paths
 
 @CompileStatic
-class CreateFunctionCommand extends CreateServiceCommand {
+class CreateFunctionCommand extends CreateAppCommand {
     public static final String NAME = "create-function"
 
     public static final String LANG_FLAG = "lang"

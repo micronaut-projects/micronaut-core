@@ -96,11 +96,11 @@ mn [target] [arguments]*'
 
 '''
             console.addStatus("Examples:")
-            console.log('$ mn create-service my-service')
+            console.log('$ mn create-app my-app')
             console.log ''
             console.addStatus("Language support for Groovy and/or Kotlin can be enabled with the corresponding feature::")
-            console.log('$ mn create-service my-groovy-service -features=groovy')
-            console.log('$ mn create-service my-kotlin-service -features=kotlin')
+            console.log('$ mn create-app my-groovy-app -features=groovy')
+            console.log('$ mn create-app my-kotlin-app -features=kotlin')
             console.log ''
             console.addStatus('Available Commands (type mn help \'command-name\' for more info):')
             console.addStatus("${'Command Name'.padRight(37)} Command Description")
