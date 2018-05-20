@@ -1,4 +1,8 @@
-You can read a JWT token from a Cookie too.
+You can send/read a JWT token from a Cookie too.
+
+The next sequence illustrates the authentication flow:
+
+image::jwt-cookie.svg[]
 
 Reading tokens from Cookies is disabled by default. Note that using JWT tokens from cookies requires JWT Authentication to be enabled.
 

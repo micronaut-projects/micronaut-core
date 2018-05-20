@@ -7,6 +7,10 @@ Basic Auth is enabled by default. Once you enable Micronaut security:
 include::{testssecurity}/security/token/basicauth/BasicAuthSpec.groovy[tag=yamlconfig,indent=0]
 ----
 
+The next sequence illustrates the authentication flow:
+
+image::basicauth.svg[]
+
 You can access a resource:
 
 [source, bash]

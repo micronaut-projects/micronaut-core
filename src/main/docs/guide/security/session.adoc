@@ -1,5 +1,9 @@
 Micronaut supports Session based authentication.
 
+The next sequence illustrates the authentication flow:
+
+image::sesssion_based_auth.svg[]
+
 |===
 
 | Configuration Property | Default Value | Description

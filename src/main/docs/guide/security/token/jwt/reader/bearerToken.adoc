@@ -2,6 +2,10 @@ Micronaut supports https://tools.ietf.org/html/rfc6750[RFC 6750 Bearer Token] sp
 
 It is enabled by default but requires JWT Authentication to be enabled.
 
+The next sequence illustrates the authentication flow:
+
+image::jwt-bearer-token.svg[]
+
 |===
 
 | Configuration Property | Default Value | Description
