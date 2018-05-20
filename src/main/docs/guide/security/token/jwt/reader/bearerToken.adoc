@@ -22,6 +22,6 @@ The token can be sent in the `Authorization` request header:
 .Accessing a protected resource using Authorization request header
 ----
 GET /protectedResource HTTP/1.1
-Host: server.example.com
+Host: micronaut.example
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MjI5OTU5MjIsInN1YiI6ImppbWkiLCJyb2xlcyI6WyJST0xFX0FETUlOIiwiUk9MRV9VU0VSIl0sImlhdCI6MTQyMjk5MjMyMn0.rA7A2Gwt14LaYMpxNRtrCdO24RGrfHtZXY9fIjV8x8o
 ----
