@@ -43,11 +43,11 @@ class CassandraConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['cassandra.primary.clusterName': "ociCluster",
-                 'cassandra.primary.contactPoint': "127.0.0.1",
-                 'cassandra.primary.port': 9042,
-                 'cassandra.primary.maxSchemaAgreementWaitSeconds': 20,
-                 'cassandra.primary.ssl': true]
+                ['cassandra.default.clusterName': "ociCluster",
+                 'cassandra.default.contactPoint': "127.0.0.1",
+                 'cassandra.default.port': 9042,
+                 'cassandra.default.maxSchemaAgreementWaitSeconds': 20,
+                 'cassandra.default.ssl': true]
         ))
         applicationContext.start()
         // end::single[]
@@ -78,8 +78,8 @@ class CassandraConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['cassandra.primary.contactPoint': "127.0.0.1",
-                 'cassandra.primary.port': 9042,
+                ['cassandra.default.contactPoint': "127.0.0.1",
+                 'cassandra.default.port': 9042,
                  'cassandra.secondary.contactPoint': "127.0.0.2",
                  'cassandra.secondary.port': 9043]
         ))
@@ -87,14 +87,14 @@ class CassandraConfigurationSpec extends Specification {
         // end::multiple[]
 
         when:
-        Cluster primaryCluster = applicationContext.getBean(Cluster, Qualifiers.byName("primary"))
+        Cluster defaultCluster = applicationContext.getBean(Cluster)
         Cluster secondaryCluster = applicationContext.getBean(Cluster, Qualifiers.byName("secondary"))
-        List<InetSocketAddress> primaryInetSocketAddresses = primaryCluster.manager.contactPoints
+        List<InetSocketAddress> defaultInetSocketAddresses = defaultCluster.manager.contactPoints
         List<InetSocketAddress> secondaryInetSocketAddresses = secondaryCluster.manager.contactPoints
 
         then:
-        primaryInetSocketAddresses[0].getHostName() == "127.0.0.1"
-        primaryInetSocketAddresses[0].getPort() == 9042
+        defaultInetSocketAddresses[0].getHostName() == "127.0.0.1"
+        defaultInetSocketAddresses[0].getPort() == 9042
 
         secondaryInetSocketAddresses[0].getHostName() == "127.0.0.2"
         secondaryInetSocketAddresses[0].getPort() == 9043
