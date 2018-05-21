@@ -27,11 +27,11 @@ The following configuration properties are available to customize JWT based auth
 
 See the javadoc for api:security.token.jwt.config.JwtConfigurationProperties[] and api:security.token.config.TokenConfigurationProperties[] for more information.
 
-==== What does a JWT look like?
+== What does a JWT look like?
 
 image::jwt.png[]
 
-=====  Header
+===  Header
 
 A base64-encoded JSON like:
 
@@ -44,7 +44,7 @@ A base64-encoded JSON like:
 }
 ----
 
-===== Claims
+=== Claims
 
 A base64-encoded JSON like:
 
@@ -62,6 +62,6 @@ A base64-encoded JSON like:
 }
 ----
 
-===== Signature
+=== Signature
 
 Depends on the algorithm specified on the header, it can be a digital signature of the base64-encoded header and claims, or an encryption of them.

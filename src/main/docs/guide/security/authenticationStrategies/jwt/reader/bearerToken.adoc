@@ -22,7 +22,7 @@ The following configuration properties are available to customize Bearer Token r
 
 See the javadoc for api:security.token.jwt.bearer.BearerTokenConfigurationProperties[] for more information.
 
-==== Sending tokens in the request
+== Sending tokens in the request
 
 The following code snippet illustrates how to send a JWT token in the `Authorization` request header:
 
