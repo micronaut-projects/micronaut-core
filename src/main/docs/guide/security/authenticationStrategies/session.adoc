@@ -1,10 +1,10 @@
 Micronaut supports Session based authentication.
 
-The next sequence illustrates the authentication flow:
+The following sequence illustrates the authentication flow:
 
 image::sesssion_based_auth.svg[]
 
-The next configuration properties are available to customize session based authentication behaviour:
+The following configuration properties are available to customize session based authentication behaviour:
 
 |===
 
@@ -24,7 +24,9 @@ The next configuration properties are available to customize session based authe
 
 |===
 
-== Example of Session-Based Authentication configuration
+See the api:security.session.SecuritySessionConfigurationProperties[] javadoc for more information.
+
+==== Example of Session-Based Authentication configuration
 
 [source, yaml]
 ----

@@ -11,7 +11,7 @@ You can enable `LoginController` with configuration property:
 
 The response of the Login Endpoint is handled by a bean instance of link:{api}/io/micronaut/security/handlers/LoginHandler.html[LoginHandler].
 
-== Login Endpoint invocation example
+==== Login Endpoint invocation example
 
 [source, bash]
 .Login Endpoint invocation example
