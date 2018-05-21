@@ -23,27 +23,29 @@ import io.micronaut.security.Secured
 import io.micronaut.security.authentication.Authentication
 import io.micronaut.security.rules.SecurityRule
 
+// Although, it is a Groovy Class is written as Java syntax as possible to embedded in the docs
+
 @Requires(property = 'spec.name', value = 'docsecured')
 //tag::exampleControllerPlusImports[]
 @Controller("/example")
 @Secured(SecurityRule.IS_AUTHENTICATED) // <1>
-class ExampleController {
+public class ExampleController {
 
     @Get("/admin")
     @Secured(["ROLE_ADMIN", "ROLE_X"]) // <2>
-    String withroles() {
-        "You have ROLE_ADMIN or ROLE_X roles"
+    public String withroles() {
+        return "You have ROLE_ADMIN or ROLE_X roles";
     }
 
     @Get('/anonymous')
     @Secured(SecurityRule.IS_ANONYMOUS)  // <3>
-    String anonymous() {
-        "You are anonymous"
+    public String anonymous() {
+        return "You are anonymous";
     }
 
     @Get("/authenticated") // <1>
-    String authenticated(Authentication authentication) {
-        "${authentication.name} is authenticated"
+    public String authenticated(Authentication authentication) {
+        return "${authentication.name} is authenticated";
     }
 }
 //end::exampleControllerPlusImports[]

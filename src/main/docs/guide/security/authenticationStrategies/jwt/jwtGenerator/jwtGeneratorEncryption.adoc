@@ -6,7 +6,7 @@ To enable a JWT encryption in token generation, you need to have in your app a b
 link:{api}/io/micronaut/security/token/jwt/encryption/ec/ECEncryptionConfiguration.html[ECEncryptionConfiguration],
 link:{api}/io/micronaut/security/token/jwt/encryption/secret/SecretEncryptionConfiguration.html[SecretEncryptionConfiguration] qualified with name `generator`.
 
-== Example of JWT Signed with Secret and Encrypted with RSA
+==== Example of JWT Signed with Secret and Encrypted with RSA
 
 Setup a link:{api}/io/micronaut/security/token/jwt/signature/secret/SecretSignatureConfiguration.html[SecretSignatureConfiguration] through configuration properties
 

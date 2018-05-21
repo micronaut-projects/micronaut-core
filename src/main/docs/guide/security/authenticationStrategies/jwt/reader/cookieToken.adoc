@@ -1,4 +1,8 @@
-You can read a JWT token from a Cookie too.
+You can send/read a JWT token from a Cookie too.
+
+The following sequence illustrates the authentication flow:
+
+image::jwt-cookie.svg[]
 
 Reading tokens from Cookies is disabled by default. Note that using JWT tokens from cookies requires JWT Authentication to be enabled.
 
@@ -17,3 +21,5 @@ Reading tokens from Cookies is disabled by default. Note that using JWT tokens f
 | `micronaut.security.token.jwt.cookie.loginFailureTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after a failed login.
 
 |===
+
+See the javadoc for api:security.token.jwt.cookie.JwtCookieConfigurationProperties[] for more information.

@@ -1,5 +1,19 @@
 Micronaut supports Session based authentication.
 
+To use the Micronaut's session based authentication capabilities you must have the `security-session` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:security-session"
+----
+
+The following sequence illustrates the authentication flow:
+
+image::sesssion_based_auth.svg[]
+
+The following configuration properties are available to customize session based authentication behaviour:
+
 |===
 
 | Configuration Property | Default Value | Description
@@ -18,7 +32,9 @@ Micronaut supports Session based authentication.
 
 |===
 
-== Example of Session-Based Authentication configuration
+See the api:security.session.SecuritySessionConfigurationProperties[] javadoc for more information.
+
+==== Example of Session-Based Authentication configuration
 
 [source, yaml]
 ----

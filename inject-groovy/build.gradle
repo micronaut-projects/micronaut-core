@@ -35,6 +35,7 @@ shadowJar {
         exclude(project(":core"))
 
         exclude(dependency(dependencyVersion("slf4j")))
+        exclude(dependency(dependencyVersion("snakeyaml")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))

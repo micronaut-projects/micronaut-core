@@ -381,7 +381,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     boolean handle(ExecutionContext executionContext) {
         CommandLine commandLine = executionContext.commandLine
 
-        String profileName = (commandLine)
+        String profileName = evaluateProfileName(commandLine)
 
         List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
@@ -647,6 +647,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         variables['project.className'] = projectClassName
         variables['project.naturalName'] = NameUtils.getNaturalName(projectClassName)
         variables['project.name'] = NameUtils.getScriptName(projectClassName)
+        variables['project.propertyName'] = NameUtils.getPropertyName(projectClassName)
         variables['profile'] = profileName
         variables['version'] = micronautVersion
         variables['app.name'] = appname
