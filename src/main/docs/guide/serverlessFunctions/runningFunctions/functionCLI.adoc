@@ -1,0 +1,7 @@
+
+Package with shadowJar
+
+java -jar -d pass in data
+
+
+
