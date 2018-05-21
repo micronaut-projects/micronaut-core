@@ -1,6 +1,6 @@
-Out-of-the-box, Micronaut supports https://tools.ietf.org/html/rfc7617[RFC7617] defines the "Basic" Hypertext Transfer Protocol (HTTP) authentication scheme, which transmits credentials as user-id/password pairs, encoded using Base64.
+Out-of-the-box, Micronaut supports https://tools.ietf.org/html/rfc7617[RFC7617] which defines the "Basic" Hypertext Transfer Protocol (HTTP) authentication scheme, which transmits credentials as user-id/password pairs, encoded using Base64.
 
-Basic Auth is enabled by default. Once you enable Micronaut security:
+Once you enable Micronaut security, Basic Auth is enabled by default.
 
 [source, yaml]
 ----
@@ -11,21 +11,19 @@ The next sequence illustrates the authentication flow:
 
 image::basicauth.svg[]
 
-You can access a resource:
+Next is a sample of a cURL command using basic auth:
 
 [source, bash]
 .cURL command using Basic Auth
 ----
-curl "http://localhost:8080/health" \
+curl "http://localhost:8080/info" \
      -u 'user:password'
 ----
 
 After credentials are read from the HTTP Header, they are feed into an link:{api}/io/micronaut/security/authentication/Authenticator.html[Authenticator]
 which attempts to validate them.
 
-See sections below to learn how to customize authentication behaviour.
-
-The next configuration properties are available:
+The next configuration properties are available to customize basic authentication behaviour:
 
 |===
 

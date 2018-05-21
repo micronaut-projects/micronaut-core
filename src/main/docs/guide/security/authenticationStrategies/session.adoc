@@ -4,6 +4,8 @@ The next sequence illustrates the authentication flow:
 
 image::sesssion_based_auth.svg[]
 
+The next configuration properties are available to customize session based authentication behaviour:
+
 |===
 
 | Configuration Property | Default Value | Description
