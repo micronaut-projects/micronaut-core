@@ -1,130 +1,23 @@
-# Micronaut Requirements
+# Micronaut ROADMAP
 
-## Minimum Feature Set
+## Micronaut 1.0 GA
 
-The following features are a TODO list of things to do on Micronaut before launching
-
-### Core Features
-
-#### Documentation Generation
-
-- We should generate asciidoc documentation for @ConfigurationProperties
-- Add generic annotated type visitor API to allow generating OpenAPI doc
-
-#### Aspect Implementations
-
-We need to implement AOP annotations for:
-
-- Spring @Transactional
-
-### Configuration Sharing
-
-Need a mechanism for configuration discovery and sharing across the federation. Configuration sharing should initially support:
-
-* AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
-
-### Auto Configurations and Health Checks
-
-We still need auto-configurations for the following:
-
-* Apache Kafka (ivan)
-* Cassandra (nero)
-* RabbitMQ (ben)
-
-### Security / JWT Token Solution
-
-Need to implement support for JWT token based authorization
-
-### Management Features
-
-Tasks to complete:
-
-- Endpoints shouldn't be exposed to the web by default
-- Integrate Endpoints with Security solution above such that @Endpoint.defaultSensitive is honoured
-- Add support for JMX
-
-#### Endpoints
-
-We need endpoints for managing and/or exposing information about:
-
-- logging
-
-These should be built on the `Endpoint` API.
-
-### HTTP Server
-
-#### Content Negotiation
-
-Content negotiation must be supported
-
-#### WebSocket Support
-
-WebSocket Support must be implemented
-
-### HTTP Client
-
-* Connection Pooling
-* Server Sent Events
-* CONTINUE request handling
-
-#### Distributed Tracing
-
-Built in distributed tracing should be activated by default and allow integration with third-party tools (zipkin, opentracing etc.).
-
-#### Metrics
-
-Built in metrics support on-top of Micro Meter (jack)
-
-#### File Upload Features
-
-* Add support for @Size on blocking types that receive multipart data. Should override the global setting
-* Support multiple form data parts with the same name
+- Support for OpenAPI doc generated at compile time
+- Support for Kafka Stream applications
+- Support for Cassandra
+- AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
+- Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
+- JMX Support in Endpoints
+- WebSocket Support
+- Micro Meter Support
 
 
-### CLI
-
-#### Profiles
-  - Function/Lambda (serverless)
-
-#### Features
-  - Http Client
-  - Tracing
-  - Mongodb
-  - GORM
-  
-#### Commands
-  - Create Controller
-  - Create Test
-  - Create Job (@Scheduled)
-
-## POST 1.0 Items
+## Micronaut 2.0
 
 The following items are postponed until after 1.0
 
-### HTTP/2 Support
-
-* The HTTP server should support HTTP/2
-
-### Configuration Sharing
-
-* Google Cloud Runtime Configurator (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
-
-
-### Service Discovery
-
-* Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
-* Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
-
-### HTTP Gateway
-
-An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client. The gateway need to be responsible for:
-
-- JWT Token based authentication
-- Load Balancing
-- Starting Distributed Tracing
-- Retry
-- Rate limiting
-- Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
-- Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
+- HTTP/2 Support
+- Google Cloud Runtime Configurator (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
+- Micronaut-based Service Gateway
 
 
