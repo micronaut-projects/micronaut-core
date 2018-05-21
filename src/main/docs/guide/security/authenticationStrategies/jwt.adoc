@@ -1,11 +1,15 @@
 Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
 JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
 
+The next configuration properties are available to customize JWT based authentication behaviour:
+
 |===
 
 | Configuration Property | Default Value | Description
 
 | `micronaut.security.token.jwt.enabled` | `false` |  You can enable JWT capabilities by enabling this property.
+
+| `micronaut.security.token.rolesName` | `roles` | Default roles claim name
 
 | `micronaut.security.token.defaultExpiration` |  `3600` | Access token expiration time in seconds
 

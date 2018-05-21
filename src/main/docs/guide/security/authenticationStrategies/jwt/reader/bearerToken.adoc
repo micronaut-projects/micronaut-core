@@ -6,6 +6,8 @@ The next sequence illustrates the authentication flow:
 
 image::jwt-bearer-token.svg[]
 
+The next configuration properties are available to customize Bearer Token read:
+
 |===
 
 | Configuration Property | Default Value | Description
@@ -20,7 +22,7 @@ image::jwt-bearer-token.svg[]
 
 == Sending tokens in the request
 
-The token can be sent in the `Authorization` request header:
+The next code snippet illustrates how to send a JWT token in the `Authorization` request header:
 
 [source, bash]
 .Accessing a protected resource using Authorization request header

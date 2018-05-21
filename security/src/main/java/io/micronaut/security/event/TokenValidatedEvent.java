@@ -29,7 +29,7 @@ public class TokenValidatedEvent extends ApplicationEvent {
     /**
      * Triggered when a token is validated.
      *
-     * @param source The object on which the Event initially occurred.
+     * @param source A String containing the token being validated.
      * @throws IllegalArgumentException if source is null.
      */
     public TokenValidatedEvent(Object source) {

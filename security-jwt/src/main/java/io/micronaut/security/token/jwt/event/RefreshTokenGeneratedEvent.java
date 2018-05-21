@@ -29,7 +29,7 @@ public class RefreshTokenGeneratedEvent extends ApplicationEvent {
     /**
      * Triggered when a JWT refresh token is generated.
      *
-     * @param source The object on which the Event initially occurred.
+     * @param source A String with the JWT refresh token generated.
      * @throws IllegalArgumentException if source is null.
      */
     public RefreshTokenGeneratedEvent(Object source) {

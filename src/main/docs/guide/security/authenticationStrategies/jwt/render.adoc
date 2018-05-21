@@ -1,4 +1,4 @@
-When you use JWT authentication and the built-in `LoginController` (see section below),
+When you use JWT authentication and the built-in <<login, LoginController>>,
 the JWT tokens are returned to the client as part of an OAuth 2.0 https://tools.ietf.org/html/RFC6749[RFC6749] access token response.
 
 An example of such a response is:
@@ -20,5 +20,3 @@ Pragma: no-cache
     ],
 }
 ----
-
-You can implement your own link:{api}/io/micronaut/security/token/jwt/render/TokenRenderer.html[TokenRenderer].
