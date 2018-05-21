@@ -647,6 +647,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         variables['project.className'] = projectClassName
         variables['project.naturalName'] = NameUtils.getNaturalName(projectClassName)
         variables['project.name'] = NameUtils.getScriptName(projectClassName)
+        variables['project.propertyName'] = NameUtils.getPropertyName(projectClassName)
         variables['profile'] = profileName
         variables['version'] = micronautVersion
         variables['app.name'] = appname
