@@ -8,7 +8,7 @@ To get started writing serverless function you must add the appropriate Micronau
 | `io.micronaut:function-aws`
 |===
 
-NOTE: If you are using Groovy, there is a single compile-time dependency to be added: `"io.micronaut:function-groovy"` Please refer to the section on *Groovy Functions*.
+NOTE: If you are using Groovy, there is a single compile-time dependency to be added: `"io.micronaut:function-groovy"` Please see <<groovyFunctions,Groovy Functions>>.
 
 Add the appropriate dependency to your project, For example, in `build.gradle`:
 

@@ -1,1 +1,13 @@
 TODO
+
+
+config behavior while running in AWS
+
+application-aws.yml
+
+Add AWS endpoints to functions
+
+see config in function-client tests
+
+
+Functions will attempt to auto discover provider functions, otherwise fall back to discovery client

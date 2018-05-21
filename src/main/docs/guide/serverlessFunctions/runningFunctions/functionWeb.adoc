@@ -1,0 +1,14 @@
+To run your function as a web application as described in this section, you will need the `function-web` dependency on your classpath. For example, in `build.gradle`
+
+.build.gradle
+[source,groovy]
+----
+runtime "io.micronaut:function-web"
+----
+
+
+
+
+Function-web will allow you to run a function as a web app, register with consul if configured, access from function client. Function client will auto discover functions on consul run with function-web. Run functions locally and then deploy to cloud provider without changing client.
+
+Same in tests (use function-web as test dependency)
