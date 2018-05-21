@@ -2,11 +2,11 @@ Micronaut supports https://tools.ietf.org/html/rfc6750[RFC 6750 Bearer Token] sp
 
 It is enabled by default but requires JWT Authentication to be enabled.
 
-The next sequence illustrates the authentication flow:
+The following sequence illustrates the authentication flow:
 
 image::jwt-bearer-token.svg[]
 
-The next configuration properties are available to customize Bearer Token read:
+The following configuration properties are available to customize Bearer Token read:
 
 |===
 
@@ -20,9 +20,11 @@ The next configuration properties are available to customize Bearer Token read:
 
 |===
 
-== Sending tokens in the request
+See the javadoc for api:security.token.jwt.bearer.BearerTokenConfigurationProperties[] for more information.
 
-The next code snippet illustrates how to send a JWT token in the `Authorization` request header:
+==== Sending tokens in the request
+
+The following code snippet illustrates how to send a JWT token in the `Authorization` request header:
 
 [source, bash]
 .Accessing a protected resource using Authorization request header

@@ -1,6 +1,6 @@
 To authenticate users you must provide implementations of link:{api}/io/micronaut/security/authentication/AuthenticationProvider.html[AuthenticationProvider].
 
-The next code snippet illustrate a naive implementation:
+The following code snippet illustrates a naive implementation:
 
 [source, groovy]
 ----
