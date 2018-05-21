@@ -26,6 +26,42 @@ To build the documentation run `./gradlew publishGuide` or `./gradlew pG` then o
 - `micronaut-core$ cd cli/build/bin`
 - `micronaut-core/cli/build/bin$ ./mn`
 
+
+## Working on the code base
+
+If you are working with the IntelliJ IDEA development environment, you can import the project using the Intellij Gradle Tooling ( "File / Import Project" and select the "settings.gradle" file).
+
+To get a local development version of Micronaut working, first run the install task.
+
+```
+./gradlew install
+```
+
+Then install SDKman, which is the quickest way to set up a development environment.
+
+Once you have SDKman installed, point SDKman to your local development version of Micronaut.
+
+```
+sdk install micronaut dev /path/to/checkout
+sdk use micronaut dev
+```
+
+Now the "mn" command will be using your development version!
+
+The most important command you will have to run before sending your changes is the check command.
+
+./gradlew check
+
+For a successful contribution, all tests should be green!
+
+## Creating a pull request
+
+Once you are satisfied with your changes:
+
+- Commit your changes in your local branch
+- Push your changes to your remote branch on GitHub
+- Send us a (pull request)[https://help.github.com/articles/creating-a-pull-request]
+
 ## Checkstyle
 
 We want to keep the code clean, following good practices about organization, javadoc and style as much as possible. 

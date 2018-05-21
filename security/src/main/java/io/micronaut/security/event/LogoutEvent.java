@@ -29,7 +29,7 @@ public class LogoutEvent extends ApplicationEvent {
     /**
      * Event triggered when the user logs out.
      *
-     * @param source The object on which the Event initially occurred.
+     * @param source The {@link io.micronaut.security.authentication.Authentication} of the user logging out.
      * @throws IllegalArgumentException if source is null.
      */
     public LogoutEvent(Object source) {

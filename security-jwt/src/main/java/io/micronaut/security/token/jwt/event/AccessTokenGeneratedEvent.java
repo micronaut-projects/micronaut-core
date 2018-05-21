@@ -29,7 +29,7 @@ public class AccessTokenGeneratedEvent extends ApplicationEvent {
     /**
      * Triggered when a JWT access token is generated.
      *
-     * @param source The object on which the Event initially occurred.
+     * @param source A String with the JWT access token generated.
      * @throws IllegalArgumentException if source is null.
      */
     public AccessTokenGeneratedEvent(Object source) {

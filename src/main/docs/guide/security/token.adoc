@@ -1,12 +1,2 @@
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.token.enabled` | `true` |  Token authentication is enabled by default
-
-| `micronaut.security.token.rolesName` | `roles` | Default roles claim name
-
-|===
-
 
 

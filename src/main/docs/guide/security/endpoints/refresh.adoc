@@ -21,7 +21,7 @@ By default, issued Refresh tokens never expire, and can be used to obtain a new 
 .Sample HTTP request to obtain an access token
 ----
 POST /myApp/oauth/access_token HTTP/1.1
-Host: server.example.com
+Host: micronaut.example
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=refresh_token&refresh_token=eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ....

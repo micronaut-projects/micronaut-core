@@ -94,7 +94,7 @@ public class AccessRefreshTokenGenerator {
         }
         AccessRefreshToken accessRefreshToken = tokenRenderer.render(userDetails, jwtGeneratorConfiguration.getAccessTokenExpiration(), accessToken.get(), refreshToken.get());
         eventPublisher.publishEvent(new AccessTokenGeneratedEvent(accessRefreshToken.getAccessToken()));
-        eventPublisher.publishEvent(new RefreshTokenGeneratedEvent(accessRefreshToken.getAccessToken()));
+        eventPublisher.publishEvent(new RefreshTokenGeneratedEvent(accessRefreshToken.getRefreshToken()));
         return Optional.of(accessRefreshToken);
     }
 

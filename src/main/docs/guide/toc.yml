@@ -154,10 +154,17 @@ management:
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
-  session: Session Authentication
-  token:
-    title: Token Authentication
+  authenticationProviders: Authentication Providers
+  securityRule:
+      title: Security Rules
+      ipPattern: IP Pattern Rule
+      secured: Secured Annotation
+      interceptUrlMap: Intercept URL Map
+      builtInEndpointsAccess: Built-In Endpoints Security
+  authenticationStrategies:
+    title: Authentication Strategies
     basicAuth: Basic Auth
+    session: Session Authentication
     jwt:
       title: JSON Web Token
       reader:
@@ -169,19 +176,12 @@ security:
         jwtGeneratorSignature: JWT Signature
         jwtGeneratorEncryption: Encrypted JWTs
       jwtValidation: JWT Token Validation
-  securityRule:
-    title: Security Rules
-    ipPattern: IP Pattern Rule
-    secured: Secured Annotation
-    interceptUrlMap: Intercept URL Map
-    builtInEndpointsAccess: Built-In Endpoints Security
-  render:
-    title: Token Render
+      claimsGeneration: Claims Generation
+      render:
+        title: Token Render
   endpoints:
     title: Built-In Security Controllers
-    login:
-      title: Login Controller
-      authenticationProviders: Authentication Providers
+    login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
   securityEvents: Security Events

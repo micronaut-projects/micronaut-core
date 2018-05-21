@@ -1,11 +1,23 @@
 Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
 JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
 
+To use the Micronaut's JWT based authentication capabilities you must have the `security-jwt` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:security-jwt"
+----
+
+The following configuration properties are available to customize JWT based authentication behaviour:
+
 |===
 
 | Configuration Property | Default Value | Description
 
 | `micronaut.security.token.jwt.enabled` | `false` |  You can enable JWT capabilities by enabling this property.
+
+| `micronaut.security.token.rolesName` | `roles` | Default roles claim name
 
 | `micronaut.security.token.defaultExpiration` |  `3600` | Access token expiration time in seconds
 
@@ -13,11 +25,13 @@ JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a sec
 
 |===
 
-== What does a JWT look like?
+See the javadoc for api:security.token.jwt.config.JwtConfigurationProperties[] and api:security.token.config.TokenConfigurationProperties[] for more information.
+
+==== What does a JWT look like?
 
 image::jwt.png[]
 
-===  Header
+=====  Header
 
 A base64-encoded JSON like:
 
@@ -30,7 +44,7 @@ A base64-encoded JSON like:
 }
 ----
 
-=== Claims
+===== Claims
 
 A base64-encoded JSON like:
 
@@ -48,5 +62,6 @@ A base64-encoded JSON like:
 }
 ----
 
-=== Signature
+===== Signature
+
 Depends on the algorithm specified on the header, it can be a digital signature of the base64-encoded header and claims, or an encryption of them.
