@@ -1,7 +1,37 @@
+To execute your function as a CLI application with `java -jar`, you will need to package your application as an executable JAR file. For example, in `build.gradle`:
 
-Package with shadowJar
+.build.gradle
+[source,gradle]
+----
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" } //<1>
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.4"
+...
+    }
+}
 
-java -jar -d pass in data
+apply plugin:"com.github.johnrengelman.shadow"
 
+shadowJar {
+    mergeServiceFiles()
+}
+
+----
+<1> The Gradle Shadow plugin is hosted in the `http://plugins.gradle.org` repository
+
+You can now package your application using the `shadowJar` task.
+
+----
+> ./gradlew shadowJar
+----
+
+At this point, you can execute your function using the `java -jar` command. To supply input data to the function, use the `-d` flag.
+
+----
+> java -jar build/libs/math-function-0.1-all.jar -d {data: 'foo'}
+----   
 
 
