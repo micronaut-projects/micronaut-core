@@ -80,8 +80,6 @@ import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
@@ -174,7 +172,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        if(ctx.channel().isWritable()) {
+        if (ctx.channel().isWritable()) {
             ctx.flush();
         }
         NettyHttpRequest request = NettyHttpRequest.get(ctx);
@@ -1034,9 +1032,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             // close handled by HttpServerKeepAliveHandler
             ChannelFuture writeFuture = context.writeAndFlush(nettyResponse);
-            if(HttpUtil.isKeepAlive(nettyResponse)) {
+            if (HttpUtil.isKeepAlive(nettyResponse)) {
                 writeFuture.addListener(future -> {
-                    if(future.isSuccess() ) {
+                    if (future.isSuccess()) {
                         context.read();
                     }
                 });
