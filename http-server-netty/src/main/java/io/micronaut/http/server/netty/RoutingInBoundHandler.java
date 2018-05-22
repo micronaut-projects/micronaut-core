@@ -27,6 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -74,7 +75,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
@@ -985,8 +985,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
                     if (registeredCodec.isPresent()) {
                         MediaTypeCodec codec = registeredCodec.get();
-                        response.header(HttpHeaderNames.CONTENT_TYPE, responseMediaType);
-                        return encodeBodyWithCodec(response, body, codec, context);
+                        return encodeBodyWithCodec(response, body, codec, responseMediaType, context);
                     }
                 }
 
@@ -1001,14 +1000,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(defaultResponseMediaType, body.getClass());
                 if (registeredCodec.isPresent()) {
                     MediaTypeCodec codec = registeredCodec.get();
-                    response.header(HttpHeaderNames.CONTENT_TYPE, responseMediaType);
-                    return encodeBodyWithCodec(response, body, codec, context);
+                    return encodeBodyWithCodec(response, body, codec, responseMediaType, context);
                 }
 
                 MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
 
-                response.header(HttpHeaderNames.CONTENT_TYPE, responseMediaType);
-                return encodeBodyWithCodec(response, body, defaultCodec, context);
+                return encodeBodyWithCodec(response, body, defaultCodec, responseMediaType,  context);
             } else {
                 return response;
             }
@@ -1035,10 +1032,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response, Object body, MediaTypeCodec codec, ChannelHandlerContext context) {
+    private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response, Object body, MediaTypeCodec codec, MediaType mediaType, ChannelHandlerContext context) {
         ByteBuf byteBuf = encodeBodyAsByteBuf(body, codec, context);
         int len = byteBuf.readableBytes();
-        response.header(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+        MutableHttpHeaders headers = response.getHeaders();
+        if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        headers.remove(HttpHeaders.CONTENT_LENGTH);
+        headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+
         setBodyContent(response, byteBuf);
         return response;
     }
@@ -1282,7 +1285,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
-        HttpHeaders headers = streamedResponse.headers();
+        io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
         context.writeAndFlush(streamedResponse);

@@ -70,6 +70,10 @@ public class ResponseController {
     @Get
     public HttpMessage status() {
         return HttpResponse.status(HttpStatus.MOVED_PERMANENTLY);
+    }
 
+    @Get
+    public HttpResponse customHeaders() {
+       return HttpResponse.ok("abc").contentType("text/plain").contentLength(7);
     }
 }
