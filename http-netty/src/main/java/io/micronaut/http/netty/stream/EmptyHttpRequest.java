@@ -31,6 +31,7 @@ import io.netty.util.ReferenceCounted;
 /**
  * Delegate for Empty HTTP Response.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */

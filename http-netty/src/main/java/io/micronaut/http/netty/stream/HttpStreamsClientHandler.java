@@ -50,6 +50,7 @@ import org.reactivestreams.Subscription;
  * As long as messages are returned in the order that they arrive, this handler implicitly supports HTTP
  * pipelining.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -27,6 +27,9 @@ import org.reactivestreams.Publisher;
  *
  * Note that receivers of this message <em>must</em> consume the publisher,
  * since the publisher will exert back pressure up the stream if not consumed.
+ *
+ * @author jroper
+ * @author Graeme Rocher
  */
 public interface StreamedHttpMessage extends HttpMessage, Publisher<HttpContent> {
 }
