@@ -120,7 +120,7 @@ serverlessFunctions:
   writingFunctions:
     title: Writing Functions
     functionApplication: FunctionApplication
-    functionBean: FunctionBean and Supplier
+    functionBean: FunctionBean
     groovyFunctions: Groovy Functions
   runningFunctions:
     title: Running Functions

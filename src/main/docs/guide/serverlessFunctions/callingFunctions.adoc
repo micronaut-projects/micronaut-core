@@ -10,14 +10,10 @@ The developer's primary use of this feature will be in defining interfaces that 
 
 In addition, the `function-client` works together with Micronaut's <<serviceDiscovery, Service Discovery>> functionality, identifying any functions that are registered with the current service discovery provider and making them available to the client application.
 
-== FunctionInvoker
 
-TODO: FunctionDefinition, FunctionInvoker, FunctionInvokerChooser
+=== FunctionClient
 
-
-== FunctionClient
-
-The link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] annotation makes it very straightforward to access methods on local and remote functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
+The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
 
 .MaxFunction.groovy
 [source,groovy]
@@ -38,7 +34,7 @@ include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionCl
 <1> Method names in the interface will be mapped to methods on the target function, in this case `Long max()`
 
 
-If you would like to the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
+If you would like the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
 
 .RoundFunction.groovy
 [source,groovy]
@@ -70,31 +66,43 @@ include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxImport, ind
 include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxFunctionClient, indent=0]
 ----
 
-== Remote Functions
+=== Remote Functions
 
 Once functions have been deployed to a cloud provider, you can specify endpoints in your client configuration. Micronaut will then create `FunctionDefinitions` for these remote functions, allowing you to access them through `FunctionClient` interfaces just as you would with local functions.
 
 
-=== AWS Lambda
+==== AWS Lambda
 
 The configuration key path `aws.lambda.functions` can be used to specify function endpoints in an AWS Lambda environment.
 
 .application.yml
 [source,yaml]
 ----
-  aws.lambda.functions.test.functionName: micronaut-function
-  aws.lambda.functions.test.qualifier: test
-  aws.lambda.region: us-east-1
+aws:
+    lambda:
+        functions:
+            hello:
+                functionName: hello-world
+                qualifer: foo
+    region: us-east-1
 ----
 
-//TODO: What is the purpose of qualifier? Is that an arbitrary value? How are they accessed in the function/client?
-//TODO: How are AWS credentials resolved?
-//TODO: How is the function resolved to the client? Does @FunctionClient take a service id? Is resolution at the method level?
+In the above case a function named `hello` is mapped to the remote lambda function called `hello-world`. You can define multiple named functions under the `aws.lambda.functions` configuration. Each is configured by api:function.client.aws.AWSInvokeRequestDefinition[] that allows setting any property on the underlying `com.amazonaws.services.lambda.model.InvokeRequest`.
+
+To configure credentials for invoking the function you can either define a `~/.aws/credentials` file or use `application.yml` to configure credentials. Micronaut registers a api:configurations.aws.EnvironmentAWSCredentialsProvider[] that resolves AWS credentials from the Micronaut <<environments, Environment>>.
+
+NOTE: To invoke a function Micronaut configures a `AWSLambdaAsyncClient` using api:function.client.aws.AWSLambdaConfiguration[] that allows configuring any of the properties of the `AWSLambdaAsyncClientBuilder` class.
 
 You can now write `FunctionClient` interfaces against the remote function, as shown below.
 
-.MyClient.groovy
+.HelloClient.groovy
 [source,groovy]
 ----
-include::{testsfunctionclient}/AwsLambdaInvokeSpec.groovy[tags=functionClient, indent=0]
+import io.reactivex.*;
+
+@FunctionClient
+interface HelloClient {
+
+    Single<String> hello(String name);
+}
 ----
