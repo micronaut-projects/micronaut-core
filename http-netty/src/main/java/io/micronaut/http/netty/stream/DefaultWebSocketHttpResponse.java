@@ -28,6 +28,7 @@ import org.reactivestreams.Subscription;
 /**
  * A default WebSocket HTTP response.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */

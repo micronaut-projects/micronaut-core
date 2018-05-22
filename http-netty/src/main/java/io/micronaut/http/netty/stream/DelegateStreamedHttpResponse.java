@@ -24,6 +24,7 @@ import org.reactivestreams.Subscriber;
 /**
  * Delegate for Streamed HTTP Response.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */

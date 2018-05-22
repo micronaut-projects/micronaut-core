@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpVersion;
 /**
  * Delegate for HTTP Request.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */
