@@ -75,7 +75,7 @@ For example the configuration in the previous section declared a value for `micr
 
 Other services can discovery instances of the `hello-world` service simply by declaring a client as follows:
 
-.Using @Client to Discovery Services
+.Using @Client to Discover Services
 [source,java]
 ----
 @Client(id="hello-world")
@@ -84,9 +84,9 @@ interface HelloClient{
 }
 ----
 
-Alternatively you can also use ann:http.client.Client[] as a qualifer to `@Inject` an instance of api:http.client.HttpClient[]:
+Alternatively you can also use ann:http.client.Client[] as a qualifier to `@Inject` an instance of api:http.client.HttpClient[]:
 
-.Using @Client to Discovery Services
+.Using @Client to Discover Services
 [source,java]
 ----
 @Client(id="hello-world")
