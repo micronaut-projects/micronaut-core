@@ -58,10 +58,11 @@ shadowJar {
     mergeServiceFiles()
 }
 
+//tag::aws[]
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "hello-world"
     handler = "example.HelloWorldFunction::hello"
-    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution" //<3>
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
     memorySize = 256
@@ -76,3 +77,4 @@ task invoke(type: AWSLambdaInvokeTask) {
         println "Lambda function result: " + new String(invokeResult.payload.array(), "UTF-8")
     }
 }
+//end::aws[]
