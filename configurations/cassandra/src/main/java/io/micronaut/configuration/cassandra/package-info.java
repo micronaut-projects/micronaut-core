@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Configuration for Cassandra
+ * Configuration for Cassandra.
  */
 @Configuration
 @Requires(classes = Cluster.class)

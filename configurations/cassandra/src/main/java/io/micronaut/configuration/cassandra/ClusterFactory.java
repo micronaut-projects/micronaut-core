@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.cassandra;
 
 import com.datastax.driver.core.Cluster;
@@ -21,7 +22,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 
 /**
- * Creates cassandra cluster for each configuration bean
+ * Creates cassandra cluster for each configuration bean.
  *
  * @author Nirav Assar
  * @since 1.0
@@ -29,6 +30,12 @@ import io.micronaut.context.annotation.Factory;
 @Factory
 public class ClusterFactory {
 
+    /**
+     * Creates the {@link Cluster} bean for the given configuration.
+     *
+     * @param cassandraConfiguration The {@link CassandraConfiguration} object
+     * @return A {@link Cluster} bean
+     */
     @EachBean(CassandraConfiguration.class)
     @Bean(preDestroy = "close")
     public Cluster cassandraCluster(CassandraConfiguration cassandraConfiguration) {
