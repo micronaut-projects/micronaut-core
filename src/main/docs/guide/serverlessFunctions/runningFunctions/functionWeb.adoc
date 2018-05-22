@@ -25,14 +25,38 @@ include::{testsuite}/server/intro/Application.java[tags=class, indent=0]
 You can now make requests against the function with a REST client.
 
 ----
-$ curl -X GET http://localhost:8080/helloFunction
+$ curl -X GET http://localhost:8080/hello
 ----
 
-In addition, the function will be registered by the configured service discovery provider, and be made accessible to clients via the link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] annotation.
+The URI mapped to is defined by the either the value of the ann:function.FunctionBean[] annotation for Java or, in the case of Groovy, the name of the function defined in the function script. The following tables summarizes the convention:
 
-For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
 
-== Testing Functions
+.Function URI Mapping with @FunctionBean
+|===
+|Annotation|Dependency
+
+|`@FunctionBean("hello")` | `/hello`
+|`@FunctionBean("helloWorld")` | `/hello-world`
+|`@FunctionBean("hello-world")` | `/hello-world`
+
+|===
+
+.Function URI Mapping with Groovy Function Script
+|===
+|Method Name|Dependency
+
+|`hello` | `/hello`
+|`helloWorld` | `/hello-world`
+
+|===
+
+Functions that only return a value are mapped to HTTP `GET` requests, whilst functions that accept an input require an HTTP `POST`.
+
+In addition, the function will be registered by the configured <<serviceDiscovery, Service Discovery>> provider, and be made accessible to clients via the ann:function.client.FunctionClient[] annotation.
+
+TIP: For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
+
+=== Testing Functions
 
 Functions can also be run as part of the Micronaut application context for ease of testing. Similarly to the example above, this approach requires the `function-web` and an HTTP server dependency on the classpath for tests. For example, in `build.gradle`:
 
@@ -41,13 +65,13 @@ Functions can also be run as part of the Micronaut application context for ease 
 ----
 dependencies {
     ...
-    runtime "io.micronaut:function-web"
-    runtime "io.micronaut:http-server-netty" //<1>
+    testRuntime "io.micronaut:function-web"
+    testRuntime "io.micronaut:http-server-netty" //<1>
     ...
 }
 ----
 
-Create a link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] interface as shown below:
+Create a ann:function.client.FunctionClient[] interface as shown below:
 
 .MathClient.groovy
 [source,groovy]
@@ -61,7 +85,7 @@ include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, 
 include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
 ----
 
-For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
+TIP: For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
 
 Now you can start up the Micronaut application and access your function via the client interface in your test.
 

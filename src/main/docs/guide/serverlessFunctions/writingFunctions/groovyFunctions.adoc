@@ -1,4 +1,8 @@
-As is typical in Groovy, writing functions is much simpler than in Java or Kotlin. To begin, add the `function-groovy` dependency (instead of the provider-specific dependency). For example, in `build.gradle`:
+As is typical in Groovy, writing functions is much simpler than in Java or Kotlin.
+
+TIP: If you have the Micronaut CLI installed you can quickly create a Groovy function with `mn create-function hello-world -lang groovy`
+
+To begin, add the `function-groovy` dependency (instead of the provider-specific dependency) which provides additional AST transformations that make writing functions simpler. For example, in `build.gradle`:
 
 .Example build.gradle
 [source,groovy]
@@ -16,18 +20,23 @@ You can now create your function as a Groovy script, under `src/main/groovy`. Yo
 .Example build.gradle
 [source,groovy]
 ----
-    mainClassName = "example.HelloGroovyFunction"
+mainClassName = "example.HelloGroovyFunction"
 ----
 
 .HelloGroovyFunction.groovy
 [source,groovy]
 ----
-String index(String name) {
+String hello(String name) {
     "Hello ${name}!"
 }
 ----
 
-In order to make use of dependency injection in your Groovy function, use the `groovy.transform.Field` annotation transform in addition to the link:{javase}java/inject/Inject.html[Inject] annotation.
+The function you define should follow the following rules:
+
+1. Define no more than 2 inputs
+2. Use either Java primitive or simple types or POJOs as the arguments and return values
+
+In order to make use of dependency injection in your Groovy function, use the `groovy.transform.Field` annotation transform in addition to the `@Inject` annotation.
 
 .HelloGroovyFunction.groovy
 [source,groovy]
@@ -37,7 +46,7 @@ import javax.inject.Inject
 
 @Field @Inject HelloService helloService
 
-String index(String name) {
+String hello(String name) {
     helloService.hello(name)
 }
 ----
