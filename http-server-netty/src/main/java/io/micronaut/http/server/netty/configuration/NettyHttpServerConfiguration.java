@@ -21,6 +21,7 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
+import io.netty.handler.logging.LogLevel;
 
 import javax.inject.Inject;
 import java.util.Collections;
@@ -50,6 +51,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected boolean chunkedSupported = true;
     protected boolean validateHeaders = true;
     protected int initialBufferSize = 128;
+    protected LogLevel logLevel;
 
     /**
      * Default empty constructor.
@@ -63,6 +65,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+    }
+
+    /**
+     * The server {@link LogLevel} to enable
+     * @return The server {@link LogLevel} to enable
+     */
+    public Optional<LogLevel> getLogLevel() {
+        return Optional.ofNullable(logLevel);
     }
 
     /**
