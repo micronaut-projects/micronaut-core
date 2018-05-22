@@ -106,7 +106,20 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         response.header("Content-Encoding") == null // removed by the decoder
     }
 
-    @Controller
+    void "test custom headers"() {
+        when:
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")).onErrorReturn({ t -> t.response }).blockingFirst()
+        Set<String> headers = response.headers.names()
+
+        then: // The content length header was replaced, not appended
+        !headers.contains("content-type")
+        !headers.contains("Content-Length")
+        headers.contains("content-length")
+        response.header("Content-Type") == "text/plain"
+        response.header("Content-Length") == "3"
+    }
+
+   /* @Controller
     static class ResponseController {
 
         @Get
@@ -146,7 +159,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpMessage status() {
             HttpResponse.status(HttpStatus.MOVED_PERMANENTLY)
         }
-    }
+
+
+    }*/
 
     static class Foo {
         String name

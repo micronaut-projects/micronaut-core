@@ -105,4 +105,9 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         nettyHeaders.add(header, value);
         return this;
     }
+
+    @Override
+    public void remove(CharSequence header) {
+        nettyHeaders.remove(header);
+    }
 }
