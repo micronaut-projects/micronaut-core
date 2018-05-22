@@ -34,7 +34,7 @@ The following configuration properties are available to customize session based 
 
 See the api:security.session.SecuritySessionConfigurationProperties[] javadoc for more information.
 
-==== Example of Session-Based Authentication configuration
+== Example of Session-Based Authentication configuration
 
 [source, yaml]
 ----
