@@ -59,6 +59,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
@@ -81,6 +83,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}.
@@ -204,10 +207,12 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         sslContext.ifPresent(ctx -> pipeline.addLast(ctx.newHandler(ch.alloc())));
 
+                        serverConfiguration.getLogLevel().ifPresent(logLevel -> pipeline.addLast(new LoggingHandler(logLevel)));
                         pipeline.addLast(new IdleStateHandler(
                             (int) serverConfiguration.getReadIdleTime().getSeconds(),
                             (int) serverConfiguration.getWriteIdleTime().getSeconds(),
                             (int) serverConfiguration.getIdleTime().getSeconds()));
+
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
                                 serverConfiguration.getMaxInitialLineLength(),
                                 serverConfiguration.getMaxHeaderSize(),
