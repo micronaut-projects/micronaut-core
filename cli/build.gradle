@@ -29,7 +29,6 @@ task createStartScripts(type: MicronautCreateStartScripts) {
     outputDir = outDir
     classpath = configurations.runtime
     doLast {
-        ant.replace(file: new File(outDir, 'mn'), token: 'gradle.icns', value: 'mn.icns')
         ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
     }
 }
@@ -40,6 +39,7 @@ class MicronautCreateStartScripts extends org.gradle.api.tasks.application.Creat
     @org.gradle.api.tasks.TaskAction
     void generate() {
         def generator = new org.gradle.api.internal.plugins.StartScriptGenerator()
+        generator.unixStartScriptGenerator.template = project.resources.text.fromFile('src/main/resources/unixStartScript.txt')
         generator.applicationName = getApplicationName()
         generator.mainClassName = getMainClassName()
         generator.defaultJvmOpts = getDefaultJvmOpts()
