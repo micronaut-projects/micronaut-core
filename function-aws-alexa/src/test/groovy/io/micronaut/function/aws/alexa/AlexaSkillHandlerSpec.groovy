@@ -19,16 +19,8 @@ public class AlexaSkillHandlerSpec extends Specification {
 
     void "test micronaut alexa stream handler with simulated input"() {
         given:
-        Skill helloWorldSkill = Skills.standard()
-                .addRequestHandlers(
-                new CancelandStopIntentHandler(),
-                new HelloWorldIntentHandler(),
-                new HelpIntentHandler(),
-                new LaunchRequestHandler(),
-                new SessionEndedRequestHandler())
-                .withSkillId("amzn1.ask.skill.cbfe084d-1ec9-4b79-83e5-8544c7181b5b")
-                .build();
-        AlexaSkillHandler requestHandler = new AlexaSkillHandler(helloWorldSkill)
+
+        AlexaSkillHandler requestHandler = new HelloWorldSkillFunction()
 
 
         when:
@@ -52,16 +44,22 @@ public class AlexaSkillHandlerSpec extends Specification {
 
     void "test micronaut alexa stream handler with simulated input - invalid skill id"() {
         given:
-        Skill helloWorldSkill = Skills.standard()
-                .addRequestHandlers(
-                new CancelandStopIntentHandler(),
-                new HelloWorldIntentHandler(),
-                new HelpIntentHandler(),
-                new LaunchRequestHandler(),
-                new SessionEndedRequestHandler())
-                .withSkillId("abc123")
-                .build();
-        AlexaSkillHandler requestHandler = new AlexaSkillHandler(helloWorldSkill)
+
+        AlexaSkillHandler requestHandler = new HelloWorldSkillFunction() {
+
+            @Override
+            public Skill getSkill() {
+                return Skills.standard()
+                        .addRequestHandlers(
+                        new CancelandStopIntentHandler(),
+                        new HelloWorldIntentHandler(),
+                        new HelpIntentHandler(),
+                        new LaunchRequestHandler(),
+                        new SessionEndedRequestHandler())
+                        .withSkillId("abc123")
+                        .build();
+            }
+        }
 
 
         when:

@@ -16,27 +16,22 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Alexa helper class for micronaut. Simply extend and create Skill object in constructor.
+ * Alexa helper class for Micronaut. Simply extend and implement getSkill().
  * @author Ryan Vanderwerf
  */
-public class AlexaSkillHandler extends MicronautRequestStreamHandler {
+public abstract class AlexaSkillHandler extends MicronautRequestStreamHandler {
 
     Serializer serializer;
     Skill skill;
 
     static final Logger logger = LogManager.getLogger(AlexaSkillHandler.class);
 
-
     /**
-     * Constructor for the handler. Pass it your Skill object
-     * @param skill Your skill class object
+     * Constructor for the handler. Sets up serializer.
      */
-    public AlexaSkillHandler(Skill skill) {
+    public AlexaSkillHandler() {
         this.serializer = new JacksonSerializer();
-        this.skill = skill;
     }
-
-
 
     /**
      * This is the main entry point to the lambda function that we shouldn't need to mess with by extending this class.
@@ -44,12 +39,16 @@ public class AlexaSkillHandler extends MicronautRequestStreamHandler {
      * The output is theh ResponseEnvelope (JSON) send back to Alexa service
      */
     @Override
-    public void handleRequest(InputStream input, OutputStream output, Context context) throws IOException {
+    public final void handleRequest(InputStream input, OutputStream output, Context context) throws IOException {
         RequestEnvelope requestEnvelope = serializer.deserialize(input, RequestEnvelope.class);
-        ResponseEnvelope response = skill.invoke(requestEnvelope);
+        ResponseEnvelope response = getSkill().invoke(requestEnvelope);
         serializer.serialize(response, output);
     }
 
-
+    /**
+     * Build your skill here, it will be used when the lambda is called.
+     * @return Skill from skill builder
+     */
+    public abstract Skill getSkill();
 
 }
