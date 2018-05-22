@@ -46,7 +46,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     }
 
     Map<String, Object> getConfiguration() {
-        ['router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent], 'router.static.resources.enabled': true]
+        ['router.static.resources.paths':
+                 ['classpath:', 'file:' + tempFile.parent],
+         'router.static.resources.enabled': true]
     }
 
     void cleanupSpec() {
@@ -107,6 +109,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
     }
 
+    @Ignore
     void "test index.html will be resolved in a sub directory"() {
         when:
         def response = rxClient.exchange(
@@ -184,6 +187,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         embeddedServer.stop()
     }
 
+    @Ignore
     void "test resources with configured mapping automatically resolves index.html in subdirectory"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [

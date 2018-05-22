@@ -94,6 +94,7 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -389,15 +390,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else {
                 Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
 
-                if (!optionalFile.isPresent()) {
-                    StringBuilder indexPath = new StringBuilder(requestPath);
-                    if (!requestPath.endsWith("/")) {
-                        indexPath.append("/");
-                    }
-                    indexPath.append("index.html");
-                    optionalFile = matchFile(indexPath.toString());
-                }
-
                 if (optionalFile.isPresent()) {
                     route = new BasicObjectRouteMatch(optionalFile.get());
                 } else {
@@ -478,13 +470,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
-                String uriPath = url.toURI().getPath();
-                if (uriPath != null) {
-                    File file = new File(uriPath);
-                    if (file.exists()) {
-                        if (!file.isDirectory() && file.canRead()) {
-                            return Optional.of(new NettySystemFileCustomizableResponseType(file));
-                        }
+                if (url.getProtocol().equals("file")) {
+                    File file = Paths.get(url.toURI()).toFile();
+                    if (file.exists() && !file.isDirectory() && file.canRead()) {
+                        return Optional.of(new NettySystemFileCustomizableResponseType(file));
                     }
                 }
 
