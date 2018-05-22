@@ -1,0 +1,70 @@
+
+NOTE: This section applies to Java & Kotlin functions - for functions written in Groovy, see <<groovyFunctions,Groovy Functions>>
+
+To write your function's behavior, annotate your class with the ann:function.FunctionBean[] annotation. Your class must also implement one of the interfaces from the `java.util.function` package.
+
+TIP: If you have the Micronaut CLI installed you can quickly create a Java function with `mn create-function hello-world` or `mn create-function hello-world -lang kotlin` for Kotlin
+
+The following examples implement Java's link:{javase}java/util/function/Supplier.html[Supplier] functional interface.
+
+.Example Java Function
+[source,java]
+----
+package example;
+
+import io.micronaut.function.FunctionBean;
+import java.util.function.Supplier;
+
+@FunctionBean("hello-world-java")
+public class HelloJavaFunction implements Supplier<String> {
+
+    @Override
+    public String get() { //<1>
+        return "Hello world!";
+    }
+}
+----
+<1> Override the `get` method of link:{javase}java/util/function/Supplier.html[Supplier] to return the response from your function.
+
+.Example Kotlin Function
+[source,kotlin]
+----
+package example
+
+import io.micronaut.function.FunctionBean
+import java.util.function.Supplier
+
+@FunctionBean("hello-world-kotlin")
+class HelloKotlinFunction : Supplier<String> {
+
+    override fun get(): String { //<1>
+        return "Hello world!"
+    }
+}
+----
+<1> Override the `get` method of link:{javase}java/util/function/Supplier.html[Supplier] to return the response from your function.
+
+The following table summarizes the supported interfaces:
+
+.Functional Interfaces
+|===
+|Interface|Dependency
+
+|jdk:java.util.function.Supplier[] | Accepts no arguments and returns a single result
+|jdk:java.util.function.Consumer[] | Accepts a single argument and returns no result
+|jdk:java.util.function.BiConsumer[] | Accepts two arguments and returns no result
+|jdk:java.util.function.Function[] | Accepts a single argument and returns a single result
+|jdk:java.util.function.BiFunction[] | Accepts two arguments and returns a single result
+|===
+
+In addition, functions have an input and/or an output. The input is represented by the accepted argument and represents the body consumed by the function and the output is represented by the return value of the function. The input and the output should be either a Java primitive or simple type (`int`, `String` etc.) or a POJO.
+
+A single project can define multiple functions, however only a single function should be configured for execution by the application. This can be configured using the `micronaut.function.name` property in `application.yml`:
+
+.Configuring the Function Name to Execute
+[source,yaml]
+----
+micronaut:
+    function:
+        name: hello-world-java
+----

@@ -15,12 +15,13 @@
  */
 package io.micronaut.function.client.aws
 
+//tag::maxFunction[]
 import groovy.transform.Field
 
 math.multiplier = 2
-
 @Field MathService mathService
 
 Long max() {
     mathService.max()
 }
+//end::maxFunction[]
