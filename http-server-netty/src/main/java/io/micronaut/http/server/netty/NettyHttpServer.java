@@ -59,7 +59,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -83,7 +82,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}.
