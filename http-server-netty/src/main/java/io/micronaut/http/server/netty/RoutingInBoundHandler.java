@@ -1033,7 +1033,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             handler.invoke(requestReference.get(), nettyHttpResponse, context);
         } else {
             // close handled by HttpServerKeepAliveHandler
-            ChannelFuture writeFuture = context.write(nettyResponse);
+            ChannelFuture writeFuture = context.writeAndFlush(nettyResponse);
             if(HttpUtil.isKeepAlive(nettyResponse)) {
                 writeFuture.addListener(future -> {
                     if(future.isSuccess() ) {
