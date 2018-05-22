@@ -44,7 +44,7 @@ class CassandraConfigurationSpec extends Specification {
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
                 ['cassandra.default.clusterName': "ociCluster",
-                 'cassandra.default.contactPoint': "127.0.0.1",
+                 'cassandra.default.contactPoint': "localhost",
                  'cassandra.default.port': 9042,
                  'cassandra.default.maxSchemaAgreementWaitSeconds': 20,
                  'cassandra.default.ssl': true]
@@ -62,7 +62,7 @@ class CassandraConfigurationSpec extends Specification {
 
         then:
         cluster.getClusterName() == "ociCluster"
-        inetSocketAddresses[0].getHostName() == "127.0.0.1"
+        inetSocketAddresses[0].getHostName() == "localhost"
         inetSocketAddresses[0].getPort() == 9042
         cluster.getConfiguration().getProtocolOptions().getMaxSchemaAgreementWaitSeconds() == 20
         cluster.getConfiguration().getProtocolOptions().getSSLOptions() != null
@@ -78,7 +78,7 @@ class CassandraConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['cassandra.default.contactPoint': "127.0.0.1",
+                ['cassandra.default.contactPoint': "localhost",
                  'cassandra.default.port': 9042,
                  'cassandra.secondary.contactPoint': "127.0.0.2",
                  'cassandra.secondary.port': 9043]
@@ -93,7 +93,7 @@ class CassandraConfigurationSpec extends Specification {
         List<InetSocketAddress> secondaryInetSocketAddresses = secondaryCluster.manager.contactPoints
 
         then:
-        defaultInetSocketAddresses[0].getHostName() == "127.0.0.1"
+        defaultInetSocketAddresses[0].getHostName() == "localhost"
         defaultInetSocketAddresses[0].getPort() == 9042
 
         secondaryInetSocketAddresses[0].getHostName() == "127.0.0.2"
