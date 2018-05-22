@@ -117,8 +117,15 @@ cloud:
     jaeger: Tracing with Jaeger
 serverlessFunctions:
   title: Serverless Functions
-  writingFunctions: Writing Functions
-  runningFunctions: Running Functions    
+  writingFunctions:
+    title: Writing Functions
+    functionApplication: FunctionApplication
+    functionBean: FunctionBean
+    groovyFunctions: Groovy Functions
+  runningFunctions:
+    title: Running Functions
+    functionWeb: Functions as Web Applications
+    functionCLI: Functions as CLI Applications
   lambdaFunctions: Deploying Functions to AWS Lambda 
   callingFunctions: Calling Functions with FunctionClient
 dataAccess:

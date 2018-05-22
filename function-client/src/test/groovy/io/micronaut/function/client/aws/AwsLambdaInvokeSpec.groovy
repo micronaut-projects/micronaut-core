@@ -132,6 +132,7 @@ class AwsLambdaInvokeSpec extends Specification {
         String title
     }
 
+    //tag::functionClient[]
     @FunctionClient
     static interface MyClient {
 
@@ -143,4 +144,5 @@ class AwsLambdaInvokeSpec extends Specification {
         @Named('micronaut-function')
         Single<Book> reactiveInvoke(String title)
     }
+    //end::functionClient[]
 }
