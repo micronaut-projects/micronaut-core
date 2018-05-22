@@ -19,6 +19,7 @@ package io.micronaut.web.router.resource;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.PathMatcher;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 import java.net.URL;
@@ -56,6 +57,10 @@ public class StaticResourceResolver {
     public Optional<URL> resolve(String path) {
         if (!loaders.isEmpty() && pathMatcher.matches(mapping, path)) {
             path = pathMatcher.extractPathWithinPattern(mapping, path);
+            //A request to the root of the mapping
+            if (StringUtils.isEmpty(path)) {
+                path = "index.html";
+            }
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
