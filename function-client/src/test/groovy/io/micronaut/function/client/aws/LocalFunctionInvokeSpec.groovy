@@ -16,12 +16,19 @@
 package io.micronaut.function.client.aws
 
 import io.micronaut.context.ApplicationContext
+
+//tag::import[]
 import io.micronaut.function.client.FunctionClient
+import javax.inject.Named
+//end::import[]
+
 import io.micronaut.runtime.server.EmbeddedServer
+//tag::rxImport[]
 import io.reactivex.Single
+//end::rxImport[]
 import spock.lang.Specification
 
-import javax.inject.Named
+
 
 /**
  * @author graemerocher
@@ -29,6 +36,7 @@ import javax.inject.Named
  */
 class LocalFunctionInvokeSpec extends Specification {
 
+    //tag::invokeLocalFunction[]
     void "test invoking a local function"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
@@ -40,7 +48,9 @@ class LocalFunctionInvokeSpec extends Specification {
         mathClient.sum(new Sum(a:5,b:10)) == 15
 
     }
+    //end::invokeLocalFunction[]
 
+    //tag::invokeRxLocalFunction[]
     void "test invoking a local function - rx"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
@@ -52,17 +62,29 @@ class LocalFunctionInvokeSpec extends Specification {
         mathClient.sum(new Sum(a:5,b:10)).blockingGet() == 15
 
     }
+    //end::invokeRxLocalFunction[]
 
+    //tag::beginFunctionClient[]
     @FunctionClient
     static interface MathClient {
-        Long max()
+    //end::beginFunctionClient[]
 
+        //tag::functionMax[]
+        Long max() //<1>
+        //end::functionMax[]
+
+        //tag::functionRnd[]
         @Named("round")
         int rnd(float value)
+        //end::functionRnd[]
 
         long sum(Sum sum)
+        //tag::endFunctionClient[]
     }
+    //end::endFunctionClient[]
 
+
+    //tag::rxFunctionClient[]
     @FunctionClient
     static interface RxMathClient {
         Single<Long> max()
@@ -72,4 +94,5 @@ class LocalFunctionInvokeSpec extends Specification {
 
         Single<Long> sum(Sum sum)
     }
+    //end::rxFunctionClient[]
 }

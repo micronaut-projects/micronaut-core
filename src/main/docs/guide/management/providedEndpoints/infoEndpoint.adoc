@@ -64,7 +64,7 @@ If a `git.properties` file is available on the classpath, the link:{api}/io/micr
 [source,groovy]
 ----
 plugins {
-    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id "com.gorylenko.gradle-git-properties" version "1.4.21"
 }
 ----
 
