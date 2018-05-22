@@ -1,4 +1,4 @@
-https://www.jaegertracing.io[Jaeger] is a another distributed tracing system developed at Uber that is more or less the reference implementation for http://opentracing.io[Open Tracing].
+https://www.jaegertracing.io[Jaeger] is another distributed tracing system developed at Uber that is more or less the reference implementation for http://opentracing.io[Open Tracing].
 
 == Running Jaeger
 

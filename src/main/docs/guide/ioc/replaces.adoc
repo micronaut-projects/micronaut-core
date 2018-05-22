@@ -1,13 +1,13 @@
 One significant difference between Micronaut's Dependency Injection system and Spring is the way beans can be replaced.
 
-With Spring beans have names and you can effectively override another bean just be creating a bean with the same name regardless of the type of the bean. Spring is also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` the control how beans override each other.
+With Spring beans have names and you can effectively override another bean just be creating a bean with the same name regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` the control how beans override each other.
 
 This strategy leads to difficult to debug problems in cases where:
 
 * Bean loading order changes, leading to unexpected results
 * A bean with the same name overrides another bean with a different type
 
-To avoid these problems, the design of Micornaut DI has no concept of bean names or load order. Beans have a type and a api:context.Qualifier[]. You cannot override a bean of a completely different type with another.
+To avoid these problems, the design of Micronaut DI has no concept of bean names or load order. Beans have a type and a api:context.Qualifier[]. You cannot override a bean of a completely different type with another.
 
 However, one feature that the Spring way of doing things enables is that it allows overriding existing beans to customize behaviour.
 

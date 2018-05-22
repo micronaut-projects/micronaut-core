@@ -12,7 +12,7 @@ The following configuration properties are available to customize Bearer Token r
 
 | Configuration Property | Default Value | Description
 
-| `micronaut.security.token.jwt.bearer.enabled` | `true` | link:{api}/io/micronaut/security/token/reader/BearerTokenReader.html[BearerTokenReader] is enabled by default
+| `micronaut.security.token.jwt.bearer.enabled` | `true` | link:{api}/io/micronaut/security/token/jwt/bearer/BearerTokenReader.html[BearerTokenReader] is enabled by default
 
 | `micronaut.security.token.jwt.bearer.headerName` | `Authorization` | Header name
 

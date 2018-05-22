@@ -12,7 +12,7 @@ For example the following code will obtain all bean definitions annotated with a
 [source,java]
 ----
 BeanContext beanContext = ... // obtain the bean context
-Collection<BeanDefinition definitions =
+Collection<BeanDefinition> definitions =
     beanContext.getBeanDefinitions(Qualfiers.byStereotype(Controller.class))
 
 for(BeanDefinition definition : definitions) {

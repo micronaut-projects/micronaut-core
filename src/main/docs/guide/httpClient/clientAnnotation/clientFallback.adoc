@@ -6,7 +6,7 @@ With that in mind Micronaut features a native fallback mechanism that is integra
 
 Using the ann:retry.annotation.Fallback[] annotation you can declare a fallback implementation of a client that will be picked up and used once all possible retries have been exhausted.
 
-In fact the mechanism is not strictly linked to Retry, you can declare any cass as ann:retry.annotation.Recoverable[] and if a method call fails (or, in the case of reactive types, an error is emitted) a class annotated with `@Fallback` will be searched for.
+In fact the mechanism is not strictly linked to Retry, you can declare any class as ann:retry.annotation.Recoverable[] and if a method call fails (or, in the case of reactive types, an error is emitted) a class annotated with `@Fallback` will be searched for.
 
 To illustrate this consider again the `PetOperations` interface declared earlier. You can define a `PetFallback` class that will be called in the case of failure:
 

@@ -2,7 +2,7 @@ By default Micronaut is a stateless HTTP server, however depending on your appli
 
 Micronaut comes with a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this that currently features two implementations:
 
-* In-Memory sessions - which you should combine with an a sticky sessions proxy if you plan to run multiple instances
+* In-Memory sessions - which you should combine with an a sticky sessions proxy if you plan to run multiple instances.
 * Redis sessions - In this case https://redis.io[Redis] is used to store sessions and non-blocking I/O is used to read/write sessions to Redis.
 
 == Enabling Sessions
@@ -43,7 +43,7 @@ micronaut:
 
 How the api:session.Session[] is resolved can be configured with api:session.http.HttpSessionConfiguration[].
 
-By default sessions are resolved using a api:session.http.HttpSessionFilter[] that looks up session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` header values) or via a Cookie called `SESSION`.
+By default sessions are resolved using an api:session.http.HttpSessionFilter[] that looks up session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` header values) or via a Cookie called `SESSION`.
 
 If you wish to disable either header resolution or cookie resolution you can via configuration in `application.yml`:
 

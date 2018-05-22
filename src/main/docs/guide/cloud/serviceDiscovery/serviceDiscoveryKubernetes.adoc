@@ -7,10 +7,10 @@ For example given a service exposed as `HELLO_WORLD_SERVICE_HOST` to your applic
 .Using @Client to Discover Services
 [source,java]
 ----
-@Client(id="hello-world")
+@Client(id = "hello-world")
 interface HelloClient{
-	...
+    ...
 }
 ----
 
-Since Kubernetes itself assumes responsibility for tasks such as health checks, load balancing and so on there is no need to since api:health.HeartbeatEvent[] instances and so on.
+Since Kubernetes itself assumes responsibility for tasks such as health checks, load balancing and so on there is no need to send api:health.HeartbeatEvent[] instances and so on.
