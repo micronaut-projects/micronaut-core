@@ -30,61 +30,7 @@ $ curl -X GET http://localhost:8080/helloFunction
 
 In addition, the function will be registered by the configured service discovery provider, and be made accessible to clients via the link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] annotation.
 
-
-For example, the following Groovy function can be accessed using the `FunctionClient` interface below.
-
-.MaxFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/MaxFunction.groovy[tags=maxFunction, indent=0]
-----
-
-
-.Using @FunctionClient to Discover Function
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionMax, indent=4]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
-----
-<1> Method names in the interface will be mapped to methods on the target function, in this case `Long max()`
-
-
-If you would like to the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
-
-.RoundFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/RoundFunction.groovy[tags=rndFunction, indent=0]
-----
-
-.Using @Named to customize target method
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, indent=4]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
-----
-
-== Reactive FunctionClients
-
-`@FunctionClient` interfaces support RxJava constructs, so the above interfaces could be implemented as shown below:
-
-.RxMathClient.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxImport, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxFunctionClient, indent=0]
-----
-
+For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
 
 == Testing Functions
 
@@ -101,7 +47,21 @@ dependencies {
 }
 ----
 
-Create a link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] interface as shown above.
+Create a link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] interface as shown below:
+
+.MathClient.groovy
+[source,groovy]
+----
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionMax, indent=4]
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, indent=4]
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
+----
+
+For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
 
 Now you can start up the Micronaut application and access your function via the client interface in your test.
 

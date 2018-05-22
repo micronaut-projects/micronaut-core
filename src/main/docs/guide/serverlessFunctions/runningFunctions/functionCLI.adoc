@@ -31,7 +31,5 @@ You can now package your application using the `shadowJar` task.
 At this point, you can execute your function using the `java -jar` command. To supply input data to the function, use the `-d` flag.
 
 ----
-> java -jar build/libs/math-function-0.1-all.jar -d {data: 'foo'}
-----   
-
-
+> java -jar build/libs/math-function-0.1-all.jar -d {value: 3}
+----
