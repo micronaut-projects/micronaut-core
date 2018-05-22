@@ -38,6 +38,8 @@ import java.util.Queue;
  *
  * @param <In>  The input Http Message
  * @param <Out> The output Http Message
+ *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */
