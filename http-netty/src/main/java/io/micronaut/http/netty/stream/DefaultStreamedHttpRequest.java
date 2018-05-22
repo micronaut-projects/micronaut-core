@@ -26,6 +26,7 @@ import org.reactivestreams.Subscriber;
 /**
  * A default streamed HTTP request.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */

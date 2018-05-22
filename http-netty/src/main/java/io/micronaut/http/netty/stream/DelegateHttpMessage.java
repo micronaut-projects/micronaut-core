@@ -22,6 +22,7 @@ import io.netty.handler.codec.http.*;
 /**
  * Delegate for HTTP Message.
  *
+ * @author jroper
  * @author Graeme Rocher
  * @since 1.0
  */
