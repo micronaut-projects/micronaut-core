@@ -1,4 +1,4 @@
-When you turn on security, <<buildingEndpoints, Built-in endpoints>> are secured depending on their sensitive value.
+When you turn on security, <<providedEndpoints, Built-in endpoints>> are secured depending on their sensitive value.
 
 [source, yaml]
 ----

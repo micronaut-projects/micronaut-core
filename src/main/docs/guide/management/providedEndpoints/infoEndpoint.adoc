@@ -18,7 +18,7 @@ endpoints:
 
 == Customization
 
-The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/source/InfoSource.html[InfoSource].  If your info source needs to retrieve data from Java properties files, you can extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
+The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/InfoSource.html[InfoSource].  If your info source needs to retrieve data from Java properties files, you can extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
 
 All of the info source beans will be collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements link:{api}/io/micronaut/management/endpoint/info/InfoAggregator.html[InfoAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html[default implementation].
 
@@ -35,11 +35,12 @@ The link:{api}/io/micronaut/management/endpoint/info/source/ConfigurationInfoSou
 ----
 info.demo.string = "demo string"
 info.demo.number = 123
-info.demo.map = [ key: 'value', other_key: 123]
+info.demo.map = [key: 'value', other_key: 123]
 ----
 
 The above config will result in the following JSON response from the info endpoint:
 
+[source,json]
 ----
 {
   "demo": {
@@ -55,7 +56,7 @@ The above config will result in the following JSON response from the info endpoi
 
 ==== Configuration
 
-The configuration info source can be disabled using the `endpoints.info.git.enabled` property.
+The configuration info source can be disabled using the `endpoints.info.config.enabled` property.
 
 === Git Info Source
 
@@ -82,4 +83,4 @@ If a `META-INF/build-info.properties` file is available on the classpath, the li
 
 To specify an alternate path/name of the properties file, you can supply a custom value in the `endpoints.info.build.location` property.
 
-The git info source can be disabled using the `endpoints.info.build.enabled` property.
+The build info source can be disabled using the `endpoints.info.build.enabled` property.

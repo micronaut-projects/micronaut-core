@@ -36,7 +36,7 @@ public class AuthenticationProviderUserPassword implements AuthenticationProvide
 
     @Override
     public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
-        if ( authenticationRequest.getIdentity().equals("user") && authenticationRequest.getSecret().equals("password") ) {
+        if (authenticationRequest.getIdentity().equals("user") && authenticationRequest.getSecret().equals("password")) {
             return Flowable.just(new UserDetails("user", new ArrayList<>()));
         }
         return Flowable.just(new AuthenticationFailed());

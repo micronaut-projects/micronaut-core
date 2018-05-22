@@ -36,7 +36,7 @@ public class TraceService {
 
     Flowable<Boolean> trace(HttpRequest<?> request) {
         return Flowable.fromCallable(() -> { // <1>
-            if(LOG.isDebugEnabled()) {
+            if (LOG.isDebugEnabled()) {
                 LOG.debug("Tracing request: " + request.getUri());
             }
             // trace logic here, potentially performing I/O <2>

@@ -40,7 +40,7 @@ class RSAOAEPEncryptionConfiguration implements RSAEncryptionConfiguration {
 
     RSAOAEPEncryptionConfiguration(@Value('${pem.path}') String pemPath) {
         Optional<KeyPair> keyPair = KeyPairProvider.keyPair(pemPath)
-        if ( keyPair.isPresent() ) {
+        if (keyPair.isPresent()) {
             this.rsaPublicKey = (RSAPublicKey) keyPair.get().getPublic()
             this.rsaPrivateKey = (RSAPrivateKey) keyPair.get().getPrivate()
         }

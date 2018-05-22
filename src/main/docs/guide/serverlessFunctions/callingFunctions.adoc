@@ -88,7 +88,7 @@ aws:
 
 In the above case a function named `hello` is mapped to the remote lambda function called `hello-world`. You can define multiple named functions under the `aws.lambda.functions` configuration. Each is configured by api:function.client.aws.AWSInvokeRequestDefinition[] that allows setting any property on the underlying `com.amazonaws.services.lambda.model.InvokeRequest`.
 
-To configure credentials for invoking the function you can either define a `~/.aws/credentials` file or use `application.yml` to configure credentials. Micronaut registers a api:configurations.aws.EnvironmentAWSCredentialsProvider[] that resolves AWS credentials from the Micronaut <<environments, Environment>>.
+To configure credentials for invoking the function you can either define a `~/.aws/credentials` file or use `application.yml`. Micronaut registers a api:configurations.aws.EnvironmentAWSCredentialsProvider[] that resolves AWS credentials from the Micronaut <<environments, Environment>>.
 
 NOTE: To invoke a function Micronaut configures a `AWSLambdaAsyncClient` using api:function.client.aws.AWSLambdaConfiguration[] that allows configuring any of the properties of the `AWSLambdaAsyncClientBuilder` class.
 

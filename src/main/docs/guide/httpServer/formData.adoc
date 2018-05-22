@@ -11,7 +11,7 @@ What this means in practise is that in order to bind regular form data the only 
 include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
 ----
 
-TIP: To avoid denial of service attacks collection types and arrays created during binding are limited by the setting `jackson.arraySizeThreshold` in `application.yml`
+TIP: To avoid denial of service attacks, collection types and arrays created during binding are limited by the setting `jackson.arraySizeThreshold` in `application.yml`
 
 
 Alternatively, instead of using a POJO you can bind form data directly to method parameters (which works with JSON too!):
@@ -23,4 +23,4 @@ Alternatively, instead of using a POJO you can bind form data directly to method
 include::{testsuite}/server/json/PersonController.java[tags=args, indent=0]
 ----
 
-As you can see from the example above, this approach allows you to use features as support for jdk:java.util.Optional[] types and restrict the parameters to be bound (When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound).
+As you can see from the example above, this approach allows you to use features such as support for jdk:java.util.Optional[] types and restrict the parameters to be bound (When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound).
