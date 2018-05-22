@@ -3,12 +3,109 @@ To run your function as a web application as described in this section, you will
 .build.gradle
 [source,groovy]
 ----
-runtime "io.micronaut:function-web"
+dependencies {
+    ...
+    runtime "io.micronaut:function-web"
+    runtime "io.micronaut:http-server-netty" //<1>
+    ...
+}
+----
+<1> In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
+
+Once the dependencies have been added to the project, you can run the function via an `Application` class.
+
+.Example Application class
+[source,java]
+----
+include::{testsuite}/server/intro/Application.java[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/Application.java[tags=class, indent=0]
+----
+
+You can now make requests against the function with a REST client.
+
+----
+$ curl -X GET http://localhost:8080/helloFunction
+----
+
+In addition, the function will be registered by the configured service discovery provider, and be made accessible to clients via the link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] annotation.
+
+
+For example, the following Groovy function can be accessed using the `FunctionClient` interface below.
+
+.MaxFunction.groovy
+[source,groovy]
+----
+include::{testsfunctionclient}/MaxFunction.groovy[tags=maxFunction, indent=0]
 ----
 
 
+.Using @FunctionClient to Discover Function
+[source,groovy]
+----
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionMax, indent=4]
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
+----
+<1> Method names in the interface will be mapped to methods on the target function, in this case `Long max()`
 
 
-Function-web will allow you to run a function as a web app, register with consul if configured, access from function client. Function client will auto discover functions on consul run with function-web. Run functions locally and then deploy to cloud provider without changing client.
+If you would like to the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
 
-Same in tests (use function-web as test dependency)
+.RoundFunction.groovy
+[source,groovy]
+----
+include::{testsfunctionclient}/RoundFunction.groovy[tags=rndFunction, indent=0]
+----
+
+.Using @Named to customize target method
+[source,groovy]
+----
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, indent=4]
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
+----
+
+== Reactive FunctionClients
+
+`@FunctionClient` interfaces support RxJava constructs, so the above interfaces could be implemented as shown below:
+
+.RxMathClient.groovy
+[source,groovy]
+----
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxImport, indent=0]
+
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxFunctionClient, indent=0]
+----
+
+
+== Testing Functions
+
+Functions can also be run as part of the Micronaut application context for ease of testing. Similarly to the example above, this approach requires the `function-web` and an HTTP server dependency on the classpath for tests. For example, in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+dependencies {
+    ...
+    runtime "io.micronaut:function-web"
+    runtime "io.micronaut:http-server-netty" //<1>
+    ...
+}
+----
+
+Create a link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient] interface as shown above.
+
+Now you can start up the Micronaut application and access your function via the client interface in your test.
+
+[source,java]
+----
+include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=invokeLocalFunction, indent=0]
+----

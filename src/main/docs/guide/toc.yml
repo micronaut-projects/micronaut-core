@@ -122,7 +122,10 @@ serverlessFunctions:
     functionApplication: FunctionApplication
     functionBean: FunctionBean and Supplier
     groovyFunctions: Groovy Functions
-  runningFunctions: Running Functions
+  runningFunctions:
+    title: Running Functions
+    functionWeb: Functions as Web Applications
+    functionCLI: Functions as CLI Applications
   lambdaFunctions: Deploying Functions to AWS Lambda 
   callingFunctions: Calling Functions with FunctionClient
 dataAccess:
