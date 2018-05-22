@@ -28,6 +28,9 @@ import org.reactivestreams.Processor;
  *
  * This is only used for server side responses. For client side websocket requests, it's
  * better to configure the reactive streams pipeline directly.
+ *
+ * @author jroper
+ * @author Graeme Rocher
  */
 public interface WebSocketHttpResponse extends HttpResponse, Processor<WebSocketFrame, WebSocketFrame> {
     /**

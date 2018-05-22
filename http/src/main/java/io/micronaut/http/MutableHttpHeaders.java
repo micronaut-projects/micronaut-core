@@ -238,4 +238,11 @@ public interface MutableHttpHeaders extends HttpHeaders {
         }
         return this;
     }
+
+    /**
+     * Removes the header for the given name.
+     *
+     * @param header The header name
+     */
+    void remove(CharSequence header);
 }
