@@ -23,6 +23,9 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 
 For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io) 
 
+# Versioning
+
+Micronaut is using Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.
 
 
 
