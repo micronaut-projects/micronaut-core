@@ -107,3 +107,10 @@ a:hover,
         max-width: 66%;
     }
 }
+
+body {
+    width: 96%;
+}
+#main {
+    margin-left: 4%;
+}
