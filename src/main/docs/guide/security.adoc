@@ -15,6 +15,6 @@ micronaut:
         enabled: true
 ----
 
-Once you enable security, Micronaut returns HTTP Status Unauthorized ( 401 ) for any endpoint invocation.
+Once you enable security, Micronaut returns HTTP Status Unauthorized (401) for any endpoint invocation.
 
 image::secured_by_default.svg[]

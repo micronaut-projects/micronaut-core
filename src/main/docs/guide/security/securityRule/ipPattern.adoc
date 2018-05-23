@@ -9,4 +9,4 @@ include::{testssecurity}/security/securityRule/IpPatternSpec.groovy[tag=yamlconf
 
 
 In the previous code, the link:{api}io/micronaut/security/rules/IpPatternsRule.html[IpPatternsRule] rejects traffic not coming
-either 127.0.0.1 or 192.168.1.* range.
+either `127.0.0.1` or `192.168.1.*` range.

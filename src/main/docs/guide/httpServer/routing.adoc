@@ -1,4 +1,4 @@
-The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation used in the previous section is one of link:{api}/io/micronaut/web/router/annotation/package-summary.html[several annotations] that allow you to control the construction of HTTP routes.
+The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation used in the previous section is one of link:{api}/io/micronaut/http/annotation/package-summary.html[several annotations] that allow you to control the construction of HTTP routes.
 
 == URI Paths
 
@@ -27,7 +27,7 @@ The following table summarizes values for the `@Controller` annotation and the c
 |`/`
 |===
 
-The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] you can therefore embed URI variables within the path using the syntax defined the by the URI template specification.
+The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] you can therefore embed URI variables within the path using the syntax defined by the URI template specification.
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 
@@ -44,7 +44,7 @@ include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
 ----
 
 <1> The `@Controller` annotation is specified without an argument resulting in a base URI of `/issues`
-<2> The link:{api}/io/micronaut/web/router/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
+<2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
 <3> The value of the URI variable is referenced in the implementation
 
 Micronaut will map the URI `/issues/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:

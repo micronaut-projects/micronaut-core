@@ -77,7 +77,7 @@ The JSON itself can be customized however you want using https://github.com/Fast
 
 If some of the properties of the object need to be in the URI being posted to you can use a URI template.
 
-For example imagine you have a class `Book` that has a property called `title`. You can represent the `title` property in the URI template and then populate it from an instance of `Book. For example:
+For example imagine you have a class `Book` that has a property called `title`. You can represent the `title` property in the URI template and then populate it from an instance of `Book`. For example:
 
 .Sending a JSON body with a URI template
 [source,java]

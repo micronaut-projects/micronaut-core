@@ -15,7 +15,7 @@ Micronaut's HTTP client includes support for streaming data over HTTP via the ap
 
 |===
 
-In ordering to do JSON streaming you should on the server side declare a controller method that returns a `application/x-json-stream` of JSON objects. For example:
+In order to do JSON streaming you should on the server side declare a controller method that returns a `application/x-json-stream` of JSON objects. For example:
 
 .Streaming JSON on the Server
 [source,java]

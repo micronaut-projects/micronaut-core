@@ -2,7 +2,7 @@ The examples so far have dealt with simply text based responses, but the most co
 
 In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
 
-In order do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+In order to do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
 
 == Binding using Reactive Frameworks
 

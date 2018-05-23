@@ -1,14 +1,16 @@
 
-The refresh endpoint will refresh the application state, causing all link:{api}io.micronaut.runtime.context.scope.Refreshable.html[Refreshable] beans in the context to be destroyed and reinstantiated upon further requests. This is accomplished by publishing a `RefreshEvent` in the Application Context.
+The refresh endpoint will refresh the application state, causing all link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[Refreshable] beans in the context to be destroyed and reinstantiated upon further requests. This is accomplished by publishing a `RefreshEvent` in the Application Context.
 
 To execute the refresh endpoint, send a POST request to /refresh.
 
+[source,bash]
 ----
 $ curl -X POST http://localhost:8080/refresh
 ----
 
 When executed without a body, the endpoint will first refresh the link:{api}/io/micronaut/context/env/Environment.html[Environment] and perform a diff to detect any changes, and will then only perform the refresh if changes are detected. To skip this check and refresh all `@Refreshable` beans regardless of environment changes (e.g., to force refresh of cached responses from third-party services), you can supply a `force` parameter in the POST request body.
 
+[source,bash]
 ----
 $ curl -X POST http://localhost:8080/refresh -H 'Content-Type: application/json' -d '{"force": true}'
 ----

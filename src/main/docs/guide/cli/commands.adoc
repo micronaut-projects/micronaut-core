@@ -1,5 +1,6 @@
 Profiles can include commands for generating common code artifacts. Not all commands are supported by all profiles; the available commands for a given profile can be viewed using the `profile-info` command.
 
+[source,bash]
 ----
 mn> profile-info service
 Profile: service
@@ -56,8 +57,9 @@ Commands in the base profile are inherited by all other profiles and are always 
 
 The `create-bean` command generates a simple {jeeapi}/javax/inject/Singleton.html[Singleton] class. It does not create an associated test.
 
+[source,bash]
 ----
-> mn create-bean EmailService
+$ mn create-bean EmailService
 | Rendered template Bean.java to destination src/main/java/example/EmailService.java
 ----
 
@@ -80,8 +82,9 @@ The `create-bean` command generates a simple {jeeapi}/javax/inject/Singleton.htm
 
 The `create-job` command generates a simple api:scheduling.annotation.Scheduled[] class. It follows a `*Job` convention for generating the class name. It does not create an associated test.
 
+[source,bash]
 ----
-> mn create-job UpdateFeeds -lang groovy
+$ mn create-job UpdateFeeds -lang groovy
 | Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy
 ----
 
@@ -108,8 +111,9 @@ The service profile includes commands that are dependent upon the HTTP server an
 
 The `create-controller` command generates a link:{api}/io/micronaut/http/annotation/Controller.html[Controller] class. It follows a `*Controller` convention for generating the class name. It creates an associated test that will run the application and instantiate an HTTP client, which can make requests against the controller.
 
+[source,bash]
 ----
-> mn create-controller Book
+$ mn create-controller Book
 | Rendered template Controller.java to destination src/main/java/example/BookController.java
 | Rendered template ControllerTest.java to destination src/test/java/example/BookControllerTest.java
 ----
@@ -133,7 +137,8 @@ The `create-controller` command generates a link:{api}/io/micronaut/http/annotat
 
 The `create-client` command generates a simple api:http.client.Client[] interface. It follows a `*Client` convention for generating the class name. It does not create an associated test.
 
+[source,bash]
 ----
-> mn create-client Book
+$ mn create-client Book
 | Rendered template Client.java to destination src/main/java/example/BookClient.java
 ----

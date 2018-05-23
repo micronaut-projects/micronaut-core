@@ -7,7 +7,7 @@ ease the refresh, you can enable link:{api}/io/micronaut/security/token/jwt/endp
 
 | Configuration Property | Default Value | Possible Values
 
-| `micronaut.security.endpoints.oauth.enabled` | false | true or false
+| `micronaut.security.endpoints.oauth.enabled` | false | `true` or `false`
 | `micronaut.security.endpoints.oauth.path` | `/oauth/access_token` | default path for `POST` requests.
 
 

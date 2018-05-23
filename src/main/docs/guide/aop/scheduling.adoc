@@ -42,7 +42,7 @@ The above example will run the task every Tuesday morning at 10:15AM.
 
 == Programmatically Scheduling Tasks
 
-If you wish to programmatically schedule tasks, then you can use the api:scheduled.TaskScheduler[] bean which can be injected as follows:
+If you wish to programmatically schedule tasks, then you can use the api:scheduling.TaskScheduler[] bean which can be injected as follows:
 
 [source,java]
 ----
