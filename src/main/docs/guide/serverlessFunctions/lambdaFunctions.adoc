@@ -22,7 +22,7 @@ dependencies {
 }
 ----
 
-=== Configuration
+== Configuration
 
 Configuration properties specific to AWS Lambda environments can be supplied in an `application-aws` configuration file in `src/main/resources`.
 
@@ -33,11 +33,11 @@ production:
     property: 44
 ----
 
-=== Manual Deployment
+== Manual Deployment
 
 You can deploy your function to AWS Lambda manually by building and uploading an executable JAR file. Various build plugins offer this capability.
 
-==== Gradle Shadow plugin
+=== Gradle Shadow plugin
 
 The https://plugins.gradle.org/plugin/com.github.johnrengelman.shadow[Gradle Shadow] plugin provides a `shadowJar` task to generate a self-contained executable JAR file, which is suitable for AWS Lambda deployments.
 
@@ -69,7 +69,7 @@ The executable JAR file can now be built using the `shadowJar` task.
 > ./gradlew shadowJar
 ----
 
-==== Maven Shade plugin
+=== Maven Shade plugin
 
 The https://maven.apache.org/plugins/maven-shade-plugin/[Maven Shade] plugin will generate an executable JAR file for Maven projects. For further details, consult the https://docs.aws.amazon.com/lambda/latest/dg/java-create-jar-pkg-maven-no-ide.html[AWS Lambda Documentation.]
 
@@ -113,7 +113,7 @@ The executable JAR file can now be built using the `package` phase.
 ----
 
 
-=== Gradle AWS Plugin
+== Gradle AWS Plugin
 
 For Gradle projects, deployment can be made even more straightforward using the https://github.com/classmethod/gradle-aws-plugin[Gradle AWS Plugin]. This plugin provides a `deploy` task which can push your function to AWS Lambda directly, as well as a `AWSLambdaInvokeTask` which can be used to invoke your function when it is deployed.
 

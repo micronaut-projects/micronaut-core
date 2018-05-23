@@ -1,0 +1,45 @@
+Features consist of additional dependencies and configuration to enable specific functionality in your application. The Micronaut profiles define a large number of features, including features for many of the configurations provided by Micronaut, such as the <<dataAccess, Data Access Configurations>>
+
+----
+> mn create-app my-demo-app -features mongo-reactive
+----
+
+This will add the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application. You can view all the available features using the `profile-info` command.
+
+----
+> mn profile-info service
+Profile: service
+--------------------
+The service profile
+
+...
+
+Provided Features:
+--------------------
+* discovery-consul - Adds support for Service Discovery with Consul (https://www.consul.io)
+* hibernate-jpa - Adds support for Hibernate/JPA
+* mongo-gorm - Configures GORM for MongoDB for Groovy applications
+* mongo-reactive - Adds support for the Mongo Reactive Streams Driver
+* neo4j-gorm - Configures GORM for Neo4j for Groovy applications
+* config-consul - Adds support for Distributed Configuration with Consul (https://www.consul.io)
+* http-server - Adds support for running a Netty server
+* neo4j-bolt - Adds support for the Neo4j Bolt Driver
+* tracing-jaeger - Adds support for distributed tracing with Jaeger (https://www.jaegertracing.io)
+* security-jwt - Adds support for JWT (JSON Web Token) based Authentication
+* junit - Adds support for the JUnit testing framework
+* hibernate-gorm - Adds support for GORM persistence framework
+* java - Adds support for Java in the application
+* kotlin - Adds support for Kotlin in the application
+* spek - Adds support for the Spek testing framewokr
+* redis-lettuce - Configures the Lettuce driver for Redis
+* jdbc-hikari - Configures SQL DataSource instances using Hikari Connection Pool
+* jdbc-tomcat - Configures SQL DataSource instances using Tomcat Connection Pool
+* discovery-eureka - Adds support for Service Discovery with Eureka
+* http-client - Adds support for creating HTTP clients
+* jdbc-dbcp - Configures SQL DataSource instances using Commons DBCP
+* spock - Adds support for the Spock testing framework
+* groovy - Adds support for Groovy in the application
+* security-session - Adds support for Session based Authentication
+* tracing-zipkin - Adds support for distributed tracing with Zipkin (https://zipkin.io)
+----
+
