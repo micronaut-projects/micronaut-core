@@ -9,7 +9,7 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 |An `Optional` of a bean. If the bean doesn't exist `empty()` is injected
 |`Optional<Engine>`
 
-|link:{jdkapi}/java/util/Iterable.html[java.util.Iterable]
+|link:{jdkapi}/java/lang/Iterable.html[java.lang.Iterable]
 |An `Iterable` or subtype of `Iterable` (example `List`, `Collection` etc.)
 |`Iterable<Engine>`
 

@@ -26,7 +26,7 @@ import javax.inject.Singleton
 class EngineImpl implements Engine {
     final EngineConfig config
 
-    EngineImpl(EngineConfig config) { // <4>
+    EngineImpl(EngineConfig config) { // <1>
         this.config = config
     }
 
@@ -35,7 +35,7 @@ class EngineImpl implements Engine {
         return config.cylinders
     }
 
-    String start() { // <5>
+    String start() { // <2>
         "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
     }
 }

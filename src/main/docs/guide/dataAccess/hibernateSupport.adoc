@@ -5,6 +5,7 @@ Micronaut features built in support for configuring a http://hibernate.org[Hiber
 Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate you need to add the `hibernate-jpa` dependency to your build configuration:
 
 .build.gradle
+[source,groovy]
 ----
 compile "io.micronaut.configuration:hibernate-jpa"
 ----
@@ -101,5 +102,5 @@ hibernate:
 The following should be noted regarding using GORM for Hibernate in Micronaut:
 
 * Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
-* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present.
+* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present. You can also add the `@Transactional` annotation to the class.
 * By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.

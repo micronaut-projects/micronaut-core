@@ -2,14 +2,16 @@ The Micronaut CLI is the recommended way to create new Micronaut projects. The C
 
 When Micronaut is installed on your computer, you can call the CLI with the `mn` command.
 
+[source,bash]
 ----
-> mn create-app my-app
+$ mn create-app my-app
 ----
 
 A Micronaut CLI project can be identified by the `micronaut-cli.yml` file, which will be included at the root of the project (if it was generated via the CLI). This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name, for example:
 
+[source,bash]
 ----
-> mn create-app my-demo-app
+$ mn create-app my-demo-app
 ----
 
 Will result in the following `micronaut-cli-yml`.
@@ -26,8 +28,9 @@ sourceLanguage: java
 
 You can supply your own default package when creating the application by prefixing the application name with the package:
 
+[source,bash]
 ----
-> mn create-app example.my-demo-app
+$ mn create-app example.my-demo-app
 ----
 
 Will result in the following `micronaut-cli-yml`.
@@ -57,8 +60,9 @@ CLI commands can accept optional *flags* to control their behavior. Some flags a
 
 If you run `mn` without any arguments, the Micronaut CLI will launch in interactive mode. This is a shell-like mode which allows you to run multiple CLI commands without re-initializing the CLI runtime, and is especially suitable when you are making use of code-generation commands (such as `create-controller`), creating multiple projects, or simply exploring the features included in the CLI. Tab-completion is enabled in the CLI, enabling you to hit the `TAB` key to see possible options for a given command or flag.
 
+[source,bash]
 ----
-> mn
+$ mn
 | Starting interactive mode...
 | Enter a command name to run. Use TAB for completion:
 mn>
@@ -71,6 +75,7 @@ mn>
 
 General usage information can be viewed using the `help` command.
 
+[source,bash]
 ----
 mn> help
 Usage (optionals marked with *):'
@@ -83,6 +88,7 @@ $ mn create-app my-app
 
 For details about a specific command, supply the command name after the `help` command.
 
+[source,bash]
 ----
 mn> help create-app
 | Command: create-app
@@ -97,6 +103,7 @@ create-app [NAME]
 
 A list of available profiles can be viewed using the `list-profiles` command.
 
+[source,bash]
 ----
 mn> list-profiles
 | Available Profiles
@@ -111,6 +118,7 @@ mn> list-profiles
 
 To view details on a specific profile, use the `profile-info` command, followed by the profile name.
 
+[source,bash]
 ----
 mn> profile-info service
 Profile: service

@@ -4,8 +4,9 @@ Profiles can inherit from other profiles, augmenting/overriding defaults set in 
 
 Profiles can be chosen using the `profile` flag on the `create-app` & `create-federation` commands.
 
+[source,bash]
 ----
-> mn create-app my-project
+$ mn create-app my-project
 ----
 
 //TODO: Include more details from https://docs.grails.org/latest/guide/profiles.html, add section on creating profiles

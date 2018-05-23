@@ -62,13 +62,15 @@ The `create-app` command will generate a basic Micronaut project, with optional 
 Once created, the application can be started using the `Application` class, or the appropriate build tool task.
 
 .Starting a Gradle project
+[source,bash]
 ----
-> ./gradlew run
+$ ./gradlew run
 ----
 
 .Starting a Maven project
+[source,bash]
 ----
-> ./mvnw compile exec:exec
+$ ./mvnw compile exec:exec
 ----
 
 === Language/Test Features
@@ -91,6 +93,7 @@ NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation 
 
 To create an app with Groovy & Spock support, supply the appropriate features via the `feature` flag:
 
+[source,bash]
 ----
 mn> create-app my-groovy-app -features groovy, spock
 ----
@@ -101,6 +104,7 @@ This will include the Groovy & Spock dependencies in your project, and write the
 
 To create an app with Kotlin & Spek support, supply the appropriate features via the `feature` flag:
 
+[source,bash]
 ----
 mn> create-app my-groovy-app -features kotlin, spek
 ----
@@ -110,8 +114,9 @@ This will include the Kotlin & Spek dependencies in your project, and write the 
 
 === Build Tool
 
-By default `create-app` will create a Gradle project, with a `build.gradle` file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via thw `build` flag:
+By default `create-app` will create a Gradle project, with a `build.gradle` file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the `build` flag:
 
+[source,bash]
 ----
 mn> create-app my-maven-app -build maven
 ----
@@ -159,8 +164,9 @@ Setting the language using the `lang` flag will generate a `*Function` file in t
 
 Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a Spek test. However, you can override the chosen test framework with the `test` flag.
 
+[source,bash]
 ----
-> mn create-function hello-world -lang java -test spock
+$ mn create-function hello-world -lang java -test spock
 ----
 
 === Build Tool
@@ -171,16 +177,18 @@ Depending upon the build tool selected, the project will include various tasks f
 
 Functions with a Gradle build are preconfigured with the https://github.com/classmethod/gradle-aws-plugin[Gradle AWS Plugin]. The configuration can be seen in the `build.gradle` file (see the section on <<lambdaFunctions, Deploying Functions to AWS Lambda>>). Assuming valid AWS credentials under `~/.aws/credentials`, the application can be deployed using the `deploy` task.
 
+[source,bash]
 ----
-> ./gradlew deploy
+$ ./gradlew deploy
 ----
 
 ==== Maven
 
 Functions with a Maven build are preconfigured with the https://maven.apache.org/plugins/maven-shade-plugin/[Maven Shade Plugin], which will generate an executable JAR suitable for uploading to AWS Lambda. The JAR file can be built using the `package` phase.
 
+[source,bash]
 ----
-> ./mvnw package
+$ ./mvnw package
 ----
 
 For further details, consult the https://docs.aws.amazon.com/lambda/latest/dg/java-create-jar-pkg-maven-no-ide.html[AWS Lambda Documentation.]

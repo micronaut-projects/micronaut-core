@@ -1,13 +1,15 @@
 Features consist of additional dependencies and configuration to enable specific functionality in your application. The Micronaut profiles define a large number of features, including features for many of the configurations provided by Micronaut, such as the <<dataAccess, Data Access Configurations>>
 
+[source,bash]
 ----
-> mn create-app my-demo-app -features mongo-reactive
+$ mn create-app my-demo-app -features mongo-reactive
 ----
 
 This will add the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application. You can view all the available features using the `profile-info` command.
 
+[source,bash]
 ----
-> mn profile-info service
+$ mn profile-info service
 Profile: service
 --------------------
 The service profile
