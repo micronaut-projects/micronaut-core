@@ -36,6 +36,9 @@ The table summarizes the configuration modules and the dependencies you should a
 |`io.micronaut.configuration:redis-lettuce`
 |Configures the https://lettuce.io[Lettuce] driver for https://redis.io[Redis]
 
+|`io.micronaut.configuration:cassandra`
+|Configures the https://github.com/datastax/java-driver[Datastax Java Driver] for http://cassandra.apache.org[Cassandra]
+
 |===
 
 For example, to add support for MongoDB you define the following dependency:
