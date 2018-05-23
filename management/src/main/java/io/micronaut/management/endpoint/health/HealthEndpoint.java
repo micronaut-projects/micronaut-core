@@ -36,7 +36,7 @@ import java.security.Principal;
 public class HealthEndpoint {
 
     /**
-     * If the endpoint is sensitive if no configuration is provided
+     * If the endpoint is sensitive if no configuration is provided.
      */
     public static final boolean DEFAULT_SENSITIVE = false;
 
