@@ -1,3 +1,5 @@
+# Contributing Code or Documentation to Micronaut
+
 ## IDE Setup
 
 Micronaut can be imported into IntelliJ IDEA by opening the `build.gradle` file.
@@ -31,10 +33,10 @@ To build the documentation run `./gradlew publishGuide` or `./gradlew pG` then o
 
 If you are working with the IntelliJ IDEA development environment, you can import the project using the Intellij Gradle Tooling ( "File / Import Project" and select the "settings.gradle" file).
 
-To get a local development version of Micronaut working, first run the install task.
+To get a local development version of Micronaut working, first run the `publishToMavenLocal` task.
 
 ```
-./gradlew install
+./gradlew pTML
 ```
 
 Then install SDKman, which is the quickest way to set up a development environment.
