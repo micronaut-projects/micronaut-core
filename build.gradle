@@ -231,7 +231,7 @@ subprojects { subproject ->
 
     tasks.withType(Test) {
         testLogging {
-            showStandardStreams = true
+            showStandardStreams = !System.getenv("TRAVIS")
             exceptionFormat = 'full'
         }
     }
