@@ -10,8 +10,7 @@ The developer's primary use of this feature will be in defining interfaces that 
 
 In addition, the `function-client` works together with Micronaut's <<serviceDiscovery, Service Discovery>> functionality, identifying any functions that are registered with the current service discovery provider and making them available to the client application.
 
-
-=== FunctionClient
+== FunctionClient
 
 The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
 
@@ -53,7 +52,7 @@ include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, 
 include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
 ----
 
-=== Reactive FunctionClients
+== Reactive FunctionClients
 
 `@FunctionClient` interfaces support RxJava constructs, so the above interfaces could be implemented as shown below:
 
@@ -66,12 +65,12 @@ include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxImport, ind
 include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxFunctionClient, indent=0]
 ----
 
-=== Remote Functions
+== Remote Functions
 
 Once functions have been deployed to a cloud provider, you can specify endpoints in your client configuration. Micronaut will then create `FunctionDefinitions` for these remote functions, allowing you to access them through `FunctionClient` interfaces just as you would with local functions.
 
 
-==== AWS Lambda
+=== AWS Lambda
 
 The configuration key path `aws.lambda.functions` can be used to specify function endpoints in an AWS Lambda environment.
 
