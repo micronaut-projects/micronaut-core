@@ -16,7 +16,7 @@ Alternatively you can https://www.consul.io/docs/install/index.html[install and 
 
 To register a Micronaut application with Consul simply add the necessary api:discovery.consul.ConsulConfiguration[]. A minimal example can be seen below:
 
-.Auto Registering with Consul
+.Auto Registering with Consul (application.yml)
 [source,yaml]
 ----
 micronaut:
@@ -42,7 +42,7 @@ By default registering with Consul is disabled hence you should set `consul.clie
 
 The api:discovery.consul.ConsulConfiguration[] class features a range of customization options for altering how an instance registers with Consul. You can customize the tags, the retry attempts, the fail fast behaviour and so on.
 
-Notice too that `ConsulConfiguration` extends api:discovery.client.DiscoveryClientConfiguration[]  which in turn extends api:http.client.HttpClientConfiguration[] allowing you to customize the settings for the Eureka client, including read timeout, proxy configuration and so on.
+Notice too that `ConsulConfiguration` extends api:discovery.client.DiscoveryClientConfiguration[]  which in turn extends api:http.client.HttpClientConfiguration[] allowing you to customize the settings for the Consul client, including read timeout, proxy configuration and so on.
 
 For example:
 
@@ -78,7 +78,7 @@ Other services can discovery instances of the `hello-world` service simply by de
 .Using @Client to Discover Services
 [source,java]
 ----
-@Client(id="hello-world")
+@Client(id = "hello-world")
 interface HelloClient{
 	...
 }
@@ -89,7 +89,7 @@ Alternatively you can also use ann:http.client.Client[] as a qualifier to `@Inje
 .Using @Client to Discover Services
 [source,java]
 ----
-@Client(id="hello-world")
+@Client(id = "hello-world")
 @Inject
 RxHttpClient httpClient;
 ----
@@ -116,4 +116,4 @@ consul:
           http: true
 ----
 
-With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <<healthEndpoint, Health Endpoint>>
+With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <<healthEndpoint, Health Endpoint>>.

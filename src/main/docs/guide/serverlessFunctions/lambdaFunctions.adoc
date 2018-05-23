@@ -42,7 +42,7 @@ You can deploy your function to AWS Lambda manually by building and uploading an
 The https://plugins.gradle.org/plugin/com.github.johnrengelman.shadow[Gradle Shadow] plugin provides a `shadowJar` task to generate a self-contained executable JAR file, which is suitable for AWS Lambda deployments.
 
 .Example build.gradle
-[source,gradle]
+[source,groovy]
 ----
 buildscript {
     repositories {
@@ -65,8 +65,9 @@ shadowJar {
 
 The executable JAR file can now be built using the `shadowJar` task.
 
+[source,bash]
 ----
-> ./gradlew shadowJar
+$ ./gradlew shadowJar
 ----
 
 === Maven Shade plugin
@@ -108,8 +109,9 @@ The https://maven.apache.org/plugins/maven-shade-plugin/[Maven Shade] plugin wil
 
 The executable JAR file can now be built using the `package` phase.
 
+[source,bash]
 ----
-./mvnw package
+$ ./mvnw package
 ----
 
 
@@ -170,14 +172,16 @@ The reason for this is the `function-groovy` dependency applies additional code 
 
 With the above build configuration, the function can be deployed to AWS Lambda using the `deploy` task.
 
+[source,bash]
 ----
-> ./gradlew deploy
+$ ./gradlew deploy
 ----
 
 The deployed function can then be invoked.
 
+[source,bash]
 ----
-> ./gradlew invoke
+$ ./gradlew invoke
 Hello, Fred
 ----
 

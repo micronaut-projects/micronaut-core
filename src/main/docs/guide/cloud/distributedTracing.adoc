@@ -1,6 +1,6 @@
 When operating Microservices in production it can be challenging to troubleshoot interactions between Microservices in a distributed architecture.
 
-To solve this problem a way to visualize interactions between Microservices in a distributed manner can be critical. Currently, there are various distributed tracing solutions, the most popular of which are https://zipkin.io[Zipkin] and https://zipkin.io[Jaeger] both of which provide different levels of support for the http://opentracing.io[Open Tracing] API.
+To solve this problem a way to visualize interactions between Microservices in a distributed manner can be critical. Currently, there are various distributed tracing solutions, the most popular of which are https://zipkin.io[Zipkin] and https://www.jaegertracing.io/[Jaeger] both of which provide different levels of support for the http://opentracing.io[Open Tracing] API.
 
 Micronaut features integration with both Zipkin and Jaeger (via the Open Tracing API).
 
@@ -54,7 +54,7 @@ class HelloService {
 
 In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
 
-These instrumentations are found in the pkg:tracing.instrument[] package and include HTTP <<clientFilters, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
+These instrumentations are found in the pkg:tracing.instrument[] package and include HTTP <<clientFilter, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
 
 == Tracing Beans
 
