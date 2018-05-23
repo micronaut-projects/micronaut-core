@@ -25,6 +25,8 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -48,6 +50,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
 
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
@@ -198,7 +202,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 Class<T> requiredType = conversionContext.getArgument().getType();
                 if (value != null) {
                     value = resolvePlaceHoldersIfNecessary(value);
-                    return conversionService.convert(value, conversionContext);
+                    Optional<T> converted = conversionService.convert(value, conversionContext);
+                    if (LOG.isTraceEnabled()) {
+                       if (converted.isPresent()) {
+                           LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                       } else {
+                           LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                       }
+                    }
+                    return converted;
                 } else if (Properties.class.isAssignableFrom(requiredType)) {
                     Properties properties = resolveSubProperties(name, entries, conversionContext);
                     return Optional.of((T) properties);
@@ -210,6 +222,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
                 }
             }
+        }
+        if (LOG.isTraceEnabled()) {
+                LOG.trace("No value found for property: {}", name);
         }
         return Optional.empty();
     }
@@ -250,17 +265,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             });
 
         return map;
-    }
-
-    private String normalizeName(String name) {
-        return name.replace('-', '.');
-    }
-
-    private Object resolvePlaceHoldersIfNecessary(Object value) {
-        if (value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
-        }
-        return value;
     }
 
     /**
@@ -385,19 +389,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
-    private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
-        switch (convention) {
-            case ENVIRONMENT_VARIABLE:
-                // environment variables are converted to lower case and dot separated
-                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
-                    .replace('_', '.'));
-            default:
-                return Collections.singletonList(
-                    NameUtils.hyphenate(property, true)
-                );
-        }
-    }
-
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
@@ -421,6 +412,30 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return entries;
+    }
+
+    private String normalizeName(String name) {
+        return name.replace('-', '.');
+    }
+
+    private Object resolvePlaceHoldersIfNecessary(Object value) {
+        if (value instanceof CharSequence) {
+            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+        }
+        return value;
+    }
+
+    private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
+        switch (convention) {
+            case ENVIRONMENT_VARIABLE:
+                // environment variables are converted to lower case and dot separated
+                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
+                        .replace('_', '.'));
+            default:
+                return Collections.singletonList(
+                        NameUtils.hyphenate(property, true)
+                );
+        }
     }
 
     private String trimIndex(String name) {
