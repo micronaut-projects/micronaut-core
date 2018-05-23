@@ -62,14 +62,16 @@ class RefreshEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body() == 'changed changed'
-
+1
         cleanup:
+        System.setProperty("foo.bar", "")
         rxClient.close()
         embeddedServer.close()
     }
 
     void "test refresh endpoint with all parameter"() {
         given:
+        System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], "test")
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
@@ -104,13 +106,14 @@ class RefreshEndpointSpec extends Specification {
 
         then: "Response is now different"
         conditions.eventually {
-            response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
-            response.code() == HttpStatus.OK.code
-            response.body() != firstResponse
+            def res = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+            res.code() == HttpStatus.OK.code
+            res.body() != firstResponse
         }
 
 
         cleanup:
+        System.setProperty("foo.bar", "")
         rxClient.close()
         embeddedServer.close()
     }
