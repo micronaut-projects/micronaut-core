@@ -1,6 +1,6 @@
 Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
 
-The following is a simply example:
+The following is a simple example:
 
 [source,groovy]
 ----
