@@ -234,6 +234,10 @@ subprojects { subproject ->
             showStandardStreams = !System.getenv("TRAVIS")
             exceptionFormat = 'full'
         }
+        afterSuite {
+            System.out.print('.')
+            System.out.flush()
+        }
     }
 
     configurations {
