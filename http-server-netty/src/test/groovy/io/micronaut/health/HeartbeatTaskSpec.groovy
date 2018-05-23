@@ -37,7 +37,7 @@ class HeartbeatTaskSpec extends Specification {
                 'micronaut.application.name':'test'
         ])
         HeartbeatListener listener = embeddedServer.getApplicationContext().getBean(HeartbeatListener)
-        PollingConditions conditions = new PollingConditions(delay: 0.5)
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
 
         then:
         conditions.eventually {
