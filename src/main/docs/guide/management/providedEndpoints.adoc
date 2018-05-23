@@ -32,8 +32,8 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 |===
 |Endpoint|URI|Description
 
-|api:management.endpoint.stop.StopEndpoint[]
+|api:management.endpoint.stop.ServerStopEndpoint[]
 | `/stop`
-|Shuts down the application server (see <<stopEndpoint, StopEndpoint>>)
+|Shuts down the application server (see <<stopEndpoint, ServerStopEndpoint>>)
 
 |===

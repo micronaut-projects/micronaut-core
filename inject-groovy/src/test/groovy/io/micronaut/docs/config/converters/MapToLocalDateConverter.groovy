@@ -29,10 +29,10 @@ class MapToLocalDateConverter implements TypeConverter<Map, LocalDate> { // <1>
         Optional<Integer> day = ConversionService.SHARED.convert(object.get("day"), Integer.class)
         Optional<Integer> month = ConversionService.SHARED.convert(object.get("month"), Integer.class)
         Optional<Integer> year = ConversionService.SHARED.convert(object.get("year"), Integer.class)
-        if ( day.isPresent() && month.isPresent() && year.isPresent() ) {
+        if (day.isPresent() && month.isPresent() && year.isPresent()) {
             try {
                 return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <2>
-            } catch ( DateTimeException e ) {
+            } catch (DateTimeException e) {
                 context.reject(object, e) // <3>
                 return Optional.empty()
             }

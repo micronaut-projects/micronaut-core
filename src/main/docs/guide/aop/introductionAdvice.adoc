@@ -36,7 +36,7 @@ include::{testsjava}/aop/introduction/StubIntroduction.java[tags=class, indent=0
 <2> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
 <3> Otherwise `null` is returned
 
-To now use this introduction advice in an application you simply annotation your abstract classes or interfaces with `@Stub`:
+To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with `@Stub`:
 
 
 .StubExample.java

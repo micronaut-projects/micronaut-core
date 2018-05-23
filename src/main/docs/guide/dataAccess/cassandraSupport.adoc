@@ -3,7 +3,7 @@ Add the following to the `build.gradle`:
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:cassandra:${projectVersion}"
+compile "io.micronaut.configuration:cassandra"
 ----
 
 Micronaut supports Cassandra configuration by using the https://docs.datastax.com/en/developer/java-driver/[Datastax Java Driver].

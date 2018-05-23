@@ -97,7 +97,7 @@ public class Neo4jDriverFactory {
 ----
 
 <1> A factory bean is created that defines methods that create beans
-<2> The `@Retryable` annotation is used try catch `ServiceUnavailableException` and retry creating the driver before failing startup.
+<2> The `@Retryable` annotation is used to catch `ServiceUnavailableException` and retry creating the driver before failing startup.
 
 
 == Retry Events

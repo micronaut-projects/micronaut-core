@@ -1,6 +1,6 @@
 Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
 
-Unlike the aforementioned frameworks, however, Micronaut uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
+Unlike the aforementioned frameworks, however, Micronaut uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is as efficient as possible with minimal impact on startup time.
 
 An example of a configuration class can be seen below:
 
@@ -12,7 +12,7 @@ include::{testsdir}/config/properties/EngineConfig.groovy[tags=imports, indent=0
 include::{testsdir}/config/properties/EngineConfig.groovy[tags=class, indent=0]
 ----
 
-<1> The `@ConfigProperties` annotation takes the configuration prefix
+<1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> You can use `javax.validation` to validate the configuration
 <3> Default values can be assigned to the property
 <4> Static inner classes can provided nested configuration
@@ -25,6 +25,9 @@ Once you have prepared a type safe configuration it can simply be injected into 
 ----
 include::{testsdir}/config/properties/EngineImpl.groovy[tags=class, indent=0]
 ----
+
+<1> Inject the `EngineConfig` bean
+<2> Use the configuration properties
 
 Configuration values can then be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
@@ -54,7 +57,7 @@ include::{testsdir}/config/builder/EngineConfig.groovy[tags=imports, indent=0]
 include::{testsdir}/config/builder/EngineConfig.groovy[tags=class, indent=0]
 ----
 
-<1> The `@ConfigProperties` annotation takes the configuration prefix
+<1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> The first builder can be configured with the class configuration prefix
 <3> The second builder can be configured with the class configuration prefix + the `configurationPrefix` value.
 

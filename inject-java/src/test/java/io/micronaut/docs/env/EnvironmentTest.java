@@ -15,19 +15,14 @@
  */
 package io.micronaut.docs.env;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySource;
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
-
-import java.util.Arrays;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 /**
  * @author Graeme Rocher
@@ -54,7 +49,7 @@ public class EnvironmentTest {
                 PropertySource.of(
                         "test",
                         CollectionUtils.mapOf(
-                                "micronaut.server.host", "foo",
+                            "micronaut.server.host", "foo",
                             "micronaut.server.port", 8080
                         )
                 ),

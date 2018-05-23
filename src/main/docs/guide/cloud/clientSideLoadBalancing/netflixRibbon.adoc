@@ -22,7 +22,7 @@ ribbon:
     ServerListRefreshInterval: 2000
 ----
 
-Each discovered client can also be configured under `ribbon.clients`. For example given a `@Client(id="hello-world")` you can configure Ribbon settings with:
+Each discovered client can also be configured under `ribbon.clients`. For example given a `@Client(id = "hello-world")` you can configure Ribbon settings with:
 
 .Per Client Ribbon Settings
 [source,yaml]
