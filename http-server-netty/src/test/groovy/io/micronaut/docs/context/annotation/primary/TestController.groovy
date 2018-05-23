@@ -26,13 +26,13 @@ public class TestController {
 
     protected final ColorPicker colorPicker;
 
-    TestController(ColorPicker colorPicker) { // <1>
+    public TestController(ColorPicker colorPicker) { // <1>
         this.colorPicker = colorPicker;
     }
 
     @Get('/')
     public String index() {
-        return colorPicker.color()
+        return colorPicker.color();
     }
 }
 //end::clazz[]
