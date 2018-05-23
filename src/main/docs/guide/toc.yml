@@ -189,4 +189,10 @@ security:
     logout: Logout Controller
     refresh: Refresh Controller
   securityEvents: Security Events
+cli:
+  title: Micronaut CLI
+  createProject: Creating a Project
+  profiles: Profiles
+  features: Features
+  commands: Commands
 

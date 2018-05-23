@@ -1,0 +1,231 @@
+Creating a project is the primary usage of the CLI. There are two primary commands for creating new projects: `create-app` and `create-function`. Both of these commands will generate a project based upon an associated profile (which can be overridden), and will set the `micronaut.application.name` configuration property in `src/main/resources/application.yml`.
+
+In addition, there are specialty commands for creating a "federation" of multiple Micronaut services (`create-federation`) and for creating new profiles for the CLI (`create-profile`).
+
+
+.Micronaut CLI Project Creation Commands
+|===
+|Command|Description|Arguments|Example
+
+|`create-app`
+|Creates a basic Micronaut application, using the `service` profile by default.
+| `profile`, `features`, `build`, `inplace`
+|`mn create-app my-project -features mongo-reactive,security-jwt  -build maven`
+
+
+|`create-function`
+|Creates a Micronaut serverless function, using the `function-aws` profile by default.
+| `provider`, `lang`, `test`, `features`, `build`, `inplace`
+|`mn create-function my-lambda-function -lang groovy -test spock`
+
+|`create-federation`
+|Creates a federation of Micronaut services with shared profile/features.
+| `services`, `profile`, `features`, `build`, `inplace`
+|`mn create-federation my-federation -services users,inventory,billing`
+
+|`create-profile`
+|Creates a Micronaut profile
+| `profile`, `features`, `inplace`
+|`mn create-profile security-service -profile service -features security-jwt`
+
+|===
+
+
+== Create-App
+
+The `create-app` command will generate a basic Micronaut project, with optional flags to specify features, profile, and build tool. The project will include a default `Application` class for starting the application.
+
+
+.Create-App Flags
+|===
+|Flag|Description|Example
+
+|`build`
+|Build tool (one of `gradle`, `maven` - default is `gradle`)
+|`-build maven`
+
+|`profile`
+|Profile to use for the project (default is `service`)
+|`-profile function-aws`
+
+|`features`
+|Features to use for the project, comma-separated
+|`-features security-jwt,mongo-gorm`
+
+|`inplace`
+|If present, generates the project in the current directory (project name is optional if this flag is set)
+|`-inplace`
+
+|===
+
+
+Once created, the application can be started using the `Application` class, or the appropriate build tool task.
+
+.Starting a Gradle project
+[source,bash]
+----
+$ ./gradlew run
+----
+
+.Starting a Maven project
+[source,bash]
+----
+$ ./mvnw compile exec:exec
+----
+
+=== Language/Test Features
+
+By default, `create-app` will generate a Java application, with JUnit configured as the test framework. The language and test framework settings for a given project are stored as the `testFramework` and `sourceLanguage` properties in the `micronaut-cli.yml` file, as shown below:
+
+.micronaut-cli.yml
+[source,yaml]
+----
+profile: service
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java
+----
+
+NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation purposes. After a project has been generated, you can edit these values to change the project defaults, however you will still need to supply the required dependencies and/or configuration in order to use your chosen language/framework. E.g, you could edit the `testFramework` property to `spock` to cause the CLI to generate Spock tests when running commands (such as `create-controller`), but you will still need to add the Spock dependency to your project.
+
+==== Groovy
+
+To create an app with Groovy & Spock support, supply the appropriate features via the `feature` flag:
+
+[source,bash]
+----
+mn> create-app my-groovy-app -features groovy, spock
+----
+
+This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+
+==== Kotlin
+
+To create an app with Kotlin & Spek support, supply the appropriate features via the `feature` flag:
+
+[source,bash]
+----
+mn> create-app my-groovy-app -features kotlin, spek
+----
+
+This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+
+
+=== Build Tool
+
+By default `create-app` will create a Gradle project, with a `build.gradle` file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the `build` flag:
+
+[source,bash]
+----
+mn> create-app my-maven-app -build maven
+----
+
+== Create-Function
+
+The `create-function` command will generate a <<serverlessFunctions,Micronaut function>> project, optimized for serverless environments, with optional flags to specify language, test framework, features and build tool. The project will include a `*Function` class (based on the project name - e.g., `hello-world` will generate `HelloWorldFunction`), and an associated test which will instantiate the function and verify that it can receive requests.
+
+TIP: Currently AWS Lambda is the only supported cloud provider for Micronaut functions, so some of the information below will be specific to that platform. Other cloud providers will be added soon and this section will be updated accordingly.
+
+.Create-Function Flags
+|===
+|Flag|Description|Example
+
+|`lang`
+|Language to use for the function (one of `java`, `groovy`, `kotlin` - default is `java`)
+|`-lang groovy`
+
+|`test`
+|Language to use for the function (one of `java`, `groovy`, `kotlin` - default is `java`)
+|`-test spock`
+
+|`build`
+|Build tool (one of `gradle`, `maven` - default is `gradle`)
+|`-build maven`
+
+|`features`
+|Features to use for the function, comma-separated
+|`-features security-jwt,mongo-gorm`
+
+|`provider`
+|Provider to use for the function (currently the only supported provider is `aws` for AWS Lambda - this is the default)
+|`-provider aws`
+
+|`inplace`
+|If present, generates the function in the current directory (function name is optional if this flag is set)
+|`-inplace`
+
+|===
+
+
+=== Language
+
+Setting the language using the `lang` flag will generate a `*Function` file in the appropriate language. For Java/Kotlin, this will generate a class annotated with ann:function.FunctionBean[]. For Groovy, a Groovy function script will be generated. See <<writingFunctions, Writing Functions>> for more details on how to write and test Micronaut functions.
+
+Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a Spek test. However, you can override the chosen test framework with the `test` flag.
+
+[source,bash]
+----
+$ mn create-function hello-world -lang java -test spock
+----
+
+=== Build Tool
+
+Depending upon the build tool selected, the project will include various tasks for building/deploying the function.
+
+==== Gradle
+
+Functions with a Gradle build are preconfigured with the https://github.com/classmethod/gradle-aws-plugin[Gradle AWS Plugin]. The configuration can be seen in the `build.gradle` file (see the section on <<lambdaFunctions, Deploying Functions to AWS Lambda>>). Assuming valid AWS credentials under `~/.aws/credentials`, the application can be deployed using the `deploy` task.
+
+[source,bash]
+----
+$ ./gradlew deploy
+----
+
+==== Maven
+
+Functions with a Maven build are preconfigured with the https://maven.apache.org/plugins/maven-shade-plugin/[Maven Shade Plugin], which will generate an executable JAR suitable for uploading to AWS Lambda. The JAR file can be built using the `package` phase.
+
+[source,bash]
+----
+$ ./mvnw package
+----
+
+For further details, consult the https://docs.aws.amazon.com/lambda/latest/dg/java-create-jar-pkg-maven-no-ide.html[AWS Lambda Documentation.]
+
+== Create-Federation
+
+The `create-federation` command accepts the same flags as the `create-app` command, and follows mostly the same behavior. The key difference is that this command accepts multiple project names following the `services` flag, and will generate a project (with the specified profile and features) for each name supplied. The `[NAME]` argument will be used to create the top-level multi-project build for the federation.
+
+.Create-Federation Flags
+|===
+|Flag|Description|Example
+
+|`services`
+|Comma-separated list of services (applications) to create
+|`-services users,inventory,billing`
+
+|`build`
+|Build tool (one of `gradle`, `maven` - default is `gradle`)
+|`-build maven`
+
+|`profile`
+|Profile to use for all projects in the federation (default is `service`)
+|`-profile function-aws`
+
+|`features`
+|Features to use for all projects in the federation, comma-separated
+|`-features security-jwt,mongo-gorm`
+
+|`inplace`
+|If present, generates the project in the current directory (project name is optional if this flag is set)
+|`-inplace`
+
+|===
+
+When creating a federation, a top-level project file will be generated (using the chosen build tool), and subprojects/modules will be created for each service in the federation.
+
+== Create-Profile
+
+The `create-profile` command is used to generate new profiles for the Micronaut CLI.
+//TODO

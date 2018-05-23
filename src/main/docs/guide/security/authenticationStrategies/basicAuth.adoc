@@ -29,7 +29,7 @@ The following configuration properties are available to customize basic authenti
 
 | Configuration Property | Default Value | Description
 
-| `micronaut.security.token.basicAuth.enabled` | `true` | link:{api}/io/micronaut/security/token/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
+| `micronaut.security.token.basicAuth.enabled` | `true` | link:{api}/io/micronaut/security/token/basicauth/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
 
 | `micronaut.security.token.basicAuth.headerName` | `Authorization` | Header name
 
@@ -39,4 +39,4 @@ The following configuration properties are available to customize basic authenti
 
 See the javadoc for api:security.token.basicauth.BasicAuthTokenReaderConfigurationProperties[] for more information.
 
-TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.
+//TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.

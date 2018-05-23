@@ -56,7 +56,7 @@ In addition, the function will be registered by the configured <<serviceDiscover
 
 TIP: For further information on the use of `@FunctionClient`, please see <<callingFunctions, Calling Functions>>.
 
-=== Testing Functions
+== Testing Functions
 
 Functions can also be run as part of the Micronaut application context for ease of testing. Similarly to the example above, this approach requires the `function-web` and an HTTP server dependency on the classpath for tests. For example, in `build.gradle`:
 
@@ -70,6 +70,7 @@ dependencies {
     ...
 }
 ----
+<1> In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
 
 Create a ann:function.client.FunctionClient[] interface as shown below:
 

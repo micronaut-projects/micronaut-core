@@ -11,7 +11,7 @@ micronaut:
 
 The above example sets of `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
 
-If you wish to have a separate configuration per client then there are a couple of options. An optional that fits nicely with <<serviceDiscovery, Service Discovery>> is to define a named bean that is a subclass of api:http.client.HttpClientConfiguration[].
+If you wish to have a separate configuration per client then there are a couple of options. An option that fits nicely with <<serviceDiscovery, Service Discovery>> is to define a named bean that is a subclass of api:http.client.HttpClientConfiguration[].
 
 For example given an injected client for a service called `hello` using `@Client`:
 

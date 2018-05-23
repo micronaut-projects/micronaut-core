@@ -53,9 +53,9 @@ import java.util.stream.Collectors;
 @Requires(beans = HealthEndpoint.class)
 public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
-    private final static String STATUS = "status";
-    private final static String DESCRIPTION = "description";
-    private final static String DETAILS = "details";
+    private static final String STATUS = "status";
+    private static final String DESCRIPTION = "description";
+    private static final String DETAILS = "details";
 
     @Override
     public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {

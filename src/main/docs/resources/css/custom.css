@@ -5,10 +5,16 @@
     width: 100%;
     z-index: 999;
     transition: top 0.5s;
+    height: 75px !important;
+}
+.navLinks {
+    margin-top: 15px;
 }
 .navTitle {
     width: auto;
+    background: none;
     padding-right: 5px !important;
+    padding-left: 0 !important;
 }
 .wiki-table th, #navigation {
     background: #000000 !important;
@@ -67,7 +73,7 @@ a:hover,
 }
 .navTitle #logo img {
     margin: 8px 0;
-    height: 30px !important;
+    height: 50px !important;
 }
 
 #navigation #nav-summary-childs {
@@ -75,7 +81,7 @@ a:hover,
 }
 
 #main {
-    margin-top: 60px;
+    margin-top: 80px;
 }
 #table-of-content {
     width: 28%;
@@ -103,7 +109,7 @@ a:hover,
 }
 
 @media screen and (min-width: 961px) {
-    #main > div:nth-child(-n+45) {
+    #main > div:nth-child(-n+46) {
         max-width: 62%;
     }
 }

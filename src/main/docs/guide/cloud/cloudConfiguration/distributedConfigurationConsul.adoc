@@ -17,7 +17,7 @@ Alternatively you can https://www.consul.io/docs/install/index.html[install and 
 To enable distributed configuration, similar to Spring Boot and Grails, you need to create a `src/main/resources/bootstrap.yml` configuration file and configure Consul as well as enable the configuration client:
 
 .bootstrap.yml
-[source.yaml]
+[source,yaml]
 ----
 micronaut:
     application:
@@ -104,7 +104,7 @@ EOF
 
 == Storing Configuration as File References
 
-Another option popular option is to https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's Key/Value store.
+Another option popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's Key/Value store.
 
 You can setup a Git repository that contains files like `application.yml`, `hello-world-test.json` etc. and the contents of these files are cloned to Consul.
 

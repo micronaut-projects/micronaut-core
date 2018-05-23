@@ -32,15 +32,14 @@ public class HeadlineController {
 
     @Get("/")
     public Publisher<Event<Headline>> index() { // <1>
-        String[] versions = new String[]{ "1.0", "2.0" }; // <2>
+        String[] versions = new String[]{"1.0", "2.0"}; // <2>
 
         return Flowable.generate(() -> 0, (i, emitter) -> { // <3>
-            if(i < versions.length) {
+            if (i < versions.length) {
                 emitter.onNext( // <4>
-                        Event.of(new Headline("Micronaut "+versions[i]+" Released", "Come and get it"))
+                    Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
                 );
-            }
-            else {
+            } else {
                 emitter.onComplete(); // <5>
             }
             return ++i;
