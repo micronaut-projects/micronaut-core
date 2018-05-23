@@ -66,6 +66,7 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
     options.links links as String[]
     options.addStringOption 'Xdoclint:none', '-quiet'
+    options.addBooleanOption('notimestamp', true)
 
     subprojects.each { proj ->
         if(!proj.name != 'docs' && !proj.name.startsWith('examples') ) {
