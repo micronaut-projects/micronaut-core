@@ -21,9 +21,34 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 * Minimal use of proxies
 * Easy Unit Testing
 
-For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io) 
+For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io)
 
-# Versioning
+## Building From Source
+
+To build from source checkout the code and run:
+
+```
+./gradlew publishToMavenLocal
+```
+
+This will publish the current version to your local Maven cache. To get the CLI operational you can do:
+
+```
+export MICRONAUT_HOME=/path/to/checkout
+export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
+```
+
+You will also need to checkout the [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles/) and run `./gradlew publishToMavenLocal` there to.
+
+You should then be able to `mn create-app hello-world`.
+
+To build the documentation run `./gradlew docs`. The documentation is built to `build/docs/index.html`.
+
+## Contributing Code
+
+If you wish to contribute to the development of Micronaut please read the [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Versioning
 
 Micronaut is using Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.
 
