@@ -26,6 +26,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author Graeme Rocher
@@ -99,11 +100,15 @@ class RefreshEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
 
         when:
-        response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+        PollingConditions conditions = new PollingConditions(timeout: 3)
 
         then: "Response is now different"
-        response.code() == HttpStatus.OK.code
-        response.body() != firstResponse
+        conditions.eventually {
+            response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+            response.code() == HttpStatus.OK.code
+            response.body() != firstResponse
+        }
+
 
         cleanup:
         rxClient.close()
