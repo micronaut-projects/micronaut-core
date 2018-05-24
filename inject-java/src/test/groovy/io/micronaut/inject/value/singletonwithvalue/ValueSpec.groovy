@@ -16,8 +16,6 @@
 package io.micronaut.inject.value.singletonwithvalue
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import spock.lang.Specification
 
 class ValueSpec extends Specification {

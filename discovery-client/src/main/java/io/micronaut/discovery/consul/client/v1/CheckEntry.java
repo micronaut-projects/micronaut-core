@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -36,6 +37,9 @@ public class CheckEntry implements Check {
     private String name;
     private String status;
 
+    /**
+     * @param id The id
+     */
     @JsonCreator
     protected CheckEntry(@JsonProperty("CheckID") String id) {
         this.id = id;
@@ -49,7 +53,7 @@ public class CheckEntry implements Check {
     /**
      * @param name The name of the check
      */
-    void setName(String name) {
+    protected void setName(String name) {
         this.name = name;
     }
 
@@ -66,7 +70,7 @@ public class CheckEntry implements Check {
     /**
      * @param notes The human readable notes
      */
-    void setNotes(String notes) {
+    protected void setNotes(String notes) {
         this.notes = notes;
     }
 
@@ -80,7 +84,7 @@ public class CheckEntry implements Check {
     /**
      * @param status The status
      */
-    void setStatus(String status) {
+    protected void setStatus(String status) {
         this.status = status;
     }
 

@@ -43,6 +43,11 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     private final Charset finalCharset;
     private final List<ConversionError> conversionErrors = new ArrayList<>();
 
+    /**
+     * @param argument     The argument
+     * @param finalLocale  The final locale
+     * @param finalCharset The final charset
+     */
     DefaultArgumentConversionContext(Argument<T> argument, Locale finalLocale, Charset finalCharset) {
         this.argument = argument;
         this.finalLocale = finalLocale;

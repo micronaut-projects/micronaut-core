@@ -1,6 +1,6 @@
 The most common type of advice you may want to apply is "Around" advice, which essentially allows you decorate a methods behaviour.
 
-=== Writing Around Advice
+== Writing Around Advice
 
 The first step to defining Around advice is to implement a link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor]. For example the following interceptor disallows parameters with `null` values:
 
@@ -53,11 +53,11 @@ include::{testsjava}/aop/around/AroundTest.java[tags=test, indent=0]
 
 NOTE: Since Micronaut is compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test compiling before the advice itself is compiled.
 
-=== Customizing Proxy Generation
+== Customizing Proxy Generation
 
 The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
 
-This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviur and the `@Around` annotation supports various attributes that allow you to alter this behaviour including:
+This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviour and the `@Around` annotation supports various attributes that allow you to alter this behaviour including:
 
 * `proxyTarget` (defaults to `false`) - If set to `true` instead of a subclass that calls `super`, the proxy will delegate to the original bean instance
 * `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.

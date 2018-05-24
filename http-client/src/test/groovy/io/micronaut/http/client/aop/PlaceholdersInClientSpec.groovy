@@ -17,8 +17,6 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Get
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -31,11 +29,16 @@ import spock.lang.Specification
  */
 class PlaceholdersInClientSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'books.uri':'/blocking',
             'my.path':'{id}'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test placeholder in @Client value"() {
         given:

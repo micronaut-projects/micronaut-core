@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io
 
-import io.micronaut.cli.util.CliSettings
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
+import io.micronaut.cli.util.CliSettings
 
 /**
  * Utility methods for interacting with resources
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class ResourceUtils extends io.micronaut.cli.io.support.ResourceUtils {
@@ -47,7 +48,7 @@ class ResourceUtils extends io.micronaut.cli.io.support.ResourceUtils {
                 def dirName = dir.name
                 if (!dir.hidden && !dirName.startsWith('.') && !['conf', 'i18n', 'assets', 'views', 'migrations'].contains(dirName)) {
                     File[] files = dir.listFiles()
-                    populatePackages(dir,files, packageNames, "")
+                    populatePackages(dir, files, packageNames, "")
                 }
             }
         }
@@ -57,28 +58,26 @@ class ResourceUtils extends io.micronaut.cli.io.support.ResourceUtils {
 
     protected static populatePackages(File rootDir, File[] files, Collection<String> packageNames, String prefix) {
 
-        if(files != null) {
-            for(dir in files ) {
-                if(dir.isDirectory()) {
+        if (files != null) {
+            for (dir in files) {
+                if (dir.isDirectory()) {
                     String dirName = dir.name
                     if (!dir.hidden && !dirName.startsWith('.')) {
                         def dirFiles = dir.listFiles()
-                        if(dirFiles != null) {
+                        if (dirFiles != null) {
                             boolean hasGroovySources = dirFiles?.find() { File f -> f.name.endsWith('.groovy') }
-                            if(hasGroovySources) {
+                            if (hasGroovySources) {
                                 // if there are Groovy sources stop here, no need to add child packages
                                 packageNames.add "${prefix}${dirName}".toString()
-                            }
-                            else {
+                            } else {
                                 // otherwise recurse into a child package
                                 populatePackages(dir, dirFiles, packageNames, "${prefix}${dirName}.")
                             }
                         }
 
                     }
-                }
-                else {
-                    if(dir.name.endsWith('.groovy') && prefix == "") {
+                } else {
+                    if (dir.name.endsWith('.groovy') && prefix == "") {
                         packageNames.add("")
                     }
                 }

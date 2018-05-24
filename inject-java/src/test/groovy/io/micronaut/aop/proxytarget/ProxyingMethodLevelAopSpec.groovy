@@ -15,10 +15,6 @@
  */
 package io.micronaut.aop.proxytarget
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.aop.Intercepted
 import io.micronaut.aop.InterceptedProxy
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext

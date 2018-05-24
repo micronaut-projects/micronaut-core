@@ -1,1 +1,19 @@
-TODO
+The HTTP server features a number of configuration options you may wish to tweak. Defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
+
+The following example shows how tweak configuration options for the server via `application.yml`:
+
+.Configuring HTTP server settings
+[source,yaml]
+----
+micronaut:
+    server:
+        maxRequestSize: 1MB
+        netty:
+           maxHeaderSize: 500KB # maximum size for headers
+           worker:
+              threads: 8 # number of netty worker threads
+           childOptions:
+              autoRead: true # auto read request body
+----
+
+All the available options are described within the javadoc of api:http.server.netty.configuration.NettyHttpServerConfiguration[].

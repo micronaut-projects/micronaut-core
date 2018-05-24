@@ -1,8 +1,8 @@
 The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables.
 
-=== Binding Annotations
+== Binding Annotations
 
-You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
+You can customize the name of the variable bound with the link:{api}/io/micronaut/context/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
 In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
@@ -25,7 +25,7 @@ The following table summarizes the annotations, their purpose and provides an ex
 |Binds a parameter from an HTTP header
 |`@Header String contentType`
 
-|link:{api}/io/micronaut/http/annotation/Parameter.html[@Parameter]
+|link:{api}/io/micronaut/context/annotation/Parameter.html[@Parameter]
 |Bindings from a request URI variable or request parameter
 |`@Parameter String myParam`
 |===
@@ -59,7 +59,7 @@ public String hello(@Header String contentType) {
 
 
 
-=== Bindable Types
+== Bindable Types
 
 Generally any type that can be converted from a String representation to a Java type via the link:{api}/io/micronaut/core/convert/ConversionService.html[ConversionService] API can be bound to.
 
@@ -100,7 +100,7 @@ public String hello(@Format('dd/MM/yyy') @Header ZonedDateTime date) {
 }
 ----
 
-=== Variables resolution
+== Variables resolution
 
 Micronaut will try to populate method arguments in the following order:
 

@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
+ * Route based method matching classes derived from URIs.
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
 package io.micronaut.web.router;
 
-import io.micronaut.context.annotation.Configuration;

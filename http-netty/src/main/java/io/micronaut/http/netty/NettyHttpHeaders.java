@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -29,7 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Delegates to Netty's {@link io.netty.handler.codec.http.HttpHeaders}
+ * Delegates to Netty's {@link io.netty.handler.codec.http.HttpHeaders}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,18 +41,25 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
     final ConversionService<?> conversionService;
 
+    /**
+     * @param nettyHeaders      The Netty Http headers
+     * @param conversionService The conversion service
+     */
     public NettyHttpHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.nettyHeaders = nettyHeaders;
         this.conversionService = conversionService;
     }
 
+    /**
+     * Default constructor.
+     */
     public NettyHttpHeaders() {
         this.nettyHeaders = new DefaultHttpHeaders(false);
         this.conversionService = ConversionService.SHARED;
     }
 
     /**
-     * @return The underlying Netty headers
+     * @return The underlying Netty headers.
      */
     public io.netty.handler.codec.http.HttpHeaders getNettyHeaders() {
         return nettyHeaders;
@@ -96,5 +104,10 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         nettyHeaders.add(header, value);
         return this;
+    }
+
+    @Override
+    public void remove(CharSequence header) {
+        nettyHeaders.remove(header);
     }
 }

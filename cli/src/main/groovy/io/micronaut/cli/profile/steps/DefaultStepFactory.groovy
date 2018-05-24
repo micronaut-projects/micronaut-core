@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.steps
 
 import groovy.transform.CompileStatic
@@ -24,7 +25,7 @@ import io.micronaut.cli.profile.Step
  * Dynamic creation of {@link Step} instances
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class DefaultStepFactory implements StepFactory {
@@ -39,7 +40,7 @@ class DefaultStepFactory implements StepFactory {
 
     @Override
     Step createStep(String name, Command command, Map parameters) {
-        if(command instanceof ProfileCommand) {
+        if (command instanceof ProfileCommand) {
             return steps[name]?.newInstance(command, parameters)
         }
     }

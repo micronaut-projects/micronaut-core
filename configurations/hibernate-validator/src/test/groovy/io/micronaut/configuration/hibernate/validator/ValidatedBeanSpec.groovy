@@ -15,11 +15,6 @@
  */
 package io.micronaut.configuration.hibernate.validator
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Value
-import io.micronaut.context.exceptions.BeanInstantiationException
-import org.hibernate.validator.constraints.NotBlank
 import org.hibernate.validator.constraints.URL
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext

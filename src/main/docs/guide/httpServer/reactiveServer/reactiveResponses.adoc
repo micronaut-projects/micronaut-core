@@ -38,6 +38,6 @@ To summarize, the following table illustrates some common response types and the
 |`Book show()`
 |===
 
-NOTE: When returning a Reactive type, the type of reactive type has an impact on the response returned. For example, when returning a rx:Flowable[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `rx:Single[]` the `Content-Length` header will be populated.
+NOTE: When returning a Reactive type, the type of reactive type has an impact on the response returned. For example, when returning a rx:Flowable[], Micronaut can not know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `rx:Single[]` the `Content-Length` header will be populated.
 
 

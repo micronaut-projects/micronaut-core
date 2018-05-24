@@ -1,0 +1,21 @@
+To authenticate users you must provide implementations of link:{api}/io/micronaut/security/authentication/AuthenticationProvider.html[AuthenticationProvider].
+
+The following code snippet illustrates a naive implementation:
+
+[source, groovy]
+----
+include::{testssecurity}/security/token/basicauth/AuthenticationProviderUserPassword.groovy[tag=clazz,indent=0]
+----
+
+The built-in <<login, Login Controller>> uses every available authentication provider. Authentication strategies, such as basic auth, where the credentials are present in the request use the available authentication providers too.
+
+
+Micronaut ships with link:{api}/io/micronaut/security/authentication/providers/DelegatingAuthenticationProvider.html[DelegatingAuthenticationProvider] which can be typically used
+in environments such as the one described in the next diagramm.
+
+image::delegating_authentication_provider.svg[]
+
+`DelegatingAuthenticationProvider` is not enabled unless you provide implementations for link:{api}/io/micronaut/security/authentication/providers/UserFetcher.html[UserFetcher],
+link:{api}/io/micronaut/security/authentication/providers/PasswordEncoder.html[PasswordEncoder] and  link:{api}/io/micronaut/security/authentication/providers/AuthoritiesFetcher.html[AuthoritiesFetcher]
+
+//TIP: Read the http://guides.micronaut.io/micronaut-security-db-authprovider/guide/index.html[Database Authentication Provider Micronaut Guide] to learn more.

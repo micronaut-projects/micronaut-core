@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ class InfoEndpointSpec extends Specification {
 
     void "test the info endpoint returns expected result"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['info.test': 'foo'], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.test': 'foo'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -40,12 +40,16 @@ class InfoEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().test == "foo"
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 
     void "test ordering of info sources"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['info.ordered': 'second'], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.ordered': 'second'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -55,11 +59,14 @@ class InfoEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
         response.body().ordered == "first"
 
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
     void "test info sources"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -77,12 +84,15 @@ class InfoEndpointSpec extends Specification {
         response.body().build.group == "io.micronaut"
         response.body().build.name == "test"
 
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 
     void "test the git endpoint with alternate location"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.git.location': 'othergit.properties'], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'endpoints.info.git.location': 'othergit.properties'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -91,6 +101,10 @@ class InfoEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().git.branch == "master2"
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
     }
 
 

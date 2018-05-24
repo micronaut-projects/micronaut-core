@@ -1,8 +1,8 @@
-The classic requirement of dependency injection is the interface and multiple possible implementations.
+If you have multiple possible implementations for a given interface that you want to inject, you need to use a qualifier.
 
 Once again Micronaut leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
 
-=== Qualifying By Name
+== Qualifying By Name
 
 To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example, consider the following classes:
 
@@ -25,7 +25,9 @@ include::{testsdir}/qualifiers/named/Vehicle.groovy[tags=class, indent=0]
 <4> The link:{jeeapi}/javax/inject/Named.html[Named] annotation is used to indicate the `V8Engine` implementation is required
 <5> Calling the start method prints: `"Starting V8"`
 
-=== Qualifying By Annotation
+You can also declare link:{jeeapi}/javax/inject/Named.html[@Named] at the class level of a bean to explicitly define the name of the bean.
+
+== Qualifying By Annotation
 
 In addition to being able to qualify by name, you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
 
@@ -43,7 +45,7 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 include::{testsdir}/qualifiers/annotation/Vehicle.groovy[tags=constructor, indent=0]
 ----
 
-=== Primary and Secondary Beans
+== Primary and Secondary Beans
 
 api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean that should be selected in the case of multiple possible interface implementations.
 

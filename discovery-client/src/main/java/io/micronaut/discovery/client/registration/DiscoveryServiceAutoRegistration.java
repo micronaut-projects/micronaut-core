@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client.registration;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -27,16 +28,28 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 /**
- * Abstract class for {@link AutoRegistration} with discovery services
+ * Abstract class for {@link AutoRegistration} with discovery services.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration {
+
+    /**
+     * @param registrationConfiguration The registration configuration
+     */
     protected DiscoveryServiceAutoRegistration(RegistrationConfiguration registrationConfiguration) {
         super(registrationConfiguration);
     }
 
+    /**
+     * Register a new service instance in the discovery service.
+     *
+     * @param discoveryService       The discovery service
+     * @param registration           The registration configuration
+     * @param instance               The service instance
+     * @param registrationObservable The registration observable
+     */
     protected void performRegistration(
         String discoveryService,
         RegistrationConfiguration registration,
@@ -73,6 +86,11 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
         });
     }
 
+    /**
+     * @param e           The throwable
+     * @param description The error's description
+     * @return The error message
+     */
     protected String getErrorMessage(Throwable e, String description) {
         String message;
         if (e instanceof HttpClientResponseException) {
@@ -88,6 +106,14 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
         return message;
     }
 
+    /**
+     * De-register a service from the discovery client.
+     *
+     * @param discoveryService    The discovery service
+     * @param registration        The registration configuration
+     * @param deregisterPublisher The registration publisher
+     * @param applicationName     The application name to de-register
+     */
     protected void performDeregistration(String discoveryService, RegistrationConfiguration registration, Publisher<HttpStatus> deregisterPublisher, String applicationName) {
         if (registration.isFailFast()) {
 

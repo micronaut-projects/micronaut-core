@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
@@ -43,8 +44,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}
+ * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}.
  *
+ * @param <B> The response type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -62,11 +64,19 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
     private final B body;
 
+    /**
+     * @param fullHttpResponse       The full Http response
+     * @param mediaTypeCodecRegistry The media type codec registry
+     * @param byteBufferFactory      The byte buffer factory
+     * @param bodyType               The body type
+     * @param errorStatus            The error status
+     */
     FullNettyClientHttpResponse(
         FullHttpResponse fullHttpResponse,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
         Argument<B> bodyType, boolean errorStatus) {
+
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
@@ -75,7 +85,17 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
-            this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+            if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
+                Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
+                if (responseBodyType.isPresent()) {
+                    Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
+                    this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
+                } else {
+                    this.body = null;
+                }
+            } else {
+                this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+            }
         } else {
             this.body = null;
         }
@@ -108,14 +128,25 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
-        if (type == null) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
         return getBody(Argument.of(type));
+    }
+
+    /**
+     * @return The Netty native response object
+     */
+    public FullHttpResponse getNativeResponse() {
+        return nettyHttpResponse;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        if (type == null) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
 
         if (type.getType() == ByteBuffer.class) {
             return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
@@ -134,7 +165,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                             return convertByteBuf(bytebuf, argument);
                         }
                         Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
-                        if(!converted.isPresent()) {
+                        if (!converted.isPresent()) {
                             ByteBuf content = nettyHttpResponse.content();
                             return convertByteBuf(content, type);
                         }
@@ -153,11 +184,23 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         return result;
     }
 
+    private boolean isParseableBodyType(Class<?> rawBodyType) {
+        return CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType);
+    }
+
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
+            }
+            if (!convertedBodies.isEmpty()) {
+                for (Map.Entry<Argument, Optional> entry : convertedBodies.entrySet()) {
+                    Argument existing = entry.getKey();
+                    if (type.getType().isAssignableFrom(existing.getType())) {
+                        return entry.getValue();
+                    }
+                }
             }
             return Optional.empty();
         }
@@ -178,12 +221,5 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
-    }
-
-    /**
-     * @return The Netty native response object
-     */
-    public FullHttpResponse getNativeResponse() {
-        return nettyHttpResponse;
     }
 }

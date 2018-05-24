@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.condition;
 
 /**
- * Represents a failure in a {@link Condition}
+ * Represents a failure in a {@link Condition}.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface Failure {
+
     /**
      * @return The failure message
      */
     String getMessage();
 
     /**
-     * A simple failure
+     * A simple failure.
+     *
      * @param message The message
      * @return The failure
      */

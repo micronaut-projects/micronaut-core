@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -24,28 +25,44 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances</p>
+ * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
+    private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
+
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
+    @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[57];
 
     /**
-     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
      * @param conversionService The {@link ConversionService}
      */
@@ -55,14 +72,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     /**
-     * Creates a new, initially empty, {@link PropertySourcePropertyResolver}
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver}.
      */
     public PropertySourcePropertyResolver() {
         this(ConversionService.SHARED);
     }
 
     /**
-     * Creates a new {@link PropertySourcePropertyResolver} for the given {@link PropertySource} instances
+     * Creates a new {@link PropertySourcePropertyResolver} for the given {@link PropertySource} instances.
      *
      * @param propertySources The {@link PropertySource} instances
      */
@@ -76,7 +93,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     /**
-     * Add a {@link PropertySource} to this resolver
+     * Add a {@link PropertySource} to this resolver.
      *
      * @param propertySource The {@link PropertySource} to add
      * @return This {@link PropertySourcePropertyResolver}
@@ -90,8 +107,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     /**
-     * Add a property source for the given map
+     * Add a property source for the given map.
      *
+     * @param name   The name of the property source
      * @param values The values
      * @return This environment
      */
@@ -184,7 +202,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 Class<T> requiredType = conversionContext.getArgument().getType();
                 if (value != null) {
                     value = resolvePlaceHoldersIfNecessary(value);
-                    return conversionService.convert(value, conversionContext);
+                    Optional<T> converted = conversionService.convert(value, conversionContext);
+                    if (LOG.isTraceEnabled()) {
+                       if (converted.isPresent()) {
+                           LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                       } else {
+                           LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                       }
+                    }
+                    return converted;
                 } else if (Properties.class.isAssignableFrom(requiredType)) {
                     Properties properties = resolveSubProperties(name, entries, conversionContext);
                     return Optional.of((T) properties);
@@ -197,58 +223,56 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
             }
         }
+        if (LOG.isTraceEnabled()) {
+                LOG.trace("No value found for property: {}", name);
+        }
         return Optional.empty();
     }
 
     /**
-     * Returns a combined Map of all properties in the catalog
+     * Returns a combined Map of all properties in the catalog.
      *
      * @return Map of all properties
      */
-    public Map<String,Object> getAllProperties(){
+    public Map<String, Object> getAllProperties() {
         Map<String, Object> map = new HashMap<>();
 
-        Arrays.stream(catalog)
-                .filter(Objects::nonNull)
-                .map(Map::entrySet)
-                .flatMap(Collection::stream)
-                .forEach((Map.Entry<String, Object> entry) -> {
-                    String k = entry.getKey();
-                    Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
-                    Map finalMap = map;
-                    int index = k.indexOf('.');
-                    if (index != -1) {
-                        String[] keys = k.split("\\.");
-                        for (int i = 0; i < keys.length -1; i++) {
-                            if (!finalMap.containsKey(keys[i])) {
-                                finalMap.put(keys[i], new HashMap<>());
-                            }
-                            Object next = finalMap.get(keys[i]);
-                            if (next instanceof Map) {
-                                finalMap = ((Map) next);
-                            }
+        Arrays
+            .stream(catalog)
+            .filter(Objects::nonNull)
+            .map(Map::entrySet)
+            .flatMap(Collection::stream)
+            .forEach((Map.Entry<String, Object> entry) -> {
+                String k = entry.getKey();
+                Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
+                Map finalMap = map;
+                int index = k.indexOf('.');
+                if (index != -1) {
+                    String[] keys = k.split("\\.");
+                    for (int i = 0; i < keys.length - 1; i++) {
+                        if (!finalMap.containsKey(keys[i])) {
+                            finalMap.put(keys[i], new HashMap<>());
                         }
-                        finalMap.put(keys[keys.length -1], value);
-                    } else {
-                        finalMap.put(k, value);
+                        Object next = finalMap.get(keys[i]);
+                        if (next instanceof Map) {
+                            finalMap = ((Map) next);
+                        }
                     }
-                });
+                    finalMap.put(keys[keys.length - 1], value);
+                } else {
+                    finalMap.put(k, value);
+                }
+            });
 
         return map;
     }
 
-    private String normalizeName(String name) {
-        return name.replace('-', '.');
-    }
-
-    private Object resolvePlaceHoldersIfNecessary(Object value) {
-        if (value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
-        }
-        return value;
-    }
-
-
+    /**
+     * @param name              The property name
+     * @param entries           The entries
+     * @param conversionContext The conversion context
+     * @return The subproperties
+     */
     protected Properties resolveSubProperties(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
@@ -256,19 +280,25 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         StringConvention keyConvention = mapFormat != null ? mapFormat.keyFormat() : StringConvention.RAW;
         String prefix = name + '.';
         entries.entrySet().stream()
-                .filter(map -> map.getKey().startsWith(prefix))
-                .forEach(entry -> {
-                    Object value = entry.getValue();
-                    if (value != null) {
-                        String key = entry.getKey().substring(prefix.length());
-                        key = keyConvention.format(key);
-                        properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
-                    }
-                });
+            .filter(map -> map.getKey().startsWith(prefix))
+            .forEach(entry -> {
+                Object value = entry.getValue();
+                if (value != null) {
+                    String key = entry.getKey().substring(prefix.length());
+                    key = keyConvention.format(key);
+                    properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
+                }
+            });
 
         return properties;
     }
 
+    /**
+     * @param name              The property name
+     * @param entries           The entries
+     * @param conversionContext The conversion context
+     * @return The submap
+     */
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Map<String, Object> subMap = new LinkedHashMap<>();
@@ -280,11 +310,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 String subMapKey = map.getKey().substring(prefix.length());
                 Object value = resolvePlaceHoldersIfNecessary(map.getValue());
                 MapFormat.MapTransformation transformation = mapFormat != null ? mapFormat.transformation() : MapFormat.MapTransformation.NESTED;
-                if(transformation == MapFormat.MapTransformation.FLAT) {
+                if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
                     subMap.put(subMapKey, value);
-                }
-                else {
+                } else {
                     int index = subMapKey.indexOf('.');
                     if (index == -1) {
                         subMapKey = keyConvention.format(subMapKey);
@@ -307,6 +336,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return subMap;
     }
 
+    /**
+     * @param properties The property source
+     * @param convention The property convention
+     */
+    @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
@@ -355,20 +389,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
-    private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
-        switch (convention) {
-            case ENVIRONMENT_VARIABLE:
-                // environment variables are converted to lower case and dot separated
-                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
-                                  .replace('_', '.'));
-            default:
-                return Collections.singletonList(
-                        NameUtils.hyphenate(property, true)
-                );
-        }
-    }
-
-
+    /**
+     * @param name        The name
+     * @param allowCreate Whether allows creation
+     * @return The map with the resolved entries for the name
+     */
+    @SuppressWarnings("MagicNumber")
     protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate) {
         Map<String, Object> entries = null;
         if (name.length() == 0) {
@@ -386,6 +412,30 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return entries;
+    }
+
+    private String normalizeName(String name) {
+        return name.replace('-', '.');
+    }
+
+    private Object resolvePlaceHoldersIfNecessary(Object value) {
+        if (value instanceof CharSequence) {
+            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+        }
+        return value;
+    }
+
+    private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
+        switch (convention) {
+            case ENVIRONMENT_VARIABLE:
+                // environment variables are converted to lower case and dot separated
+                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
+                        .replace('_', '.'));
+            default:
+                return Collections.singletonList(
+                        NameUtils.hyphenate(property, true)
+                );
+        }
     }
 
     private String trimIndex(String name) {

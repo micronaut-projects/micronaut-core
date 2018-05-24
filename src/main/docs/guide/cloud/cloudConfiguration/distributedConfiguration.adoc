@@ -1,0 +1,11 @@
+As you can see, Micronaut features a robust system for externalizing and adapting configuration to the environment inspired by similar approaches found in Grails and Spring Boot.
+
+However, what if you want two Microservices to share configuration? Micronaut comes with built in APIs for doing distributed configuration.
+
+The api:discovery.config.ConfigurationClient[] interface has a single method called `getPropertySources` that can be implemented to read and resolve configuration from distributed sources.
+
+The `getPropertySources` returns a rs:Publisher[] that emits zero or many api:context.env.PropertySource[] instances.
+
+The default implementation is api:discovery.config.DefaultCompositeConfigurationClient[] which merges all registered `ConfigurationClient` beans into a single bean.
+
+You can either implement your own api:discovery.config.ConfigurationClient[] implementation or you can use one of the ones already built into Micronaut. The following sections cover those.

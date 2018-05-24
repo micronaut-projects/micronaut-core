@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import io.micronaut.core.util.StringUtils;
 import java.util.Optional;
 
 /**
- *
  * An interface for objects that have attributes.
  *
  * @author graemerocher
@@ -37,15 +36,14 @@ public interface AttributeHolder {
      */
     ConvertibleValues<Object> getAttributes();
 
-
-
     /**
      * Obtain the value of an attribute on the HTTP method.
+     *
      * @param name The name of the attribute
      * @return An {@link Optional} value
      */
     default Optional<Object> getAttribute(CharSequence name) {
-        if(StringUtils.isNotEmpty(name)) {
+        if (StringUtils.isNotEmpty(name)) {
             return getAttributes().get(name.toString(), Object.class);
         }
         return Optional.empty();
@@ -53,13 +51,14 @@ public interface AttributeHolder {
 
     /**
      * Obtain the value of an attribute on the HTTP method.
+     *
      * @param name The name of the attribute
      * @param type The required type
-     * @param <T> type Generic
+     * @param <T>  type Generic
      * @return An {@link Optional} value
      */
     default <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
-        if(StringUtils.isNotEmpty(name)) {
+        if (StringUtils.isNotEmpty(name)) {
             return getAttributes().get(name.toString(), type);
         }
         return Optional.empty();

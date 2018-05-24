@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.core.naming.NameUtils;
@@ -26,7 +27,8 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
- * The base class used by a {@link FilePart}, {@link BytePart}, & {@link InputStreamPart} to build a Netty multipart request.
+ * The base class used by a {@link FilePart}, {@link BytePart}, & {@link InputStreamPart} to build a Netty multipart
+ * request.
  *
  * @author Puneet Behl
  * @since 1.0
@@ -36,10 +38,10 @@ abstract class AbstractFilePart extends Part {
     protected final MediaType contentType;
 
     /**
-     * Constructor to create an object
+     * Constructor to create an object.
      *
-     * @param name Parameter name to bind in the multipart request
-     * @param filename Name of the file
+     * @param name        Parameter name to bind in the multipart request
+     * @param filename    Name of the file
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
      */
     AbstractFilePart(String name, String filename, @Nullable MediaType contentType) {
@@ -56,21 +58,20 @@ abstract class AbstractFilePart extends Part {
     }
 
     /**
-     * Copy the content into {@link FileUpload} object
+     * Copy the content into {@link FileUpload} object.
      *
      * @param fileUpload The {@link FileUpload} to write the content to
-     * @throws IOException
+     * @throws IOException if there is an error writing the file
      */
     abstract void setContent(FileUpload fileUpload) throws IOException;
 
     /**
-     *
      * @return The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
      */
     abstract long getLength();
 
     /**
-     * Create an object of {@link InterfaceHttpData} to build Netty multipart request
+     * Create an object of {@link InterfaceHttpData} to build Netty multipart request.
      *
      * @see Part#getData(HttpRequest, HttpDataFactory)
      */
@@ -81,7 +82,7 @@ abstract class AbstractFilePart extends Part {
         String encoding = mediaType.isTextBased() ? null : "binary";
 
         FileUpload fileUpload = factory.createFileUpload(request, name, filename, contentType,
-                encoding, null, getLength());
+            encoding, null, getLength());
         try {
             setContent(fileUpload);
         } catch (IOException e) {

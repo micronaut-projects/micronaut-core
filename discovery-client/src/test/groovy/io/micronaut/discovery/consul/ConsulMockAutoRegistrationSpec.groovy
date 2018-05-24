@@ -15,19 +15,8 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.socket.SocketUtils
-import io.micronaut.discovery.consul.client.v1.ConsulClient
-import io.micronaut.discovery.consul.client.v1.HTTPCheck
-import io.micronaut.discovery.consul.client.v1.HealthEntry
-import io.micronaut.discovery.consul.client.v1.NewServiceEntry
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
@@ -35,7 +24,6 @@ import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.consul.client.v1.HTTPCheck
 import io.micronaut.discovery.consul.client.v1.HealthEntry
 import io.micronaut.discovery.consul.client.v1.NewServiceEntry
-import io.micronaut.discovery.consul.client.v1.TTLCheck
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
@@ -44,7 +32,6 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
 
 import java.time.Duration

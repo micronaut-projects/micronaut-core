@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support;
 
 import groovy.util.XmlSlurper;
@@ -23,7 +24,20 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.reflect.Array;
 import java.net.URL;
 import java.security.MessageDigest;
@@ -33,38 +47,42 @@ import java.util.Map;
 
 /**
  * Simple utility methods for file and stream copying.
- * All copy methods use a block size of 4096 bytes,
- * and close all affected streams when done.
- *
- * <p>Mainly for use within the framework,
- * but also useful for application code.
+ * All copy methods use a block size of 4096 bytes, and close all affected streams when done.
+ * <p>
+ * >Mainly for use within the framework, but also useful for application code.
  *
  * @author Juergen Hoeller
  * @author Graeme Rocher
- *
  * @since 06.10.2003
  */
 @SuppressWarnings("unchecked")
 public class SpringIOUtils {
 
+    public static final int BUFFER_SIZE = 4096;
+
+    /**
+     * byte to hex string converter.
+     */
+    private static final char[] CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'a', 'b', 'c', 'd', 'e', 'f'};
+
     @SuppressWarnings("rawtypes")
     private static Map algorithms = new HashMap();
+
+    private static SAXParserFactory saxParserFactory = null;
+
     static {
         algorithms.put("md5", "MD5");
         algorithms.put("sha1", "SHA-1");
     }
-    // byte to hex string converter
-    private static final char[] CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'a', 'b', 'c', 'd', 'e', 'f'};
-    public static final int BUFFER_SIZE = 4096;
 
     /**
      * Convert a byte[] array to readable string format. This makes the "hex" readable!
      *
+     * @param in byte[] buffer to convert to string format
      * @return result String buffer in String format
-     * @param in
-     *            byte[] buffer to convert to string format
      */
+    @SuppressWarnings("MagicNumber")
     public static String byteArrayToHexString(byte[] in) {
         byte ch = 0x00;
 
@@ -89,6 +107,12 @@ public class SpringIOUtils {
         return out.toString();
     }
 
+    /**
+     * @param f         The file
+     * @param algorithm The algorithm
+     * @return The string representation
+     * @throws IOException if there is an error
+     */
     public static String computeChecksum(File f, String algorithm) throws IOException {
         return byteArrayToHexString(compute(f, algorithm));
     }
@@ -124,7 +148,7 @@ public class SpringIOUtils {
     }
 
     /**
-     * Adds the contents of 1 array to another
+     * Adds the contents of 1 array to another.
      *
      * @param array1 The target array
      * @param array2 The source array
@@ -139,7 +163,7 @@ public class SpringIOUtils {
             final Class<?> type1 = array1.getClass().getComponentType();
             final Class<?> type2 = array2.getClass().getComponentType();
             if (!type1.isAssignableFrom(type2)) {
-                throw new IllegalArgumentException("Cannot store "+type2.getName()+" in an array of "+type1.getName());
+                throw new IllegalArgumentException("Cannot store " + type2.getName() + " in an array of " + type1.getName());
             }
             throw ase; // No, so rethrow original
         }
@@ -151,12 +175,13 @@ public class SpringIOUtils {
     //---------------------------------------------------------------------
 
     /**
-     * Copies all the resources for the given target directory. The base resource serves to calculate the relative path such that the
-     * directory structure is maintained
+     * Copies all the resources for the given target directory. The base resource serves to calculate the relative
+     * path such that the directory structure is maintained.
      *
-     * @param base The base resource
+     * @param base      The base resource
      * @param resources The resources to copy
      * @param targetDir The target directory
+     * @throws IOException if there is an error
      */
     public static void copyAll(Resource base, Resource[] resources, File targetDir) throws IOException {
         final URL baseUrl = base.getURL();
@@ -169,7 +194,8 @@ public class SpringIOUtils {
 
     /**
      * Copy the contents of the given input File to the given output File.
-     * @param in the file to copy from
+     *
+     * @param in  the file to copy from
      * @param out the file to copy to
      * @return the number of bytes copied
      * @throws java.io.IOException in case of I/O errors
@@ -178,12 +204,13 @@ public class SpringIOUtils {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
         return copy(new BufferedInputStream(new FileInputStream(in)),
-                new BufferedOutputStream(new FileOutputStream(out)));
+            new BufferedOutputStream(new FileOutputStream(out)));
     }
 
     /**
      * Copy the contents of the given input File to the given output File.
-     * @param in the file to copy from
+     *
+     * @param in  the file to copy from
      * @param out the file to copy to
      * @return the number of bytes copied
      * @throws java.io.IOException in case of I/O errors
@@ -192,12 +219,13 @@ public class SpringIOUtils {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
         return copy(new BufferedInputStream(in.getInputStream()),
-                new BufferedOutputStream(new FileOutputStream(out)));
+            new BufferedOutputStream(new FileOutputStream(out)));
     }
 
     /**
      * Copy the contents of the given byte array to the given output File.
-     * @param in the byte array to copy from
+     *
+     * @param in  the byte array to copy from
      * @param out the file to copy to
      * @throws IOException in case of I/O errors
      */
@@ -211,6 +239,7 @@ public class SpringIOUtils {
 
     /**
      * Copy the contents of the given input File into a new byte array.
+     *
      * @param in the file to copy from
      * @return the new byte array that has been copied to
      * @throws IOException in case of I/O errors
@@ -228,7 +257,8 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given InputStream to the given OutputStream.
      * Closes both streams when done.
-     * @param in the stream to copy from
+     *
+     * @param in  the stream to copy from
      * @param out the stream to copy to
      * @return the number of bytes copied
      * @throws IOException in case of I/O errors
@@ -246,17 +276,14 @@ public class SpringIOUtils {
             }
             out.flush();
             return byteCount;
-        }
-        finally {
+        } finally {
             try {
                 in.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
             try {
                 out.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
         }
     }
@@ -264,7 +291,8 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given byte array to the given OutputStream.
      * Closes the stream when done.
-     * @param in the byte array to copy from
+     *
+     * @param in  the byte array to copy from
      * @param out the OutputStream to copy to
      * @throws IOException in case of I/O errors
      */
@@ -273,12 +301,10 @@ public class SpringIOUtils {
         assert out != null : "No output stream specified";
         try {
             out.write(in);
-        }
-        finally {
+        } finally {
             try {
                 out.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
         }
     }
@@ -286,6 +312,7 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given InputStream into a new byte array.
      * Closes the stream when done.
+     *
      * @param in the stream to copy from
      * @return the new byte array that has been copied to
      * @throws IOException in case of I/O errors
@@ -303,7 +330,8 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given Reader to the given Writer.
      * Closes both when done.
-     * @param in the Reader to copy from
+     *
+     * @param in  the Reader to copy from
      * @param out the Writer to copy to
      * @return the number of characters copied
      * @throws IOException in case of I/O errors
@@ -322,17 +350,14 @@ public class SpringIOUtils {
             }
             out.flush();
             return byteCount;
-        }
-        finally {
+        } finally {
             try {
                 in.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
             try {
                 out.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
         }
     }
@@ -340,7 +365,8 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given String to the given output Writer.
      * Closes the write when done.
-     * @param in the String to copy from
+     *
+     * @param in  the String to copy from
      * @param out the Writer to copy to
      * @throws IOException in case of I/O errors
      */
@@ -350,12 +376,10 @@ public class SpringIOUtils {
 
         try {
             out.write(in);
-        }
-        finally {
+        } finally {
             try {
                 out.close();
-            }
-            catch (IOException ex) {
+            } catch (IOException ex) {
             }
         }
     }
@@ -367,8 +391,9 @@ public class SpringIOUtils {
      */
     public static void closeQuietly(Closeable closeable) {
         try {
-            if(closeable != null)
+            if (closeable != null) {
                 closeable.close();
+            }
         } catch (IOException e) {
             // ignore
         }
@@ -377,6 +402,7 @@ public class SpringIOUtils {
     /**
      * Copy the contents of the given Reader into a String.
      * Closes the reader when done.
+     *
      * @param in the reader to copy from
      * @return the String that has been copied to
      * @throws IOException in case of I/O errors
@@ -387,18 +413,27 @@ public class SpringIOUtils {
         return out.toString();
     }
 
+    /**
+     * @return A new Xml slurper
+     * @throws ParserConfigurationException If there is a parser error
+     * @throws SAXException                 If there is an error with SAXO
+     */
     public static XmlSlurper createXmlSlurper() throws ParserConfigurationException, SAXException {
         return new XmlSlurper(newSAXParser());
     }
 
+    /**
+     * @return A new {@link SAXParser}
+     * @throws ParserConfigurationException If there is a parser error
+     * @throws SAXException                 If there is an error with SAXO
+     */
     public static SAXParser newSAXParser() throws ParserConfigurationException, SAXException {
         SAXParserFactory factory = createParserFactory();
         return factory.newSAXParser();
     }
 
-    private static SAXParserFactory saxParserFactory = null;
     private static SAXParserFactory createParserFactory() throws ParserConfigurationException {
-        if(saxParserFactory == null) {
+        if (saxParserFactory == null) {
             saxParserFactory = FactorySupport.createSaxParserFactory();
             saxParserFactory.setNamespaceAware(true);
             saxParserFactory.setValidating(false);

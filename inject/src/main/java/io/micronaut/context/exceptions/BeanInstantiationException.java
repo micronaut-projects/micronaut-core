@@ -13,39 +13,65 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanType;
 
 /**
- * Thrown when no such beans exists
+ * Thrown when no such beans exists.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class BeanInstantiationException extends BeanContextException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public BeanInstantiationException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public BeanInstantiationException(String message) {
         super(message);
     }
 
+    /**
+     * @param resolutionContext The resolution context
+     * @param cause             The throwable
+     */
     public BeanInstantiationException(BeanResolutionContext resolutionContext, Throwable cause) {
         super(MessageUtils.buildMessage(resolutionContext, cause.getMessage()), cause);
     }
 
+    /**
+     * @param resolutionContext The resolution context
+     * @param message           The message
+     */
     public BeanInstantiationException(BeanResolutionContext resolutionContext, String message) {
         super(MessageUtils.buildMessage(resolutionContext, message));
     }
 
+    /**
+     * @param beanDefinition The bean definition
+     * @param cause          The throwable
+     * @param <T>            The bean type
+     */
     public <T> BeanInstantiationException(BeanType<T> beanDefinition, Throwable cause) {
         super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + cause.getMessage(), cause);
     }
 
+    /**
+     * @param beanDefinition The bean definition
+     * @param message        The message
+     * @param <T>            The bean type
+     */
     public <T> BeanInstantiationException(BeanType<T> beanDefinition, String message) {
         super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + message);
     }

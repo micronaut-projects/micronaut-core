@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
@@ -22,11 +23,15 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * Abstract implementation of the {@link ClassWriterOutputVisitor} interface that deals with
- * service descriptors in a common way across Java and Groovy
+ * Abstract implementation of the {@link ClassWriterOutputVisitor} interface that deals with service descriptors in a
+ * common way across Java and Groovy.
  *
  * @author graemerocher
  * @since 1.0
@@ -45,7 +50,6 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
         if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
             serviceDescriptors.computeIfAbsent(type, s -> new HashSet<>()).add(classname);
         }
-
     }
 
     @Override
@@ -64,7 +68,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
                 try (BufferedReader bufferedReader = new BufferedReader(generatedFile.openReader())) {
 
                     String line = bufferedReader.readLine();
-                    while(line != null) {
+                    while (line != null) {
                         serviceTypes.add(line);
                         line = bufferedReader.readLine();
                     }

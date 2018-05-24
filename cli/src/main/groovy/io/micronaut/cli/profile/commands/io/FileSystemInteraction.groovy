@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.io
 
 import io.micronaut.cli.io.support.Resource
-
 
 /**
  * Utility methods exposed to scripts for interacting with resources (found on the file system or jars) and the file system
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface FileSystemInteraction {
 
@@ -116,7 +116,7 @@ interface FileSystemInteraction {
      * @return The class name
      */
     String className(Resource resource)
-    
+
     /**
      * Get files matching the given pattern
      *
@@ -128,9 +128,11 @@ interface FileSystemInteraction {
     static class CopySpec {
         def from
         def into
+
         void from(path) {
             this.from = path
         }
+
         void into(path) {
             this.into = path
         }

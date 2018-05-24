@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -27,7 +28,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 /**
- * A method injection point that represents a method that does not exist
+ * A method injection point that represents a method that does not exist.
  *
  * @author graemerocher
  * @since 1.0
@@ -40,11 +41,18 @@ class MissingMethodInjectionPoint implements MethodInjectionPoint {
     private final String methodName;
     private final Argument[] argTypes;
 
+    /**
+     * @param definition    The bean definition
+     * @param declaringType The declaring class type
+     * @param methodName    The method name
+     * @param argTypes      The argument types
+     */
     MissingMethodInjectionPoint(
-            BeanDefinition<?> definition,
-            Class<?> declaringType,
-            String methodName,
-            Argument[] argTypes) {
+        BeanDefinition<?> definition,
+        Class<?> declaringType,
+        String methodName,
+        Argument[] argTypes) {
+
         this.definition = definition;
         this.declaringType = declaringType;
         this.methodName = methodName;

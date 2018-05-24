@@ -31,6 +31,7 @@ public interface ReferenceCounted {
     /**
      * Release a reference to this object.
      *
+     * @return Whether the reference has been released
      * @throws IllegalStateException if the reference count is already 0
      */
     boolean release();

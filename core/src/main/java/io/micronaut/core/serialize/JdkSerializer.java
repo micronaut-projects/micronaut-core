@@ -38,10 +38,16 @@ public class JdkSerializer implements ObjectSerializer {
 
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param conversionService The conversion service
+     */
     public JdkSerializer(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
     }
 
+    /**
+     * Default constructor.
+     */
     public JdkSerializer() {
         this(ConversionService.SHARED);
     }
@@ -77,10 +83,21 @@ public class JdkSerializer implements ObjectSerializer {
         }
     }
 
+    /**
+     * @param outputStream The output stream
+     * @return A new {@link ObjectOutputStream}
+     * @throws IOException if there is an error
+     */
     protected ObjectOutputStream createObjectOutput(OutputStream outputStream) throws IOException {
         return new ObjectOutputStream(outputStream);
     }
 
+    /**
+     * @param inputStream  The input stream
+     * @param requiredType The required type
+     * @return A {@link ObjectOutputStream}
+     * @throws IOException if there is an error
+     */
     protected ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
         return new ObjectInputStream(inputStream) {
             @Override

@@ -55,16 +55,16 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         rxClient.retrieve(request).blockingFirst() == result
 
         where:
-        uri                     | result                       | headers
-        '/header/formattedDate' | "Header: $formatted"         | ['Date': formatted]
-        '/header/optional'      | "Header: application/json"   | ['Content-Type': 'application/json']
-        '/header/optional'      | "Header: Not-Present"        | [:]
-        '/header/date'          | "Header: $now"               | ['Date': now]
-        '/header/withMediaType' | "Header: application/json"   | ['Content-Type': 'application/json']
-        '/header/all'           | "Header: application/json"   | ['Content-Type': 'application/json']
-        '/header/multiple'      | "Header: [application/json]" | ['Content-Type': 'application/json']
-        '/header/simple'        | "Header: application/json"   | ['Content-Type': 'application/json']
-        '/header/withValue'     | "Header: application/json"   | ['Content-Type': 'application/json']
+        uri                       | result                       | headers
+        '/header/formatted-date'  | "Header: $formatted"         | ['Date': formatted]
+        '/header/optional'        | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/optional'        | "Header: Not-Present"        | [:]
+        '/header/date'            | "Header: $now"               | ['Date': now]
+        '/header/with-media-type' | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/all'             | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/multiple'        | "Header: [application/json]" | ['Content-Type': 'application/json']
+        '/header/simple'          | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/with-value'      | "Header: application/json"   | ['Content-Type': 'application/json']
 
     }
 

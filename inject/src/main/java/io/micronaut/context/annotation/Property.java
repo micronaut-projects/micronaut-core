@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import java.lang.annotation.Documented;
@@ -21,7 +22,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * A property that can be contained within a {@link PropertySource} or used generally throughout the system
+ * A property that can be contained within a {@link PropertySource} or used generally throughout the system.
  *
  * @author graemerocher
  * @since 1.0

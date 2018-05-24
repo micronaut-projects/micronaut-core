@@ -53,11 +53,17 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     private final ClassLoader classLoader;
     private boolean includeJars;
 
+    /**
+     * @param classLoader The class loader
+     */
     public ClassPathAnnotationScanner(ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.includeJars = true;
     }
 
+    /**
+     * Default constructor.
+     */
     public ClassPathAnnotationScanner() {
         this(ClassPathAnnotationScanner.class.getClassLoader());
     }
@@ -68,7 +74,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * @param includeJars The jar files to include
      * @return This scanner
      */
-    ClassPathAnnotationScanner includeJars(boolean includeJars) {
+    protected ClassPathAnnotationScanner includeJars(boolean includeJars) {
         this.includeJars = includeJars;
         return this;
     }
@@ -90,12 +96,17 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         }
     }
 
+    /**
+     * @param annotation The annotation
+     * @param pkg        The package
+     * @return The list of class
+     */
     protected List<Class> doScan(String annotation, String pkg) {
         try {
             String packagePath = pkg.replace('.', '/').concat("/");
             List<Class> classes = new ArrayList<>();
             Enumeration<URL> resources = classLoader.getResources(packagePath);
-            if(!resources.hasMoreElements() && LOG.isDebugEnabled()) {
+            if (!resources.hasMoreElements() && LOG.isDebugEnabled()) {
                 LOG.debug("No resources found under package path: {}", packagePath);
             }
             while (resources.hasMoreElements()) {
@@ -151,6 +162,11 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         }
     }
 
+    /**
+     * @param annotation The annotation
+     * @param classes    The classes
+     * @param file       The file
+     */
     protected void traverseFile(String annotation, List<Class> classes, File file) {
         if (file.isDirectory()) {
             try (DirectoryStream<Path> dirs = Files.newDirectoryStream(file.toPath())) {
@@ -172,6 +188,11 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         }
     }
 
+    /**
+     * @param annotation The annotation
+     * @param file       The file
+     * @param classes    The classes
+     */
     protected void scanFile(String annotation, File file, List<Class> classes) {
         String fileName = file.getName();
         if (fileName.endsWith(".class")) {

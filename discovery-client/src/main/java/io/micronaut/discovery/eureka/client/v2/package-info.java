@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
+ * Eureka client classes
+ *
  * @author graemerocher
  * @since 1.0
  */
@@ -21,7 +24,5 @@
 @RequiresEureka
 package io.micronaut.discovery.eureka.client.v2;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;

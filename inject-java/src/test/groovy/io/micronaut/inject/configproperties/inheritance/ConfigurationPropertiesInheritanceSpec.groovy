@@ -18,10 +18,6 @@ package io.micronaut.inject.configproperties.inheritance
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 /**
  * @author Graeme Rocher

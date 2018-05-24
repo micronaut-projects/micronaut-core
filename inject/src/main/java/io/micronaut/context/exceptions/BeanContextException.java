@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 /**
- * An exception that occurs loading the context
+ * An exception that occurs loading the context.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class BeanContextException extends RuntimeException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public BeanContextException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public BeanContextException(String message) {
         super(message);
     }

@@ -19,10 +19,6 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.field.protectedwithqualifier.OneA
 import io.micronaut.inject.field.protectedwithqualifier.TwoA
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.field.protectedwithqualifier.OneA
-import io.micronaut.inject.field.protectedwithqualifier.TwoA
 import spock.lang.Specification
 
 class FieldPrivateWithQualifierSpec extends Specification {

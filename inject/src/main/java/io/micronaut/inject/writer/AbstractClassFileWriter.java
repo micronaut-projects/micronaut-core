@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -24,7 +25,11 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -32,7 +37,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Abstract class that writes generated classes to disk and provides convenience methods for building classes
+ * Abstract class that writes generated classes to disk and provides convenience methods for building classes.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -59,23 +64,30 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         NAME_TO_TYPE_MAP.put("float", "F");
     }
 
-
     /**
-     * Write the class to the target directory
+     * Write the class to the target directory.
      *
      * @param targetDir The target directory
+     * @throws IOException if there is an error writing the file
      */
     public void writeTo(File targetDir) throws IOException {
         accept(newClassWriterOutputVisitor(targetDir));
     }
 
     /**
-     * Accept a ClassWriterOutputVisitor to write this writer to disk
+     * Accept a ClassWriterOutputVisitor to write this writer to disk.
      *
      * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     * @throws IOException if there is an error writing to disk
      */
     public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
+    /**
+     * Returns the descriptor corresponding to the given class.
+     *
+     * @param type The type
+     * @return The descriptor for the class
+     */
     protected static String getTypeDescriptor(Object type) {
         if (type instanceof Class) {
             return Type.getDescriptor((Class) type);
@@ -85,11 +97,24 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * Returns the Type reference corresponding to the given class.
+     *
+     * @param className    The class name
+     * @param genericTypes The generic types
+     * @return The {@link Type}
+     */
     protected static Type getTypeReferenceForName(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
         return Type.getType(referenceString);
     }
 
+    /**
+     * Return the type reference for a class.
+     *
+     * @param type The type
+     * @return The {@link Type}
+     */
     protected static Type getTypeReference(Object type) {
         if (type instanceof Class) {
             return Type.getType((Class) type);
@@ -106,6 +131,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param fieldType           The field type
+     * @param injectMethodVisitor The {@link MethodVisitor}
+     */
     protected static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
         Class wrapperType = AbstractClassFileWriter.getWrapperType(fieldType);
         if (wrapperType != null) {
@@ -118,6 +147,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The {@link MethodVisitor}
+     * @param type          The type
+     */
     protected static void pushCastToType(MethodVisitor methodVisitor, Object type) {
         String internalName = getInternalNameForCast(type);
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
@@ -151,6 +184,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                     case Type.FLOAT:
                         valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
                         break;
+                    default:
+                        // no-ip
                 }
 
                 if (valueMethod != null) {
@@ -160,6 +195,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The {@link MethodVisitor}
+     * @param type          The type
+     */
     protected static void pushReturnValue(MethodVisitor methodVisitor, Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
@@ -185,6 +224,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                     case Type.FLOAT:
                         methodVisitor.visitInsn(FRETURN);
                         break;
+                    default:
+                        //no-op
                 }
             } else {
                 methodVisitor.visitInsn(ARETURN);
@@ -194,6 +235,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param type The type
+     * @return The class
+     */
     protected static Class getWrapperType(Object type) {
         if (isPrimitive(type)) {
             return ReflectionUtils.getWrapperType((Class) type);
@@ -201,6 +246,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return null;
     }
 
+    /**
+     * @param type The type
+     * @return Whether a type is primitive
+     */
     protected static boolean isPrimitive(Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
@@ -209,6 +258,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return false;
     }
 
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param methodName    The method name
+     * @param argumentTypes The argument types
+     */
     protected static void pushMethodNameAndTypesArguments(GeneratorAdapter methodVisitor, String methodName, Collection<Object> argumentTypes) {
         // and the method name
         methodVisitor.visitLdcInsn(methodName);
@@ -226,6 +280,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param size          The size
+     */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Class arrayType, int size) {
         // the size of the array
         methodVisitor.push(size);
@@ -237,6 +296,12 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param index         The index
+     * @param size          The size
+     * @param string        The string
+     */
     protected static void pushStoreStringInArray(GeneratorAdapter methodVisitor, int index, int size, String string) {
         // the array index position
         methodVisitor.push(index);
@@ -250,6 +315,12 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param index         The index
+     * @param size          The size
+     * @param runnable      The runnable
+     */
     protected static void pushStoreInArray(GeneratorAdapter methodVisitor, int index, int size, Runnable runnable) {
         // the array index position
         methodVisitor.push(index);
@@ -263,6 +334,12 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param index         The index
+     * @param size          The size
+     * @param type          The type
+     */
     protected static void pushStoreTypeInArray(GeneratorAdapter methodVisitor, int index, int size, Object type) {
         // the array index position
         methodVisitor.push(index);
@@ -287,6 +364,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param types The types
+     * @return An array with the {@link Type} of the objects
+     */
     protected Type[] getObjectTypes(Collection types) {
         Type[] converted = new Type[types.size()];
         Iterator iter = types.iterator();
@@ -297,6 +378,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return converted;
     }
 
+    /**
+     * @param type The type
+     * @return The {@link Type} for the object type
+     */
     protected static Type getObjectType(Object type) {
         if (type instanceof Class) {
             return Type.getType((Class) type);
@@ -310,6 +395,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param className    The class name
+     * @param genericTypes The generic types
+     * @return The type descriptor as String
+     */
     protected static String getTypeDescriptor(String className, String... genericTypes) {
         if (NAME_TO_TYPE_MAP.containsKey(className)) {
             return NAME_TO_TYPE_MAP.get(className);
@@ -332,6 +422,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The method descriptor
+     */
     protected static String getMethodDescriptor(String returnType, String... argumentTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
@@ -346,6 +441,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return builder.toString();
     }
 
+    /**
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The method descriptor
+     */
     protected static String getMethodDescriptor(Object returnType, Collection<Object> argumentTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
@@ -360,6 +460,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return builder.toString();
     }
 
+    /**
+     * @param returnTypeReference The return type reference
+     * @param argReferenceTypes   The argument reference types
+     * @return The method signature
+     */
     protected static String getMethodSignature(String returnTypeReference, String... argReferenceTypes) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
@@ -374,10 +479,18 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return builder.toString();
     }
 
+    /**
+     * @param argumentTypes The argument types
+     * @return The constructor descriptor
+     */
     protected static String getConstructorDescriptor(Object... argumentTypes) {
         return getConstructorDescriptor(Arrays.asList(argumentTypes));
     }
 
+    /**
+     * @param argList The argument list
+     * @return The constructor descriptor
+     */
     protected static String getConstructorDescriptor(Collection<Object> argList) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
@@ -390,11 +503,12 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
-     * Writes the class file to disk in the given directory
+     * Writes the class file to disk in the given directory.
      *
      * @param targetDir   The target directory
      * @param classWriter The current class writer
      * @param className   The class name
+     * @throws IOException if there is a problem writing the class to disk
      */
     protected void writeClassToDisk(File targetDir, ClassWriter classWriter, String className) throws IOException {
         if (targetDir != null) {
@@ -409,30 +523,59 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param out         The output stream
+     * @param classWriter The current class writer
+     * @throws IOException if there is a problem writing the class to disk
+     */
     protected void writeClassToDisk(OutputStream out, ClassWriter classWriter) throws IOException {
         byte[] bytes = classWriter.toByteArray();
         out.write(bytes);
     }
 
+    /**
+     * @param classWriter The current class writer
+     * @return The {@link GeneratorAdapter} for the constructor
+     */
     protected GeneratorAdapter startConstructor(ClassVisitor classWriter) {
         MethodVisitor defaultConstructor = classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
         return new GeneratorAdapter(defaultConstructor, ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
 
-    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object... argumentTypes
-    ) {
+    /**
+     * @param classWriter   The current class writer
+     * @param argumentTypes The argument types
+     * @return The {@link GeneratorAdapter} for the constructor
+     */
+    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object... argumentTypes) {
         String descriptor = getConstructorDescriptor(argumentTypes);
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null), ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor);
     }
 
+    /**
+     * @param classWriter The current class writer
+     * @param className   The class name
+     * @param superType   The super type
+     */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC, className, null, superType.getInternalName(), null);
     }
 
+    /**
+     * @param classWriter      The current class writer
+     * @param className        The class name
+     * @param superType        The super type
+     * @param genericSignature The generic signature
+     */
     protected void startClass(ClassWriter classWriter, String className, Type superType, String genericSignature) {
         classWriter.visit(V1_8, ACC_PUBLIC, className, genericSignature, superType.getInternalName(), null);
     }
 
+    /**
+     * @param cv            The constructor visitor
+     * @param superClass    The super class
+     * @param argumentTypes The argument types
+     */
     protected void invokeConstructor(MethodVisitor cv, Class superClass, Class... argumentTypes) {
         try {
             Type superType = Type.getType(superClass);
@@ -447,6 +590,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param visitor    The interface visitor
+     * @param targetType The target type
+     * @param method     The method
+     */
     protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class targetType, Method method) {
         Type type = Type.getType(targetType);
         String owner = type.getSort() == Type.ARRAY ? type.getDescriptor()
@@ -455,12 +603,22 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             method.getDescriptor(), true);
     }
 
+    /**
+     * @param classWriter The current class writer
+     * @param returnType  The return type
+     * @param methodName  The method name
+     * @return TheThe {@link GeneratorAdapter} for the method
+     */
     protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
         Type methodType = Type.getMethodType(Type.getType(returnType));
 
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, methodName, methodType.getDescriptor(), null, null), ACC_PUBLIC, methodName, methodType.getDescriptor());
     }
 
+    /**
+     * @param className The class name
+     * @return The internal name
+     */
     protected static String getInternalName(String className) {
         String newClassName = className.replace('.', '/');
         if (newClassName.endsWith("[]")) {
@@ -469,6 +627,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return newClassName;
     }
 
+    /**
+     * @param type The type
+     * @return the internal name for cast
+     */
     protected static String getInternalNameForCast(Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
@@ -486,24 +648,46 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
 
+    /**
+     * @param className The class name
+     * @return The class file name
+     */
     protected String getClassFileName(String className) {
         return className.replace('.', File.separatorChar) + ".class";
     }
 
+    /**
+     * @param compilationDir The compilation directory
+     * @return The directory class writer output visitor
+     */
     protected ClassWriterOutputVisitor newClassWriterOutputVisitor(File compilationDir) {
         return new DirectoryClassWriterOutputVisitor(compilationDir);
     }
 
+    /**
+     * @param overriddenMethodGenerator The overriden method generator
+     */
     protected void returnVoid(GeneratorAdapter overriddenMethodGenerator) {
         overriddenMethodGenerator.pop();
         overriddenMethodGenerator.visitInsn(RETURN);
     }
 
+    /**
+     * @param classWriter The current class writer
+     * @return The {@link GeneratorAdapter}
+     */
     protected GeneratorAdapter visitStaticInitializer(ClassVisitor classWriter) {
         MethodVisitor mv = classWriter.visitMethod(ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
         return new GeneratorAdapter(mv, ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
 
+    /**
+     * @param writer        The class writer
+     * @param methodName    The method name
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The {@link GeneratorAdapter}
+     */
     protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
         return new GeneratorAdapter(writer.visitMethod(
             ACC_PUBLIC,
@@ -516,25 +700,25 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             getMethodDescriptor(returnType, argumentTypes));
     }
 
-
     /**
-     * Generates a service discovery for the given class name and file
-     * @param className The class name
+     * Generates a service discovery for the given class name and file.
+     *
+     * @param className     The class name
+     * @param generatedFile The generated file
      * @throws IOException An exception if an error occurs
      */
     protected void generateServiceDescriptor(String className, GeneratedFile generatedFile) throws IOException {
         CharSequence contents = generatedFile.getTextContent();
-        if(contents != null) {
+        if (contents != null) {
             String[] entries = contents.toString().split("\\n");
             if (!Arrays.asList(entries).contains(className)) {
-                try(BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
+                try (BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
                     w.newLine();
                     w.write(className);
                 }
             }
-        }
-        else {
-            try(BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
+        } else {
+            try (BufferedWriter w = new BufferedWriter(generatedFile.openWriter())) {
                 w.write(className);
             }
         }

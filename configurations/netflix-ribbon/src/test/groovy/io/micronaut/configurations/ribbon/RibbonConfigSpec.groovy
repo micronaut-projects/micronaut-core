@@ -29,8 +29,6 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-import javax.inject.Singleton
-
 /**
  * @author graemerocher
  * @since 1.0

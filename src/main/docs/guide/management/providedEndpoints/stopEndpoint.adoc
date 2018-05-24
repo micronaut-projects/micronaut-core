@@ -2,7 +2,7 @@ The stop endpoint shuts down the application server.
 
 To execute the stop endpoint, send a POST request to /stop.
 
-=== Configuration
+== Configuration
 
 To configure the stop endpoint, supply configuration through `endpoints.stop`.
 

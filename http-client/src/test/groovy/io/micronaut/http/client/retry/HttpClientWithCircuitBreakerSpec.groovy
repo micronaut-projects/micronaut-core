@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.retry
 
-import io.micronaut.context.ApplicationContext
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
@@ -23,7 +22,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.CircuitBreaker
-import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -34,9 +32,13 @@ import spock.lang.Specification
  * @since 1.0
  */
 class HttpClientWithCircuitBreakerSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
 
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test simple blocking retry"() {
         given:

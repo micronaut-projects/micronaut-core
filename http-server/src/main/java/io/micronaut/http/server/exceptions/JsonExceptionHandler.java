@@ -23,8 +23,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 
 import javax.inject.Singleton;
 
@@ -42,7 +42,7 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
     public Object handle(HttpRequest request, JsonProcessingException exception) {
         // TODO: Send JSON back with detailed error
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        VndError body = new VndError("Invalid JSON: " + exception.getMessage());
+        JsonError body = new JsonError("Invalid JSON: " + exception.getMessage());
         body.link(Link.SELF, Link.of(request.getUri()));
         response.body(body);
 

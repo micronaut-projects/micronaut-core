@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
@@ -31,6 +32,7 @@ import io.micronaut.discovery.eureka.EurekaServiceInstance;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -44,7 +46,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Compile time implementation of {@link EurekaClient}
+ * Compile time implementation of {@link EurekaClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -111,23 +113,41 @@ abstract class AbstractEurekaClient implements EurekaClient {
         );
     }
 
+    /**
+     * @return A {@link Publisher} with applications info
+     */
     @SuppressWarnings("WeakerAccess")
     @Get("/apps")
+    @Produces(single = true)
     public abstract Publisher<ApplicationInfos> getApplicationInfosInternal();
 
+    /**
+     * @param vipAddress The vip address
+     * @return A {@link Publisher} with applications info
+     */
     @SuppressWarnings("WeakerAccess")
     @Get("/vips/{vipAddress}")
+    @Produces(single = true)
     public abstract Publisher<ApplicationInfos> getApplicationVipsInternal(String vipAddress);
 
+    /**
+     * Class for the applications info.
+     */
     @JsonRootName("applications")
     static class ApplicationInfos {
         private List<ApplicationInfo> applications;
 
+        /**
+         * @param applications The list of applications info
+         */
         @JsonCreator
         public ApplicationInfos(@JsonProperty("application") List<ApplicationInfo> applications) {
-            this.applications = applications;
+            this.applications = applications != null ? applications : Collections.emptyList();
         }
 
+        /**
+         * @return The applications info
+         */
         @JsonProperty("application")
         public List<ApplicationInfo> getApplications() {
             return applications;

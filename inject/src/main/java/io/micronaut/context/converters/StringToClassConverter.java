@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -23,7 +24,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a String to a class
+ * Converts a String to a class.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,6 +34,9 @@ public class StringToClassConverter implements TypeConverter<CharSequence, Class
 
     private final ClassLoader classLoader;
 
+    /**
+     * @param classLoader The class loader
+     */
     public StringToClassConverter(ClassLoader classLoader) {
         this.classLoader = classLoader;
     }

@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Executable;
 
 /**
- * <p>Represents a handle to an executable object. Differs from {@link Executable} in that the first argument to
- * {@link #invoke(Object...)} is not the object instead the object is typically held within the handle itself</p>
+ * <p>Represents a handle to an executable object. Differs from {@link io.micronaut.core.type.Executable} in that the
+ * first argument to {@link #invoke(Object...)} is not the object instead the object is typically held within the
+ * handle itself.</p>
  * <p>
  * <p>Executable handles are also applicable to constructors and static methods</p>
  *
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,12 +38,12 @@ public interface ExecutionHandle<R> extends AnnotationMetadataDelegate {
     Class getDeclaringType();
 
     /**
-     * The required argument types
+     * @return The required argument types.
      */
     Argument[] getArguments();
 
     /**
-     * Invokes the method
+     * Invokes the method.
      *
      * @param arguments The arguments
      * @return The result

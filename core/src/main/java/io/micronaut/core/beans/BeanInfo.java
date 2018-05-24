@@ -19,14 +19,14 @@ package io.micronaut.core.beans;
 import java.util.Map;
 
 /**
- * An interface that provides basic bean information. Designed as a simpler replacement for.
- * {@link java.beans.BeanInfo}
+ * An interface that provides basic bean information. Designed as a simpler replacement for {@link java.beans.BeanInfo}.
  *
  * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface BeanInfo<T> {
+
     /**
      * @return The bean class
      */

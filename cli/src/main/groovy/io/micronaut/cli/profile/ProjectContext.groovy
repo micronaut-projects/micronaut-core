@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
-import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.config.ConfigMap
+import io.micronaut.cli.console.logging.MicronautConsole
 
 /**
  * The project context used by a {@link io.micronaut.cli.profile.Profile}
  *
  * @author Lari Hotari
  * @author Graeme Rocher
+ * @since 1.0
  */
 interface ProjectContext {
 

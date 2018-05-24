@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.ApplicationContext
 import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single
@@ -40,8 +39,13 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class RxJavaFallbackSpec extends Specification{
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test that fallbacks are called for RxJava responses"() {
         given:
@@ -137,7 +141,6 @@ class RxJavaFallbackSpec extends Specification{
     }
 
     @Controller("/rxjava/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

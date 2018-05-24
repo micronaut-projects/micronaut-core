@@ -16,7 +16,6 @@
 package io.micronaut.docs.factories
 
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 /**

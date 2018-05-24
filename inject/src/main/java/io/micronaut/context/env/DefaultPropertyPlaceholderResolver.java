@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -22,7 +23,7 @@ import io.micronaut.core.value.PropertyResolver;
 import java.util.Optional;
 
 /**
- * The default {@link PropertyPlaceholderResolver}
+ * The default {@link PropertyPlaceholderResolver}.
  *
  * @author graemerocher
  * @since 1.0
@@ -30,13 +31,16 @@ import java.util.Optional;
 public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderResolver {
 
     /**
-     * Prefix for placeholder in properties
+     * Prefix for placeholder in properties.
      */
     public static final String PREFIX = "${";
 
     private final PropertyResolver environment;
     private final String prefix;
 
+    /**
+     * @param environment The property resolver for the environment
+     */
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
         this.environment = environment;
         this.prefix = PREFIX;

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 import groovy.transform.Canonical
@@ -24,7 +25,7 @@ import jline.console.completer.Completer
  * Describes a {@link Command}
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 @Canonical
@@ -54,6 +55,21 @@ class CommandDescription {
 
     private Map<String, CommandArgument> arguments = new LinkedHashMap<>()
     private Map<String, CommandArgument> flags = new LinkedHashMap<>()
+
+    CommandDescription(String name) {
+        this.name = name
+    }
+
+    CommandDescription(String name, String description) {
+        this.name = name
+        this.description = description
+    }
+
+    CommandDescription(String name, String description, String usage) {
+        this.name = name
+        this.description = description
+        this.usage = usage
+    }
 
     /**
      * Returns an argument for the given name or null if it doesn't exist
@@ -93,7 +109,7 @@ class CommandDescription {
      * @param synonyms The synonyms
      * @return This command description
      */
-    CommandDescription synonyms(String...synonyms) {
+    CommandDescription synonyms(String... synonyms) {
         this.synonyms.addAll(synonyms)
         return this
     }
@@ -128,7 +144,7 @@ class CommandDescription {
     CommandDescription argument(Map args) {
         def arg = new CommandArgument(args)
         def name = arg.name
-        if(name) {
+        if (name) {
             arguments[name] = arg
         }
         return this
@@ -143,7 +159,7 @@ class CommandDescription {
     CommandDescription flag(Map args) {
         def arg = new CommandArgument(args)
         def name = arg.name
-        if(name) {
+        if (name) {
             arg.required = false
             flags[name] = arg
         }

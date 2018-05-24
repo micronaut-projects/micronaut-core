@@ -13,20 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
 
 /**
- * <p>An event fired when a bean is created and fully initialized</p>
+ * <p>An event fired when a bean is created and fully initialized.</p>
  *
+ * @param <T> The event type
  * @author Graeme Rocher
  * @see BeanInitializingEvent
  * @since 1.0
  */
 public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
+    /**
+     * @param beanContext    The bean context
+     * @param beanDefinition The bean definition
+     * @param bean           The bean
+     */
     public BeanCreatedEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
         super(beanContext, beanDefinition, bean);
     }

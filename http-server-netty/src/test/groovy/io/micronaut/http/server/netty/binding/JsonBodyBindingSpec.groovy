@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateos.Link
-import io.micronaut.http.hateos.VndError
+import io.micronaut.http.hateos.JsonError
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
@@ -97,7 +97,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_VND_ERROR
+        response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
         result['_links'].self.href == '/json/string'
         result.message.startsWith('Invalid JSON')
     }
@@ -160,7 +160,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/objectToObject', json), String
+                HttpRequest.POST('/json/object-to-object', json), String
         ).blockingFirst()
 
 
@@ -184,7 +184,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/arrayToArray', json), String
+                HttpRequest.POST('/json/array-to-array', json), String
         ).blockingFirst()
 
         then:
@@ -220,7 +220,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/futureMap', json), String
+                HttpRequest.POST('/json/future-map', json), String
         ).blockingFirst()
 
         then:
@@ -231,7 +231,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/futureObject', json), String
+                HttpRequest.POST('/json/future-object', json), String
         ).blockingFirst()
 
         then:
@@ -243,7 +243,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(
-                HttpRequest.POST('/json/publisherObject', json), String
+                HttpRequest.POST('/json/publisher-object', json), String
         ).blockingFirst()
 
         then:
@@ -330,7 +330,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Error(JsonParseException)
         HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
             def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
-            def error = new VndError("Invalid JSON: ${jsonParseException.message}")
+            def error = new JsonError("Invalid JSON: ${jsonParseException.message}")
             error.link(Link.SELF, Link.of(request.getUri()))
             response.body(error)
             return response

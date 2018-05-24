@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
-import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -28,7 +28,8 @@ import javax.inject.Singleton;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * The Default thread factory the Netty {@link io.netty.channel.nio.NioEventLoopGroup} will use within Micronaut to create threads
+ * The Default thread factory the Netty {@link io.netty.channel.nio.NioEventLoopGroup} will use within Micronaut to
+ * create threads.
  *
  * @author graemerocher
  * @since 1.0
@@ -37,12 +38,18 @@ import java.util.concurrent.ThreadFactory;
 @Factory
 public class NettyThreadFactory {
 
+    /**
+     * Name for Netty thread factory.
+     */
     public static final String NAME = "netty";
-    public static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
-            "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
 
     /**
-     * Constructs the default thread factory used by the HTTP client
+     * Constant with the default threads in the event loop.
+     */
+    public static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
+
+    /**
+     * Constructs the default thread factory used by the HTTP client.
      *
      * @return The thread factory
      */

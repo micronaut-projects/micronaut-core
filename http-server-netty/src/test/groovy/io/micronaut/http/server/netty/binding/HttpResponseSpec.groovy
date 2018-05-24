@@ -31,13 +31,14 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class HttpResponseSpec extends AbstractMicronautSpec {
-    @Shared defaultHeaders = [:]
-    
+    @Shared
+            defaultHeaders = [:]
+
     @Unroll
     void "test custom HTTP response for java action #action"() {
 
         when:
-        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
+        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({ t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
         for (name in response.headers.names()) {
@@ -53,22 +54,22 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
 
         where:
-        action             | status                        | body                       | headers
-        "ok"               | HttpStatus.OK                 | null                       | [connection:'close']
-        "okWithBody"       | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type':'text/plain']
-        "okWithBodyObject" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
-        "status"           | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection:'close']
-        "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
-        "createdUri"       | HttpStatus.CREATED            | null                       | [connection:'close','location': 'http://test.com']
-        "accepted"         | HttpStatus.ACCEPTED           | null                       | [connection:'close']
-        "disallow"         | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
+        action                | status                        | body                       | headers
+        "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
+        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
+        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'close', 'location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
+        "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
 
     }
 
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
+        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({ t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
         for (name in response.headers.names()) {
@@ -84,19 +85,19 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         actualHeaders == headers
 
         where:
-        action             | status                        | body                       | headers
-        "ok"               | HttpStatus.OK                 | null                       | [connection:'close']
-        "okWithBody"       | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type':'text/plain']
-        "okWithBodyObject" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
-        "status"           | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection:'close']
-        "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
-        "createdUri"       | HttpStatus.CREATED            | null                       | [connection:'close','location': 'http://test.com']
-        "accepted"         | HttpStatus.ACCEPTED           | null                       | [connection:'close']
+        action                | status                       | body                       | headers
+        "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
+        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
+        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'close', 'location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'close']
     }
 
     void "test content encoding"() {
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/java/response/okWithBody").header("Accept-Encoding", "gzip"), String).onErrorReturn({t -> t.response }).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String).onErrorReturn({ t -> t.response }).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -105,7 +106,20 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         response.header("Content-Encoding") == null // removed by the decoder
     }
 
-    @Controller
+    void "test custom headers"() {
+        when:
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")).onErrorReturn({ t -> t.response }).blockingFirst()
+        Set<String> headers = response.headers.names()
+
+        then: // The content length header was replaced, not appended
+        !headers.contains("content-type")
+        !headers.contains("Content-Length")
+        headers.contains("content-length")
+        response.header("Content-Type") == "text/plain"
+        response.header("Content-Length") == "3"
+    }
+
+   /* @Controller
     static class ResponseController {
 
         @Get
@@ -145,7 +159,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpMessage status() {
             HttpResponse.status(HttpStatus.MOVED_PERMANENTLY)
         }
-    }
+
+
+    }*/
 
     static class Foo {
         String name

@@ -46,6 +46,11 @@ public class BasicObjectRouteMatch implements RouteMatch<Object> {
     }
 
     @Override
+    public Class<?> getDeclaringType() {
+        return object.getClass();
+    }
+
+    @Override
     public Map<String, Object> getVariables() {
         return Collections.emptyMap();
     }

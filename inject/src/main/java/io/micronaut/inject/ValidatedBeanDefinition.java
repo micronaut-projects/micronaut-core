@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -25,15 +26,16 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A bean definition that is validated with javax.validation
+ * A bean definition that is validated with javax.validation.
  *
+ * @param <T> The bean definition type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Validates the bean with the validator factory if present
+     * Validates the bean with the validator factory if present.
      *
      * @param resolutionContext The resolution context
      * @param instance          The instance

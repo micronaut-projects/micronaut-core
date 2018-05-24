@@ -30,6 +30,10 @@ public class ConversionErrorException extends RuntimeException {
     private final Argument argument;
     private final ConversionError conversionError;
 
+    /**
+     * @param argument        The argument
+     * @param conversionError The conversion error
+     */
     public ConversionErrorException(Argument argument, ConversionError conversionError) {
         super(buildMessage(argument, conversionError), conversionError.getCause());
         this.argument = argument;

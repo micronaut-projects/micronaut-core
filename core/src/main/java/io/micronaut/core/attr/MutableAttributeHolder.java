@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,13 +38,14 @@ public interface MutableAttributeHolder extends AttributeHolder {
 
     /**
      * Sets an attribute on the message.
-     * @param name The name of the attribute
+     *
+     * @param name  The name of the attribute
      * @param value The value of the attribute
      * @return This message
      */
     default MutableAttributeHolder setAttribute(CharSequence name, Object value) {
-        if(StringUtils.isNotEmpty(name)) {
-            if(value == null) {
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
                 getAttributes().remove(name.toString());
             } else {
                 getAttributes().put(name.toString(), value);
@@ -58,11 +59,11 @@ public interface MutableAttributeHolder extends AttributeHolder {
      *
      * @param name The name of the attribute
      * @param type The required type
-     * @param <T> type Generic
+     * @param <T>  type Generic
      * @return An {@link Optional} value
      */
     default <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {
-        if(StringUtils.isNotEmpty(name)) {
+        if (StringUtils.isNotEmpty(name)) {
             String key = name.toString();
             Optional<T> value = getAttribute(key, type);
             value.ifPresent(o -> getAttributes().remove(key));

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
 import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CACHE_NAME;
@@ -27,7 +28,7 @@ import javax.inject.Named;
 import java.time.Duration;
 
 /**
- * A cache configuration for the Discovery client cache
+ * A cache configuration for the Discovery client cache.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,17 +39,21 @@ import java.time.Duration;
 public class DiscoveryClientCacheConfiguration extends CacheConfiguration implements Toggleable {
 
     /**
-     * The prefix to use for all discovery client settings
+     * The prefix to use for all discovery client settings.
      */
     public static final String CACHE_NAME = "discovery-client";
 
     /**
-     * Configuration property name for enabled discovery cache client
+     * Configuration property name for enabled discovery cache client.
      */
     public static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discovery-client.enabled";
 
     private boolean enabled = true;
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
+    @SuppressWarnings("MagicNumber")
     public DiscoveryClientCacheConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(CACHE_NAME, applicationConfiguration);
         setExpireAfterAccess(Duration.ofSeconds(30));

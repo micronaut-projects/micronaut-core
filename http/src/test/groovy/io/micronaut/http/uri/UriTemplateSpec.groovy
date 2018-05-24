@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.uri
 
-import io.micronaut.http.uri.UriTemplate
 import spock.lang.Specification
 import spock.lang.Unroll
 

@@ -31,6 +31,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     private final TypeElement classElement;
 
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata) {
         super(classElement, annotationMetadata);
         this.classElement = classElement;

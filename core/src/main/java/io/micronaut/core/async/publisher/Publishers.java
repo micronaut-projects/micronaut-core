@@ -18,6 +18,7 @@ package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -43,7 +44,9 @@ import java.util.function.Supplier;
 @Internal
 public class Publishers {
 
+    @SuppressWarnings("ConstantName")
     static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
+    @SuppressWarnings("ConstantName")
     static final List<Class<?>> singleTypes = new ArrayList<>(3);
 
     static {
@@ -71,11 +74,21 @@ public class Publishers {
      * Build a {@link Publisher} from a {@link CompletableFuture}.
      *
      * @param futureSupplier The supplier of the {@link CompletableFuture}
-     * @param <T>
+     * @param <T>            The type of the publisher
      * @return The {@link Publisher}
      */
     public static <T> Publisher<T> fromCompletableFuture(Supplier<CompletableFuture<T>> futureSupplier) {
         return new CompletableFuturePublisher<>(futureSupplier);
+    }
+    /**
+     * Build a {@link Publisher} from a {@link CompletableFuture}.
+     *
+     * @param future The {@link CompletableFuture}
+     * @param <T>  The type of the publisher
+     * @return The {@link Publisher}
+     */
+    public static <T> Publisher<T> fromCompletableFuture(CompletableFuture<T> future) {
+        return new CompletableFuturePublisher<>(() -> future);
     }
 
     /**
@@ -241,19 +254,44 @@ public class Publishers {
 
     /**
      * Is the given object a Publisher or convertible to a publisher.
+     *
      * @param object The object
      * @return True if it is
      */
     public static boolean isConvertibleToPublisher(Object object) {
-        if(object == null) {
+        if (object == null) {
             return false;
         }
-        if(object instanceof Publisher) {
+        if (object instanceof Publisher) {
             return true;
         } else {
             return isConvertibleToPublisher(object.getClass());
         }
     }
+
+    /**
+     * Attempts to convert the publisher to the given type.
+     *
+     * @param object The object to convert
+     * @param publisherType The publisher type
+     * @param <T> The generic type
+     * @return The Resulting in publisher
+     */
+    public static <T extends Publisher<?>> T convertPublisher(Object object, Class<T> publisherType) {
+        Objects.requireNonNull(object, "Invalid argument [object]: " + object);
+        Objects.requireNonNull(object, "Invalid argument [publisherType]: " + publisherType);
+        if (object instanceof CompletableFuture) {
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+            return ConversionService.SHARED.convert(futurePublisher, publisherType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+        }
+        else {
+
+            return ConversionService.SHARED.convert(object, publisherType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + object.getClass()));
+        }
+    }
+
 
     /**
      * Does the given reactive type emit a single result.
@@ -270,6 +308,11 @@ public class Publishers {
         return false;
     }
 
+    /**
+     * A publisher for a value.
+     *
+     * @param <T> The type
+     */
     private static class JustPublisher<T> implements Publisher<T> {
         private final T value;
 
@@ -288,7 +331,9 @@ public class Publishers {
                         return;
                     }
                     done = true;
-                    subscriber.onNext(value);
+                    if (value != null) {
+                        subscriber.onNext(value);
+                    }
                     subscriber.onComplete();
                 }
 
@@ -300,6 +345,11 @@ public class Publishers {
         }
     }
 
+    /**
+     * A publisher that throws an error.
+     *
+     * @param <T> The type
+     */
     private static class JustThrowPublisher<T> implements Publisher<T> {
 
         private final Throwable error;

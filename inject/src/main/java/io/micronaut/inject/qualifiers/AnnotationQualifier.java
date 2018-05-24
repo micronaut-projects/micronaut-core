@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.inject.BeanType;
@@ -22,8 +23,9 @@ import java.lang.annotation.Annotation;
 import java.util.stream.Stream;
 
 /**
- * Qualifies using an annotation
+ * Qualifies using an annotation.
  *
+ * @param <T> Type type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -31,6 +33,9 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
 
     private final Annotation qualifier;
 
+    /**
+     * @param qualifier The qualifier
+     */
     AnnotationQualifier(Annotation qualifier) {
         super(qualifier.annotationType().getSimpleName());
         this.qualifier = qualifier;
@@ -51,11 +56,14 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
         return reduceByAnnotation(beanType, candidates, name);
     }
 
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         AnnotationQualifier<?> that = (AnnotationQualifier<?>) o;
 

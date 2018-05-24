@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Delete;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.*;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
@@ -31,7 +28,7 @@ import javax.validation.constraints.NotNull;
 import java.util.List;
 
 /**
- * API operations for Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations
+ * API operations for Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -39,7 +36,7 @@ import java.util.List;
 public interface EurekaOperations {
 
     /**
-     * Registers a new {@link InstanceInfo} with the Eureka server
+     * Registers a new {@link InstanceInfo} with the Eureka server.
      *
      * @param appId    The application id
      * @param instance The instance
@@ -53,7 +50,7 @@ public interface EurekaOperations {
     Publisher<HttpStatus> register(@NotBlank String appId, @Valid @NotNull @Body InstanceInfo instance);
 
     /**
-     * De-registers a {@link InstanceInfo} with the Eureka server
+     * De-registers a {@link InstanceInfo} with the Eureka server.
      *
      * @param appId      The application id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
@@ -67,33 +64,35 @@ public interface EurekaOperations {
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId);
 
     /**
-     * Obtain a {@link ApplicationInfo} for the given app id
+     * Obtain a {@link ApplicationInfo} for the given app id.
      *
      * @param appId The app id
      * @return The {@link ApplicationInfo} instance
      */
     @Get("/apps/{appId}")
+    @Produces(single = true)
     Publisher<ApplicationInfo> getApplicationInfo(@NotBlank String appId);
 
     /**
-     * Obtain a {@link InstanceInfo} for the given app id
+     * Obtain a {@link InstanceInfo} for the given app id.
      *
      * @param appId      The app id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
      * @return The {@link InstanceInfo} instance
      */
     @Get("/apps/{appId}/{instanceId}")
+    @Produces(single = true)
     Publisher<InstanceInfo> getInstanceInfo(@NotBlank String appId, @NotBlank String instanceId);
 
     /**
-     * Obtain all of the {@link ApplicationInfo} registered with Eureka
+     * Obtain all of the {@link ApplicationInfo} registered with Eureka.
      *
      * @return The {@link ApplicationInfo} instances
      */
     Publisher<List<ApplicationInfo>> getApplicationInfos();
 
     /**
-     * Obtain all of the {@link ApplicationInfo} registered with Eureka under the given VIP address
+     * Obtain all of the {@link ApplicationInfo} registered with Eureka under the given VIP address.
      *
      * @param vipAddress The {@link InstanceInfo#vipAddress}
      * @return The {@link ApplicationInfo} instances
@@ -102,7 +101,7 @@ public interface EurekaOperations {
     Publisher<List<ApplicationInfo>> getApplicationVips(String vipAddress);
 
     /**
-     * Send an application heartbeat to Eureka
+     * Send an application heartbeat to Eureka.
      *
      * @param appId      The application id
      * @param instanceId The instance id
@@ -112,7 +111,7 @@ public interface EurekaOperations {
     Publisher<HttpStatus> heartbeat(@NotBlank String appId, @NotBlank String instanceId);
 
     /**
-     * Update the application's status
+     * Update the application's status.
      *
      * @param appId      The application id
      * @param instanceId The instance id
@@ -123,7 +122,7 @@ public interface EurekaOperations {
     Publisher<HttpStatus> updateStatus(@NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status);
 
     /**
-     * Update application metadata value
+     * Update application metadata value.
      *
      * @param appId      The application id
      * @param instanceId The instance id

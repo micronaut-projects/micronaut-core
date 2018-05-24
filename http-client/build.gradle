@@ -7,8 +7,10 @@ dependencies {
     compileOnly dependencyVersion("reactor")
 
     testCompile project(":inject-groovy")
+    testCompile project(":validation")
     testCompile project(":inject-java")
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
     testCompile project(":http-server-netty")
+    testRuntime project(":configurations:hibernate-validator")
 }

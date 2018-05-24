@@ -19,7 +19,8 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
- * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>.
+ * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated
+ * code</p>.
  *
  * @param <T> The declaring type
  * @param <R> The result of the method call
@@ -30,6 +31,8 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
 
     /**
      * The required argument types.
+     *
+     * @return The arguments
      */
     Argument[] getArguments();
 

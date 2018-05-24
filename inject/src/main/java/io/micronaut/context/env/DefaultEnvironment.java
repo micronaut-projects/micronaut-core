@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
@@ -38,13 +39,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,15 +74,19 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
-    protected final ClassPathResourceLoader resourceLoader;
-
-    private EnvironmentsAndPackage environmentsAndPackage;
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String PCF_ENV = "VCAP_SERVICES";
+    private static final String HEROKU_DYNO = "DYNO";
+
+    protected final ClassPathResourceLoader resourceLoader;
+
+    private EnvironmentsAndPackage environmentsAndPackage;
 
     private final Set<String> names;
     private final ClassLoader classLoader;
@@ -82,18 +100,36 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
+    /**
+     * @param classLoader The class loader
+     * @param names       The names
+     */
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
         this(classLoader, ConversionService.SHARED, names);
     }
 
+    /**
+     * @param names The names
+     */
     public DefaultEnvironment(String... names) {
         this(DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED, names);
     }
 
+    /**
+     * @param classLoader       The class loader
+     * @param conversionService The conversion service
+     * @param names             The names
+     */
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
         this(ClassPathResourceLoader.defaultLoader(classLoader), conversionService, names);
     }
 
+    /**
+     * @param resourceLoader    The resource loader
+     * @param conversionService The conversion service
+     * @param names             The names
+     */
+    @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
@@ -230,7 +266,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return diffCatalog(copiedCatalog, catalog);
     }
 
-
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
         return conversionService.convert(object, targetType, context);
@@ -279,7 +314,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     /**
-     * Creates the default annotation scanner
+     * Creates the default annotation scanner.
      *
      * @param classLoader The class loader
      * @return The scanner
@@ -288,24 +323,29 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return new CachingClassPathAnnotationScanner(classLoader);
     }
 
+    /**
+     * @return The property source root name
+     */
     protected String getPropertySourceRootName() {
         return DEFAULT_NAME;
     }
 
+    /**
+     * @param name The name to read property sources
+     */
     protected void readPropertySources(String name) {
         List<PropertySource> propertySources = readPropertySourceList(name);
         propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(PROPERTY_SOURCES_KEY)));
         propertySources.addAll(readPropertySourceListFromFiles(
-                readPropertySourceListKeyFromEnvironment())
+            readPropertySourceListKeyFromEnvironment())
         );
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
-            if(LOG.isDebugEnabled()) {
+            if (LOG.isDebugEnabled()) {
                 LOG.debug("Processing property source: {}", propertySource.getName());
             }
             processPropertySource(propertySource, propertySource.getConvention());
         }
-
     }
 
     /**
@@ -327,10 +367,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         Optional<Collection<String>> filePathList = Optional.ofNullable(files)
-                .filter(value -> !value.isEmpty())
-                .map(value -> value.split(FILE_SEPARATOR))
-                .map(Arrays::asList)
-                .map(Collections::unmodifiableList);
+            .filter(value -> !value.isEmpty())
+            .map(value -> value.split(FILE_SEPARATOR))
+            .map(Arrays::asList)
+            .map(Collections::unmodifiableList);
 
         filePathList.ifPresent(list -> {
             if (!list.isEmpty()) {
@@ -354,6 +394,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return propertySources;
     }
 
+    /**
+     * @param name The name to resolver property sources
+     * @return The list of property sources
+     */
     protected List<PropertySource> readPropertySourceList(String name) {
         List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
@@ -361,7 +405,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                if(LOG.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                 }
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
@@ -376,12 +420,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return propertySources;
     }
 
+    /**
+     * @return Loaded properties as a {@link SoftServiceLoader}
+     */
     protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
         return SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
     }
 
     /**
-     * Obtains the {@link PropertySourceLoader} instances
+     * Obtains the {@link PropertySourceLoader} instances.
      *
      * @return A collection of {@link PropertySourceLoader}
      */
@@ -392,13 +439,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             synchronized (this) { // double check
                 propertySourceLoaderList = this.propertySourceLoaderList;
                 if (propertySourceLoaderList == null) {
-                    this.propertySourceLoaderList = propertySourceLoaderList = evaluatePropertySourceLoaders();
+                    propertySourceLoaderList = evaluatePropertySourceLoaders();
+                    this.propertySourceLoaderList = propertySourceLoaderList;
                 }
             }
         }
         return propertySourceLoaderList;
     }
 
+    @SuppressWarnings("MagicNumber")
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
         Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
@@ -455,7 +504,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
-                    this.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
+                    environmentsAndPackage = deduceEnvironments();
+                    this.environmentsAndPackage = environmentsAndPackage;
                 }
             }
         }
@@ -463,9 +513,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static EnvironmentsAndPackage deduceEnvironments() {
+
+
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         Set<String> enviroments = environmentsAndPackage.enviroments;
+
+        // analyze stack to check for Android / Test env
         for (StackTraceElement stackTraceElement : stackTrace) {
             String methodName = stackTraceElement.getMethodName();
             if (methodName.contains("$spock_")) {
@@ -486,38 +540,63 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
-        ComputePlatform computePlatform = determineCloudProvider();
-        if (computePlatform != null) {
-            switch (computePlatform) {
-                case GOOGLE_COMPUTE:
-                    //instantiate bean for GC metadata discovery
-                    enviroments.add(GOOGLE_COMPUTE);
-                    break;
-                case AMAZON_EC2:
-                    //instantiate bean for ec2 metadata discovery
-                    enviroments.add(AMAZON_EC2);
-                    break;
-                case AZURE:
-                    // not implemented
-                    enviroments.add(AZURE);
-                    break;
-                case IBM:
-                    // not implemented
-                    enviroments.add(IBM);
-                    break;
-                case OTHER:
-                    // do nothing here
-                    break;
+
+        if (!enviroments.contains(ANDROID)) {
+            // deduce k8s
+            if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                enviroments.add(Environment.KUBERNETES);
+                enviroments.add(Environment.CLOUD);
+            }
+            // deduce CF
+            if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                enviroments.add(Environment.CLOUD_FOUNDRY);
+                enviroments.add(Environment.CLOUD);
+            }
+
+            // deduce heroku
+            if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                enviroments.add(Environment.HEROKU);
+                enviroments.add(Environment.CLOUD);
+            }
+
+            ComputePlatform computePlatform = determineCloudProvider();
+            if (computePlatform != null) {
+                switch (computePlatform) {
+                    case GOOGLE_COMPUTE:
+                        //instantiate bean for GC metadata discovery
+                        enviroments.add(GOOGLE_COMPUTE);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case AMAZON_EC2:
+                        //instantiate bean for ec2 metadata discovery
+                        enviroments.add(AMAZON_EC2);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case AZURE:
+                        // not yet implemented
+                        enviroments.add(AZURE);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case IBM:
+                        // not yet implemented
+                        enviroments.add(IBM);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case OTHER:
+                        // do nothing here
+                        break;
+                    default:
+                        // no-op
+                }
             }
         }
 
-
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-                  System.getenv(ENVIRONMENTS_ENV))
-                .filter(Objects::nonNull)
-                .flatMap(s -> Arrays.stream(s.split(",")))
-                .map(String::trim)
-                .forEach(enviroments::add);
+            System.getenv(ENVIRONMENTS_ENV))
+            .filter(StringUtils::isNotEmpty)
+            .flatMap(s -> Arrays.stream(s.split(",")))
+            .map(String::trim)
+            .forEach(enviroments::add);
 
         if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
             LOG.info("Established active environments: {}", enviroments);
@@ -617,6 +696,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return ComputePlatform.BARE_METAL;
     }
 
+    @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
             URL url = new URL("http://metadata.google.internal");
@@ -692,6 +772,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
+    /**
+     * Helper class for handling environments and package.
+     */
     private static class EnvironmentsAndPackage {
         String aPackage;
         Set<String> enviroments = new HashSet<>(1);

@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Iterator;
@@ -29,7 +28,7 @@ import java.util.Optional;
 
 /**
  * A {@link ConfigurationMetadataWriter} that writes out metadata in the format defined by
- * spring-configuration-metadata.json
+ * spring-configuration-metadata.json.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -61,6 +60,9 @@ public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWri
         }
     }
 
+    /**
+     * @return The file name
+     */
     protected String getFileName() {
         return "configuration-metadata.json";
     }

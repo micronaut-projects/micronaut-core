@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.exceptions.reporting;
 
 import org.apache.commons.logging.Log;
@@ -25,14 +26,14 @@ import java.util.List;
 /**
  * Default implementation of StackTraceFilterer.
  *
- * @since 2.0
  * @author Graeme Rocher
+ * @since 1.0
  */
 public class DefaultStackTraceFilterer implements StackTraceFilterer {
     public static final String STACK_LOG_NAME = "StackTrace";
     public static final Log STACK_LOG = LogFactory.getLog(STACK_LOG_NAME);
 
-    private static final String[] DEFAULT_INTERNAL_PACKAGES = new String[] {
+    private static final String[] DEFAULT_INTERNAL_PACKAGES = new String[]{
         "org.codehaus.groovy.runtime.",
         "org.codehaus.groovy.reflection.",
         "org.codehaus.groovy.ast.",
@@ -55,24 +56,35 @@ public class DefaultStackTraceFilterer implements StackTraceFilterer {
     private boolean shouldFilter;
     private String cutOffPackage = null;
 
+    /**
+     * Default constructor.
+     */
     public DefaultStackTraceFilterer() {
         this(!Boolean.getBoolean(SYS_PROP_DISPLAY_FULL_STACKTRACE));
     }
 
+    /**
+     * @param shouldFilter Whether should filter
+     */
     public DefaultStackTraceFilterer(boolean shouldFilter) {
         this.shouldFilter = shouldFilter;
         packagesToFilter.addAll(Arrays.asList(DEFAULT_INTERNAL_PACKAGES));
     }
 
+    @Override
     public void addInternalPackage(String name) {
-        if (name == null) throw new IllegalArgumentException("Package name cannot be null");
+        if (name == null) {
+            throw new IllegalArgumentException("Package name cannot be null");
+        }
         packagesToFilter.add(name);
     }
 
+    @Override
     public void setCutOffPackage(String cutOffPackage) {
         this.cutOffPackage = cutOffPackage;
     }
 
+    @Override
     public Throwable filter(Throwable source, boolean recursive) {
         if (recursive) {
             Throwable current = source;
@@ -84,6 +96,7 @@ public class DefaultStackTraceFilterer implements StackTraceFilterer {
         return filter(source);
     }
 
+    @Override
     public Throwable filter(Throwable source) {
         if (shouldFilter) {
             StackTraceElement[] trace = source.getStackTrace();
@@ -107,6 +120,26 @@ public class DefaultStackTraceFilterer implements StackTraceFilterer {
         return source;
     }
 
+    @Override
+    public void setShouldFilter(boolean shouldFilter) {
+        this.shouldFilter = shouldFilter;
+    }
+
+    /**
+     * Whether the given class name is an internal class and should be filtered.
+     *
+     * @param className The class name
+     * @return true if is internal
+     */
+    protected boolean isApplicationClass(String className) {
+        for (String packageName : packagesToFilter) {
+            if (className.startsWith(packageName)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private List<StackTraceElement> filterTraceWithCutOff(StackTraceElement[] trace, String endPackage) {
         List<StackTraceElement> newTrace = new ArrayList<StackTraceElement>();
         boolean foundGroovy = false;
@@ -116,7 +149,9 @@ public class DefaultStackTraceFilterer implements StackTraceFilterer {
             if (!foundGroovy && fileName != null && fileName.endsWith(".groovy")) {
                 foundGroovy = true;
             }
-            if (endPackage != null && className.startsWith(endPackage) && foundGroovy) break;
+            if (endPackage != null && className.startsWith(endPackage) && foundGroovy) {
+                break;
+            }
             if (isApplicationClass(className)) {
                 if (stackTraceElement.getLineNumber() > -1) {
                     newTrace.add(stackTraceElement);
@@ -124,21 +159,5 @@ public class DefaultStackTraceFilterer implements StackTraceFilterer {
             }
         }
         return newTrace;
-    }
-
-    /**
-     * Whether the given class name is an internal class and should be filtered
-     * @param className The class name
-     * @return true if is internal
-     */
-    protected boolean isApplicationClass(String className) {
-        for (String packageName : packagesToFilter) {
-            if (className.startsWith(packageName)) return false;
-        }
-        return true;
-    }
-
-    public void setShouldFilter(boolean shouldFilter) {
-        this.shouldFilter = shouldFilter;
     }
 }

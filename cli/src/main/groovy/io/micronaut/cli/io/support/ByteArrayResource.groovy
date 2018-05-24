@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.io.support
 
 import groovy.transform.CompileStatic
 
 /**
  * A Resource impl used represent a Resource as an array of bytes
+ *
+ * @author Jame Kleeh
+ * @since 1.0
  */
 @CompileStatic
 class ByteArrayResource implements Resource {

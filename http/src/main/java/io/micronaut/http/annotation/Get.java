@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#GET}
+ * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#GET}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -55,7 +56,7 @@ public @interface Get {
     String[] produces() default {};
 
     /**
-     * The default consumes. Ignored for server request which never a consume a value for a GET request
+     * The default consumes. Ignored for server request which never a consume a value for a GET request.
      *
      * @return The default consumes, otherwise override from controller
      */

@@ -13,24 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.logging;
 
 import java.io.PrintStream;
 
 /**
- * Used to replace default System.err with one that routes calls through GrailsConsole.
+ * Used to replace default System.err with one that routes calls through MicronautConsole.
  *
  * @author Graeme Rocher
- * @since 2.0
+ * @since 1.0
  */
 public class ConsoleErrorPrintStream extends PrintStream {
 
+    /**
+     * @param out The print stream
+     */
     public ConsoleErrorPrintStream(PrintStream out) {
         super(out, true);
     }
 
+    /**
+     * @return The print stream
+     */
     public PrintStream getTargetOut() {
-        return (PrintStream)out;
+        return (PrintStream) out;
     }
 
     @Override

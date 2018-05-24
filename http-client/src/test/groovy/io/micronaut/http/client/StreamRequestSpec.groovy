@@ -16,7 +16,6 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -24,24 +23,19 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.StreamRequestSpec.Book
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
-import io.reactivex.Emitter
 import io.reactivex.Flowable
 import io.reactivex.FlowableEmitter
 import io.reactivex.FlowableOnSubscribe
 import io.reactivex.Single
 import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.print.attribute.standard.Media
 import java.nio.charset.StandardCharsets
 
 /**
@@ -79,7 +73,6 @@ class StreamRequestSpec extends Specification {
         cleanup:
         client.stop()
         client.close()
-
     }
 
     void "test stream post request with byte chunks"() {
@@ -138,10 +131,7 @@ class StreamRequestSpec extends Specification {
         cleanup:
         client.stop()
         client.close()
-
     }
-
-
 
     void "test stream post request with POJOs flowable"() {
         given:
@@ -149,7 +139,7 @@ class StreamRequestSpec extends Specification {
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojoFlowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
             @Override
             void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
                 while(i < 5) {
@@ -171,15 +161,13 @@ class StreamRequestSpec extends Specification {
         client.close()
     }
 
-
-
     void "test json stream post request with POJOs flowable"() {
         given:
         RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
 
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojoFlowable', Flowable.create( new FlowableOnSubscribe<Object>() {
+        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
             @Override
             void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
                 while(i < 5) {
@@ -195,6 +183,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.size() == 5
         result == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
+
+        cleanup:
+        client.close()
     }
 
     @Controller('/stream/request')

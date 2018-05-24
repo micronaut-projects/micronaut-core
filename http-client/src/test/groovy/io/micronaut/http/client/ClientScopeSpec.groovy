@@ -16,11 +16,6 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
@@ -40,12 +35,17 @@ import javax.inject.Singleton
  */
 class ClientScopeSpec extends Specification {
     @Shared int port = SocketUtils.findAvailableTcpPort()
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'micronaut.server.port':port,
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test client scope annotation"() {
         given:

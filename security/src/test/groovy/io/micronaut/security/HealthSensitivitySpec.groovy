@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.security
 
 import io.micronaut.context.ApplicationContext
@@ -5,6 +20,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.AuthenticationFailed
@@ -22,23 +38,52 @@ import javax.inject.Singleton
 class HealthSensitivitySpec extends Specification {
 
     @Unroll
-    void "Populate Sensitive: #setSensitive sensitive: #sensitive security: #security authenticated: #authenticated => #expected"(boolean setSensitive,
-                                                                                                boolean sensitive,
-                                                                                                boolean security,
-                                                                                                boolean authenticated,
-                                                                                                HealthLevelOfDetail expected) {
+    void "If endpoints.health.sensitive=true #description => 401"(boolean security, String description) {
         given:
         Map m = [
                 'spec.name': 'healthsensitivity',
                 'endpoints.health.enabled': true,
                 'endpoints.health.disk-space.threshold': '9999GB',
+                'endpoints.health.sensitive': true,
         ]
         if (security) {
             m['micronaut.security.enabled'] = security
         }
-        if (setSensitive) {
-            m['endpoints.health.sensitive'] = sensitive
+
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m)
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health")
+        rxClient.exchange(httpRequest, Map).blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
+
+        where:
+        security << [true, false]
+        description = security ? 'with security but unauthenticated' : 'without security'
+    }
+
+    @Unroll
+    void "#description => #expected"(boolean sensitive, boolean security, boolean authenticated, HealthLevelOfDetail expected, String description) {
+        given:
+        Map m = [
+                'spec.name': 'healthsensitivity',
+                'endpoints.health.enabled': true,
+                'endpoints.health.sensitive': sensitive,
+                'endpoints.health.disk-space.threshold': '9999GB',
+        ]
+        if (security) {
+            m['micronaut.security.enabled'] = security
         }
+
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m)
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
@@ -67,14 +112,12 @@ class HealthSensitivitySpec extends Specification {
         rxClient.close()
 
         where:
-        setSensitive | sensitive | security | authenticated || expected
-        true         | true      | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true         | true      | true     | false         || HealthLevelOfDetail.STATUS
-        true         | false     | true     | false         || HealthLevelOfDetail.STATUS
-        true         | false     | true     | true          || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true         | true      | false    | false         || HealthLevelOfDetail.STATUS
-        true         | false     | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false        | false     | false    | false         || HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        sensitive | security | authenticated | expected
+        true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+//        false     | true     | false         | HealthLevelOfDetail.STATUS
+//        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+//        false     | false    | false         | HealthLevelOfDetail.STATUS
+        description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated': 'not authenticated') : '')
     }
 
     @Singleton

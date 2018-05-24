@@ -17,8 +17,6 @@
 package io.micronaut.core.io.scan
 
 import groovy.transform.AutoClone
-import io.micronaut.core.io.scan.nested.Foo2
-import io.micronaut.core.io.scan2.Foo3
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import io.micronaut.core.io.scan.nested.Foo2
 import io.micronaut.core.io.scan2.Foo3

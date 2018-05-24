@@ -20,18 +20,17 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
- * An interface that provides basic bean introspection. Designed as a simpler replacement for
- * {@link java.beans.Introspector}.
+ * An interface that provides basic bean introspection. Designed as a simpler replacement for {@link java.beans.Introspector}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Introspector {
+public final class Introspector {
 
     /* The cache to store Bean Info objects that have been found or created */
     private static final int DEFAULT_CAPACITY = 128;
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "ConstantName"})
     private static final Cache<Class<?>, BeanInfo> theCache = Caffeine.newBuilder()
                                                                       .maximumSize(DEFAULT_CAPACITY)
                                                                       .build();
@@ -69,7 +68,8 @@ public class Introspector {
      * object. Subsequent calls to this method will be answered with the cached
      * data.
      * </p>
-     * @param <T> type Generic
+     *
+     * @param <T>       type Generic
      * @param beanClass the specified bean class.
      * @return the <code>BeanInfo</code> of the bean class.
      */

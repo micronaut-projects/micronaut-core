@@ -42,7 +42,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.UNPROCESSABLE_ENTITY.code
-        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
 
         when:
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
@@ -69,7 +69,6 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
     }
 
     @Controller('/errors')
-    @Singleton
     static class BookController {
 
         @Get('/')

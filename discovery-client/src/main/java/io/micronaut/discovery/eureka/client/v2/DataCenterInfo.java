@@ -13,6 +13,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonRootName;
@@ -24,13 +25,23 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
  * A simple interface for indicating which <em>datacenter</em> a particular instance belongs.
  *
  * @author Karthik Ranganathan
- *
  */
 @JsonRootName("dataCenterInfo")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = As.PROPERTY, property = "@class")
 @JsonTypeIdResolver(DataCenterTypeInfoResolver.class)
 public interface DataCenterInfo {
-    enum Name {Netflix, Amazon, MyOwn}
 
+    /**
+     * Different data centers related to the instances.
+     */
+    enum Name {
+        Netflix,
+        Amazon,
+        MyOwn
+    }
+
+    /**
+     * @return The name
+     */
     Name getName();
 }

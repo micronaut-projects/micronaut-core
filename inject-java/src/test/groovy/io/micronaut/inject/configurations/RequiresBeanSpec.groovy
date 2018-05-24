@@ -26,18 +26,7 @@ import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
 import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
 import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.context.env.PropertySource
-import io.micronaut.inject.configurations.requiresbean.RequiresBean
-import io.micronaut.inject.configurations.requiresconditionfalse.TravisBean
-import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
-import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
-import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
-import io.micronaut.inject.configurations.requiressdk.RequiresJava9
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 class RequiresBeanSpec extends Specification {
@@ -54,6 +43,7 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresJava9)
     }
 
+    @IgnoreIf({ System.getenv("TRAVIS") } ) // fails on travis, which is expected
     void "test that a condition can be required for a bean when false"() {
         given:
         BeanContext context = new DefaultBeanContext()

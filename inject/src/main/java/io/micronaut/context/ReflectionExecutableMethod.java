@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -33,8 +34,10 @@ import java.util.Map;
 
 /**
  * A fallback implementation of {@link ExecutableMethod} that uses reflection in the case where no invocation data has
- * been produced at compile time (which should be rarely)
+ * been produced at compile time (which should be rarely).
  *
+ * @param <T> The type
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -44,6 +47,10 @@ class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
     private final Method method;
     private final Argument[] arguments;
 
+    /**
+     * @param beanDefinition The bean definition
+     * @param method         The method
+     */
     ReflectionExecutableMethod(BeanDefinition<T> beanDefinition, Method method) {
         this.beanDefinition = beanDefinition;
         this.method = method;
@@ -72,8 +79,12 @@ class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         ReflectionExecutableMethod<?, ?> that = (ReflectionExecutableMethod<?, ?>) o;
 
@@ -140,6 +151,9 @@ class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
         return method.getDeclaredAnnotations();
     }
 
+    /**
+     * @param <MRT> The method return type
+     */
     private class MethodReturnType<MRT> implements ReturnType<MRT> {
 
         @Override
@@ -149,7 +163,6 @@ class ReflectionExecutableMethod<T, R> implements ExecutableMethod<T, R> {
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            // TODO: build via reflection
             return Collections.emptyMap();
         }
 

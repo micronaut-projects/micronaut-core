@@ -31,11 +31,13 @@ import java.util.Optional;
 /**
  * Represents an argument to a constructor or method.
  *
+ * @param <T> The argument type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 class DefaultArgument<T> implements Argument<T> {
+
     private final Class<T> type;
     private final String name;
     private final AnnotatedElement annotatedElement;
@@ -43,6 +45,13 @@ class DefaultArgument<T> implements Argument<T> {
     private final Argument[] typeParameterArray;
     private Annotation qualifier;
 
+    /**
+     * @param type         The type
+     * @param name         The name
+     * @param qualifier    The qualifier
+     * @param annotations  The annotations
+     * @param genericTypes The generic types
+     */
     DefaultArgument(Class<T> type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
         this.type = type;
         this.name = name;
@@ -52,6 +61,12 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameterArray = genericTypes;
     }
 
+    /**
+     * @param type         The type
+     * @param name         The name
+     * @param qualifier    The qualifier
+     * @param genericTypes The generic types
+     */
     DefaultArgument(Class<T> type, String name, Annotation qualifier, Argument... genericTypes) {
         this.type = type;
         this.name = name;
@@ -61,15 +76,20 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameterArray = genericTypes;
     }
 
-
+    /**
+     * @param type               The type
+     * @param name               The name
+     * @param annotationMetadata The annotation metadata
+     * @param genericTypes       The generic types
+     */
     DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
         this.type = type;
         this.name = name;
         this.annotatedElement = annotationMetadata != null ? annotationMetadata : AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
-        if(annotationMetadata != null) {
+        if (annotationMetadata != null) {
             this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
-                                               .map(annotationMetadata::getAnnotation)
-                                               .orElse(null);
+                .map(annotationMetadata::getAnnotation)
+                .orElse(null);
         }
         this.typeParameters = initializeTypeParameters(genericTypes);
         this.typeParameterArray = genericTypes;
@@ -77,7 +97,7 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        if(annotatedElement instanceof AnnotationMetadata) {
+        if (annotatedElement instanceof AnnotationMetadata) {
             return (AnnotationMetadata) annotatedElement;
         }
         return AnnotationMetadata.EMPTY_METADATA;
@@ -108,7 +128,7 @@ class DefaultArgument<T> implements Argument<T> {
 
     @Override
     public Annotation getQualifier() {
-        if(this.qualifier != null) {
+        if (this.qualifier != null) {
             return this.qualifier;
         } else {
             this.qualifier = AnnotationUtil.findAnnotationWithStereoType("javax.inject.Qualifier", getAnnotations()).orElse(null);

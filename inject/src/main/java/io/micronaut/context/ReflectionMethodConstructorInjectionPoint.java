@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -22,10 +23,9 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 
 import javax.annotation.Nullable;
-import java.lang.reflect.Method;
 
 /**
- * <p>Calls a method that constructs the object</p>
+ * <p>Calls a method that constructs the object.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,13 +33,20 @@ import java.lang.reflect.Method;
 @Internal
 class ReflectionMethodConstructorInjectionPoint extends ReflectionMethodInjectionPoint implements ConstructorInjectionPoint {
 
-    public ReflectionMethodConstructorInjectionPoint(
-            BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata
-    ) {
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param methodName         The method name
+     * @param arguments          The arguments
+     * @param annotationMetadata The annotation metadata
+     */
+    ReflectionMethodConstructorInjectionPoint(
+        BeanDefinition declaringBean,
+        Class<?> declaringType,
+        String methodName,
+        @Nullable Argument[] arguments,
+        @Nullable AnnotationMetadata annotationMetadata) {
+
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }
 

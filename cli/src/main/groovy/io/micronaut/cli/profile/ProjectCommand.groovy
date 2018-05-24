@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 /**
  * A marker interface for commands that are global, but apply only within the context of a project
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface ProjectCommand extends Command {
 }

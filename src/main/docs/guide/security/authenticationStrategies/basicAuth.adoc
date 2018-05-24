@@ -1,0 +1,42 @@
+Out-of-the-box, Micronaut supports https://tools.ietf.org/html/rfc7617[RFC7617] which defines the "Basic" Hypertext Transfer Protocol (HTTP) authentication scheme, which transmits credentials as user-id/password pairs, encoded using Base64.
+
+Once you enable Micronaut security, Basic Auth is enabled by default.
+
+[source, yaml]
+----
+include::{testssecurity}/security/token/basicauth/BasicAuthSpec.groovy[tag=yamlconfig,indent=0]
+----
+
+The following sequence illustrates the authentication flow:
+
+image::basicauth.svg[]
+
+Below is a sample of a cURL command using basic auth:
+
+[source, bash]
+.cURL command using Basic Auth
+----
+curl "http://localhost:8080/info" \
+     -u 'user:password'
+----
+
+After credentials are read from the HTTP Header, they are feed into an link:{api}/io/micronaut/security/authentication/Authenticator.html[Authenticator]
+which attempts to validate them.
+
+The following configuration properties are available to customize basic authentication behaviour:
+
+|===
+
+| Configuration Property | Default Value | Description
+
+| `micronaut.security.token.basicAuth.enabled` | `true` | link:{api}/io/micronaut/security/token/basicauth/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
+
+| `micronaut.security.token.basicAuth.headerName` | `Authorization` | Header name
+
+| `micronaut.security.token.basicAuth.prefix` | `Basic` | e.g. `Basic dXNlcjp1c2Vy`
+
+|===
+
+See the javadoc for api:security.token.basicauth.BasicAuthTokenReaderConfigurationProperties[] for more information.
+
+//TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.

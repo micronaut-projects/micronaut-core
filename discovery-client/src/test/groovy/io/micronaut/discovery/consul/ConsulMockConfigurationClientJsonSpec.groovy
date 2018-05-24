@@ -62,7 +62,6 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
     @Shared
     ConsulConfigurationClient configClient = embeddedServer.applicationContext.getBean(ConsulConfigurationClient)
 
-
     def setup() {
         consulServer.applicationContext.getBean(MockConsulServer)
                                         .keyvalues.clear()

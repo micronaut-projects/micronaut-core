@@ -1,4 +1,4 @@
-When you turn on security, Built-in endpoints are secured depending on their sensitive value.
+When you turn on security, <<providedEndpoints, Built-in endpoints>> are secured depending on their sensitive value.
 
 [source, yaml]
 ----
@@ -6,4 +6,4 @@ include::{testssecurity}/security/securityRule/builtinendpoints/BuiltInEndpoints
 ----
 
 <1> `/beans` endpoint is secured
-<2> `/health` endpoint is open for unauthenticated access.
+<2> `/info` endpoint is open for unauthenticated access.

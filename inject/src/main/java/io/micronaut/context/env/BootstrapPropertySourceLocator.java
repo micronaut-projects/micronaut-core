@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -21,8 +22,7 @@ import io.micronaut.core.annotation.Blocking;
 import java.util.Collections;
 
 /**
- * Allows blocking resolving of {@link PropertySource} from remote
- * distributed configuration servers
+ * Allows blocking resolving of {@link PropertySource} from remote distributed configuration servers.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,13 +30,13 @@ import java.util.Collections;
 public interface BootstrapPropertySourceLocator {
 
     /**
-     * An empty version that does nothing
+     * An empty version that does nothing.
      */
     BootstrapPropertySourceLocator EMPTY_LOCATOR = environment -> Collections.emptySet();
 
     /**
-     * A blocking interface that will attempt to resolve either remote
-     * or local {@link PropertySource} instances for the current Environment
+     * A blocking interface that will attempt to resolve either remote or local {@link PropertySource} instances
+     * for the current Environment.
      *
      * @param environment The environment
      * @return An iterable of {@link PropertySource}

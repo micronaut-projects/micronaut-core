@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -29,6 +30,9 @@ import javax.annotation.Nullable;
 public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer {
     private final ServiceInstanceList serviceInstanceList;
 
+    /**
+     * @param serviceInstanceList The service instance list
+     */
     public ServiceInstanceListRoundRobinLoadBalancer(ServiceInstanceList serviceInstanceList) {
         this.serviceInstanceList = serviceInstanceList;
     }

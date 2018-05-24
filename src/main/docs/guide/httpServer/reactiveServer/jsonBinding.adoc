@@ -2,9 +2,9 @@ The examples so far have dealt with simply text based responses, but the most co
 
 In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
 
-In order do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+In order to do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
 
-=== Binding using Reactive Frameworks
+== Binding using Reactive Frameworks
 
 From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
 
@@ -28,7 +28,7 @@ Using CURL from the command line you can POST JSON to the `/people` URI for the 
 $ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintstone","age":45}'
 ----
 
-=== Binding Using CompletableFuture
+== Binding Using CompletableFuture
 
 The same method as the previous example can also be written with the jdk:java.util.concurrent.CompletableFuture[] API instead:
 
@@ -41,7 +41,7 @@ include::{testsuite}/server/json/PersonController.java[tags=future, indent=0]
 The above example uses the `thenApply` method to achieve the same as the previous example.
 
 
-=== Binding using POJOs
+== Binding using POJOs
 
 Note however, that if your method does not do any blocking I/O then you can just as easily write:
 

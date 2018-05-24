@@ -16,7 +16,6 @@
 
 package io.micronaut.discovery;
 
-import io.micronaut.cache.CacheConfiguration;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
@@ -36,8 +35,6 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public abstract class CompositeDiscoveryClient implements DiscoveryClient {
-
-    static final String SETTINGS_CACHE_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
 
     private final DiscoveryClient[] discoveryClients;
 

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
@@ -24,12 +25,19 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Extended version of {@link OptionalValuesMap} that resolved place holders
+ * Extended version of {@link OptionalValuesMap} that resolved place holders.
  *
+ * @param <V> A generic value
  * @author graemerocher
  * @since 1.0
  */
 class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
+
+    /**
+     * @param type        The type
+     * @param values      A map of values
+     * @param environment The environment
+     */
     EnvironmentOptionalValuesMap(Class<?> type, Map<CharSequence, ?> values, Environment environment) {
         super(type, resolveValues(environment, values));
     }

@@ -13,24 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.ssl;
 
 /**
- * An exception thrown while configuring SSL
+ * An exception thrown while configuring SSL.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class SslConfigurationException extends RuntimeException {
 
+    /**
+     * @param message The message
+     */
     public SslConfigurationException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public SslConfigurationException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param cause The throwable
+     */
     public SslConfigurationException(Throwable cause) {
         super("An error occurred configuring SSL", cause);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.gorm.configuration;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -25,6 +26,7 @@ import org.grails.datastore.mapping.config.Settings;
  * @since 1.0
  */
 public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
+
     /**
      * Constructor.
      *
@@ -37,11 +39,10 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
 
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
-        if(Settings.SETTING_FAIL_ON_ERROR.equals(key) && defaultValue == null) {
+        if (Settings.SETTING_FAIL_ON_ERROR.equals(key) && defaultValue == null) {
             //noinspection unchecked
-            return (T)super.getProperty(key, Boolean.class, Boolean.TRUE);
-        }
-        else {
+            return (T) super.getProperty(key, Boolean.class, Boolean.TRUE);
+        } else {
 
             return super.getProperty(key, targetType, defaultValue);
         }

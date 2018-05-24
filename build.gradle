@@ -17,8 +17,8 @@ plugins {
 }
 
 repositories {
-    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
     maven { url "https://repo.grails.org/grails/core" }
+    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
 version project.projectVersion
@@ -60,6 +60,11 @@ ext {
                     group:'com.fasterxml.jackson.datatype',
                     name:'jackson-datatype-jdk8',
                     modules:['jackson-datatype-jsr310']
+            ],
+            jsr305:[
+                    version:jsr305Version,
+                    group:'com.google.code.findbugs',
+                    name:'jsr305'
             ],
             'micrometer.core': [
                 version: micrometerVersion,
@@ -120,6 +125,11 @@ ext {
                 version: spockVersion,
                 group:'org.spockframework',
                 name: 'spock-core'
+            ],
+            'reactive.streams':[
+                version:reactiveStreamsVersion,
+                group:'org.reactivestreams',
+                name:'reactive-streams'
             ],
             rxjava1: [
                 version: rxJava1Version,
@@ -215,25 +225,28 @@ subprojects { subproject ->
             apply plugin: 'checkstyle'
             
             checkstyle {
-                toolVersion = 8.2
-                configFile = new File(project.rootDir, 'config/checkstyle/checkstyle.xml')
-                ignoreFailures = false
+                toolVersion = 8.10
+                configFile = rootProject.file('config/checkstyle/checkstyle.xml')
 
-                // TODO - We need to turn these down once
-                // the current issues are addressed.  Setting
-                // high thresholds for now to allow builds to pass
-                // until we can prioritize addressing the relevant
-                // issues.
-                maxErrors = 9_999
-                maxWarnings = 9_999
+                // Per submodule
+                maxErrors = 5
+                maxWarnings = 10
+
+                showViolations = true
             }
+
+            checkstyleTest.enabled = false
         }
     }
 
     tasks.withType(Test) {
         testLogging {
-            showStandardStreams = true
+            showStandardStreams = !System.getenv("TRAVIS")
             exceptionFormat = 'full'
+        }
+        afterSuite {
+            System.out.print('.')
+            System.out.flush()
         }
     }
 
@@ -290,6 +303,7 @@ apply from:"gradle/docs.gradle"
 // generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
 allprojects {
     apply plugin: 'idea'
+
     idea {
         module {
             outputDir file('build/classes/java/main')
@@ -297,4 +311,60 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
+
+    tasks.withType(Test) {
+        ignoreFailures = true
+    }
+}
+
+task aggregateReports {
+    group 'verification'
+    doLast() {
+        def html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Micronaut reports</title></head><body><img src='http://micronaut.io/images/micronautlogo.svg' alt='Micronaut'/><ul>"
+        subprojects.each { subproject ->
+            if ( subproject.tasks.find { Task task -> task.name == 'test' } ) {
+              def link = ''
+                if (new File("${subproject.buildDir}/reports/checkstyle").exists()) {
+                    mkdir("${rootProject.buildDir}/reports/${subproject.name}/checkstyle")
+                    copy {
+                        from "${subproject.buildDir}/reports/checkstyle"
+                        into "${rootProject.buildDir}/reports/${subproject.name}/checkstyle"
+                    }
+                    link += " <a href='${subproject.name}/checkstyle/index.html'>checkstyle</a>"
+                }
+              if (new File("${subproject.buildDir}/test-results/test").exists()) {
+                  int failures = 0
+                  int errors = 0
+                  int skipped = 0
+                  int tests = 0
+                  new File("${subproject.buildDir}/test-results/test").eachFile() { file ->
+                      if ( file.name.endsWith('.xml') ) {
+                          def testsuite = new XmlSlurper().parseText(file.text)
+                          failures += "${testsuite['@failures']}" as int
+                          errors += "${testsuite['@errors']}" as int
+                          skipped += "${testsuite['@skipped']}" as int
+                          tests += "${testsuite['@tests']}" as int
+                      }
+                  }
+                  link += " tests: ${tests} skipped: ${skipped} <span style='${errors ? 'color: red;' : ''}'>errors: ${errors}</span> <span style='${failures ? 'color: red;' : ''}'>failures: ${failures}</span>"
+              }
+              if (new File("${subproject.buildDir}/reports/tests/test").exists()) {
+                  mkdir("${rootProject.buildDir}/reports/${subproject.name}/test")
+                  copy {
+                      from "${subproject.buildDir}/reports/tests/test"
+                      into "${rootProject.buildDir}/reports/${subproject.name}/test"
+                  }
+                  link += " <a href='${subproject.name}/test/index.html'>test</a>"
+              }
+
+
+              if (link) {
+                  html += "<li><b>${subproject.name}</b> $link</li>"
+              }
+            }
+        }
+        html += "</ul></body></html>"
+        File f = new File("${rootProject.buildDir}/reports/index.html")
+        f.text = html
+    }
 }

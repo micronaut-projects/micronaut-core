@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
  */
 package io.micronaut.tracing.jaeger
 
-import io.jaegertracing.Span
 import io.jaegertracing.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -29,7 +27,6 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.opentracing.Tracer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

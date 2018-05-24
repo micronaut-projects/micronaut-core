@@ -100,7 +100,7 @@ public class RouteBuilderTests {
                     );
 
             GET("/message{/message}", controller, "hello", String.class).consumes(MediaType.APPLICATION_JSON_TYPE);
-            GET("/books{/id}", controller, "show").nest(() ->
+            GET("/books{/id}", controller, "show", Long.class).nest(() ->
                     GET("/authors", controller)
             );
             GET(controller);
@@ -117,7 +117,7 @@ public class RouteBuilderTests {
             POST("/books", controller, "save").consumes(MediaType.APPLICATION_JSON_TYPE);
 
             // handle errors TODO
-            error(ClassNotFoundException.class, controller);
+            error(ClassNotFoundException.class, controller, "classNotFound");
             error(ReflectiveOperationException.class, controller);
             // handle status codes
             status(HttpStatus.NOT_FOUND, controller, "notFound");
@@ -139,8 +139,8 @@ public class RouteBuilderTests {
         String show(Long id) { return "Book " + id; }
         String index() { return "dummy"; }
         String save() { return "dummy"; }
-        String delete() { return "dummy"; }
-        String update() { return "dummy"; }
+        String delete(Long id) { return "dummy"; }
+        String update(Long id) { return "dummy"; }
 
         String notFound() { return "not found";}
 

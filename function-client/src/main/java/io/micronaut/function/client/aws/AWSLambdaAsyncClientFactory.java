@@ -20,6 +20,7 @@ import com.amazonaws.services.lambda.AWSLambdaAsync;
 import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
 
 /**
@@ -27,6 +28,7 @@ import io.micronaut.runtime.context.scope.Refreshable;
  * @since 1.0
  */
 @Factory
+@Requires(beans = AWSLambdaConfiguration.class)
 public class AWSLambdaAsyncClientFactory {
 
     private final AWSLambdaConfiguration configuration;
@@ -45,6 +47,7 @@ public class AWSLambdaAsyncClientFactory {
      */
     @Bean
     @Refreshable
+    @Requires(beans = AWSLambdaConfiguration.class)
     AWSLambdaAsync awsLambdaAsyncClient() {
         AWSLambdaAsyncClientBuilder builder = configuration.getBuilder();
         return builder.build();

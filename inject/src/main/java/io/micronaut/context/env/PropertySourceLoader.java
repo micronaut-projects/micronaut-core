@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.core.io.ResourceLoader;
@@ -22,7 +23,7 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
- * Loads the given property source for the given environment
+ * Loads the given property source for the given environment.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +31,7 @@ import java.util.Optional;
 public interface PropertySourceLoader extends Toggleable, PropertySourceLocator, PropertySourceReader {
 
     /**
-     * Load a {@link PropertySource} for the given {@link Environment}
+     * Load a {@link PropertySource} for the given {@link Environment}.
      *
      * @param environment The environment
      * @return An optional of {@link PropertySource}
@@ -41,10 +42,10 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
     }
 
     /**
-     * Load a {@link PropertySource} for the given {@link Environment}
+     * Load a {@link PropertySource} for the given {@link Environment}.
      *
-     * @param resourceName The resourceName of the resource to load
-     * @param resourceLoader The {@link ResourceLoader} to retrieve the resource
+     * @param resourceName    The resourceName of the resource to load
+     * @param resourceLoader  The {@link ResourceLoader} to retrieve the resource
      * @param environmentName The environment name to load. Null if the default environment is to be used
      * @return An optional of {@link PropertySource}
      */

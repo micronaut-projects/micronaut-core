@@ -1,7 +1,0 @@
-To authenticate users you must provide implementations of link:{api}/io/micronaut/security/authentication/AuthenticationProvider.html[AuthenticationProvider].
-
-Micronaut ships with link:{api}/io/micronaut/security/authentication/providers/DelegatingAuthenticationProvider.html[DelegatingAuthenticationProvider] which can be typically used
-in environments where you store User credentails in a persistence mechanism such as database. However, it is not enabled unless you provide implementations for link:{api}/io/micronaut/security/authentication/providers/UserFetcher.html[UserFetcher],
-link:{api}/io/micronaut/security/authentication/providers/PasswordEncoder.html[PasswordEncoder] and  link:{api}/io/micronaut/security/authentication/providers/AuthoritiesFetcher.html[AuthoritiesFetcher]
-
-TIP: Read the http://guides.micronaut.io/micronaut-security-db-authprovider/guide/index.html[Database Authentication Provider Micronaut Guide] to learn more.

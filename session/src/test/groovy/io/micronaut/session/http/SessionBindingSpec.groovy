@@ -28,6 +28,7 @@ import io.micronaut.session.annotation.SessionValue
 import io.reactivex.Flowable
 import spock.lang.Specification
 
+import javax.annotation.Nullable
 import javax.inject.Singleton
 
 /**
@@ -159,14 +160,34 @@ class SessionBindingSpec extends Specification {
 
         then:
         response.getBody().get() == "value in session"
-        response.header(HttpHeaders.AUTHORIZATION_INFO)
+
+        when:
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/value-nullable")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
+
+        then:
+        response.getBody().get() == "value in session"
+
+        when:
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/value-nullable")
+                , String
+        ))
+        response = flowable.blockingFirst()
+
+        then:
+        response.getBody().get() == "no value in session"
+
 
         cleanup:
         embeddedServer.stop()
     }
 
     @Controller('/sessiontest')
-    @Singleton
     static class SessionController {
 
         @Get
@@ -184,6 +205,10 @@ class SessionBindingSpec extends Specification {
             )
         }
 
+        @Get
+        String valueNullable(@SessionValue @Nullable String myValue) {
+            return myValue ?:  "no value in session"
+        }
 
         @Get
         String optional(Optional<Session> session) {

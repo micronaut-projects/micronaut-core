@@ -6,6 +6,7 @@ shadowJar {
         exclude(project(":core"))
 
         exclude(dependency(dependencyVersion("slf4j")))
+        exclude(dependency(dependencyVersion("snakeyaml")))
         exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
         exclude(dependency('org.ow2.asm:.*:.*'))
         exclude(dependency('org.reactivestreams:.*:.*'))
@@ -22,18 +23,19 @@ tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowR
 dependencies {
     shadowCompile group: 'javax.inject', name: 'javax.inject', version: '1'
     shadowCompile project(":core")
+    shadowCompile dependencyVersion("snakeyaml")
 
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
     compile project(path: ':core')
+    compile dependencyVersion("snakeyaml")
 
     compileOnly dependencyVersion("groovy")
     compile "org.ow2.asm:asm:$asmVersion"
     compile "org.ow2.asm:asm-commons:$asmVersion"
     compile "org.ow2.asm:asm-tree:$asmVersion"
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+    compileOnly dependencyVersion("validation")
 
-    [dependencyVersion("validation"), dependencyVersion("snakeyaml")].each { String dep ->
-        compileOnly dep
-        testCompile dep
-    }
+    testCompile dependencyVersion("validation")
+
 }

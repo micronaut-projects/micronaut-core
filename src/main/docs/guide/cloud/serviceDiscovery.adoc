@@ -1,127 +1,50 @@
-==Route 53 Service Discovery
+Service Discovery enables the ability for Microservices to find each other without necessarily knowing the physical location or IP address of associated services.
 
-----
+There are many ways Service Discovery can be implemented, including:
 
-To use the Route 53 Service Discovery, you must meet the following criteria:
-<1> Run instances on ec2 instances of some type
-<2> Have a domain name hosted in Route 53
-<3> Have a newer version of AWS-CLI (like 14+)
+* You could manually implement Service Discovery using DNS without requiring a third party tool or component.
+* You could use a discovery server such as https://github.com/Netflix/eureka[Eureka], https://www.consul.io[Consul] or https://zookeeper.apache.org[ZooKeeper].
+* You could delegate the work to a container runtime, such as https://kubernetes.io[Kubernetes].
 
-Assuming you have those things, you are ready. It's not as fancy as Consul or Eureka, but other than some initail setup
-with the AWS-CLI, there is no other software running to go wrong. You can even support health checks pulsate
- if you add a custom health check to your service. If you would like to test your account CAN create and use Service Discovery see the Integration Test section.
- More information can be found at https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html.
+With that in mind Micronaut tries to flexible to support all of these approaches. As of this writing Micronaut features integrated support for the popular Service Discovery servers Eureka and Consul.
 
- Here are the steps
- <1> Use AWS-CLI to create a namespace. You can make either a public or private one depending on what IPs or subnets
- you are using
- <2> Create a service with DNS Records with AWS-CLI command
- <3> Add health checks or custom health checks (optional)
- <4> Add Service ID to your applications configuration file
+To include Service Discovery in your application simply the first step is to add the `discovery-client` dependency to your application, for example in `build.gradle`:
 
-
-==Creating the Namespace
-
-
-Namespaces is similar to a regular route 53 hosted zone, and they appear in the Route53 console but it doesn't support
-working with them. You must use the AWS-CLI at this time for any Service Discovery functionality.
-First decide if you are creating a public facing namespace or a private one, as the commands are different:
-
-
-.Creating Namespace
-[source,bash]
-----
-aws servicediscovery create-public-dns-namespace --name micronaut.io --create-request-id create-1522767790 --description adescrptionhere
-
-or
-
-aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescrptionhere --vpc yourvpcID
-----
-
-
-When you run this you will get an operation ID. You can check the status with the get-operation CLI command:
-
-.Get Operation Results
-[source,bash]
-----
-aws servicediscovery get-operation --operation-id asdffasdfsda
-----
-
-
-This will tell you the ID of the namespace. Write that down, you'll need it for the next steps. If you get an error it will say way. For the same, I use the domain name I'm using for the service discovery records for the name (dns records next).
-You can use this command to get the status of any call you make that returns an operation id.
-
-
-==Creating the Service & DNS Records
-
-Next step is creating the Service and DNS records.
-
-.Create Service
-[source,bash]
-----
-aws create-service --name yourservicename --create-request-id somenumber --descrption someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
-----
-
-
-
-The DnsRecord type can be 'A'(ipv4),'AAAA'(ipv6),'SRV', or 'CNAME'. RoutingPolicy can be 'WEIGHTED' or 'MULTIVALUE'. Keep in mind CNAME must use weighted routing type, SRV must have a valid port configured.
-
-If you want to add a health check, you can use the following syntax on the CLI: Type=string,ResourcePath=string,FailureThreshold=integer
-Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check on a public namespace. See Custom Health Checks for private namespaces. Resource path should be a url that returns 200 OK if it's healty.
-
-For a custom health check, you only need to specify --health-check-custom-config FailureThreshold=integer which will work on private namespaces as well.
-This is also good because Micronaut will send out pulsation commands to let AWS know the instance is still healthy.
-
-For more help run 'aws discoveryservice create-service help'.
-
-You will get a service ID and an ARN back from this command if successful. Write that down, it's going to go into the Micronaut configuration.
-
-
-==Setting up the configuration in Micronaut
-
-===Auto Naming Registration
-
-You will need to add the configuration to make your applications register with Route 53 Autodiscovery:
-
-.Registration Properties
+.build.gradle
 [source,groovy]
 ----
-aws.route53.registration.enabled=true
-aws.route53.registration.awsServiceId=<enter the service id you got after creation on aws cli>
-aws.route53.discovery.namespaceId=<namespaceId>
+compile "io.micronaut:discovery-client"
 ----
 
-==Discovery
+The `discovery-client` dependency provides implementations of the api:discovery.DiscoveryClient[] interface.
 
+The api:discovery.DiscoveryClient[] is fairly simple and provides two main entry points:
 
-.Discovery Properties
-[source,groovy]
+* api:discovery.DiscoveryClient.getServiceIds()[] - Returns all discovered service IDs
+* api:discovery.DiscoveryClient.getInstances(java.lang.String)[] - Returns all the api:discovery.ServiceInstance[] objects for a given service ID
+
+Both methods return rs:Publisher[] instances since the operation to retrieve service ID information may result in a blocking network call depending on the underlying implementation.
+
+The default implementation of the `DiscoveryClient` interface is api:discovery.client.CachingCompositeDiscoveryClient[] which merges all other `DiscoveryClient` beans into a single bean and provides caching of the results of the methods. The default behaviour is to cache for 30 seconds. This cache can be disabled in application configuration:
+
+.Disabling the Discovery Client Cache
+[source,yaml]
 ----
-aws.route53.discovery.client.enabled=true
-aws.route53.discovery.client.awsServiceId=serviceid
+micronaut:
+    caches:
+        discovery-client:
+            enabled: false
 ----
 
-You can also call the following methods by getting the bean "Route53AutoNamingClient":
+Alternatively you can alter the cache's expiration policy:
 
-.Discovery Methods
-[source,java]
+.Configuring the Discovery Client Cache
+[source,yaml]
 ----
-Publisher<List<ServiceInstance>> getInstances(String serviceId) - if serviceId is null it will use property "aws.route53.discovery.client.awsServiceId"
-Publisher<List<String>> getServiceIds() - reads property "aws.route53.discovery.namespaceId"
+micronaut:
+    caches:
+        discovery-client:
+            expireAfterAccess: 60s
 ----
 
-==Integration Tests
-
-If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in ~/.aws/credentials)
-you can run the integration tests. You will still need a domain hosted on route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery.
-When the test completes it will remove/terminate all resources it spun up.
-
-
-
-
-
-
-
-
-
-
+See the api:discovery.client.DiscoveryClientCacheConfiguration[] class for available configuration options.

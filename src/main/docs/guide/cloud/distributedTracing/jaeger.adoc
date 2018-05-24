@@ -1,1 +1,72 @@
-TODO
+https://www.jaegertracing.io[Jaeger] is another distributed tracing system developed at Uber that is more or less the reference implementation for http://opentracing.io[Open Tracing].
+
+== Running Jaeger
+
+The easiest way to get started with Jaeger is to run Jaeger via Docker:
+
+[source,bash]
+----
+$ docker run -d -e \
+  COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
+  -p 5775:5775/udp \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  -p 9411:9411 \
+  jaegertracing/all-in-one:latest
+----
+
+You can then navigate to `http://localhost:16686` to access the Jaeger UI.
+
+See https://www.jaegertracing.io/docs/getting-started/[Getting Started with Jaeger] for more information.
+
+== Sending Traces to Jaeger
+
+To send tracing spans to Jaeger the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
+
+.Adding Jaeger Dependencies
+[source,groovy]
+----
+compile 'io.jaegertracing:jaeger-core:0.27.0'
+----
+
+Then you need to enable Jaeger tracing in your configuration (potentially only your production configuration):
+
+.application.yml
+[source,yaml]
+----
+tracing:
+    jaeger:
+        enabled: true
+----
+
+By default Jaeger will be configured to send traces to a locally running Jaeger agent.
+
+TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-app hello-world -features tracing-jaeger`
+
+
+== Jaeger Configuration
+
+There are many configuration options available for the Jaeger client that sends Spans to Jaeger and they are generally exposed via the api:tracing.jaeger.JaegerConfiguration[] class. You can refer to the javadoc for all the available options.
+
+Below is an example of customizing JaegerConfiguration configuration:
+
+.Customizing Zipkin Configuration
+[source,yaml]
+----
+tracing:
+    jaeger:
+        enabled: true
+        sampler:
+            probability: 0.5
+        sender:
+            agentHost: foo
+            agentPort: 5775
+        reporter:
+            flushInterval: 2000
+            maxQueueSize: 200
+----
+
+You can also optionally dependency inject common configuration classes into api:tracing.jaeger.JaegerConfiguration[] such as `io.jaegertracing.Configuration.SamplerConfiguration` just by defining them as beans. See the API for api:tracing.jaeger.JaegerConfiguration[] for available injection points.

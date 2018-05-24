@@ -1,5 +1,5 @@
-/*
- * Copyright 2018 original authors
+ /*
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import javax.inject.Inject;
  * @author graemerocher
  * @since 1.0
  */
-@Requires(classes = { Tracing.class})
+@Requires(classes = {Tracing.class})
 @Requires(property = BraveTracerConfiguration.PREFIX + ".enabled", value = "true")
 @ConfigurationProperties(BraveTracerConfiguration.PREFIX)
 public class BraveTracerConfiguration implements Toggleable {
@@ -122,7 +122,7 @@ public class BraveTracerConfiguration implements Toggleable {
     }
 
     /**
-     * @param propagationFactory The {@link Propagation.Factory} to use
+     * @param propagationFactory The {@link brave.propagation.Propagation.Factory} to use
      */
     @Inject
     public void setPropagationFactory(@Nullable Propagation.Factory propagationFactory) {
@@ -153,13 +153,12 @@ public class BraveTracerConfiguration implements Toggleable {
         }
     }
 
-
     /**
      * Used to configure HTTP trace sending under the {@code tracing.zipkin.http} namespace.
      */
     @ConfigurationProperties("http")
     @Requires(property = HttpClientSenderConfiguration.PREFIX)
-    @Requires(classes = { Tracing.class})
+    @Requires(classes = {Tracing.class})
     public static class HttpClientSenderConfiguration extends HttpClientConfiguration {
         public static final String PREFIX = BraveTracerConfiguration.PREFIX + ".http";
         @ConfigurationBuilder(prefixes = "")

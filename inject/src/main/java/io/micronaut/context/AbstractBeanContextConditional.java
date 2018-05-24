@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.Requirements;
@@ -30,16 +31,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Abstract implementation of the {@link BeanContextConditional} interface
+ * Abstract implementation of the {@link BeanContextConditional} interface.
  *
  * @author graemerocher
  * @since 1.0
  */
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
-    private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
-
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
+
+    private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
 
     @Override
     public boolean isEnabled(BeanContext context) {
@@ -50,13 +51,11 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
             Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
             DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
             enabled = condition == null || condition.matches(conditionContext);
-            if(LOG.isDebugEnabled() && !enabled) {
-                if(this instanceof BeanConfiguration) {
+            if (LOG.isDebugEnabled() && !enabled) {
+                if (this instanceof BeanConfiguration) {
                     LOG.debug(this + " will not be loaded due to failing conditions:");
-                }
-                else {
-
-                    LOG.debug("Bean ["+this+"] will not be loaded due to failing conditions:");
+                } else {
+                    LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
                 }
                 for (Failure failure : conditionContext.getFailures()) {
                     LOG.debug("* {}", failure.getMessage());

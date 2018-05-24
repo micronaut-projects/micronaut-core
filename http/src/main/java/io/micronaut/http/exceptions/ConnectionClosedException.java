@@ -13,19 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.exceptions;
 
 /**
- * Exception thrown when the client or server unexpectedly closes the connection
+ * Exception thrown when the client or server unexpectedly closes the connection.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ConnectionClosedException extends HttpException {
+
+    /**
+     * @param message The message
+     */
     public ConnectionClosedException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public ConnectionClosedException(String message, Throwable cause) {
         super(message, cause);
     }

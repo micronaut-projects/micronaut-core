@@ -1,4 +1,4 @@
-As mentioned previously, Micronaut is both an HTTP server and an HTTP client. A low-level HTTP client is provided out of the box which you can use to test the `HelloController` created in the previous section.
+As mentioned previously, Micronaut is both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided out of the box which you can use to test the `HelloController` created in the previous section.
 
 For example, the following test is written using http://spockframework.org[Spock Framework]:
 
@@ -16,7 +16,7 @@ include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=
 <4> The `retrieve` method returns the response of the controller as a `String`
 
 
-In addition to a low-level client, Micronaut features a high-level compile-time client, powered by the api:http.client.Client[] annotation.
+In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.Client[] annotation.
 
 To create a client, simply create an interface annotated with `@Client`. For example:
 

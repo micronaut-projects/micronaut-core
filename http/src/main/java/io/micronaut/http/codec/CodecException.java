@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.codec;
 
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * An exception thrown when a object cannot be decoded
+ * An exception thrown when a object cannot be decoded.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class CodecException extends HttpException {
+
+    /**
+     * @param message The message
+     */
     public CodecException(String message) {
         super(message);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public CodecException(String message, Throwable cause) {
         super(message, cause);
     }

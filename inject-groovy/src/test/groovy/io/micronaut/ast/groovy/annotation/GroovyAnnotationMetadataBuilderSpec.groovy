@@ -15,12 +15,9 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Infrastructure
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.inject.annotation.AnnotationValue
+import io.micronaut.inject.annotation.MultipleAlias
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -47,6 +44,25 @@ import javax.inject.Singleton
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
 
+    void "test multiple alias definitions with value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Multi', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@MultipleAlias("test")
+class Multi {
+}
+''', )
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(ConfigurationReader)
+        metadata.getValue(ConfigurationReader, String).get() == 'test'
+        metadata.hasDeclaredAnnotation(MultipleAlias)
+        metadata.getValue(MultipleAlias, String).get() == 'test'
+        metadata.getValue(MultipleAlias, "id", String).get() == 'test'
+    }
     void "test annotation names by stereotype"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
@@ -186,26 +202,6 @@ class Test {
         metadata.hasAnnotation(Primary)
         metadata.hasStereotype(Qualifier)
         !metadata.hasStereotype(Singleton)
-    }
-
-    void "test parse inherited stereotype data"() {
-
-        given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
-
-@io.micronaut.context.annotation.Infrastructure
-class Test {
-}
-''')
-
-        expect:
-        metadata != null
-        metadata.hasAnnotation(Infrastructure)
-        metadata.hasDeclaredAnnotation(Infrastructure)
-        metadata.hasStereotype(Singleton)
-        metadata.hasStereotype(Scope)
-        metadata.hasStereotype(Context)
     }
 
     void "test parse inherited stereotype data attributes default values"() {
