@@ -310,10 +310,34 @@ allprojects {
 task aggregateReports {
     group 'verification'
     doLast() {
-        def html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Micronaut reports</title></head><body><ul>"
+        def html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Micronaut reports</title></head><body><img src='http://micronaut.io/images/micronautlogo.svg' alt='Micronaut'/><ul>"
         subprojects.each { subproject ->
             if ( subproject.tasks.find { Task task -> task.name == 'test' } ) {
               def link = ''
+                if (new File("${subproject.buildDir}/reports/checkstyle").exists()) {
+                    mkdir("${rootProject.buildDir}/reports/${subproject.name}/checkstyle")
+                    copy {
+                        from "${subproject.buildDir}/reports/checkstyle"
+                        into "${rootProject.buildDir}/reports/${subproject.name}/checkstyle"
+                    }
+                    link += " <a href='${subproject.name}/checkstyle/index.html'>checkstyle</a>"
+                }
+              if (new File("${subproject.buildDir}/test-results/test").exists()) {
+                  int failures = 0
+                  int errors = 0
+                  int skipped = 0
+                  int tests = 0
+                  new File("${subproject.buildDir}/test-results/test").eachFile() { file ->
+                      if ( file.name.endsWith('.xml') ) {
+                          def testsuite = new XmlSlurper().parseText(file.text)
+                          failures += "${testsuite['@failures']}" as int
+                          errors += "${testsuite['@errors']}" as int
+                          skipped += "${testsuite['@skipped']}" as int
+                          tests += "${testsuite['@tests']}" as int
+                      }
+                  }
+                  link += "tests: ${tests} skipped: ${skipped} <span style='${errors ? 'color: red;' : ''}'>errors: ${errors}</span> <span style='${failures ? 'color: red;' : ''}'>failures: ${failures}</span>"
+              }
               if (new File("${subproject.buildDir}/reports/tests/test").exists()) {
                   mkdir("${rootProject.buildDir}/reports/${subproject.name}/test")
                   copy {
@@ -323,16 +347,9 @@ task aggregateReports {
                   link += " <a href='${subproject.name}/test/index.html'>test</a>"
               }
 
-              if (new File("${subproject.buildDir}/reports/checkstyle").exists()) {
-                  mkdir("${rootProject.buildDir}/reports/${subproject.name}/checkstyle")
-                  copy {
-                      from "${subproject.buildDir}/reports/checkstyle"
-                      into "${rootProject.buildDir}/reports/${subproject.name}/checkstyle"
-                  }
-                  link += " <a href='${subproject.name}/checkstyle/index.html'>checkstyle</a></li>"
-              }
+
               if (link) {
-                  html += "<li>${subproject.name} $link"
+                  html += "<li><b>${subproject.name}</b> $link</li>"
               }
             }
         }
