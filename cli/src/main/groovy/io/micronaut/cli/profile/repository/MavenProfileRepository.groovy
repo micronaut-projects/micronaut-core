@@ -37,7 +37,7 @@ import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedExc
 @CompileStatic
 class MavenProfileRepository extends AbstractJarProfileRepository {
 
-    public static final RepositoryConfiguration DEFAULT_REPO;
+    public static final RepositoryConfiguration DEFAULT_REPO
 
     static {
         def version = MicronautCli.getPackage().getImplementationVersion()
@@ -104,7 +104,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         try {
             grapeEngine.grab(group: art.groupId,
                              module: art.artifactId,
-                             version: art.version ?: MicronautCli.getPackage().getImplementationVersion())
+                             version: art.version ?: null)
         } catch (DependencyResolutionFailedException e) {
 
             def localData = new File(System.getProperty("user.home"), "/.m2/repository/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
