@@ -56,4 +56,10 @@ If you wish to contribute to the development of Micronaut please read the [CONTR
 
 Micronaut is using Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.
 
+## CI
+
+[Travis-CI](http://travis-ci.org) is used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/reports/index.html). 
+
+
+
 

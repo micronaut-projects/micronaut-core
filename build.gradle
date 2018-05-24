@@ -336,7 +336,7 @@ task aggregateReports {
                           tests += "${testsuite['@tests']}" as int
                       }
                   }
-                  link += "tests: ${tests} skipped: ${skipped} <span style='${errors ? 'color: red;' : ''}'>errors: ${errors}</span> <span style='${failures ? 'color: red;' : ''}'>failures: ${failures}</span>"
+                  link += " tests: ${tests} skipped: ${skipped} <span style='${errors ? 'color: red;' : ''}'>errors: ${errors}</span> <span style='${failures ? 'color: red;' : ''}'>failures: ${failures}</span>"
               }
               if (new File("${subproject.buildDir}/reports/tests/test").exists()) {
                   mkdir("${rootProject.buildDir}/reports/${subproject.name}/test")
