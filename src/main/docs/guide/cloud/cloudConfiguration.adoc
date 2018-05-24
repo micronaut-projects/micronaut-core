@@ -1,0 +1,108 @@
+Applications that are built for the Cloud often need adapt to running in a Cloud environment, read and share configuration in a distributed manner and externalize configuration to the environment where necessary.
+
+Micronaut's <<environments, Environment>> concept is by default Cloud platform aware and will make a best effort to detect the underlying active environment.
+
+You can then use the api:context.annotation.Requires[] annotation to <<conditionalBeans,conditionally load bean definitions>>.
+
+The following table summarizes the constants provided by the api:context.env.Environment[] interface and provides an example:
+
+.Micronaut Environment Detection
+|===
+|Constant|Description |Requires Example
+
+|api:context.env.Environment#ANDROID[]
+|The application is running as an Android application
+|`@Requires(env = Environment.ANDROID)`
+
+|api:context.env.Environment#TEST[]
+|The application is running within a JUnit or Spock test
+|`@Requires(env = Environment.TEST)`
+
+|api:context.env.Environment#CLOUD[]
+|The application is running in a Cloud environment (present for all other cloud platform types)
+|`@Requires(env = Environment.CLOUD)`
+
+|api:context.env.Environment#AMAZON_EC2[]
+|Running on https://aws.amazon.com/ec2[Amazon EC2]
+|`@Requires(env = Environment.AMAZON_EC2)`
+
+|api:context.env.Environment#GOOGLE_COMPUTE[]
+|Running on https://cloud.google.com/compute/[Google Compute]
+|`@Requires(env = Environment.GOOGLE_COMPUTE)`
+
+|api:context.env.Environment#KUBERNETES[]
+|Running on https://www.kubernetes.io[Kubernetes]
+|`@Requires(env = Environment.KUBERNETES)`
+
+|api:context.env.Environment#HEROKU[]
+|Running on https://heroku.com[Heroku]
+|`@Requires(env = Environment.HEROKU)`
+
+|api:context.env.Environment#CLOUD_FOUNDRY[]
+|Running on https://www.cloudfoundry.org[Cloud Foundry]
+|`@Requires(env = Environment.CLOUD_FOUNDRY)`
+
+|api:context.env.Environment#AZURE[]
+|Running on https://azure.microsoft.com[Microsoft Azure]
+|`@Requires(env = Environment.AZURE)`
+
+|api:context.env.Environment#IBM[]
+|Running on https://www.ibm.com/cloud/[IBM Cloud]
+|`@Requires(env = Environment.IBM)`
+
+|===
+
+Note that it may be that case that you have multiple active environment names since you may run Kubernetes on AWS for example.
+
+In addition, using the value of the constants defined in the table above you can create environment specific configuration files. For example if you create a `src/main/resources/application-gcp.yml` file then that configuration will only be loaded when running on Google Compute.
+
+TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable will override the `host` property in api:discovery.consul.ConsulConfiguration[].
+
+
+== Using Cloud Instance Metadata
+
+
+When Micronaut detects it is running on Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
+
+TIP: Depending the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
+
+All of this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
+
+If you need to access the metadata for your application instance you can use the interface api:runtime.server.EmbeddedServerInstance[], and call `getMetadata()` which will get a map of all of the metadata.
+
+
+If you are connecting remotely via client, the instance metadata can be referenced once you have retrieved a api:io.micronaut.discovery.ServiceInstance[] from either the api:http.client.LoadBalancer[] or api:discovery.DiscoveryClient[] APIs.
+
+NOTE: The Netflix Ribbon client side load balancer can be configured to use the metadata to do zone aware client side load balancing. See <<clientSideLoadBalancing,Client Side Load Balancing>>
+
+To obtain metadata for a service via <<serviceDiscovery,Service Discovery>> use the api:http.client.LoadBalancerResolver[] interface to resolve a api:http.client.LoadBalancer[] and obtain a reference to a service by identifier:
+
+.Obtaining Metadata for a Service instance
+[source,java]
+----
+LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service");
+Flowable.fromPublisher(
+    loadBalancer.select()
+).subscribe((instance) ->
+    ConvertibleValues<String> metaData = instance.getMetadata();
+    ...
+);
+----
+
+
+To obtain metadata for the locally running server use the api:runtime.server.EmbeddedServerInstance[] interface:
+
+
+.Obtaining Metadata for a Local Server
+[source,java]
+----
+EmbeddedServerInstance serverInstance = applicationContext.getBean(EmbeddedServerInstance.class);
+ConvertibleValues<String> metaData = serverInstance.getMetadata();
+----
+
+
+
+
+
+
+

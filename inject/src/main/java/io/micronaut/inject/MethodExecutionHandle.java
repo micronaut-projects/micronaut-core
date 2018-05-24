@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 /**
- * Represents an execution handle that invokes a method
+ * Represents an execution handle that invokes a method.
  *
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,10 @@
 package io.micronaut.retry.intercept
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.retry.event.RetryEvent
-import io.micronaut.retry.event.RetryEventListener
-import io.reactivex.Single
-import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
+import io.reactivex.Single
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 

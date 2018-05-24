@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,14 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
-import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
 
 /**

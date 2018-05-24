@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.http.MediaType;
@@ -22,8 +23,8 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * <p>Interface for a HATEOS link</p>
- *
+ * <p>Interface for a HATEOS link.</p>
+ * <p>
  * <p>See https://tools.ietf.org/html/draft-kelly-json-hal-08#section-5</p>
  *
  * @author Graeme Rocher
@@ -31,9 +32,24 @@ import java.util.Optional;
  */
 public interface Link {
 
+    /**
+     * Help link.
+     */
     CharSequence HELP = "help";
+
+    /**
+     * Self link.
+     */
     CharSequence SELF = "self";
+
+    /**
+     * About link.
+     */
     CharSequence ABOUT = "about";
+
+    /**
+     * Href link.
+     */
     CharSequence HREF = "href";
 
     /**
@@ -91,7 +107,8 @@ public interface Link {
     }
 
     /**
-     * Create a link from the given URI
+     * Create a link from the given URI.
+     *
      * @param uri The URI
      * @return The link
      */
@@ -100,7 +117,8 @@ public interface Link {
     }
 
     /**
-     * Create a link from the given URI
+     * Create a link from the given URI.
+     *
      * @param uri The URI
      * @return The link
      */
@@ -109,7 +127,8 @@ public interface Link {
     }
 
     /**
-     * Create a link from the given URI
+     * Create a link from the given URI.
+     *
      * @param uri The URI
      * @return The link
      */
@@ -118,47 +137,62 @@ public interface Link {
     }
 
     /**
-     * Build for creating {@link Link} instances
+     * Build for creating {@link Link} instances.
      */
     interface Builder {
 
         /**
+         * @param templated Whether the URI is templated
+         * @return The builder
          * @see Link#isTemplated()
          */
         Builder templated(boolean templated);
 
         /**
+         * @param profile The profile URI
+         * @return The builder
          * @see Link#getProfile()
          */
         Builder profile(@Nullable URI profile);
 
         /**
+         * @param deprecation The deprecation URI
+         * @return The builder
          * @see Link#getDeprecation()
          */
         Builder deprecation(@Nullable URI deprecation);
 
         /**
+         * @param title The title of the link
+         * @return The builder
          * @see Link#getTitle()
          */
         Builder title(@Nullable String title);
 
         /**
+         * @param name The name of the link
+         * @return The builder
          * @see Link#getName()
          */
         Builder name(@Nullable String name);
 
         /**
+         * @param hreflang The language of the link
+         * @return The builder
          * @see Link#getHreflang()
          */
         Builder hreflang(@Nullable String hreflang);
 
         /**
+         * @param mediaType The type of the URI
+         * @return The builder
          * @see Link#getType()
          */
         Builder type(@Nullable MediaType mediaType);
 
         /**
-         * Build the link
+         * Build the link.
+         *
          * @return The {@link Link}
          */
         Link build();

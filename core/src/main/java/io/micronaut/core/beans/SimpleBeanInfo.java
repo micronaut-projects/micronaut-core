@@ -1,32 +1,37 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ * Copyright 2017-2018 original authors
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package io.micronaut.core.beans;
+
+import static io.micronaut.core.naming.NameUtils.decapitalize;
 
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.*;
-
-import static io.micronaut.core.naming.NameUtils.decapitalize;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Note: Based on code found in Apache Harmony
+ * Note: Based on code found in Apache Harmony.
  *
  * @author graemerocher
  * @since 1.0
@@ -36,10 +41,9 @@ class SimpleBeanInfo implements BeanInfo {
 
     // Prefixes for methods that set or get a Property
     private static final String PREFIX_IS = "is"; //$NON-NLS-1$
-
     private static final String PREFIX_GET = "get"; //$NON-NLS-1$
-
     private static final String PREFIX_SET = "set"; //$NON-NLS-1$
+
     private static final String STR_GETTERS = "getters"; //$NON-NLS-1$
     private static final String STR_SETTERS = "setters"; //$NON-NLS-1$
     private static final String STR_NORMAL = "normal"; //$NON-NLS-1$
@@ -50,13 +54,16 @@ class SimpleBeanInfo implements BeanInfo {
     private final Class<?> beanClass;
     private final Map<String, PropertyDescriptor> properties;
 
+    /**
+     * Constructor.
+     * @param beanClass beanClass
+     */
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
         List<PropertyDescriptor> propertyList = introspectProperties(introspectMethods(beanClass));
-        if(propertyList.isEmpty()) {
+        if (propertyList.isEmpty()) {
             this.properties = Collections.emptyMap();
-        }
-        else {
+        } else {
             HashMap<String, PropertyDescriptor> propertyMap = new HashMap<>(propertyList.size());
             for (PropertyDescriptor propertyDescriptor : propertyList) {
                 propertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
@@ -65,11 +72,11 @@ class SimpleBeanInfo implements BeanInfo {
         }
     }
 
-
     @Override
     public Class<?> getBeanClass() {
         return beanClass;
     }
+
     @Override
     public Map<String, PropertyDescriptor> getPropertyDescriptors() {
         return properties;
@@ -77,23 +84,20 @@ class SimpleBeanInfo implements BeanInfo {
 
     /**
      * Introspects the supplied class and returns a list of the Properties of
-     * the class
+     * the class.
      *
      * @param methodDescriptors the method descriptors
      * @return The list of Properties as an array of PropertyDescriptors
      */
     @SuppressWarnings("unchecked")
-    private List<PropertyDescriptor> introspectProperties(Method[] methodDescriptors){
-
+    private List<PropertyDescriptor> introspectProperties(Method[] methodDescriptors) {
 
         // Get the list of public non-static methods into an array
-
         if (methodDescriptors == null) {
             return null;
         }
 
-        HashMap<String, HashMap> propertyTable = new HashMap<>(
-                methodDescriptors.length);
+        HashMap<String, HashMap> propertyTable = new HashMap<>(methodDescriptors.length);
 
         // Search for methods that either get or set a Property
         for (Method methodDescriptor : methodDescriptors) {
@@ -180,8 +184,7 @@ class SimpleBeanInfo implements BeanInfo {
 
         // validate parameter types
         paramTypes = theMethod.getParameterTypes();
-        if (paramTypes.length > 1
-                || (paramTypes.length == 1 && paramTypes[0] != int.class)) {
+        if (paramTypes.length > 1 || (paramTypes.length == 1 && paramTypes[0] != int.class)) {
             return;
         }
 
@@ -248,15 +251,17 @@ class SimpleBeanInfo implements BeanInfo {
         // Get the list of methods belonging to this class
         Method[] basicMethods = beanClass.getMethods();
 
-        if (ArrayUtils.isEmpty(basicMethods))
+        if (ArrayUtils.isEmpty(basicMethods)) {
             return null;
+        }
 
-        ArrayList<Method> methodList = new ArrayList<>(
-                basicMethods.length);
+        ArrayList<Method> methodList = new ArrayList<>(basicMethods.length);
 
         // Loop over the methods found, looking for public non-static methods
         for (Method basicMethod : basicMethods) {
-            if(basicMethod.getDeclaringClass() == Object.class) break;
+            if (basicMethod.getDeclaringClass() == Object.class) {
+                break;
+            }
             int modifiers = basicMethod.getModifiers();
             if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers) && !basicMethod.isBridge() && !basicMethod.isSynthetic() && basicMethod.getName().indexOf('$') == -1) {
                 methodList.add(basicMethod);
@@ -277,10 +282,9 @@ class SimpleBeanInfo implements BeanInfo {
     /**
      * Checks and fixes all cases when several incompatible checkers / getters
      * were specified for single property.
-     *
      */
     @SuppressWarnings("unchecked")
-    private void fixGetSet(HashMap<String, HashMap> propertyTable){
+    private void fixGetSet(HashMap<String, HashMap> propertyTable) {
 
         if (propertyTable == null) {
             return;
@@ -288,10 +292,8 @@ class SimpleBeanInfo implements BeanInfo {
 
         for (Map.Entry<String, HashMap> entry : propertyTable.entrySet()) {
             HashMap<String, Object> table = entry.getValue();
-            ArrayList<Method> getters = (ArrayList<Method>) table
-                    .get(STR_GETTERS);
-            ArrayList<Method> setters = (ArrayList<Method>) table
-                    .get(STR_SETTERS);
+            ArrayList<Method> getters = (ArrayList<Method>) table.get(STR_GETTERS);
+            ArrayList<Method> setters = (ArrayList<Method>) table.get(STR_SETTERS);
 
             Method normalGetter = null;
             Method normalSetter = null;
@@ -315,12 +317,10 @@ class SimpleBeanInfo implements BeanInfo {
                 // checks if it's a normal getter
                 if (paramTypes == null || paramTypes.length == 0) {
                     // normal getter found
-                    if (normalGetter == null
-                            || methodName.startsWith(PREFIX_IS)) {
+                    if (normalGetter == null || methodName.startsWith(PREFIX_IS)) {
                         normalGetter = getter;
                     }
                 }
-
             }
 
             // retrieve normal setter
@@ -330,8 +330,7 @@ class SimpleBeanInfo implements BeanInfo {
 
                 for (Method setter : setters) {
                     if (setter.getParameterTypes().length == 1
-                            && propertyType
-                            .equals(setter.getParameterTypes()[0])) {
+                        && propertyType.equals(setter.getParameterTypes()[0])) {
                         normalSetter = setter;
                         break;
                     }
@@ -346,7 +345,6 @@ class SimpleBeanInfo implements BeanInfo {
                     }
                 }
             }
-
 
             // determine property type
             if (normalGetter != null) {
@@ -381,14 +379,12 @@ class SimpleBeanInfo implements BeanInfo {
                 continue;
             }
 
-
             // default rule - invalid property
             table.put(STR_NORMAL, STR_INVALID);
         }
-
     }
+
     private static boolean isInvalidProperty(String propertyName) {
         return (propertyName == null) || (propertyName.length() == 0) || EXCLUDED_PROPERTIES.contains(propertyName);
     }
-
 }

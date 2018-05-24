@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.aws;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -22,7 +23,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
- * Default configuration for retrieving Amazon EC2 metadata for {@link io.micronaut.context.env.ComputePlatform#AMAZON_EC2}
+ * Default configuration for retrieving Amazon EC2 metadata for {@link io.micronaut.context.env.ComputePlatform#AMAZON_EC2}.
  *
  * @author graemerocher
  * @since 1.0
@@ -32,7 +33,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 public class AmazonMetadataConfiguration implements Toggleable {
 
     /**
-     * Prefix for Amazon EC2 configuration metadata
+     * Prefix for Amazon EC2 configuration metadata.
      */
     public static final String PREFIX = ApplicationConfiguration.PREFIX + "." + Environment.AMAZON_EC2 + ".metadata";
 
@@ -74,7 +75,7 @@ public class AmazonMetadataConfiguration implements Toggleable {
      * @return The metadata Url
      */
     public String getMetadataUrl() {
-        if(metadataUrl == null) {
+        if (metadataUrl == null) {
             return url + "/latest/meta-data/";
         }
         return metadataUrl;
@@ -91,7 +92,7 @@ public class AmazonMetadataConfiguration implements Toggleable {
      * @return The instance document Url
      */
     public String getInstanceDocumentUrl() {
-        if(instanceDocumentUrl == null) {
+        if (instanceDocumentUrl == null) {
             return url + "/latest/dynamic/instance-identity/document";
         }
         return instanceDocumentUrl;

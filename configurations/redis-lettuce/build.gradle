@@ -3,7 +3,7 @@ dependencies {
     compileOnly project(":session")
     compileOnly project(":inject-java")
     compileOnly project(":management")
-    compile "io.lettuce:lettuce-core:$lettuceVersion"
+    compile dependencyVersion("lettuce")
     compileOnly "com.github.kstyrc:embedded-redis:0.6"
 
     testCompile project(":inject-java")
@@ -11,6 +11,6 @@ dependencies {
     testCompile project(":session")
     testCompile project(":management")
     testCompile project(":http-server-netty")
-    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+    testCompile project(":http-client")
     testCompile "com.github.kstyrc:embedded-redis:0.6"
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.annotation;
 
-import javax.inject.Qualifier;
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import javax.inject.Qualifier;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
 /**
- * <p>A {@link Qualifier} that indicates that this bean is the primary bean that should be selected in the case of multiple possible interface implementations.</p>
+ * <p>A {@link Qualifier} that indicates that this bean is the primary bean that should be selected in the case of
+ * multiple possible interface implementations.</p>
  *
  * @author Graeme Rocher
  * @see Qualifier @Qualifier

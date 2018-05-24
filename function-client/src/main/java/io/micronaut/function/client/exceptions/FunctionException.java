@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.exceptions;
 
 /**
- * An exception thrown when an error occurs in the function system
+ * An exception thrown when an error occurs in the function system.
  *
  * @author graemerocher
  * @since 1.0
  */
 public class FunctionException extends RuntimeException {
 
-
+    /**
+     * Constructor.
+     * @param message message
+     */
     public FunctionException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor.
+     * @param message message
+     * @param cause cause of the exception
+     */
     public FunctionException(String message, Throwable cause) {
         super(message, cause);
     }

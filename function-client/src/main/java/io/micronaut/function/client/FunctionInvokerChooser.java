@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client;
 
 import java.util.Optional;
 
 /**
- * Strategy interface for choosing a {@link FunctionInvoker}
+ * Strategy interface for choosing a {@link FunctionInvoker}.
  *
  * @author graemerocher
  * @since 1.0
@@ -26,12 +27,12 @@ import java.util.Optional;
 public interface FunctionInvokerChooser {
 
     /**
-     * Chooses a {@link FunctionInvoker}
+     * Chooses a {@link FunctionInvoker}.
      *
      * @param definition The definition
-     * @param <I>
-     * @param <O>
+     * @param <I> input type
+     * @param <O> output type
      * @return An {@link Optional} instance of {@link FunctionInvoker}
      */
-    <I,O> Optional<FunctionInvoker<I,O>> choose(FunctionDefinition definition);
+    <I, O> Optional<FunctionInvoker<I, O>> choose(FunctionDefinition definition);
 }

@@ -1,31 +1,38 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * An implementation of {@link ConvertibleMultiValues} that uses a backing {@link LinkedHashMap}
+ * An implementation of {@link ConvertibleMultiValues} that uses a backing {@link LinkedHashMap}.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -36,13 +43,15 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     private final ConversionService<?> conversionService;
 
     /**
-     * Construct an empty {@link ConvertibleValuesMap}
+     * Construct an empty {@link ConvertibleValuesMap}.
      */
     public ConvertibleMultiValuesMap() {
         this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
+
     /**
-     * Construct a {@link ConvertibleValuesMap} from the given map
+     * Construct a {@link ConvertibleValuesMap} from the given map.
+     *
      * @param values The map
      */
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
@@ -50,9 +59,9 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     }
 
     /**
-     * Construct a {@link ConvertibleValuesMap} from the given map and conversion service
+     * Construct a {@link ConvertibleValuesMap} from the given map and conversion service.
      *
-     * @param values The map
+     * @param values            The map
      * @param conversionService The conversion service
      */
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
@@ -63,38 +72,32 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<V> values = getAll(name);
-        if(!values.isEmpty()) {
+        if (!values.isEmpty()) {
             Optional<T> converted = conversionService.convert(values, conversionContext);
             boolean hasValue = converted.isPresent();
             boolean hasSingleEntry = values.size() == 1;
-            if(!hasValue && hasSingleEntry) {
+            if (!hasValue && hasSingleEntry) {
                 return conversionService.convert(values.get(0), conversionContext);
-            }
-            else if(hasValue && hasSingleEntry) {
+            } else if (hasValue && hasSingleEntry) {
                 T result = converted.get();
-                if(result instanceof List && ((List)result).isEmpty()) {
+                if (result instanceof List && ((List) result).isEmpty()) {
                     return conversionService.convert(values.get(0), conversionContext);
-                }
-                else if(result instanceof Optional && !((Optional)result).isPresent()) {
+                } else if (result instanceof Optional && !((Optional) result).isPresent()) {
                     return conversionService.convert(values.get(0), conversionContext);
-                }
-                else {
+                } else {
                     return converted;
                 }
-            }
-            else {
+            } else {
                 return converted;
             }
-        }
-        else {
+        } else {
             Argument<T> argument = conversionContext.getArgument();
-            if(Map.class.isAssignableFrom(argument.getType())) {
+            if (Map.class.isAssignableFrom(argument.getType())) {
                 Argument valueType = argument.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
                 Map map = subMap(name.toString(), valueType);
-                if( map.isEmpty() ) {
+                if (map.isEmpty()) {
                     return Optional.empty();
-                }
-                else {
+                } else {
                     return Optional.of((T) map);
                 }
             }
@@ -102,14 +105,12 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
         return Optional.empty();
     }
 
-
     @Override
     public List<V> getAll(CharSequence name) {
         List<V> value = values.get(name);
-        if(value != null) {
+        if (value != null) {
             return Collections.unmodifiableList(value);
-        }
-        else {
+        } else {
             return Collections.emptyList();
         }
     }
@@ -117,7 +118,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     @Override
     public V get(CharSequence name) {
         List<V> all = getAll(name);
-        if(all.isEmpty()) {
+        if (all.isEmpty()) {
             return null;
         }
         return all.get(0);

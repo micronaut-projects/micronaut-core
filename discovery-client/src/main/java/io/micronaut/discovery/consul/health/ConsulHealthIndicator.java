@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.health;
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.health.indicator.HealthIndicator;
-import io.micronaut.management.health.indicator.HealthResult;
-import io.reactivex.Flowable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.Collections;
 
 /**
- * A {@link HealthIndicator} for Consul
+ * A {@link HealthIndicator} for Consul.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,6 +40,9 @@ public class ConsulHealthIndicator implements HealthIndicator {
 
     private final ConsulClient client;
 
+    /**
+     * @param client The Consul client
+     */
     public ConsulHealthIndicator(ConsulClient client) {
         this.client = client;
     }

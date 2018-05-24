@@ -1,8 +1,8 @@
-The classic requirement of dependency injection is the interface and multiple possible implementations.
+If you have multiple possible implementations for a given interface that you want to inject, you need to use a qualifier.
 
 Once again Micronaut leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
 
-=== Qualifying By Name
+== Qualifying By Name
 
 To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example, consider the following classes:
 
@@ -25,7 +25,9 @@ include::{testsdir}/qualifiers/named/Vehicle.groovy[tags=class, indent=0]
 <4> The link:{jeeapi}/javax/inject/Named.html[Named] annotation is used to indicate the `V8Engine` implementation is required
 <5> Calling the start method prints: `"Starting V8"`
 
-=== Qualifying By Annotation
+You can also declare link:{jeeapi}/javax/inject/Named.html[@Named] at the class level of a bean to explicitly define the name of the bean.
+
+== Qualifying By Annotation
 
 In addition to being able to qualify by name, you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
 
@@ -42,3 +44,49 @@ The above annotation is itself annotated with the `@Qualifier` annotation to des
 ----
 include::{testsdir}/qualifiers/annotation/Vehicle.groovy[tags=constructor, indent=0]
 ----
+
+== Primary and Secondary Beans
+
+api:context.annotation.Primary[] is a qualifier that indicates that a bean is the primary bean that should be selected in the case of multiple possible interface implementations.
+
+Consider the following example:
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/ColorPicker.groovy[tags=clazz, indent=0]
+----
+
+Given a common interface called `ColorPicker` that is implemented by multiple classes.
+
+.The Primary Bean
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=clazz, indent=0]
+----
+
+The `Green` bean is a `ColorPicker`, but is annotated with `@Primary`.
+
+.Another Bean of the Same Type
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=imports, indent=0]
+
+include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=clazz, indent=0]
+----
+
+The `Blue` bean is also a `ColorPicker` and hence you have two possible candidates when injecting the `ColorPicker` interface. Since `Green` is the primary it will always be favoured.
+
+
+
+[source,java]
+----
+include::{testshttpservernetty}/context/annotation/primary/TestController.groovy[tags=clazz, indent=0]
+----
+
+<1> Although there are two `ColorPicker` beans, `Green` gets injected due to the `@Primary` annotation.
+
+If multiple possible candidates are present and no `@Primary` is defined then a api:context.exceptions.NonUniqueBeanException[] will be thrown.
+
+In addition to `@Primary`, there is also a api:context.annotation.Secondary[] annotation which causes the opposite effect and allows de-prioritizing a bean.

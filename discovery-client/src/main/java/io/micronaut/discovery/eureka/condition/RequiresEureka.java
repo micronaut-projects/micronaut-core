@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.condition;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.eureka.EurekaConfiguration;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Meta annotation for that can be added to any component that requires Eureka to load
+ * Meta annotation for that can be added to any component that requires Eureka to load.
  *
  * @author graemerocher
  * @since 1.0

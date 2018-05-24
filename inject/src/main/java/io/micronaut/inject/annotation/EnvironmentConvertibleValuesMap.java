@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -29,8 +28,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Extended version of {@link ConvertibleValuesMap} that resolves placeholders based on the environment
+ * Extended version of {@link ConvertibleValuesMap} that resolves placeholders based on the environment.
  *
+ * @param <V> generic valu
  * @author graemerocher
  * @since 1.0
  */
@@ -38,6 +38,10 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
 
     private final Environment environment;
 
+    /**
+     * @param map         A map of values
+     * @param environment The environment
+     */
     EnvironmentConvertibleValuesMap(Map<? extends CharSequence, V> map, Environment environment) {
         super(map, environment);
         this.environment = environment;
@@ -47,53 +51,62 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
         PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-        if(value instanceof CharSequence) {
+        if (value instanceof CharSequence) {
             String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
             return environment.convert(str, conversionContext);
-        }
-        else if(value instanceof String[]) {
+        } else if (value instanceof String[]) {
             String[] a = (String[]) value;
             for (int i = 0; i < a.length; i++) {
                 a[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
             return environment.convert(a, conversionContext);
-        }
-        else {
+        } else if (value instanceof AnnotationValue[]) {
+            AnnotationValue[] annotationValues = (AnnotationValue[]) value;
+            for (int i = 0; i < annotationValues.length; i++) {
+                AnnotationValue annotationValue = annotationValues[i];
+                annotationValues[i] = new AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
+            }
+            return environment.convert(annotationValues, conversionContext);
+        } else if (value instanceof AnnotationValue) {
+            AnnotationValue av = (AnnotationValue) value;
+            av = new AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
+            return environment.convert(av, conversionContext);
+        } else {
             return super.get(name, conversionContext);
         }
-    }
-
-    private String doResolveIfNecessary(CharSequence value, PropertyPlaceholderResolver placeholderResolver) {
-        String str = value.toString();
-        if(str.contains("${")) {
-            str = placeholderResolver.resolveRequiredPlaceholders(str);
-        }
-        return str;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Collection<V> values() {
         return super.values().stream().map(v -> {
-            if(v instanceof CharSequence) {
+            if (v instanceof CharSequence) {
                 v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholders(v.toString());
             }
             return v;
         }).collect(Collectors.toList());
     }
 
+    private String doResolveIfNecessary(CharSequence value, PropertyPlaceholderResolver placeholderResolver) {
+        String str = value.toString();
+        if (str.contains("${")) {
+            str = placeholderResolver.resolveRequiredPlaceholders(str);
+        }
+        return str;
+    }
+
     /**
-     * Creates a new {@link ConvertibleValues} for the values
+     * Creates a new {@link ConvertibleValues} for the values.
      *
-     * @param values A map of values
-     * @param <T> The target generic type
+     * @param environment The environment
+     * @param values      A map of values
+     * @param <T>         The target generic type
      * @return The values
      */
-    static <T> ConvertibleValues<T> of(Environment environment, Map<? extends CharSequence, T> values ) {
-        if(values == null) {
+    static <T> ConvertibleValues<T> of(Environment environment, Map<? extends CharSequence, T> values) {
+        if (values == null) {
             return ConvertibleValuesMap.empty();
-        }
-        else {
+        } else {
             return new EnvironmentConvertibleValuesMap<>(values, environment);
         }
     }

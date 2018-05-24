@@ -1,1 +1,1 @@
-TODO
+In addition to the <<providedEndpoints, Built-In Endpoints>>, the `management` dependency also provides support for creating custom endpoints.  Custom endpoints can be enabled and configured identically to the built-in endpoints, and can be used to retrieve and return any metrics or other application data that you require.

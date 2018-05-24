@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
  */
 
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Micronaut and Consul (https://www.consul.io)
+ * This package contains client APIs, service discovery and distributed configuration integration between Micronaut
+ * and Consul (https://www.consul.io).
  *
  * @author graemerocher
  * @since 1.0
@@ -24,4 +25,3 @@
 package io.micronaut.discovery.consul;
 
 import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.consul.condition.RequiresConsul;

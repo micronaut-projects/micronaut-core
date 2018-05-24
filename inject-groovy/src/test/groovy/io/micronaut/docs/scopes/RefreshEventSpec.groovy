@@ -1,22 +1,21 @@
 /*
- * Copyright 2018 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.docs.scopes
 
 import groovy.json.JsonOutput
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpResponse
@@ -27,7 +26,7 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -40,14 +39,14 @@ import static io.micronaut.http.HttpResponse.ok
  * @author Sergio del Amo
  * @since 1.0
  */
-@IgnoreIf({ os.windows })
+@Ignore
 class RefreshEventSpec extends Specification {
     @Shared int port = SocketUtils.findAvailableTcpPort()
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             'micronaut.server.port':port,
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     String getUrl() {
         "http://localhost:$port"
@@ -122,7 +121,7 @@ curl -X "POST" "{url}/weather/evict"
 
         @PostConstruct
         void init() {
-            forecast = "Scattered Clouds ${new Date().format('dd/MMM/yy HH:ss.SSS')}"
+            forecast = "Scattered Clouds ${new Date().format('dd/MMM/yy HH:ss.SSS')}" // <2>
         }
 
         String latestForecast() {
@@ -131,7 +130,7 @@ curl -X "POST" "{url}/weather/evict"
     }
     //end::weatherService[]
 
-    //tag::weatherController[]
+
     @Controller('/weather')
     static class WeatherController {
         @Inject
@@ -147,11 +146,13 @@ curl -X "POST" "{url}/weather/evict"
 
         @Post("/evict")
         HttpResponse<Map<String, String>> evict() {
-            applicationContext.publishEvent(new RefreshEvent()) // <2>
+            //tag::publishEvent[]
+            applicationContext.publishEvent(new RefreshEvent())
+            //end::publishEvent[]
             ok([msg: 'OK']) as HttpResponse<Map<String, String>>
         }
     }
-    //end::weatherController[]
+
 
 
 }

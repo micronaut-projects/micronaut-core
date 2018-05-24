@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,28 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
 import javax.inject.Singleton;
 
 /**
- * Handles exceptions of type {@link DuplicateRouteException}
+ * Handles exceptions of type {@link DuplicateRouteException}.
  *
  * @author James Kleeh
  * @since 1.0
@@ -46,7 +40,7 @@ public class DuplicateRouteHandler implements ExceptionHandler<DuplicateRouteExc
 
     @Override
     public HttpResponse handle(HttpRequest request, DuplicateRouteException exception) {
-        VndError error = new VndError(exception.getMessage());
+        JsonError error = new JsonError(exception.getMessage());
         error.link(Link.SELF, Link.of(request.getUri()));
         return HttpResponse.badRequest(error);
     }

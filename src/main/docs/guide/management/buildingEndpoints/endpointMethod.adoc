@@ -1,1 +1,150 @@
-TODO
+Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") requests. To return a response from an endpoint, annotate its public method/s with one of following annotations:
+
+.Endpoint Method Annotations
+|===
+|Annotation|Description
+
+|api:management.endpoint.Read[]
+|Responds to `GET` requests
+
+|api:management.endpoint.Write[]
+|Responds to `POST` requests
+
+|api:management.endpoint.Delete[]
+|Responds to `DELETE` requests
+
+|===
+
+== Read Methods
+
+Annotating a method with the api:management.endpoint.Read[] annotation will cause it to respond to `GET` requests.
+[source,groovy]
+.CurrentDateEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readImport, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=simpleRead, indent=4]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----
+
+The above method responds to the following request:
+
+[source,bash]
+----
+$ curl -X GET localhost:55838/date
+
+1526085903689
+----
+
+The api:management.endpoint.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
+
+[source,groovy]
+.CurrentDateEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readImport, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readArg, indent=4]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----
+<1> Supported media types are represented by api:http.MediaType[]
+
+The above method responds to the following request:
+
+[source,bash]
+----
+$ curl -X GET localhost:8080/date/the_date_is
+
+the_date_is: Fri May 11 19:24:21 CDT
+----
+
+
+== Write Methods
+
+Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
+[source,groovy]
+.CurrentDateEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=writeImport, indent=0]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=mediaTypeImport, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=simpleWrite, indent=4]
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----
+
+The above method responds to the following request:
+
+[source,bash]
+----
+$ curl -X POST http://localhost:39357/date
+
+Current date reset
+----
+
+The api:management.endpoint.Write[] annotation accepts an optional `consumes` argument, which sets the media type accepted by the method (default is `application/json`):
+
+[source,groovy]
+.MessageEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointImport, indent=0]
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=writeImport, indent=0]
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=mediaTypeImport, indent=0]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassBegin, indent=0]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=message, indent=4]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=writeArg, indent=4]
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----
+
+The above method responds to the following request:
+
+[source,bash]
+----
+$ curl -X POST http://localhost:65013/message -H 'Content-Type: application/json' -d $'{"newMessage": "A new message"}'
+
+Message updated
+----
+
+
+== Delete Methods
+
+Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
+
+[source,groovy]
+.MessageEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointImport, indent=0]
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=deleteImport, indent=0]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassBegin, indent=0]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=message, indent=4]
+
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=simpleDelete, indent=4]
+include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----
+
+The above method responds to the following request:
+
+[source,bash]
+----
+$ curl -X DELETE http://localhost:65013/message
+
+Message deleted
+----

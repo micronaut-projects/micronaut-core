@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types.files;
 
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -25,8 +26,7 @@ import java.net.URLConnection;
 import java.time.Instant;
 
 /**
- * A special type for streaming an {@link InputStream} representing
- * a file or resource. The
+ * A special type for streaming an {@link InputStream} representing a file or resource.
  *
  * @author James Kleeh
  * @since 1.0
@@ -38,14 +38,29 @@ public class StreamedFile implements FileCustomizableResponseType {
     private final InputStream inputStream;
     private final long length;
 
+    /**
+     * @param inputStream The input stream
+     * @param name        The name of the file
+     */
     public StreamedFile(InputStream inputStream, String name) {
         this(inputStream, name, Instant.now().toEpochMilli());
     }
 
+    /**
+     * @param inputStream  The input stream
+     * @param name         the name of the file
+     * @param lastModified The last modified date
+     */
     public StreamedFile(InputStream inputStream, String name, long lastModified) {
         this(inputStream, name, lastModified, -1);
     }
 
+    /**
+     * @param inputStream   The input stream
+     * @param name          the name of the file
+     * @param lastModified  The last modified date
+     * @param contentLength the content length
+     */
     public StreamedFile(InputStream inputStream, String name, long lastModified, long contentLength) {
         this.name = name;
         this.lastModified = lastModified;
@@ -63,7 +78,7 @@ public class StreamedFile implements FileCustomizableResponseType {
         String path = url.getPath();
         int idx = path.lastIndexOf(File.separatorChar);
         if (idx > -1) {
-            this.name = path.substring(idx+1);
+            this.name = path.substring(idx + 1);
         } else {
             this.name = path;
         }

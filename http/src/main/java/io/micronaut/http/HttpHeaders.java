@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
 
+package io.micronaut.http;
 
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
@@ -29,331 +29,407 @@ import java.util.OptionalLong;
 import java.util.stream.Collectors;
 
 /**
- * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+ * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface HttpHeaders extends ConvertibleMultiValues<String> {
+
     /**
-     * {@code "Accept"}
+     * {@code "Accept"}.
      */
     String ACCEPT = "Accept";
+
     /**
-     * {@code "Accept-Charset"}
+     * {@code "Accept-Charset"}.
      */
     String ACCEPT_CHARSET = "Accept-Charset";
+
     /**
-     * {@code "Accept-Encoding"}
+     * {@code "Accept-Encoding"}.
      */
     String ACCEPT_ENCODING = "Accept-Encoding";
+
     /**
-     * {@code "Accept-Language"}
+     * {@code "Accept-Language"}.
      */
     String ACCEPT_LANGUAGE = "Accept-Language";
+
     /**
-     * {@code "Accept-Ranges"}
+     * {@code "Accept-Ranges"}.
      */
     String ACCEPT_RANGES = "Accept-Ranges";
+
     /**
-     * {@code "Accept-Patch"}
+     * {@code "Accept-Patch"}.
      */
     String ACCEPT_PATCH = "Accept-Patch";
+
     /**
-     * {@code "Access-Control-Allow-Credentials"}
+     * {@code "Access-Control-Allow-Credentials"}.
      */
     String ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
+
     /**
-     * {@code "Access-Control-Allow-Headers"}
+     * {@code "Access-Control-Allow-Headers"}.
      */
     String ACCESS_CONTROL_ALLOW_HEADERS = "Access-Control-Allow-Headers";
+
     /**
-     * {@code "Access-Control-Allow-Methods"}
+     * {@code "Access-Control-Allow-Methods"}.
      */
     String ACCESS_CONTROL_ALLOW_METHODS = "Access-Control-Allow-Methods";
+
     /**
-     * {@code "Access-Control-Allow-Origin"}
+     * {@code "Access-Control-Allow-Origin"}.
      */
     String ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
+
     /**
-     * {@code "Access-Control-Expose-Headers"}
+     * {@code "Access-Control-Expose-Headers"}.
      */
     String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
+
     /**
-     * {@code "Access-Control-Max-Age"}
+     * {@code "Access-Control-Max-Age"}.
      */
     String ACCESS_CONTROL_MAX_AGE = "Access-Control-Max-Age";
+
     /**
-     * {@code "Access-Control-Request-Headers"}
+     * {@code "Access-Control-Request-Headers"}.
      */
     String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+
     /**
-     * {@code "Access-Control-Request-Method"}
+     * {@code "Access-Control-Request-Method"}.
      */
     String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+
     /**
-     * {@code "Age"}
+     * {@code "Age"}.
      */
     String AGE = "Age";
+
     /**
-     * {@code "Allow"}
+     * {@code "Allow"}.
      */
     String ALLOW = "Allow";
+
     /**
-     * {@code "Authorization"}
+     * {@code "Authorization"}.
      */
     String AUTHORIZATION = "Authorization";
 
+
     /**
-     * {@code "Authorization"}
+     * {@code "Authorization"}.
      */
     String AUTHORIZATION_INFO = "Authorization-Info";
+
     /**
-     * {@code "Cache-Control"}
+     * {@code "Cache-Control"}.
      */
     String CACHE_CONTROL = "Cache-Control";
+
     /**
-     * {@code "Connection"}
+     * {@code "Connection"}.
      */
     String CONNECTION = "Connection";
+
     /**
-     * {@code "Content-Base"}
+     * {@code "Content-Base"}.
      */
     String CONTENT_BASE = "Content-Base";
+
     /**
-     * {@code "Content-Disposition"}
+     * {@code "Content-Disposition"}.
      */
     String CONTENT_DISPOSITION = "Content-Disposition";
+
     /**
-     * {@code "Content-Encoding"}
+     * {@code "Content-Encoding"}.
      */
     String CONTENT_ENCODING = "Content-Encoding";
+
     /**
-     * {@code "Content-Language"}
+     * {@code "Content-Language"}.
      */
     String CONTENT_LANGUAGE = "Content-Language";
+
     /**
-     * {@code "Content-Length"}
+     * {@code "Content-Length"}.
      */
     String CONTENT_LENGTH = "Content-Length";
+
     /**
-     * {@code "Content-Location"}
+     * {@code "Content-Location"}.
      */
     String CONTENT_LOCATION = "Content-Location";
+
     /**
-     * {@code "Content-Transfer-Encoding"}
+     * {@code "Content-Transfer-Encoding"}.
      */
     String CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding";
+
     /**
-     * {@code "Content-MD5"}
+     * {@code "Content-MD5"}.
      */
     String CONTENT_MD5 = "Content-MD5";
+
     /**
-     * {@code "Content-Range"}
+     * {@code "Content-Range"}.
      */
     String CONTENT_RANGE = "Content-Range";
+
     /**
-     * {@code "Content-Type"}
+     * {@code "Content-Type"}.
      */
     String CONTENT_TYPE = "Content-Type";
+
     /**
-     * {@code "Cookie"}
+     * {@code "Cookie"}.
      */
     String COOKIE = "Cookie";
+
     /**
-     * {@code "Date"}
+     * {@code "Date"}.
      */
     String DATE = "Date";
+
     /**
-     * {@code "ETag"}
+     * {@code "ETag"}.
      */
     String ETAG = "ETag";
+
     /**
-     * {@code "Expect"}
+     * {@code "Expect"}.
      */
     String EXPECT = "Expect";
+
     /**
-     * {@code "Expires"}
+     * {@code "Expires"}.
      */
     String EXPIRES = "Expires";
+
     /**
-     * {@code "From"}
+     * {@code "From"}.
      */
     String FROM = "From";
+
     /**
-     * {@code "Host"}
+     * {@code "Host"}.
      */
     String HOST = "Host";
+
     /**
-     * {@code "If-Match"}
+     * {@code "If-Match"}.
      */
     String IF_MATCH = "If-Match";
+
     /**
-     * {@code "If-Modified-Since"}
+     * {@code "If-Modified-Since"}.
      */
     String IF_MODIFIED_SINCE = "If-Modified-Since";
+
     /**
-     * {@code "If-None-Match"}
+     * {@code "If-None-Match"}.
      */
     String IF_NONE_MATCH = "If-None-Match";
+
     /**
-     * {@code "If-Range"}
+     * {@code "If-Range"}.
      */
     String IF_RANGE = "If-Range";
+
     /**
-     * {@code "If-Unmodified-Since"}
+     * {@code "If-Unmodified-Since"}.
      */
     String IF_UNMODIFIED_SINCE = "If-Unmodified-Since";
+
     /**
-     * {@code "Last-Modified"}
+     * {@code "Last-Modified"}.
      */
     String LAST_MODIFIED = "Last-Modified";
+
     /**
-     * {@code "Location"}
+     * {@code "Location"}.
      */
     String LOCATION = "Location";
+
     /**
-     * {@code "Max-Forwards"}
+     * {@code "Max-Forwards"}.
      */
     String MAX_FORWARDS = "Max-Forwards";
+
     /**
-     * {@code "Origin"}
+     * {@code "Origin"}.
      */
     String ORIGIN = "Origin";
+
     /**
-     * {@code "Pragma"}
+     * {@code "Pragma"}.
      */
     String PRAGMA = "Pragma";
+
     /**
-     * {@code "Proxy-Authenticate"}
+     * {@code "Proxy-Authenticate"}.
      */
     String PROXY_AUTHENTICATE = "Proxy-Authenticate";
+
     /**
-     * {@code "Proxy-Authorization"}
+     * {@code "Proxy-Authorization"}.
      */
     String PROXY_AUTHORIZATION = "Proxy-Authorization";
+
     /**
-     * {@code "Range"}
+     * {@code "Range"}.
      */
     String RANGE = "Range";
+
     /**
-     * {@code "Referer"}
+     * {@code "Referer"}.
      */
     String REFERER = "Referer";
+
     /**
-     * {@code "Retry-After"}
+     * {@code "Retry-After"}.
      */
     String RETRY_AFTER = "Retry-After";
+
     /**
-     * {@code "Sec-WebSocket-Key1"}
+     * {@code "Sec-WebSocket-Key1"}.
      */
     String SEC_WEBSOCKET_KEY1 = "Sec-WebSocket-Key1";
+
     /**
-     * {@code "Sec-WebSocket-Key2"}
+     * {@code "Sec-WebSocket-Key2"}.
      */
     String SEC_WEBSOCKET_KEY2 = "Sec-WebSocket-Key2";
+
     /**
-     * {@code "Sec-WebSocket-Location"}
+     * {@code "Sec-WebSocket-Location"}.
      */
     String SEC_WEBSOCKET_LOCATION = "Sec-WebSocket-Location";
+
     /**
-     * {@code "Sec-WebSocket-Origin"}
+     * {@code "Sec-WebSocket-Origin"}.
      */
     String SEC_WEBSOCKET_ORIGIN = "Sec-WebSocket-Origin";
+
     /**
-     * {@code "Sec-WebSocket-Protocol"}
+     * {@code "Sec-WebSocket-Protocol"}.
      */
     String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
+
     /**
-     * {@code "Sec-WebSocket-Version"}
+     * {@code "Sec-WebSocket-Version"}.
      */
     String SEC_WEBSOCKET_VERSION = "Sec-WebSocket-Version";
+
     /**
-     * {@code "Sec-WebSocket-Key"}
+     * {@code "Sec-WebSocket-Key"}.
      */
     String SEC_WEBSOCKET_KEY = "Sec-WebSocket-Key";
+
     /**
-     * {@code "Sec-WebSocket-Accept"}
+     * {@code "Sec-WebSocket-Accept"}.
      */
     String SEC_WEBSOCKET_ACCEPT = "Sec-WebSocket-Accept";
+
     /**
-     * {@code "Server"}
+     * {@code "Server"}.
      */
     String SERVER = "Server";
+
     /**
-     * {@code "Set-Cookie"}
+     * {@code "Set-Cookie"}.
      */
     String SET_COOKIE = "Set-Cookie";
+
     /**
-     * {@code "Set-Cookie2"}
+     * {@code "Set-Cookie2"}.
      */
     String SET_COOKIE2 = "Set-Cookie2";
+
     /**
-     * {@code "TE"}
+     * {@code "TE"}.
      */
     String TE = "TE";
+
     /**
-     * {@code "Trailer"}
+     * {@code "Trailer"}.
      */
     String TRAILER = "Trailer";
+
     /**
-     * {@code "Transfer-Encoding"}
+     * {@code "Transfer-Encoding"}.
      */
     String TRANSFER_ENCODING = "Transfer-Encoding";
+
     /**
-     * {@code "Upgrade"}
+     * {@code "Upgrade"}.
      */
     String UPGRADE = "Upgrade";
+
     /**
-     * {@code "User-Agent"}
+     * {@code "User-Agent"}.
      */
     String USER_AGENT = "User-Agent";
+
     /**
-     * {@code "Vary"}
+     * {@code "Vary"}.
      */
     String VARY = "Vary";
+
     /**
-     * {@code "Via"}
+     * {@code "Via"}.
      */
     String VIA = "Via";
+
     /**
-     * {@code "Warning"}
+     * {@code "Warning"}.
      */
     String WARNING = "Warning";
+
     /**
-     * {@code "WebSocket-Location"}
+     * {@code "WebSocket-Location"}.
      */
     String WEBSOCKET_LOCATION = "WebSocket-Location";
+
     /**
-     * {@code "WebSocket-Origin"}
+     * {@code "WebSocket-Origin"}.
      */
     String WEBSOCKET_ORIGIN = "WebSocket-Origin";
+
     /**
-     * {@code "WebSocket-Protocol"}
+     * {@code "WebSocket-Protocol"}.
      */
     String WEBSOCKET_PROTOCOL = "WebSocket-Protocol";
+
     /**
-     * {@code "WWW-Authenticate"}
+     * {@code "WWW-Authenticate"}.
      */
     String WWW_AUTHENTICATE = "WWW-Authenticate";
 
     /**
-     * {@code "X-Auth-Token"}
+     * {@code "X-Auth-Token"}.
      */
     String X_AUTH_TOKEN = "X-Auth-Token";
 
     /**
-     * Obtain the date header
+     * Obtain the date header.
      *
      * @param name The header name
-     * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed {@link Optional#empty()}
+     * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed
+     * {@link Optional#empty()}
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
         try {
             return findFirst(name).map((str) -> {
-                        LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
-                        return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
-                    }
+                    LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
+                    return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
+                }
 
             );
         } catch (DateTimeParseException e) {
@@ -362,7 +438,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     }
 
     /**
-     * Obtain the date header
+     * Obtain the date header.
      *
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
@@ -372,7 +448,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     }
 
     /**
-     * Obtain an integer header
+     * Obtain an integer header.
      *
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
@@ -382,7 +458,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     }
 
     /**
-     * Find an integer header
+     * Find an integer header.
      *
      * @param name The name of the header
      * @return An {@link Optional} of {@link Integer}
@@ -391,9 +467,8 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
         return get(name, Integer.class);
     }
 
-
     /**
-     * Get the first value of the given header
+     * Get the first value of the given header.
      *
      * @param name The header name
      * @return The first value or null if it is present
@@ -403,17 +478,17 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     }
 
     /**
-     * The request or response content type
+     * The request or response content type.
      *
      * @return The content type
      */
     default Optional<MediaType> contentType() {
         return findFirst(HttpHeaders.CONTENT_TYPE)
-                .map(MediaType::new);
+            .map(MediaType::new);
     }
 
     /**
-     * The request or response content type
+     * The request or response content type.
      *
      * @return The content type
      */
@@ -423,16 +498,16 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     }
 
     /**
-     * A list of accepted {@link MediaType} instances
+     * A list of accepted {@link MediaType} instances.
      *
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
         return getAll(HttpHeaders.ACCEPT)
-                .stream()
-                .map(MediaType::new)
-                .distinct()
-                .collect(Collectors.toList());
+            .stream()
+            .map(MediaType::new)
+            .distinct()
+            .collect(Collectors.toList());
     }
 
     /**
@@ -447,5 +522,19 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      */
     default Optional<String> getOrigin() {
         return findFirst(ORIGIN);
+    }
+
+    /**
+     * @return The {@link #AUTHORIZATION} header
+     */
+    default Optional<String> getAuthorization() {
+        return findFirst(AUTHORIZATION);
+    }
+
+    /**
+     * @return The {@link #CONTENT_TYPE} header
+     */
+    default Optional<String> getContentType() {
+        return findFirst(CONTENT_TYPE);
     }
 }

@@ -1,29 +1,20 @@
 /*
- * Copyright 2018 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -31,9 +22,10 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -61,6 +53,10 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get() == 'success'
+
+        cleanup:
+        client.stop()
+        client.close()
     }
 
 
@@ -79,6 +75,10 @@ class HttpGetSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        client.stop()
+        client.close()
     }
 
     void "test simple 404 request as VndError"() {
@@ -102,11 +102,17 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get().message == "Page Not Found"
+
+        cleanup:
+        client.stop()
+        client.close()
     }
 
     void "test simple blocking get request"() {
+
         given:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        def asyncClient = HttpClient.create(embeddedServer.getURL())
+        BlockingHttpClient client = asyncClient.toBlocking()
 
         when:
         HttpResponse<String> response = client.exchange(
@@ -120,6 +126,9 @@ class HttpGetSpec extends Specification {
         body.isPresent()
         body.get() == 'success'
 
+        cleanup:
+        asyncClient.stop()
+        asyncClient.close()
     }
 
     void "test simple get request with type"() {
@@ -137,6 +146,9 @@ class HttpGetSpec extends Specification {
         response.status == HttpStatus.OK
         body.isPresent()
         body.get() == 'success'
+
+        cleanup:
+        client.stop()
     }
 
     void "test simple exchange request with POJO"() {
@@ -159,6 +171,10 @@ class HttpGetSpec extends Specification {
         body.isPresent()
         body.get().title == 'The Stand'
 
+
+        cleanup:
+        client.stop()
+
     }
 
     void "test simple retrieve request with POJO"() {
@@ -176,6 +192,10 @@ class HttpGetSpec extends Specification {
         then:
         book != null
         book.title == "The Stand"
+
+
+        cleanup:
+        client.stop()
     }
 
     void "test simple get request with POJO list"() {
@@ -205,6 +225,10 @@ class HttpGetSpec extends Specification {
         list.size() == 1
         list.get(0) instanceof Book
         list.get(0).title == 'The Stand'
+
+
+        cleanup:
+        client.stop()
 
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,31 +17,18 @@ package io.micronaut.discovery.eureka
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.eureka.client.v2.ApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.EurekaOperations
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfos
+import io.micronaut.discovery.eureka.client.v2.*
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.discovery.eureka.client.v2.ApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.EurekaOperations
-import io.micronaut.discovery.eureka.client.v2.InstanceInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfo
-import io.micronaut.discovery.eureka.client.v2.MockApplicationInfos
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
 import org.reactivestreams.Publisher
 
 import javax.inject.Singleton
 import javax.validation.Valid
-import javax.validation.constraints.*
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -49,7 +36,6 @@ import java.util.concurrent.ConcurrentHashMap
  * @since 1.0
  */
 @Controller('/eureka')
-@Singleton
 @Requires(property = MockEurekaServer.ENABLED)
 class MockEurekaServer implements EurekaOperations{
     public static Map<String, Map<String, Boolean>> heartbeats = new ConcurrentHashMap<>()
@@ -91,6 +77,7 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Get('/apps')
+    @Produces(single = true)
     Publisher<MockApplicationInfos> getApplicationInfosInternal() {
         return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->
             new MockApplicationInfo(it.key, it.value.values() as List<InstanceInfo>)
@@ -108,6 +95,7 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Get('/vips/{vipAddress}')
+    @Produces(single = true)
     Publisher<MockApplicationInfos> getApplicationVipsInternal(String vipAddress) {
         // this logic is wrong, i know.. we just test the call
         return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->

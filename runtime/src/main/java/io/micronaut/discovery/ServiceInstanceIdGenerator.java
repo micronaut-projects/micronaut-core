@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.Environment;
 
 import javax.annotation.Nonnull;
 
 /**
- * Interface for generating IDs for {@link ServiceInstance}
+ * Interface for generating IDs for {@link ServiceInstance}.
  *
  * @author graemerocher
  * @since 1.0
@@ -29,11 +29,12 @@ import javax.annotation.Nonnull;
 public interface ServiceInstanceIdGenerator {
 
     /**
-     * Generates a service ID
+     * Generates a service ID.
      *
-     * @param environment The environment
+     * @param environment     The environment
      * @param serviceInstance The service instance
      * @return The generated ID. Never null
      */
-    @Nonnull String generateId(Environment environment, ServiceInstance serviceInstance);
+    @Nonnull
+    String generateId(Environment environment, ServiceInstance serviceInstance);
 }

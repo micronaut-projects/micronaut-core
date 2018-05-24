@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.databind.DatabindContext;
@@ -23,7 +24,7 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import java.io.IOException;
 
 /**
- * Forked from original Netflix code
+ * Forked from original Netflix code.
  *
  * @author Tomasz Bak
  */
@@ -35,6 +36,9 @@ class DataCenterTypeInfoResolver extends ClassNameIdResolver {
      */
     public static final String MY_DATA_CENTER_INFO_TYPE_MARKER = "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo";
 
+    /**
+     * Default constructor.
+     */
     public DataCenterTypeInfoResolver() {
         super(TypeFactory.defaultInstance().constructType(DataCenterInfo.class), TypeFactory.defaultInstance());
     }

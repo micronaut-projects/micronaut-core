@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
@@ -20,14 +21,13 @@ import io.micronaut.core.io.Writable;
 import java.io.IOException;
 import java.io.Writer;
 
-import static io.micronaut.inject.configuration.ConfigurationMetadataBuilder.writeAttribute;
-
 /**
- * Metadata about a property
+ * Metadata about a property.
  *
  * @author Graeme Rocher
  */
 public class PropertyMetadata implements Writable {
+
     String type;
     String name;
     String description;
@@ -35,26 +35,44 @@ public class PropertyMetadata implements Writable {
     String defaultValue;
     String declaringType;
 
+    /**
+     * @return The type
+     */
     public String getType() {
         return type;
     }
 
+    /**
+     * @return The name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @return The description
+     */
     public String getDescription() {
         return description;
     }
 
+    /**
+     * @return The path
+     */
     public String getPath() {
         return path;
     }
 
+    /**
+     * @return The default value
+     */
     public String getDefaultValue() {
         return defaultValue;
     }
 
+    /**
+     * @return The declaring type
+     */
     public String getDeclaringType() {
         return declaringType;
     }
@@ -67,16 +85,14 @@ public class PropertyMetadata implements Writable {
         ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
         out.write(',');
         ConfigurationMetadataBuilder.writeAttribute(out, "sourceType", declaringType);
-        if(description != null) {
+        if (description != null) {
             out.write(',');
             ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
         }
-        if(defaultValue != null) {
+        if (defaultValue != null) {
             out.write(',');
             ConfigurationMetadataBuilder.writeAttribute(out, "defaultValue", defaultValue);
         }
         out.write('}');
     }
-
-
 }

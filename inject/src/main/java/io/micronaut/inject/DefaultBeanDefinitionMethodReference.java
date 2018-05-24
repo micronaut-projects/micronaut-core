@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
-
 /**
+ * @param <T> The type
+ * @param <R> The result type
  * @author graemerocher
  * @since 1.0
  */
-class DefaultBeanDefinitionMethodReference<T,R> implements BeanDefinitionMethodReference<T,R>, DelegatingExecutableMethod<T,R> {
+class DefaultBeanDefinitionMethodReference<T, R> implements BeanDefinitionMethodReference<T, R>, DelegatingExecutableMethod<T, R> {
 
     private final BeanDefinition<T> definition;
-    private final ExecutableMethod<T,R> method;
+    private final ExecutableMethod<T, R> method;
 
-    public DefaultBeanDefinitionMethodReference(BeanDefinition<T> definition, ExecutableMethod<T, R> method) {
+    /**
+     * @param definition The bean definition
+     * @param method     The method
+     */
+    DefaultBeanDefinitionMethodReference(BeanDefinition<T> definition, ExecutableMethod<T, R> method) {
         this.definition = definition;
         this.method = method;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
-import io.micronaut.context.LifeCycle;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -27,22 +23,12 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URL;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A non-blocking HTTP client interface designed around the Micronaut API and Reactive Streams.
@@ -52,19 +38,20 @@ import java.util.function.Function;
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
 
-
     /**
      * @return A blocking HTTP client suitable for testing and non-production scenarios.
      */
     BlockingHttpClient toBlocking();
 
     /**
-     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type</p>
+     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.</p>
      * <p>
-     * <p>This method will send a {@code Content-Length} header and except a content length header the response and is designed for simple non-streaming exchanges of data</p>
+     * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
+     * designed for simple non-streaming exchanges of data</p>
      * <p>
-     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed {@link HttpRequest}</p>
+     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
+     * {@link HttpRequest}</p>
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -75,7 +62,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType);
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher}.
      *
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
@@ -86,8 +74,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher}.
      *
+     * @param uri The Uri
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     default Publisher<HttpResponse<ByteBuffer>> exchange(String uri) {
@@ -95,7 +85,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher}.
      *
      * @param uri      The request URI
      * @param bodyType The body type
@@ -107,8 +98,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -121,8 +112,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -132,24 +123,22 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      */
     default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         return Publishers.map(exchange(request, bodyType), response -> {
-            if(bodyType.getType() == HttpStatus.class) {
+            if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
-            }
-            else {
+            } else {
                 Optional<O> body = response.getBody();
                 return body
-                        .orElseThrow(() -> new HttpClientResponseException(
-                                "Empty body",
-                                response
-                        ));
+                    .orElseThrow(() -> new HttpClientResponseException(
+                        "Empty body",
+                        response
+                    ));
             }
         });
     }
 
-
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
@@ -162,8 +151,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
      *
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
@@ -174,8 +163,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
-     * the response body to the specified type
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
      *
      * @param uri The URI
      * @return A {@link Publisher} that emits String result
@@ -191,8 +180,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Micronaut application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a
+     * Micronaut application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client
@@ -200,6 +189,4 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     static HttpClient create(URL url) {
         return new DefaultHttpClient(url);
     }
-
-
 }

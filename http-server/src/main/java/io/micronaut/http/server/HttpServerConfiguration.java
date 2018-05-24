@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -32,21 +33,25 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * <p>A base {@link ConfigurationProperties} for servers</p>
+ * <p>A base {@link ConfigurationProperties} for servers.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(value = "micronaut.server", cliPrefix = "")
+@ConfigurationProperties(value = HttpServerConfiguration.PREFIX, cliPrefix = "")
 public class HttpServerConfiguration {
 
     /**
-     * Constant for localhost
+     * The prefix used for configuration.
+     */
+
+    public static final String PREFIX = "micronaut.server";
+
+    /**
+     * Constant for localhost.
      */
     public static final String LOCALHOST = "localhost";
 
-    private final ApplicationConfiguration applicationConfiguration;
-    private Charset defaultCharset;
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
     protected Optional<Integer> readTimeout;
@@ -58,10 +63,19 @@ public class HttpServerConfiguration {
     protected MultipartConfiguration multipart = new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
 
+    private final ApplicationConfiguration applicationConfiguration;
+    private Charset defaultCharset;
+
+    /**
+     * Default constructor.
+     */
     public HttpServerConfiguration() {
         this.applicationConfiguration = new ApplicationConfiguration();
     }
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
     @Inject
     public HttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         if (applicationConfiguration != null) {
@@ -93,14 +107,14 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * The default server port
+     * @return The default server port
      */
     public int getPort() {
         return port;
     }
 
     /**
-     * The default host
+     * @return The default host
      */
     public Optional<String> getHost() {
         return host;
@@ -156,7 +170,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Configuration for multipart handling
+     * Configuration for multipart handling.
      */
     @ConfigurationProperties("multipart")
     public static class MultipartConfiguration implements Toggleable {
@@ -197,7 +211,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Configuration for CORS
+     * Configuration for CORS.
      */
     @ConfigurationProperties("cors")
     public static class CorsConfiguration implements Toggleable {

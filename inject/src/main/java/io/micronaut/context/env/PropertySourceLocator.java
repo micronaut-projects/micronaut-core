@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import java.util.Optional;
 
 /**
- * An interface for beans that are capable of locating a {@link PropertySource} instance
+ * An interface for beans that are capable of locating a {@link PropertySource} instance.
  *
  * @author graemerocher
  * @since 1.0
  */
 public interface PropertySourceLocator {
+
     /**
-     * Locate a {@link PropertySource} for the given environment
+     * Locate a {@link PropertySource} for the given environment.
      *
      * @param environment The environment
      * @return The located property source

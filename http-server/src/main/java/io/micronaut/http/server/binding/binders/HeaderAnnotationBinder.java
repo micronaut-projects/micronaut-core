@@ -1,45 +1,44 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.server.binding.binders;
 
-import io.micronaut.http.annotation.Header;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
-import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.http.HttpHeaders;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Header;
-import io.micronaut.core.type.Argument;
-
-import java.util.Optional;
 
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Header} annotation
- * to trigger binding from an HTTP header
+ * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header}
+ * annotation to trigger binding from an HTTP header.
  *
- *
- * @see HttpHeaders
+ * @param <T> A type
  * @author Graeme Rocher
+ * @see io.micronaut.http.HttpHeaders
  * @since 1.0
  */
 public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Header, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Header, T> {
 
+    /**
+     * @param conversionService The conversion service
+     */
     public HeaderAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }

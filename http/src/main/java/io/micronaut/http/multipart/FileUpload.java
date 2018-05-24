@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,45 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.multipart;
 
 import io.micronaut.http.MediaType;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
+
 import java.util.Optional;
 
 /**
- * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request</p>
+ * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface FileUpload {
-
-    /**
-     * Gets the content of this part as an <tt>InputStream</tt>
-     *
-     * @return The content of this part as an <tt>InputStream</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    InputStream getInputStream() throws IOException;
-
-    /**
-     * Gets the content of this part as a <tt>byte[]</tt>
-     *
-     * @return The content of this part as a <tt>byte[]</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    byte[] getBytes() throws IOException;
-
-    /**
-     * Gets the content of this part as a <tt>ByteBuffer</tt>
-     *
-     * @return The content of this part as a <tt>ByteBuffer</tt>
-     * @throws IOException If an error occurs in retrieving the content
-     */
-    ByteBuffer getByteBuffer() throws IOException;
 
     /**
      * Gets the content type of this part.
@@ -61,14 +36,14 @@ public interface FileUpload {
     Optional<MediaType> getContentType();
 
     /**
-     * Gets the name of this part
+     * Gets the name of this part.
      *
      * @return The name of this part
      */
     String getName();
 
     /**
-     * Gets the name of this part
+     * Gets the name of this part.
      *
      * @return The name of this part
      */
@@ -82,7 +57,7 @@ public interface FileUpload {
     long getSize();
 
     /**
-     * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state
+     * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state.
      *
      * @return True if the part is fully uploaded
      */

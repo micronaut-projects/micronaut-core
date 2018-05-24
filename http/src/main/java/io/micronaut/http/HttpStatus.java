@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
 
+package io.micronaut.http;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+ * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,9 +31,9 @@ public enum HttpStatus implements CharSequence {
     CONTINUE(100, "Continue"),
     SWITCHING_PROTOCOLS(101, "Switching Protocols"),
     PROCESSING(102, "Processing"),
-    OK(200,"Ok"),
-    CREATED(201,"Created"),
-    ACCEPTED(202,"Accepted"),
+    OK(200, "Ok"),
+    CREATED(201, "Created"),
+    ACCEPTED(202, "Accepted"),
     NON_AUTHORITATIVE_INFORMATION(203, "Non-Authoritative Information"),
     NO_CONTENT(204, "No Content"),
     RESET_CONTENT(205, "Reset Content"),
@@ -66,7 +66,7 @@ public enum HttpStatus implements CharSequence {
     REQUEST_ENTITY_TOO_LARGE(413, "Request Entity Too Large"),
     REQUEST_URI_TOO_LONG(414, "Request-URI Too Long"),
     UNSUPPORTED_MEDIA_TYPE(415, "Unsupported Media Type"),
-    REQUESTED_RANGE_NOT_SATISFIABLE(416,"Requested Range Not Satisfiable"),
+    REQUESTED_RANGE_NOT_SATISFIABLE(416, "Requested Range Not Satisfiable"),
     EXPECTATION_FAILED(417, "Expectation Failed"),
     I_AM_A_TEAPOT(418, "I am a teapot"),
     ENHANCE_YOUR_CALM(420, "Enhance your calm"),
@@ -99,22 +99,22 @@ public enum HttpStatus implements CharSequence {
     private static final Map<Integer, HttpStatus> BY_CODE;
 
     static {
-
         HttpStatus[] statuses = values();
-        Map<Integer, HttpStatus> byCode= new LinkedHashMap<>();
-        for(HttpStatus status : statuses) {
+        Map<Integer, HttpStatus> byCode = new LinkedHashMap<>();
+        for (HttpStatus status : statuses) {
             byCode.put(status.code, status);
         }
 
         BY_CODE = Collections.unmodifiableMap(byCode);
     }
 
-
-
     private final int code;
     private final String reason;
 
-
+    /**
+     * @param code   The code
+     * @param reason The reason
+     */
     HttpStatus(int code, String reason) {
         Objects.requireNonNull(reason, "Argument 'reason' cannot be null");
         this.code = code;
@@ -136,14 +136,14 @@ public enum HttpStatus implements CharSequence {
     }
 
     /**
-     * The status for the given code
+     * The status for the given code.
      *
      * @param code The code
      * @return The value
      */
     public static HttpStatus valueOf(int code) {
         HttpStatus status = BY_CODE.get(code);
-        if(status == null) {
+        if (status == null) {
             throw new IllegalArgumentException("Invalid HTTP status code: " + code);
         }
         return status;
@@ -163,5 +163,4 @@ public enum HttpStatus implements CharSequence {
     public CharSequence subSequence(int start, int end) {
         return name().subSequence(start, end);
     }
-
 }

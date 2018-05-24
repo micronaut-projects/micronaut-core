@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -136,7 +136,6 @@ class Test {
 
     }
 
-    @NotYetImplemented
     void "test build repeatable annotations"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\

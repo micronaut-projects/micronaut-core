@@ -1,0 +1,110 @@
+Micronaut features automatic configuration of the https://lettuce.io[Lettuce] driver for https://redis.io[Redis] via the `redis-lettuce` module.
+
+== Configuring Lettuce
+
+To configure the Lettuce driver you should first add the `redis-lettuce` module to your classpath:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:redis-lettuce"
+----
+
+You should then configure the URI of the Redis server you wish to communicate with in `application.yml`:
+
+.Configuring `redis.uri`
+[source,yaml]
+----
+redis:
+    uri: redis://localhost
+----
+
+TIP: The `redis.uri` setting should be in the format as described in the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details[Connection URIs] section of the Lettuce wiki
+
+You can also specify multiple Redis URIs using `redis.uris` in which case a `RedisClusterClient` is created instead.
+
+== Available Lettuce Beans
+
+Once you have the above configuration in place you can inject one of the following beans:
+
+* `io.lettuce.core.RedisClient` - The main client interface
+* `io.lettuce.core.api.StatefulRedisConnection` - A connection interface that features synchronous, reactive (based on Reactor) and async APIs that operate on `String` values
+* `io.lettuce.core.pubsub.StatefulRedisPubSubConnection` - A connection interface for dealing with Redis Pub/Sub
+
+The following example demonstrates the use of the `StatefulRedisConnection` interface's synchronous API:
+
+.Using StatefulRedisConnection
+[source,groovy]
+----
+@Inject StatefulRedisConnection<String, String> connection
+...
+include::{testsredis}/RedisClientFactorySpec.groovy[tags=commands, indent=0]
+----
+
+NOTE: The Lettuce driver's `StatefulRedisConnection` interface is designed to be long-lived and there is no need to close the connection. It will be closed automatically when the application shuts down.
+
+== Customizing The Redis Configuration
+
+You can customize the Redis configuration using any properties exposed by the api:configuration.lettuce.DefaultRedisConfiguration[] class. For example, in `application.yml`:
+
+.Customizing Redis Configuration
+[source,yaml]
+----
+redis:
+    uri: redis://localhost
+    ssl: true
+    timeout: 30s
+----
+
+=== Multiple Redis Connections
+
+You can configure multiple Redis connections using the `redis.servers` setting. For example:
+
+.Customizing Redis Configuration
+[source,yaml]
+----
+redis:
+    servers:
+        foo:
+            uri: redis://foo
+        bar:
+            uri: redis://bar
+----
+
+In which case the same beans will be created for each entry under `redis.servers` but exposed as `@Named` beans.
+
+.Using StatefulRedisConnection
+[source,groovy]
+----
+@Inject @Named("foo") StatefulRedisConnection<String, String> connection;
+----
+
+The above example will inject the connection named `foo`.
+
+== Embedding Redis for Testing
+
+You can run an embedded version of Redis for testing and CI scenarios by adding a dependency on the Embedded Redis project:
+
+.build.gradle
+[source,groovy]
+----
+testCompile "com.github.kstyrc:embedded-redis:0.6"
+----
+
+If Redis is unavailable for the configured Redis URI an embedded instance of Redis will be automatically be started and then shutdown at the end of the test (when `stop` is called on the `ApplicationContext`).
+
+== Redis Health Checks
+
+When the `redis-lettuce` module is activated a api:configuration.lettuce.health.RedisHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Redis connection or connections.
+
+See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+
+
+== Using Redis as a Cache
+
+You can use Redis as a cache implementation, see the section on <<caching, Cache Advice>> for how to configure Redis backed caches.
+
+== Using Redis for HTTP Sessions
+
+You can use Redis as a backing implementation for storing HTTP sessions. See the section on <<sessions, HTTP Sessions>> for more information on how to configure Redis backed sessions.
+

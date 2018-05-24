@@ -1,0 +1,87 @@
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.apache.ant:ant:1.9.7"
+    compile dependencyModuleVersion("groovy", "groovy-ant")
+    compile dependencyModuleVersion("groovy", "groovy-json")
+    compile dependencyModuleVersion("groovy", "groovy-jmx")
+    compile "org.fusesource.jansi:jansi:1.14"
+    compile "jline:jline:2.12"
+    compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
+    compile dependencyVersion("snakeyaml")
+    runtime dependencyModuleVersion("slf4j", "slf4j-simple")
+    runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
+
+    testCompile "net.sf.expectit:expectit-core:0.5.0"
+    testCompile "com.github.jnr:jnr-posix:3.0.6"
+}
+
+File outDir = new File(project.buildDir, 'bin')
+
+task createStartScripts(type: MicronautCreateStartScripts) {
+    description = "Creates OS specific scripts to run the Micronaut CLI."
+    mainClassName = 'io.micronaut.cli.MicronautCli'
+    applicationName = 'mn'
+    defaultJvmOpts = ["-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=3"]
+    outputDir = outDir
+    classpath = configurations.runtime
+    doLast {
+        ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
+    }
+}
+
+class MicronautCreateStartScripts extends org.gradle.api.tasks.application.CreateStartScripts {
+    Collection<String> projectArtifacts=[]
+
+    @org.gradle.api.tasks.TaskAction
+    void generate() {
+        def generator = new org.gradle.api.internal.plugins.StartScriptGenerator()
+        generator.unixStartScriptGenerator.template = project.resources.text.fromFile('src/main/resources/unixStartScript.txt')
+        generator.applicationName = getApplicationName()
+        generator.mainClassName = getMainClassName()
+        generator.defaultJvmOpts = getDefaultJvmOpts()
+        generator.optsEnvironmentVar = getOptsEnvironmentVar()
+        generator.exitEnvironmentVar = getExitEnvironmentVar()
+        generator.classpath = project.tasks.getByName('fatJar').outputs.files.collect { it.name }
+        generator.scriptRelPath = "bin/${getUnixScript().name}"
+        generator.generateUnixScript(getUnixScript())
+        generator.generateWindowsScript(getWindowsScript())
+    }
+}
+
+task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
+    manifest {
+        attributes 'Main-Class': 'io.micronaut.cli.MicronautCli',
+                'Implementation-Version': project.version
+    }
+    from {
+        configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
+    destinationDir = project.buildDir
+}
+
+task cliZip(type: Zip, dependsOn: ['fatJar']) {
+    archiveName = 'mn.zip'
+    from('build/bin') {
+        into('bin')
+    }
+    from('../media') {
+        into('media')
+    }
+    from fatJar.outputs.files
+    from('../LICENSE')
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact cliZip {
+                classifier "dist"
+            }
+        }
+    }
+}

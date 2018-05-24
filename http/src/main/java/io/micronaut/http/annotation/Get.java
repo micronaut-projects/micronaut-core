@@ -1,21 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.AliasFor;
 
 import java.lang.annotation.Documented;
@@ -23,10 +25,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#GET}
+ * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#GET}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,6 +36,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD})
 @HttpMethodMapping
 public @interface Get {
+
     /**
      * @return The URI of the GET route if not specified inferred from the method name and arguments
      */
@@ -47,6 +48,7 @@ public @interface Get {
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     String uri() default "";
+
     /**
      * @return The default produces, otherwise override from controller
      */
@@ -54,10 +56,10 @@ public @interface Get {
     String[] produces() default {};
 
     /**
-     * The default consumes. Ignored for server request which never a consume a value for a GET request
+     * The default consumes. Ignored for server request which never a consume a value for a GET request.
+     *
      * @return The default consumes, otherwise override from controller
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
-
 }

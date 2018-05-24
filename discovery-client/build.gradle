@@ -5,9 +5,33 @@ dependencies {
     compile project(":http-client")
     compile project(":validation")
 
+    compileOnly project(":configurations:aws-common")
+    // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-core
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/jmespath-java
+    compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-servicediscovery
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+
+
+    testCompile project(":configurations:aws-common")
+    // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
+    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-core
+    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/jmespath-java
+    testCompile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-servicediscovery
+    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+
     testRuntime project(":configurations:hibernate-validator")
     testCompile project(":management")
     testCompile project(":http-server-netty")
     testCompile project(":inject-groovy")
-    testRuntime "org.yaml:snakeyaml:$yamlVersion"
+    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.297"
+    testCompile dependencyVersion("reactor")
+    testRuntime dependencyVersion("snakeyaml")
+
 }

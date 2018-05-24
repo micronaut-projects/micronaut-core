@@ -1,24 +1,20 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.context.router
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.annotation.Controller
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpMethod
@@ -68,6 +64,7 @@ class GroovyRouteBuilderSpec extends Specification {
         '/book/1/author'    | HttpMethod.GET    | true      | ResourceRoutes | ['author']
     }
 
+    // tag::routes[]
     @Singleton
     static class MyRoutes extends GroovyRouteBuilder {
 
@@ -78,13 +75,14 @@ class GroovyRouteBuilderSpec extends Specification {
         @Inject
         void bookResources(BookController bookController, AuthorController authorController) {
             GET(bookController) {
-                POST("/hello{/message}", bookController.&hello)
+                POST("/hello{/message}", bookController.&hello) // <1>
             }
-            GET(bookController, ID) {
+            GET(bookController, ID) { // <2>
                 GET(authorController)
             }
         }
     }
+    // end::routes[]
 
     @Singleton
     static class ResourceRoutes extends GroovyRouteBuilder {

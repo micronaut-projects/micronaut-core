@@ -1,22 +1,28 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.cli;
 
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * Implementation of the {@link CommandLine} interface.
@@ -74,7 +80,6 @@ class DefaultCommandLine implements CommandLine {
         return null;
     }
 
-
     @Override
     public String getRemainingArgsString() {
         return remainingArgsToString(" ", false);
@@ -85,7 +90,7 @@ class DefaultCommandLine implements CommandLine {
         final Iterator<Map.Entry<String, Object>> i = undeclaredOptions.entrySet().iterator();
         while (i.hasNext()) {
             Map.Entry<String, Object> next = i.next();
-            if(!i.hasNext()) {
+            if (!i.hasNext()) {
                 return next;
             }
         }
@@ -107,30 +112,54 @@ class DefaultCommandLine implements CommandLine {
         return rawArguments;
     }
 
+    /**
+     * @param option option
+     */
     void addDeclaredOption(Option option) {
         addDeclaredOption(option, Boolean.TRUE);
     }
 
+    /**
+     * @param option option
+     */
     void addUndeclaredOption(String option) {
         undeclaredOptions.put(option, Boolean.TRUE);
     }
 
+    /**
+     * @param option option
+     * @param value value
+     */
     void addUndeclaredOption(String option, Object value) {
         undeclaredOptions.put(option, value);
     }
 
+    /**
+     * @param option option
+     * @param value value
+     */
     void addDeclaredOption(Option option, Object value) {
         declaredOptions.put(option, value);
     }
 
+    /**
+     * @param arg arg
+     */
     void addRemainingArg(String arg) {
         remainingArgs.add(arg);
     }
 
+    /**
+     * @param name name
+     * @param value value
+     */
     void addSystemProperty(String name, String value) {
         systemProperties.put(name, value);
     }
 
+    /**
+     * @param args array of args
+     */
     void setRawArguments(String[] args) {
         this.rawArguments = args;
     }
@@ -139,12 +168,11 @@ class DefaultCommandLine implements CommandLine {
         StringBuilder sb = new StringBuilder();
         String sep = "";
         List<String> args = new ArrayList<>(remainingArgs);
-        if(includeOptions) {
+        if (includeOptions) {
             for (Map.Entry<String, Object> entry : undeclaredOptions.entrySet()) {
-                if (entry.getValue() instanceof Boolean && ((Boolean)entry.getValue())) {
+                if (entry.getValue() instanceof Boolean && ((Boolean) entry.getValue())) {
                     args.add('-' + entry.getKey());
-                }
-                else {
+                } else {
                     args.add('-' + entry.getKey() + '=' + entry.getValue());
                 }
             }
@@ -155,5 +183,4 @@ class DefaultCommandLine implements CommandLine {
         }
         return sb.toString();
     }
-
 }

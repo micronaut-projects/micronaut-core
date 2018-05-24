@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanResolutionContext;
@@ -25,35 +26,36 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A bean definition that is validated with javax.validation
+ * A bean definition that is validated with javax.validation.
  *
+ * @param <T> The bean definition type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Validates the bean with the validator factory if present
+     * Validates the bean with the validator factory if present.
      *
      * @param resolutionContext The resolution context
-     * @param instance The instance
+     * @param instance          The instance
      * @return The instance
      */
     default T validate(BeanResolutionContext resolutionContext, T instance) {
         Optional<ValidatorFactory> validatorFactoryBean = resolutionContext.getContext().findBean(ValidatorFactory.class);
-        if(validatorFactoryBean.isPresent()) {
+        if (validatorFactoryBean.isPresent()) {
             ValidatorFactory validatorFactory = validatorFactoryBean.get();
             Validator validator = validatorFactory.getValidator();
             Set<ConstraintViolation<T>> errors = validator.validate(instance);
-            if(!errors.isEmpty()) {
+            if (!errors.isEmpty()) {
                 StringBuilder builder = new StringBuilder();
-                builder.append( "Validation failed for bean definition [" );
-                builder.append( instance.getClass().getName() );
-                builder.append( "]\nList of constraint violations:[\n" );
+                builder.append("Validation failed for bean definition [");
+                builder.append(instance.getClass().getName());
+                builder.append("]\nList of constraint violations:[\n");
                 for (ConstraintViolation<?> violation : errors) {
-                    builder.append( "\t" ).append( violation.getPropertyPath() ).append(" - ").append(violation.getMessage()).append("\n");
+                    builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
                 }
-                builder.append( "]" );
+                builder.append("]");
                 throw new BeanInstantiationException(resolutionContext, builder.toString());
             }
         }

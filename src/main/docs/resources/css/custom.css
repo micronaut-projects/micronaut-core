@@ -1,0 +1,122 @@
+#navigation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+    transition: top 0.5s;
+    height: 75px !important;
+}
+.navLinks {
+    margin-top: 15px;
+}
+.navTitle {
+    width: auto;
+    background: none;
+    padding-right: 5px !important;
+    padding-left: 0 !important;
+}
+.wiki-table th, #navigation {
+    background: #000000 !important;
+}
+
+#navigation a {
+    color: #FFFFFF !important;
+    text-shadow: none !important;
+}
+#navigation .selected a {
+    background: #4CAFDE !important;
+}
+#navigation a:hover {
+    color: #FFFFFF !important;
+    background: #4CAFDE !important;
+}
+
+#navigation .navTitle a:hover {
+    background: #000000 !important;
+}
+
+#nav-summary #nav-summary-childs a:hover {
+    color: #FFFFFF !important;
+}
+
+#navigation .selected a:hover,
+#navigation .active .button {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+}
+
+a,
+a:hover,
+a:focus,
+a:active,
+a:hover,
+#table-of-content a:hover strong,
+#table-of-content a strong,
+.menu a:hover,
+.local .local-title .toggle a {
+    color: #255AA8 !important;
+}
+
+#table-of-content a:hover {
+    border-right: 2px solid #255AA8 !important;
+}
+.menu .menu-block h1,
+#main .project strong,
+#main h1,
+#main h2 {
+    font-weight: bold !important;
+    color: #000000 !important;
+}
+.navTitle {
+    background-image: none !important;
+}
+.navTitle #logo img {
+    margin: 8px 0;
+    height: 50px !important;
+}
+
+#navigation #nav-summary-childs {
+    background: #000000 !important;
+}
+
+#main {
+    margin-top: 80px;
+}
+#table-of-content {
+    width: 28%;
+    margin-left: 3%;
+    margin-right: 3%;
+    max-width: 500px;
+    float: right;
+    z-index: 998;
+    text-align: left;
+}
+
+.mobile {
+    display: block;
+}
+.desktop {
+    display: none;
+}
+@media screen and (min-width: 961px) {
+    .mobile {
+        display: none;
+    }
+    .desktop {
+        display: block;
+    }
+}
+
+@media screen and (min-width: 961px) {
+    #main > div:nth-child(-n+46) {
+        max-width: 62%;
+    }
+}
+
+body {
+    width: 96%;
+}
+#main {
+    margin-left: 4%;
+}

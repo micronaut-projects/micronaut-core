@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,11 @@
  */
 package io.micronaut.configurations.hystrix
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxStreamingHttpClient
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxStreamingHttpClient
-import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription

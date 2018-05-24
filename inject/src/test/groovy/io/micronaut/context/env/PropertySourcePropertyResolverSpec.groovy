@@ -1,17 +1,17 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.context.env
 
@@ -26,8 +26,28 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
 
     @Unroll
-    void "test resolve environment properties"() {
+    void "test property resolution rules for key #key"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [TWITTER_OAUTH2_ACCESS_TOKEN: 'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test",
+                        ['camelCase.fooBar': 'xxx',
+                         'camelCase.URL'   : "http://localhost"],
+                        PropertySource.PropertyConvention.JAVA_PROPERTIES
+                )
+        )
 
+        expect:
+        resolver.containsProperty(key)
+        resolver.getProperty(key, Object).isPresent()
+        resolver.getProperty(key, String).get() == expected
+
+
+        where:
+        key                           | expected
+        'twitter.oauth2.access.token' | 'xxx'
+        'camel-case.foo-bar'          | 'xxx'
+        'camel-case.url'              | 'http://localhost'
     }
 
     @Unroll
@@ -46,10 +66,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         property                      | value | key                           | type   | expected
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access-token' | String | 'xxx'
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.accesstoken'  | String | 'xxx'
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access-token' | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.OAuth2AccessToken'   | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2accesstoken'   | String | 'xxx'
 
     }
 

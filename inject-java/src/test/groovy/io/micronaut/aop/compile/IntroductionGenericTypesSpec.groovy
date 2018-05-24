@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,6 @@ import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.writer.BeanDefinitionVisitor
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.core.type.ReturnType
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 /**

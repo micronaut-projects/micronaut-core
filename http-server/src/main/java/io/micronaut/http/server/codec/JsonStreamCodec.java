@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.codec;
 
-import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -33,20 +31,25 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Allow encoding objects using {@link MediaType#APPLICATION_JSON_STREAM}
+ * Allow encoding objects using {@link MediaType#APPLICATION_JSON_STREAM}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class JsonStreamCodec implements MediaTypeCodec {
+
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
     private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
     private MediaTypeCodecRegistry codecRegistry;
 
+    /**
+     * @param byteBufferFactory     A byte buffer factory
+     * @param codecRegistryProvider A media type codec registry
+     */
     public JsonStreamCodec(
-            ByteBufferFactory byteBufferFactory,
-            Provider<MediaTypeCodecRegistry> codecRegistryProvider) {
+        ByteBufferFactory byteBufferFactory,
+        Provider<MediaTypeCodecRegistry> codecRegistryProvider) {
         this.byteBufferFactory = byteBufferFactory;
         this.codecRegistryProvider = codecRegistryProvider;
     }
@@ -78,16 +81,16 @@ public class JsonStreamCodec implements MediaTypeCodec {
     @Override
     public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
         MediaTypeCodec jsonCodec = resolveMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE)
-                .orElseThrow(() -> new CodecException("No possible JSON encoders found!"));
+            .orElseThrow(() -> new CodecException("No possible JSON encoders found!"));
         ByteBuffer encoded = jsonCodec.encode(object, allocator);
         encoded.write(NEWLINE);
         return encoded;
     }
 
     private MediaTypeCodecRegistry resolveMediaTypeCodecRegistry() {
-        if(this.codecRegistry == null)
+        if (this.codecRegistry == null) {
             this.codecRegistry = codecRegistryProvider.get();
+        }
         return this.codecRegistry;
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.core.type.Argument
-import io.micronaut.function.client.FunctionClient
-import io.micronaut.function.client.FunctionDefinition
-import io.micronaut.http.annotation.Body
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
@@ -38,10 +34,10 @@ import javax.inject.Named
  * @author graemerocher
  * @since 1.0
  */
-//@IgnoreIf({
-//    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
-//})
-@Ignore
+@IgnoreIf({
+    return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
+})
+//@Ignore
 class AwsLambdaInvokeSpec extends Specification {
 
 
@@ -75,6 +71,7 @@ class AwsLambdaInvokeSpec extends Specification {
         configuration.builder.region == 'us-east-1'
     }
 
+    @Ignore
     void "test invoke function"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
@@ -100,7 +97,7 @@ class AwsLambdaInvokeSpec extends Specification {
         book.title == "THE STAND"
     }
 
-
+    @Ignore
     void "test invoke client with @FunctionClient"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
@@ -135,8 +132,10 @@ class AwsLambdaInvokeSpec extends Specification {
         String title
     }
 
+    //tag::functionClient[]
     @FunctionClient
     static interface MyClient {
+
         Book micronautFunction(@Body Book book)
 
         @Named('micronaut-function')
@@ -145,4 +144,5 @@ class AwsLambdaInvokeSpec extends Specification {
         @Named('micronaut-function')
         Single<Book> reactiveInvoke(String title)
     }
+    //end::functionClient[]
 }

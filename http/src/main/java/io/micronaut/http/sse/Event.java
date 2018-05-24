@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.sse;
 
 import io.micronaut.core.util.ArgumentUtils;
@@ -21,29 +22,33 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 
 /**
- * Represents a Server Sent Event. See https://www.w3.org/TR/2011/WD-eventsource-20111020/
+ * Represents a Server Sent Event. See https://www.w3.org/TR/2011/WD-eventsource-20111020/.
  *
+ * @param <T> The event type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface Event<T> {
+
     /**
-     * The id parameter
+     * The id parameter.
      */
     String ID = "id";
+
     /**
-     * The event parameter
+     * The event parameter.
      */
     String EVENT = "event";
+
     /**
-     * The data parameter
+     * The data parameter.
      */
     String DATA = "data";
+
     /**
-     * The retry parameter
+     * The retry parameter.
      */
     String RETRY = "retry";
-
 
     /**
      * @return The data object to write
@@ -71,7 +76,7 @@ public interface Event<T> {
     Duration getRetry();
 
     /**
-     * Sets the retry duration
+     * Sets the retry duration.
      *
      * @param duration The duration
      * @return The event
@@ -79,7 +84,7 @@ public interface Event<T> {
     Event<T> retry(@Nullable Duration duration);
 
     /**
-     * Sets the id
+     * Sets the id.
      *
      * @param id The id to set
      * @return The event
@@ -87,7 +92,7 @@ public interface Event<T> {
     Event<T> id(@Nullable String id);
 
     /**
-     * Sets the event name
+     * Sets the event name.
      *
      * @param name The event name
      * @return The event
@@ -95,7 +100,7 @@ public interface Event<T> {
     Event<T> name(@Nullable String name);
 
     /**
-     * Sets the event comment
+     * Sets the event comment.
      *
      * @param comment The Event comment
      * @return The event
@@ -103,7 +108,7 @@ public interface Event<T> {
     Event<T> comment(@Nullable String comment);
 
     /**
-     * Constructs a new event for the given data
+     * Constructs a new event for the given data.
      *
      * @param data The data
      * @param <ET> The data type
@@ -115,18 +120,19 @@ public interface Event<T> {
     }
 
     /**
-     * Constructs a new event for the given data
+     * Constructs a new event for the given data.
      *
-     * @param data The data
-     * @param <ET> The data type
+     * @param event The event
+     * @param data  The data
+     * @param <ET>  The data type
      * @return The event instance
      */
     static <ET> Event<ET> of(Event event, ET data) {
         ArgumentUtils.check("data", data).notNull();
         return new DefaultEvent<>(data)
-                    .id(event.getId())
-                    .comment(event.getComment())
-                    .name(event.getName())
-                    .retry(event.getRetry());
+            .id(event.getId())
+            .comment(event.getComment())
+            .name(event.getName())
+            .retry(event.getRetry());
     }
 }

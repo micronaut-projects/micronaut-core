@@ -1,0 +1,13 @@
+Moreover, you can configure endpoint authentication and authorization access with an Intercept URL Map:
+
+[source, yaml]
+----
+include::{testssecurity}/security/securityRule/intercepturlmap/InterceptUrlMapSpec.groovy[tag=yamlconfig,indent=0]
+----
+
+<1> Enable access to authenticated and not authenticated users
+<2> Enable access for everyone authenticated
+<3> Enable access for users who are granted any of the specified roles.
+
+As you see in the previous code listing, any endpoint is identified by a combination of pattern
+and an optional HTTP Method

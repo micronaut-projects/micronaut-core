@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Utility visitor that only visits public abstract methods that have not been implemented by the given type
+ * Utility visitor that only visits public abstract methods that have not been implemented by the given type.
  *
+ * @param <R> The return type of the visitor's method
+ * @param <P> The type of the additional parameter to the visitor's methods.
  * @author graemerocher
+ * @see javax.lang.model.util.AbstractTypeVisitor8
  * @since 1.0
  */
-public abstract class PublicAbstractMethodVisitor<R,P> extends PublicMethodVisitor<R,P> {
+public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisitor<R, P> {
 
     private final TypeElement classElement;
     private final ModelUtils modelUtils;
@@ -35,6 +43,11 @@ public abstract class PublicAbstractMethodVisitor<R,P> extends PublicMethodVisit
 
     private Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
 
+    /**
+     * @param classElement The {@link TypeElement}
+     * @param modelUtils   The {@link ModelUtils}
+     * @param elementUtils The {@link Elements}
+     */
     PublicAbstractMethodVisitor(TypeElement classElement, ModelUtils modelUtils, Elements elementUtils) {
         this.classElement = classElement;
         this.modelUtils = modelUtils;
@@ -47,15 +60,14 @@ public abstract class PublicAbstractMethodVisitor<R,P> extends PublicMethodVisit
         String methodName = executableElement.getSimpleName().toString();
         boolean acceptable = modelUtils.isAbstract(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
         boolean isDeclared = executableElement.getEnclosingElement().equals(classElement);
-        if(acceptable && !isDeclared && declaredMethods.containsKey(methodName)) {
+        if (acceptable && !isDeclared && declaredMethods.containsKey(methodName)) {
             // check method is not overridden already
             for (ExecutableElement element : declaredMethods.get(methodName)) {
-                if(elementUtils.overrides(element, executableElement, classElement)) {
+                if (elementUtils.overrides(element, executableElement, classElement)) {
                     return false;
                 }
             }
-        }
-        else if(!acceptable && !modelUtils.isStatic(executableElement)) {
+        } else if (!acceptable && !modelUtils.isStatic(executableElement)) {
             List<ExecutableElement> declaredMethodList = declaredMethods.computeIfAbsent(methodName, s -> new ArrayList<>());
             declaredMethodList.add(executableElement);
         }

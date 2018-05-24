@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.exceptions;
 
 /**
@@ -21,11 +22,18 @@ package io.micronaut.http.client.exceptions;
  */
 public class ContentLengthExceededException extends HttpClientException {
 
+    /**
+     * @param maxLength      The maximum length
+     * @param receivedLength The received length
+     */
     public ContentLengthExceededException(long maxLength, long receivedLength) {
-        super("The received length ["+receivedLength+"] exceeds the maximum content length ["+maxLength+"]");
+        super("The received length [" + receivedLength + "] exceeds the maximum content length [" + maxLength + "]");
     }
 
+    /**
+     * @param maxLength The maximum length
+     */
     public ContentLengthExceededException(long maxLength) {
-        super("The received length exceeds the maximum content length ["+maxLength+"]");
+        super("The received length exceeds the maximum content length [" + maxLength + "]");
     }
 }

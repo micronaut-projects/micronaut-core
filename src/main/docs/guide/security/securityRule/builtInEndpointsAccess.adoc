@@ -1,0 +1,9 @@
+When you turn on security, <<providedEndpoints, Built-in endpoints>> are secured depending on their sensitive value.
+
+[source, yaml]
+----
+include::{testssecurity}/security/securityRule/builtinendpoints/BuiltInEndpointsSpec.groovy[tag=yamlconfig,indent=0]
+----
+
+<1> `/beans` endpoint is secured
+<2> `/info` endpoint is open for unauthenticated access.

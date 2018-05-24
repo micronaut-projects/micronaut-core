@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package io.micronaut.docs.server.filters;
 import io.micronaut.http.HttpRequest;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.http.HttpRequest;
 import org.slf4j.*;
 
 import javax.inject.Singleton;
@@ -37,7 +36,7 @@ public class TraceService {
 
     Flowable<Boolean> trace(HttpRequest<?> request) {
         return Flowable.fromCallable(() -> { // <1>
-            if(LOG.isDebugEnabled()) {
+            if (LOG.isDebugEnabled()) {
                 LOG.debug("Tracing request: " + request.getUri());
             }
             // trace logic here, potentially performing I/O <2>

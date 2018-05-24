@@ -1,0 +1,4 @@
+The api:http.client.HttpClient[] interface forms the basis for the low-level API. This interfaces declares methods to help ease executing HTTP requests and receive responses.
+
+The majority of the methods in the api:http.client.HttpClient[] interface returns Reactive Streams rs:Publisher[] instances, which is not always the most useful interface to work against, hence a sub-interface called api:http.client.RxHttpClient[] is included that provides a variation of the api:http.client.HttpClient[] interface that returns RxJava rx:Flowable[] types.
+

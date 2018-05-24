@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.naming.NameUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -25,11 +26,12 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * <p>A builder for producing metadata for the available {@link ConfigurationProperties}</p>
+ * <p>A builder for producing metadata for the available {@link io.micronaut.context.annotation.ConfigurationProperties}.</p>
  * <p>
- * <p>This data can then be subsequently written to a format readable by IDEs (like spring-configuration-metadata.json for example).</p>
+ * <p>This data can then be subsequently written to a format readable by IDEs
+ * (like spring-configuration-metadata.json for example).</p>
  *
- * @param <T> The
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -38,10 +40,16 @@ public abstract class ConfigurationMetadataBuilder<T> {
     private final List<PropertyMetadata> properties = new ArrayList<>();
     private final List<ConfigurationMetadata> configurations = new ArrayList<>();
 
+    /**
+     * @return The properties
+     */
     public List<PropertyMetadata> getProperties() {
         return Collections.unmodifiableList(properties);
     }
 
+    /**
+     * @return The configurations
+     */
     public List<ConfigurationMetadata> getConfigurations() {
         return Collections.unmodifiableList(configurations);
     }
@@ -54,18 +62,18 @@ public abstract class ConfigurationMetadataBuilder<T> {
     }
 
     /**
-     * Visit a {@link ConfigurationProperties} class
+     * Visit a {@link io.micronaut.context.annotation.ConfigurationProperties} class.
      *
-     * @param type        The type of the {@link ConfigurationProperties}
+     * @param type        The type of the {@link io.micronaut.context.annotation.ConfigurationProperties}
      * @param description A description
      * @return This {@link ConfigurationMetadata}
      */
     public ConfigurationMetadata visitProperties(T type,
                                                  @Nullable String description) {
 
-        String path = buildTypePath(type);
+        String path = buildTypePath(type, type);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
-        configurationMetadata.name = path;
+        configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = getTypeString(type);
         configurationMetadata.description = description;
         this.configurations.add(configurationMetadata);
@@ -73,16 +81,19 @@ public abstract class ConfigurationMetadataBuilder<T> {
     }
 
     /**
-     * Visit a configuration property
+     * Visit a configuration property.
      *
+     * @param owningType    The type that owns the property
      * @param declaringType The declaring type of the property
      * @param propertyType  The property type
      * @param name          The property name
      * @param description   A description for the property
-     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
+     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers,
+     *                      enums etc.)
      * @return This property metadata
      */
-    public PropertyMetadata visitProperty(T declaringType,
+    public PropertyMetadata visitProperty(T owningType,
+                                          T declaringType,
                                           String propertyType,
                                           String name,
                                           @Nullable String description,
@@ -91,7 +102,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = getTypeString(declaringType);
         metadata.name = name;
-        metadata.path = buildPropertyPath(declaringType, name);
+        metadata.path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
         metadata.type = propertyType;
         metadata.description = description;
         metadata.defaultValue = defaultValue;
@@ -100,12 +111,13 @@ public abstract class ConfigurationMetadataBuilder<T> {
     }
 
     /**
-     * Visit a configuration property on the last declared properties instance
+     * Visit a configuration property on the last declared properties instance.
      *
-     * @param propertyType  The property type
-     * @param name          The property name
-     * @param description   A description for the property
-     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
+     * @param propertyType The property type
+     * @param name         The property name
+     * @param description  A description for the property
+     * @param defaultValue The default value of the property (only used for constant values such as strings, numbers,
+     *                     enums etc.)
      * @return This property metadata or null if no existing configuration is active
      */
     public PropertyMetadata visitProperty(String propertyType,
@@ -113,12 +125,12 @@ public abstract class ConfigurationMetadataBuilder<T> {
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
 
-        if(!configurations.isEmpty()) {
+        if (!configurations.isEmpty()) {
             ConfigurationMetadata last = configurations.get(configurations.size() - 1);
             PropertyMetadata metadata = new PropertyMetadata();
             metadata.declaringType = last.type;
             metadata.name = name;
-            metadata.path = last.name + "." + name;
+            metadata.path = NameUtils.hyphenate(last.name + "." + name, true);
             metadata.type = propertyType;
             metadata.description = description;
             metadata.defaultValue = defaultValue;
@@ -129,11 +141,11 @@ public abstract class ConfigurationMetadataBuilder<T> {
     }
 
     /**
-     * <p>Build a property path for the given declaring type and property name</p>
+     * <p>Build a property path for the given declaring type and property name.</p>
      * <p>
-     * <p>For {@link ConfigurationProperties} that path is a property is established by looking
-     * at the value of the {@link ConfigurationProperties} and then calculating the path based on the
-     * inheritance tree.</p>
+     * <p>For {@link io.micronaut.context.annotation.ConfigurationProperties} that path is a property is
+     * established by looking at the value of the {@link io.micronaut.context.annotation.ConfigurationProperties} and
+     * then calculating the path based on the inheritance tree.</p>
      * <p>
      * <p>For example consider the following classes:</p>
      * <p>
@@ -149,32 +161,42 @@ public abstract class ConfigurationMetadataBuilder<T> {
      *   }
      * </code></pre>
      * <p>
-     * <p>The path of the property {@code foo} will be "parent.foo" whilst the path of the property {@code bar} will be "parent.child.bar" factoring in the class hierarchy</p>
+     * <p>The path of the property {@code foo} will be "parent.foo" whilst the path of the property {@code bar} will
+     * be "parent.child.bar" factoring in the class hierarchy</p>
      * <p>
      * <p>Inner classes hierarchies are also taken into account</p>
      *
+     * @param owningType    The owning type
      * @param declaringType The declaring type
      * @param propertyName  The property name
      * @return The property path
      */
-    protected abstract String buildPropertyPath(T declaringType, String propertyName);
+    protected abstract String buildPropertyPath(T owningType, T declaringType, String propertyName);
 
     /**
-     * Variation of {@link #buildPropertyPath(Object, String)} for types
+     * Variation of {@link #buildPropertyPath(Object, Object, String)} for types.
      *
+     * @param owningType    The owning type
      * @param declaringType The type
      * @return The type path
      */
-    protected abstract String buildTypePath(T declaringType);
+    protected abstract String buildTypePath(T owningType, T declaringType);
 
     /**
-     * Convert the given type to a string
+     * Convert the given type to a string.
      *
      * @param type The type
      * @return The string
      */
     protected abstract String getTypeString(T type);
 
+    /**
+     * Quote a string.
+     *
+     * @param string The string to quote
+     * @return The quoted string
+     */
+    @SuppressWarnings("MagicNumber")
     static String quote(String string) {
         if (string == null || string.length() == 0) {
             return "\"\"";
@@ -229,10 +251,18 @@ public abstract class ConfigurationMetadataBuilder<T> {
         return sb.toString();
     }
 
+    /**
+     * Write a quoted attribute with a value to a writer.
+     *
+     * @param out   The out writer
+     * @param name  The name of the attribute
+     * @param value The value
+     * @throws IOException If an error occurred writing output
+     */
     static void writeAttribute(Writer out, String name, String value) throws IOException {
         out.write('"');
         out.write(name);
         out.write("\":");
-        out.write( quote(value) );
+        out.write(quote(value));
     }
 }

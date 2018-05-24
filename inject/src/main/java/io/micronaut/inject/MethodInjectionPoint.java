@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationSource;
@@ -21,7 +22,7 @@ import io.micronaut.core.type.Executable;
 import java.lang.reflect.Method;
 
 /**
- * Defines an injection point for a method
+ * Defines an injection point for a method.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -47,11 +48,13 @@ public interface MethodInjectionPoint extends CallableInjectionPoint, Executable
      * @return Is this method a post construct method
      */
     boolean isPostConstructMethod();
+
     /**
-     * Invokes the method
+     * Invokes the method.
      *
-     * @param args The arguments. Should match the types of getArguments()
+     * @param instance The instance
+     * @param args     The arguments. Should match the types of getArguments()
      * @return The new value
      */
-    Object invoke(Object instance, Object...args);
+    Object invoke(Object instance, Object... args);
 }

@@ -1,0 +1,21 @@
+Micronaut security classes generate several link:{api}/io/micronaut/context/event/ApplicationEvent.html[ApplicationEvent]s which you can subscribe to.
+|===
+
+| Event Name | Description
+
+| link:{api}/io/micronaut/security/event/LoginFailedEvent.html[LoginFailedEvent] | Triggered when an unsuccessful login takes place.
+
+| link:{api}/io/micronaut/security/event/LoginSuccessfulEvent.html[LoginSuccessfulEvent] | Triggered when a successful login takes place.
+
+| link:{api}/io/micronaut/security/event/LogoutEvent.html[LogoutEvent] | Triggered when the user logs out.
+
+| link:{api}/io/micronaut/security/event/TokenValidatedEvent.html[TokenValidatedEvent] | Triggered when a token is validated.
+
+| link:{api}/io/micronaut/security/token/jwt/event/AccessTokenGeneratedEvent.html[AccessTokenGeneratedEvent] | Triggered when a JWT access token is generated.
+
+| link:{api}/io/micronaut/security/token/jwt/event/RefreshTokenGeneratedEvent.html[RefreshTokenGeneratedEvent] | Triggered when a JWT refresh token is generated.
+
+|===
+
+
+

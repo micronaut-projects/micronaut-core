@@ -1,25 +1,26 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.naming.conventions;
 
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI</p>
+ * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -27,56 +28,67 @@ import java.util.Optional;
 public enum MethodConvention {
 
     /**
-     * The index method of controllers
+     * The index method of controllers.
      */
-    INDEX("","GET"),
+    INDEX("", "GET"),
 
     /**
-     * The show method of controllers
+     * The show method of controllers.
      */
-    SHOW(MethodConvention.ID_PATH,"GET"),
+    SHOW(MethodConvention.ID_PATH, "GET"),
 
     /**
-     * The show method of controllers
+     * The show method of controllers.
      */
-    SAVE("","POST"),
+    SAVE("", "POST"),
 
     /**
-     * The default update method of controllers
+     * The default update method of controllers.
      */
-    UPDATE(MethodConvention.ID_PATH,"PUT"),
+    UPDATE(MethodConvention.ID_PATH, "PUT"),
 
     /**
-     * The default delete method of controllers
+     * The default delete method of controllers.
      */
     DELETE(MethodConvention.ID_PATH),
 
     /**
-     * The default options method of controllers
+     * The default options method of controllers.
      */
     OPTIONS(""),
 
     /**
-     * The default head method of controllers
+     * The default head method of controllers.
      */
     HEAD(""),
 
     /**
-     * The default trace method of controllers
+     * The default trace method of controllers.
      */
     TRACE("");
 
+    /**
+     * Path for the id.
+     */
     public static final String ID_PATH = "{/id}";
+
     private final String lowerCase;
     private final String httpMethod;
     private final String uri;
 
+    /**
+     * @param uri        The URI
+     * @param httpMethod The Http method
+     */
     MethodConvention(String uri, String httpMethod) {
         this.uri = uri;
         this.httpMethod = httpMethod;
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
+    /**
+     * @param uri The URI
+     */
     MethodConvention(String uri) {
         this.uri = uri;
         this.httpMethod = name();
@@ -89,8 +101,9 @@ public enum MethodConvention {
     public String uri() {
         return this.uri;
     }
+
     /**
-     * The HTTP method name for this convention
+     * @return The HTTP method name for this convention.
      */
     public String httpMethod() {
         return httpMethod;
@@ -104,7 +117,7 @@ public enum MethodConvention {
     }
 
     /**
-     * Obtain the method convention for the given method
+     * Obtain the method convention for the given method.
      *
      * @param name The method name
      * @return An optional of the method convention
@@ -116,5 +129,4 @@ public enum MethodConvention {
             return Optional.empty();
         }
     }
-
 }

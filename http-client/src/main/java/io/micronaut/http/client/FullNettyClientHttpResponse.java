@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -45,6 +31,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.codec.http.FullHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,34 +42,41 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
+ * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}.
  *
- * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}
- *
+ * @param <B> The response type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
+public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private final MutableConvertibleValues<Object> attributes;
-    private final io.netty.handler.codec.http.HttpResponse nettyHttpResponse;
+    private final FullHttpResponse nettyHttpResponse;
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
     private final B body;
 
+    /**
+     * @param fullHttpResponse       The full Http response
+     * @param mediaTypeCodecRegistry The media type codec registry
+     * @param byteBufferFactory      The byte buffer factory
+     * @param bodyType               The body type
+     * @param errorStatus            The error status
+     */
     FullNettyClientHttpResponse(
-            FullHttpResponse fullHttpResponse,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
-            Argument<B> bodyType, boolean errorStatus) {
+        FullHttpResponse fullHttpResponse,
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
+        Argument<B> bodyType, boolean errorStatus) {
+
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
@@ -88,14 +84,22 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
-        if(rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
-            this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
-        }
-        else {
+        if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
+            if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
+                Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
+                if (responseBodyType.isPresent()) {
+                    Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
+                    this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
+                } else {
+                    this.body = null;
+                }
+            } else {
+                this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+            }
+        } else {
             this.body = null;
         }
     }
-
 
     @Override
     public String reason() {
@@ -124,53 +128,79 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
-        if (type == null) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
         return getBody(Argument.of(type));
+    }
+
+    /**
+     * @return The Netty native response object
+     */
+    public FullHttpResponse getNativeResponse() {
+        return nettyHttpResponse;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        if (type == null) return Optional.empty();
-        if (!(this.nettyHttpResponse instanceof FullHttpResponse)) return Optional.empty();
+        if (type == null) {
+            return Optional.empty();
+        }
 
-        io.netty.handler.codec.http.FullHttpResponse fullResponse = (FullHttpResponse) this.nettyHttpResponse;
         if (type.getType() == ByteBuffer.class) {
-            return Optional.of((T) byteBufferFactory.wrap(fullResponse.content()));
+            return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
         }
 
         if (type.getType() == ByteBuf.class) {
-            return Optional.of((T) (fullResponse.content()));
+            return Optional.of((T) (nettyHttpResponse.content()));
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-                    Optional<B> existing = getBody();
-                    if (existing.isPresent()) {
-                        return getBody().flatMap(b -> {
-                            if (b instanceof ByteBuffer) {
-                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
-                                return convertByteBuf(bytebuf, argument);
-                            }
-                            return ConversionService.SHARED.convert(b, ConversionContext.of(type));
-                        });
-                    } else {
-                        ByteBuf content = fullResponse.content();
-                        return convertByteBuf(content, type);
-                    }
+                Optional<B> existing = getBody();
+                if (existing.isPresent()) {
+                    return getBody().flatMap(b -> {
+                        if (b instanceof ByteBuffer) {
+                            ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                            return convertByteBuf(bytebuf, argument);
+                        }
+                        Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
+                        if (!converted.isPresent()) {
+                            ByteBuf content = nettyHttpResponse.content();
+                            return convertByteBuf(content, type);
+                        }
+                        return converted;
+                    });
+                } else {
+                    ByteBuf content = nettyHttpResponse.content();
+                    return convertByteBuf(content, type);
                 }
+            }
 
         );
-        if(LOG.isTraceEnabled() && !result.isPresent()) {
+        if (LOG.isTraceEnabled() && !result.isPresent()) {
             LOG.trace("Unable to convert response body to target type {}", type.getType());
         }
         return result;
     }
 
+    private boolean isParseableBodyType(Class<?> rawBodyType) {
+        return CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType);
+    }
+
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
-            if(LOG.isTraceEnabled()) {
+            if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
+            }
+            if (!convertedBodies.isEmpty()) {
+                for (Map.Entry<Argument, Optional> entry : convertedBodies.entrySet()) {
+                    Argument existing = entry.getKey();
+                    if (type.getType().isAssignableFrom(existing.getType())) {
+                        return entry.getValue();
+                    }
+                }
             }
             return Optional.empty();
         }
@@ -186,8 +216,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                     return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
                 }
             }
-        }
-        else if(!hasContentType && LOG.isTraceEnabled()) {
+        } else if (!hasContentType && LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion

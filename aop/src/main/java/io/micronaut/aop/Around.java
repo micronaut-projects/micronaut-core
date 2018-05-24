@@ -1,22 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.aop;
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Type;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.Executable;
 
 import java.lang.annotation.Documented;
@@ -24,10 +25,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice</p>
+ * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice.</p>
  *
  * <p>Around advice decorates a method invocation such that the method can be intercepted via a {@link MethodInterceptor}</p>
  *
@@ -42,7 +41,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *   }
  * </code></pre>
  *
- * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link Type} must implement {@link MethodInterceptor}</p>
+ * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link io.micronaut.context.annotation.Type} must implement {@link MethodInterceptor}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -62,17 +61,17 @@ public @interface Around {
      *
      * <p>Generated subclasses will implement {@link InterceptedProxy} if this attribute is set to true</p>
      *
-     * @see InterceptedProxy
      * @return True if the original implementation should be proxied. Defaults to false.
+     * @see InterceptedProxy
      */
     boolean proxyTarget() default false;
 
     /**
      * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the of <code>hotswap</code> to true
-     * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface</p>
+     * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface.</p>
      *
-     * @see HotSwappableInterceptedProxy
      * @return True if the proxy should allow hotswap
+     * @see HotSwappableInterceptedProxy
      */
     boolean hotswap() default false;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.health;
 
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -33,7 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 
 /**
- * A Health Indicator for Redis
+ * A Health Indicator for Redis.
  *
  * @author graemerocher
  * @since 1.0
@@ -42,11 +43,19 @@ import java.util.Collections;
 @Requires(classes = HealthIndicator.class)
 public class RedisHealthIndicator implements HealthIndicator {
     public static final String NAME = "redis";
+    private static final int TIMEOUT_SECONDS = 3;
+    private static final int RETRY = 3;
     private final BeanContext beanContext;
     private final HealthAggregator<?> healthAggregator;
     private final StatefulRedisConnection[] connections;
 
-    public RedisHealthIndicator(BeanContext beanContext, HealthAggregator<?> healthAggregator, StatefulRedisConnection...connections) {
+    /**
+     * Constructor.
+     * @param beanContext beanContext
+     * @param healthAggregator healthAggregator
+     * @param connections connections
+     */
+    public RedisHealthIndicator(BeanContext beanContext, HealthAggregator<?> healthAggregator, StatefulRedisConnection... connections) {
         this.beanContext = beanContext;
         this.healthAggregator = healthAggregator;
         this.connections = connections;
@@ -58,35 +67,32 @@ public class RedisHealthIndicator implements HealthIndicator {
         Flux<BeanRegistration<StatefulRedisConnection>> redisClients = Flux.fromIterable(registrations);
 
         Flux<HealthResult> healthResultFlux = redisClients.flatMap(registration -> {
-            StatefulRedisConnection<String,String> connection = registration.getBean();
-                String dbName = "redis(" + registration.getIdentifier().getName() + ")";
+            StatefulRedisConnection<String, String> connection = registration.getBean();
+            String dbName = "redis(" + registration.getIdentifier().getName() + ")";
             Mono<String> pingCommand = connection.reactive().ping();
-            pingCommand = pingCommand.timeout(Duration.ofSeconds(3)).retry(3);
+            pingCommand = pingCommand.timeout(Duration.ofSeconds(TIMEOUT_SECONDS)).retry(RETRY);
             return pingCommand.map(s -> {
-                    if (s.equalsIgnoreCase("pong")) {
-                        return HealthResult
-                                .builder(dbName, HealthStatus.UP)
-                                .build();
-                    }
+                if (s.equalsIgnoreCase("pong")) {
                     return HealthResult
-                            .builder(dbName, HealthStatus.DOWN)
-                            .details(Collections.singletonMap("message", "Unexpected response: " + s))
-                            .build();
-
-                }).onErrorResume(throwable ->
-                        Mono.just(HealthResult
-                                .builder(dbName, HealthStatus.DOWN)
-                                .exception(throwable)
-                                .build()
-                        )
-                );
-
-
+                        .builder(dbName, HealthStatus.UP)
+                        .build();
+                }
+                return HealthResult
+                    .builder(dbName, HealthStatus.DOWN)
+                    .details(Collections.singletonMap("message", "Unexpected response: " + s))
+                    .build();
+            }).onErrorResume(throwable ->
+                Mono.just(HealthResult
+                    .builder(dbName, HealthStatus.DOWN)
+                    .exception(throwable)
+                    .build()
+                )
+            );
         });
 
         return this.healthAggregator.aggregate(
-                NAME,
-                healthResultFlux
+            NAME,
+            healthResultFlux
         );
     }
 }

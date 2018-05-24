@@ -1,0 +1,16 @@
+Kubernetes is a container runtime which has a whole bunch of features including integrated Service Discovery. The https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables[strategy for Service Discovery in Kubernetes] is pretty simple in that for each Pod, Kubernetes will expose environment variables in the format `[SERVICE_NAME]_SERVICE_HOST` and `[SERVICE_NAME]_SERVICE_PORT`.
+
+Micronaut features a api:discovery.kubernetes.KubernetesDiscoveryClient[] that simply looks at the environment variables and translates those into the available services.
+
+For example given a service exposed as `HELLO_WORLD_SERVICE_HOST` to your application, you can declare clients that will be automatically discovered using:
+
+.Using @Client to Discover Services
+[source,java]
+----
+@Client(id = "hello-world")
+interface HelloClient{
+    ...
+}
+----
+
+Since Kubernetes itself assumes responsibility for tasks such as health checks, load balancing and so on there is no need to send api:health.HeartbeatEvent[] instances and so on.

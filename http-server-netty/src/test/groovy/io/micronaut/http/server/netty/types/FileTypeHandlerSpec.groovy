@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty.types
 
 import io.micronaut.context.annotation.Requires
@@ -59,7 +74,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        rxClient.exchange('/test/notFound', String).blockingFirst()
+        rxClient.exchange('/test/not-found', String).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -69,7 +84,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body() == '{"_links":{},"_embedded":{},"message":"Internal Server Error: Could not find file"}'
+        response.body() == '{"message":"Internal Server Error: Could not find file"}'
     }
 
     void "test when an attached file is returned"() {
@@ -89,7 +104,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test/differentName', String).blockingFirst()
+        def response = rxClient.exchange('/test/different-name', String).blockingFirst()
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code

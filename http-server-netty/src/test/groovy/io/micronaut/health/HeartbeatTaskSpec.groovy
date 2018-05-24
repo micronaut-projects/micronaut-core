@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,8 @@ package io.micronaut.health
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -31,6 +30,7 @@ import javax.inject.Singleton
  */
 class HeartbeatTaskSpec extends Specification {
 
+    @IgnoreIf({System.getenv('TRAVIS')})
     void "test that by default a heartbeat is sent"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -39,7 +39,7 @@ class HeartbeatTaskSpec extends Specification {
                 'micronaut.application.name':'test'
         ])
         HeartbeatListener listener = embeddedServer.getApplicationContext().getBean(HeartbeatListener)
-        PollingConditions conditions = new PollingConditions(delay: 0.5)
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
 
         then:
         conditions.eventually {

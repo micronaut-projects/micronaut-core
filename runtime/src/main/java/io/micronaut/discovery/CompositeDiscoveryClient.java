@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
-import io.micronaut.cache.CacheConfiguration;
-import io.micronaut.core.util.ArrayUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -29,17 +29,20 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A composite implementation combining all registered {@link DiscoveryClient} instances
+ * A composite implementation combining all registered {@link DiscoveryClient} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
-    static final String SETTINGS_CACHE_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
-
     private final DiscoveryClient[] discoveryClients;
 
+    /**
+     * Construct the CompositeDiscoveryClient from all discovery clients.
+     *
+     * @param discoveryClients The service discovery clients
+     */
     protected CompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         this.discoveryClients = discoveryClients;
     }
@@ -51,10 +54,12 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
-        if(ArrayUtils.isEmpty(discoveryClients)) {
+        serviceId = NameUtils.hyphenate(serviceId);
+        if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
-        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(serviceId)));
+        String finalServiceId = serviceId;
+        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(finalServiceId)));
         Maybe<List<ServiceInstance>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((instances, otherInstances) -> {
             instances.addAll(otherInstances);
             return instances;
@@ -64,7 +69,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public Flowable<List<String>> getServiceIds() {
-        if(ArrayUtils.isEmpty(discoveryClients)) {
+        if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flowable.just(Collections.emptyList());
         }
         Stream<Flowable<List<String>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getServiceIds()));
@@ -84,6 +89,6 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public String toString() {
-        return "compositeDiscoveryClient("+Arrays.stream(discoveryClients).map(DiscoveryClient::getDescription).collect(Collectors.joining(",")) +")";
+        return "compositeDiscoveryClient(" + Arrays.stream(discoveryClients).map(DiscoveryClient::getDescription).collect(Collectors.joining(",")) + ")";
     }
 }

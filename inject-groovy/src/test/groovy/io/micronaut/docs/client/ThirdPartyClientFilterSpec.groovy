@@ -1,7 +1,20 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Value
 import io.reactivex.Flowable
 import io.reactivex.functions.Consumer
 
@@ -59,7 +72,7 @@ class ThirdPartyClientFilterSpec extends Specification {
             'bintray.token': token,
             'bintray.organization': 'grails',
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     def "a client filter is applied to the request and adds the authorization header"() {
         given:
@@ -97,20 +110,22 @@ class ThirdPartyClientFilterSpec extends Specification {
 //tag::bintrayService[]
 @Singleton
 class BintrayService {
+    final RxHttpClient client
+    final String org
 
-    @Inject
-    @Client(BintrayApi.URL)
-    RxHttpClient client
-
-    @Value('${bintray.organization}')
-    String org
+    BintrayService(
+            @Client(BintrayApi.URL) RxHttpClient client,           // <1>
+            @Value('${bintray.organization}') String org ) {
+        this.client = client
+        this.org = org
+    }
 
     Flowable<HttpResponse<String>> fetchRepositories() {
-        client.exchange(HttpRequest.GET("/repos/$org"), String)
+        return client.exchange(HttpRequest.GET("/repos/$org"), String) // <2>
     }
 
     Flowable<HttpResponse<String>> fetchPackages(String repo) {
-        client.exchange(HttpRequest.GET("/repos/${org}/${repo}/packages"), String)
+        return client.exchange(HttpRequest.GET("/repos/${org}/${repo}/packages"), String) // <2>
     }
 }
 //end::bintrayService[]
@@ -119,18 +134,22 @@ class BintrayService {
 @Filter('/repos/**') // <1>
 class BintrayFilter implements HttpClientFilter {
 
-    @Value('${bintray.username}')
-    String username
 
-    @Value('${bintray.token}')
-    String token
+    final String username
+    final String token
+
+    BintrayFilter(
+            @Value('${bintray.username}') String username, // <2>
+            @Value('${bintray.token}') String token ) { // <2>
+        this.username = username
+        this.token = token
+    }
 
     @Override
     Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-        String encoded = "$username:$token".bytes.encodeBase64()
-        String authorization = "Basic $encoded".toString()
-        request.header('Authorization', authorization)
-        chain.proceed(request)
+        return chain.proceed(
+                request.basicAuth(username, token) // <3>
+        )
     }
 }
 //end::bintrayFilter[]

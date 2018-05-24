@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.metadata;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -21,7 +22,7 @@ import java.util.Map;
 
 /**
  * Strategy interface for classes to contribute to {@link io.micronaut.discovery.ServiceInstance} metadata
- * when registering an instance with a discovery service
+ * when registering an instance with a discovery service.
  *
  * @author graemerocher
  * @since 1.0
@@ -29,7 +30,7 @@ import java.util.Map;
 public interface ServiceInstanceMetadataContributor {
 
     /**
-     * Contribute metadata to the given {@link ServiceInstance} prior to registration
+     * Contribute metadata to the given {@link ServiceInstance} prior to registration.
      *
      * @param instance The instance
      * @param metadata The metadata

@@ -1,20 +1,20 @@
 dependencies {
     compileOnly project(":inject-java")
     compile project(":configurations:netflix-archaius")
-    compile "com.netflix.hystrix:hystrix-core:$hystrixVersion"
+    compile dependencyVersion("hystrix")
 
-    compile "com.netflix.hystrix:hystrix-serialization:$hystrixVersion", {
+    compile dependencyModuleVersion("hystrix","hystrix-serialization"), {
         exclude group:"com.fasterxml.jackson.module", module:'jackson-module-afterburner'
         exclude group:"com.fasterxml.jackson.core", module:'jackson-core'
         exclude group:"com.fasterxml.jackson.core", module:'jackson-databind'
         exclude group:"com.fasterxml.jackson.core", module:'jackson-annotations'
     }
 
-    runtime "com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion"
+    runtime dependencyVersion("jackson.modules")
 
-    runtime "io.reactivex:rxjava:$rxJava1Version"
+    runtime dependencyVersion("rxjava1")
     runtime project(":runtime")
-    runtime "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
+    runtime dependencyVersion("rxjava1.interop")
 
     testCompile project(":discovery-client")
     testCompile project(":inject-groovy")

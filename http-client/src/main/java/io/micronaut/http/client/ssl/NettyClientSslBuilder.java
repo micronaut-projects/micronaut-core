@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
@@ -24,10 +25,6 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.SslBuilder;
-import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -38,8 +35,8 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * The Netty implementation of {@link SslBuilder} that generates
- * an {@link SslContext} to create a client that supports SSL.
+ * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a client that
+ * supports SSL.
  *
  * @author James Kleeh
  * @since 1.0
@@ -47,27 +44,39 @@ import java.util.Optional;
 @Singleton
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
+    /**
+     * @param ssl              The SSL configuration
+     * @param resourceResolver The resouce resolver
+     */
     public NettyClientSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
-    @Inject public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
+    /**
+     * @param ssl The SSL configuration
+     */
+    @Inject
+    public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
         super(ssl, new ResourceResolver());
     }
 
+    /**
+     * @return The SSL configuration
+     */
     public SslConfiguration getSslConfiguration() {
         return ssl;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build() {
         if (!ssl.isEnabled()) {
             return Optional.empty();
         }
         SslContextBuilder sslBuilder = SslContextBuilder
-                .forClient()
-                .keyManager(getKeyManagerFactory())
-                .trustManager(getTrustManagerFactory());
+            .forClient()
+            .keyManager(getKeyManagerFactory())
+            .trustManager(getTrustManagerFactory());
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
@@ -98,8 +107,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             } else {
                 return null;
             }
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             throw new SslConfigurationException(ex);
         }
     }
@@ -112,10 +120,8 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             } else {
                 return InsecureTrustManagerFactory.INSTANCE;
             }
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             throw new SslConfigurationException(ex);
         }
     }
-
 }

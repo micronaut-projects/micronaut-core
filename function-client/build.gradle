@@ -1,11 +1,15 @@
 dependencies {
     compile project(":function")
     compile project(":http-client")
+    compile project(":configurations:aws-common")
     compileOnly project(":inject-java")
     compileOnly project(":function-aws")
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
+    testCompile project(":http-server-netty")
     testCompile project(":function-aws")
+    testCompile project(":function-web")
+    testCompile project(":function-groovy")
     testCompile project(":inject-groovy")
     testCompile group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

@@ -2,7 +2,7 @@ Since Micronaut dependency injection is based on annotation processors and doesn
 
 This allows you to use the same application framework for both your Android client and server implementation.
 
-### Configuring Your Android Build
+== Configuring Your Android Build
 
 To get started you must add the Micronaut annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
 
@@ -37,7 +37,7 @@ You can find more information on https://developer.android.com/studio/build/grad
 
 NOTE: Micronaut `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
 
-### Enabling Dependency Injection
+== Enabling Dependency Injection
 
 Once you have configured the classpath correctly, the next step is start the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
 

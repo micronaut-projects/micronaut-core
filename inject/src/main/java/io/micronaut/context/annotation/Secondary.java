@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import javax.inject.Qualifier;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * <p>Counter part to {@link Primary} that allows reducing the priority of a given bean for the purposes of dependency injection</p>
+ * <p>Counter part to {@link Primary} that allows reducing the priority of a given bean for the purposes of dependency
+ * injection.</p>
  *
  * @author Graeme Rocher
  * @see Qualifier @Qualifier

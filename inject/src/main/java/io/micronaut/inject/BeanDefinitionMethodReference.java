@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,28 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 /**
- * An interface for a {@link ExecutableMethod} that is associated with a {@link BeanDefinitionReference}
+ * An interface for a {@link ExecutableMethod} that is associated with a {@link BeanDefinitionReference}.
  *
+ * @param <T> The type
+ * @param <R> The result type
  * @author graemerocher
  * @since 1.0
  */
-public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T,R> {
+public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T, R> {
 
     /**
-     * @return The {@link BeanDefinition} associated with this method
+     * @return The {@link BeanDefinition} associated with this method.
      */
     BeanDefinition<T> getBeanDefinition();
 
     /**
-     * Create a {@link BeanDefinitionMethodReference} for the given {@link BeanDefinition} and {@link ExecutableMethod}
+     * Create a {@link BeanDefinitionMethodReference} for the given {@link BeanDefinition} and {@link ExecutableMethod}.
      *
      * @param definition The definition
-     * @param method The method
-     * @param <T1>
-     * @param <R1>
+     * @param method     The method
+     * @param <T1>       The type
+     * @param <R1>       The result
      * @return The {@link BeanDefinitionMethodReference}
      */
     static <T1, R1> BeanDefinitionMethodReference<T1, R1> of(BeanDefinition<T1> definition, ExecutableMethod<T1, R1> method) {

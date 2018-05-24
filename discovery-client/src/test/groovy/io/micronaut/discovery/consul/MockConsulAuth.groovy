@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,17 +26,6 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.annotation.Value
-import io.micronaut.core.async.publisher.Publishers
-import io.micronaut.core.util.Toggleable
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.filter.HttpServerFilter
-import io.micronaut.http.filter.ServerFilterChain
 import org.reactivestreams.Publisher
 
 /**
@@ -44,12 +33,12 @@ import org.reactivestreams.Publisher
  * @since 1.0
  */
 @Filter('/v1/**')
-@Requires('consul.client.aslToken')
+@Requires('consul.client.asl-token')
 class MockConsulAuth implements HttpServerFilter, Toggleable{
 
     final Optional<String> token
 
-    MockConsulAuth(@Value('${consul.client.aslToken}') Optional<String> token) {
+    MockConsulAuth(@Value('${consul.client.asl-token}') Optional<String> token) {
         this.token = token
     }
 

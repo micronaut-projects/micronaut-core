@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
@@ -24,10 +25,6 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.SslBuilder;
-import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
@@ -36,8 +33,8 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * The Netty implementation of {@link SslBuilder} that generates
- * an {@link SslContext} to create a server handler with to support SSL.
+ * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handler
+ * with to support SSL.
  *
  * @author James Kleeh
  * @since 1.0
@@ -45,14 +42,22 @@ import java.util.Optional;
 @Singleton
 public class NettyServerSslBuilder extends SslBuilder<SslContext> {
 
+    /**
+     * @param ssl              The SSL configuration
+     * @param resourceResolver The resource resolver
+     */
     public NettyServerSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
+    /**
+     * @return The SSL configuration
+     */
     public SslConfiguration getSslConfiguration() {
         return ssl;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build() {
         if (!ssl.isEnabled()) {
@@ -67,8 +72,9 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
             }
         }
         SslContextBuilder sslBuilder = SslContextBuilder
-                .forServer(getKeyManagerFactory())
-                .trustManager(getTrustManagerFactory());
+            .forServer(getKeyManagerFactory())
+            .trustManager(getTrustManagerFactory());
+
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }

@@ -1,29 +1,28 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.CookieFactory;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.http.cookie.CookieFactory;
 
 import java.util.Optional;
 
 /**
- * A factory interface for creating {@link MutableHttpResponse} instances
+ * A factory interface for creating {@link MutableHttpResponse} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,17 +30,14 @@ import java.util.Optional;
 public interface HttpResponseFactory {
 
     /**
-     * The default {@link CookieFactory} instance
+     * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
      */
     Optional<HttpResponseFactory> INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
-            .firstOr("io.micronaut.http.server.netty.NettyHttpResponseFactory",
-                      HttpResponseFactory.class.getClassLoader()
-            )
-            .map(ServiceDefinition::load);
-
+        .firstOr("io.micronaut.http.server.netty.NettyHttpResponseFactory", HttpResponseFactory.class.getClassLoader())
+        .map(ServiceDefinition::load);
 
     /**
-     * Creates an {@link HttpStatus#OK} response with a body
+     * Creates an {@link HttpStatus#OK} response with a body.
      *
      * @param body The body
      * @param <T>  The body type
@@ -50,24 +46,27 @@ public interface HttpResponseFactory {
     <T> MutableHttpResponse<T> ok(T body);
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
      * @param reason An alternatively reason message
+     * @param <T>    The response type
      * @return The response
      */
     <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
-     * @param body The body
+     * @param body   The body
+     * @param <T>    The body type
      * @return The response
      */
     <T> MutableHttpResponse<T> status(HttpStatus status, T body);
 
     /**
+     * @param <T> The response type
      * @return The ok response
      */
     default <T> MutableHttpResponse<T> ok() {
@@ -76,10 +75,10 @@ public interface HttpResponseFactory {
 
     /**
      * @param status The status
+     * @param <T>    The response type
      * @return The restus response
      */
     default <T> MutableHttpResponse<T> status(HttpStatus status) {
         return status(status, null);
     }
-
 }

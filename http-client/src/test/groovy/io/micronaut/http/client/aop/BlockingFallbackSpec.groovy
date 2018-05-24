@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
@@ -37,9 +36,14 @@ import java.util.concurrent.atomic.AtomicLong
  * @since 1.0
  */
 class BlockingFallbackSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test that fallback is called when an exception happens invoking the server"() {
         given:
@@ -111,7 +115,6 @@ class BlockingFallbackSpec extends Specification {
     }
 
     @Controller("/blocking/fallback/books")
-    @Singleton
     static class BookController implements BookApi {
 
         @Override

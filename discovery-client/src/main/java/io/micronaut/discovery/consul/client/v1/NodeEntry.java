@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.net.InetAddress;
@@ -33,6 +33,7 @@ import java.util.Optional;
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class NodeEntry {
+
     private final String node;
     private final InetAddress address;
     private String datacenter;
@@ -40,8 +41,9 @@ public class NodeEntry {
     private Map<String, String> nodeMetadata;
 
     /**
-     * Create a new catalog entry
-     * @param nodeId The node ID
+     * Create a new catalog entry.
+     *
+     * @param nodeId  The node ID
      * @param address The node address
      */
     @JsonCreator
@@ -50,33 +52,59 @@ public class NodeEntry {
         this.address = address;
     }
 
-
     /**
-     * https://www.consul.io/api/catalog.html#taggedaddresses
+     * See https://www.consul.io/api/catalog.html#taggedaddresses.
      *
      * @return The tagged addresses
      */
     public Map<String, String> getTaggedAddresses() {
-        if(taggedAddresses == null) {
+        if (taggedAddresses == null) {
             return Collections.emptyMap();
         }
         return taggedAddresses;
     }
 
     /**
-     * https://www.consul.io/api/catalog.html#nodemeta
+     * See https://www.consul.io/api/catalog.html#taggedaddresses.
+     *
+     * @param taggedAddresses The tagged addresses
+     */
+    public void setTaggedAddresses(Map<String, String> taggedAddresses) {
+        this.taggedAddresses = taggedAddresses;
+    }
+
+    /**
+     * See https://www.consul.io/api/catalog.html#nodemeta.
      *
      * @return The node metadata
      */
     public Map<String, String> getNodeMetadata() {
-        if(nodeMetadata == null) {
+        if (nodeMetadata == null) {
             return Collections.emptyMap();
         }
         return nodeMetadata;
     }
 
     /**
-     * https://www.consul.io/api/catalog.html#node
+     * @param nodeMetadata The node metadata
+     * @return The {@link NodeEntry} instance
+     */
+    public NodeEntry nodeMetadata(Map<String, String> nodeMetadata) {
+        this.nodeMetadata = nodeMetadata;
+        return this;
+    }
+
+    /**
+     * See https://www.consul.io/api/catalog.html#nodemeta.
+     *
+     * @param nodeMetadata The node metadata
+     */
+    public void setNodeMetadata(Map<String, String> nodeMetadata) {
+        this.nodeMetadata = nodeMetadata;
+    }
+
+    /**
+     * See https://www.consul.io/api/catalog.html#node.
      *
      * @return The node ID
      */
@@ -85,7 +113,7 @@ public class NodeEntry {
     }
 
     /**
-     * https://www.consul.io/api/catalog.html#address
+     * See https://www.consul.io/api/catalog.html#address.
      *
      * @return The node address
      */
@@ -94,7 +122,7 @@ public class NodeEntry {
     }
 
     /**
-     * https://www.consul.io/api/catalog.html#datacenter
+     * See https://www.consul.io/api/catalog.html#datacenter.
      *
      * @return The data center to use
      */
@@ -102,35 +130,32 @@ public class NodeEntry {
         return Optional.ofNullable(datacenter);
     }
 
-    public NodeEntry datacenter(String datacenter) {
-        if(StringUtils.isNotEmpty(datacenter))
-            this.datacenter = datacenter;
-        return this;
-    }
-
-    public NodeEntry taggedAddresses(Map<String, String> taggedAddresses) {
-        this.taggedAddresses = taggedAddresses;
-        return this;
-    }
-
-    public NodeEntry nodeMetadata(Map<String, String> nodeMetadata) {
-        this.nodeMetadata = nodeMetadata;
-        return this;
-    }
-
+    /**
+     * See https://www.consul.io/api/catalog.html#datacenter.
+     *
+     * @param datacenter The data center to use
+     */
     public void setDatacenter(String datacenter) {
         this.datacenter = datacenter;
     }
 
-    public void setTaggedAddresses(Map<String, String> taggedAddresses) {
+    /**
+     * @param datacenter The datacenter
+     * @return The {@link NodeEntry} instance
+     */
+    public NodeEntry datacenter(String datacenter) {
+        if (StringUtils.isNotEmpty(datacenter)) {
+            this.datacenter = datacenter;
+        }
+        return this;
+    }
+
+    /**
+     * @param taggedAddresses The tagged addresses
+     * @return The {@link NodeEntry} instance
+     */
+    public NodeEntry taggedAddresses(Map<String, String> taggedAddresses) {
         this.taggedAddresses = taggedAddresses;
-    }
-
-    public void setNodeMetadata(Map<String, String> nodeMetadata) {
-        this.nodeMetadata = nodeMetadata;
-    }
-
-    public void setMeta(Map<String, String> nodeMetadata) {
-        this.nodeMetadata = nodeMetadata;
+        return this;
     }
 }
