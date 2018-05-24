@@ -189,6 +189,9 @@ security:
     logout: Logout Controller
     refresh: Refresh Controller
   securityEvents: Security Events
+spring:
+  title: Micronaut And Spring
+  micronautBeans: Adding Micronaut Beans To A Spring Context
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
