@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
-
-
-import io.micronaut.core.util.StringUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.Optional;
 
 /**
- * A {@link ClassWriterOutputVisitor} that writes to a target target directory
+ * A {@link ClassWriterOutputVisitor} that writes to a target target directory.
  *
  * @author graemerocher
  * @since 1.0
@@ -34,6 +32,9 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
 
     private final File targetDir;
 
+    /**
+     * @param targetDir The target directory
+     */
     public DirectoryClassWriterOutputVisitor(File targetDir) {
         this.targetDir = targetDir;
     }
@@ -49,11 +50,11 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path)  {
+    public Optional<GeneratedFile> visitMetaInfFile(String path) {
         return Optional.ofNullable(targetDir).map(root ->
-                new FileBackedGeneratedFile(
-                    new File(root, "META-INF" + File.separator + path)
-                )
+            new FileBackedGeneratedFile(
+                new File(root, "META-INF" + File.separator + path)
+            )
         );
     }
 

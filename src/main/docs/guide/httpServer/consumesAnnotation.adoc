@@ -6,4 +6,4 @@ include::{testshttpservernetty}/consumes/TestController.groovy[tags=clazz, inden
 ----
 
 <1> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
-<1> By default, a controller's action consumes request with `Content-Type` of type `application-json`.
+<2> By default, a controller's action consumes request with `Content-Type` of type `application-json`.

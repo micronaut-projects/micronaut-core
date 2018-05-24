@@ -31,6 +31,7 @@ import io.micronaut.configurations.aws.AWSConfiguration;
 import io.micronaut.configurations.aws.EnvironmentAWSCredentialsProvider;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
 
@@ -44,6 +45,7 @@ import javax.inject.Inject;
  * @since 1.0
  */
 @ConfigurationProperties(AWSLambdaConfiguration.PREFIX)
+@Requires(classes = AWSLambdaAsyncClientBuilder.class)
 public class AWSLambdaConfiguration {
 
     /**

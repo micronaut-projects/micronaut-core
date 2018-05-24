@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 
 /**
- * An event fired once startup is complete
+ * An event fired once startup is complete.
  *
  * @author Graeme Rocher
  * @since 1.0

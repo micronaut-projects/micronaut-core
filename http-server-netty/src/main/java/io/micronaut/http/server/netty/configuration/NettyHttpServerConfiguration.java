@@ -17,9 +17,11 @@
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
+import io.netty.handler.logging.LogLevel;
 
 import javax.inject.Inject;
 import java.util.Collections;
@@ -40,6 +42,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected Map<ChannelOption, Object> options = Collections.emptyMap();
     protected Worker worker;
     protected Parent parent;
+    @ReadableBytes
+    protected int maxInitialLineLength = 4096;
+    @ReadableBytes
+    protected int maxHeaderSize = 8192;
+    @ReadableBytes
+    protected int maxChunkSize = 8192;
+    protected boolean chunkedSupported = true;
+    protected boolean validateHeaders = true;
+    protected int initialBufferSize = 128;
+    protected LogLevel logLevel;
 
     /**
      * Default empty constructor.
@@ -53,6 +65,68 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+    }
+
+    /**
+     * The server {@link LogLevel} to enable
+     * @return The server {@link LogLevel} to enable
+     */
+    public Optional<LogLevel> getLogLevel() {
+        return Optional.ofNullable(logLevel);
+    }
+
+    /**
+     * The maximum length of the initial HTTP request line. Defaults to 4096.
+     *
+     * @return The maximum length of the initial HTTP request line
+     */
+    public int getMaxInitialLineLength() {
+        return maxInitialLineLength;
+    }
+
+    /**
+     * The maximum size of an individual HTTP setter. Defaults to 8192.
+     *
+     * @return The maximum size of an individual HTTP setter
+     */
+    public int getMaxHeaderSize() {
+        return maxHeaderSize;
+    }
+
+    /**
+     * The maximum chunk size. Defaults to 8192.
+     *
+     * @return The maximum chunk size
+     */
+    public int getMaxChunkSize() {
+        return maxChunkSize;
+    }
+
+    /**
+     * Whether chunked requests are supported.
+     *
+     * @return Whether chunked requests are supported.
+     */
+    public boolean isChunkedSupported() {
+        return chunkedSupported;
+    }
+
+    /**
+     * Whether to validate headers.
+     *
+     * @return Whether to validate headers
+     */
+    public boolean isValidateHeaders() {
+        return validateHeaders;
+    }
+
+    /**
+     * The initial buffer size. Defaults to 128.
+     *
+     * @return The initial buffer size.
+     */
+    public int getInitialBufferSize() {
+        return initialBufferSize;
     }
 
     /**

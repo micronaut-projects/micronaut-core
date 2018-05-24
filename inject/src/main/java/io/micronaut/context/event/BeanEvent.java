@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
 
 /**
- * An abstract bean event
+ * An abstract bean event.
  *
+ * @param <T> The event type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -29,6 +31,11 @@ public abstract class BeanEvent<T> extends BeanContextEvent {
     protected final BeanDefinition<T> beanDefinition;
     protected final T bean;
 
+    /**
+     * @param beanContext    The bean context
+     * @param beanDefinition The bean definition
+     * @param bean           The bean
+     */
     public BeanEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
         super(beanContext);
         this.beanDefinition = beanDefinition;

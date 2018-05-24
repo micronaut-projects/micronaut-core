@@ -30,8 +30,13 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ParameterSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive parameter"() {
         given:

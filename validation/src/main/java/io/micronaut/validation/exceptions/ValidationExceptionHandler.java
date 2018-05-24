@@ -19,8 +19,8 @@ package io.micronaut.validation.exceptions;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
-import io.micronaut.http.hateos.VndError;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
@@ -36,12 +36,12 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(classes = ValidationException.class)
-public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<VndError>> {
+public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<JsonError>> {
 
     @Override
-    public HttpResponse<VndError> handle(HttpRequest request, ValidationException exception) {
+    public HttpResponse<JsonError> handle(HttpRequest request, ValidationException exception) {
         Errors errors = exception.getErrors();
-        VndError error = new VndError(exception.getMessage());
+        JsonError error = new JsonError(exception.getMessage());
         FieldError fieldError = errors.getFieldError();
         if (fieldError != null) {
             error.path(fieldError.getField());

@@ -26,7 +26,6 @@ import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
 
-import javax.lang.model.element.TypeElement
 import java.util.function.Function
 
 /**

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -28,8 +29,9 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import java.util.Optional;
 
 /**
- * Wrapper object for a {@link StreamedHttpResponse}
+ * Wrapper object for a {@link StreamedHttpResponse}.
  *
+ * @param <B> The response body type
  * @author graemerocher
  * @since 1.0
  */
@@ -42,12 +44,18 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
     private B body;
     private MutableConvertibleValues<Object> attributes;
 
+    /**
+     * @param response The streamed Http response
+     */
     NettyStreamedHttpResponse(StreamedHttpResponse response) {
         this.nettyResponse = response;
         this.status = HttpStatus.valueOf(response.status().code());
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
     }
 
+    /**
+     * @return The streamed Http response
+     */
     public StreamedHttpResponse getNettyResponse() {
         return nettyResponse;
     }
@@ -74,7 +82,8 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    this.attributes = attributes = new MutableConvertibleValuesMap<>();
+                    attributes = new MutableConvertibleValuesMap<>();
+                    this.attributes = attributes;
                 }
             }
         }
@@ -82,7 +91,7 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
     }
 
     /**
-     * Sets the body
+     * Sets the body.
      *
      * @param body The body
      */

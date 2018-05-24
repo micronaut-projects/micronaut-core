@@ -44,7 +44,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Delegates to Netty's {@link FullHttpResponse}
+ * Delegates to Netty's {@link FullHttpResponse}.
  *
  * @param <B> The response body
  * @author Graeme Rocher
@@ -72,12 +72,6 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.conversionService = conversionService;
     }
 
-    @Override
-    public String toString() {
-        HttpStatus status = getStatus();
-        return status.getCode() + " " + status.getReason();
-    }
-
     /**
      * @param conversionService The conversion service
      */
@@ -87,6 +81,12 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public String toString() {
+        HttpStatus status = getStatus();
+        return status.getCode() + " " + status.getReason();
     }
 
     @Override
@@ -170,6 +170,9 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public NettyHttpResponse<B> body(B body) {
         this.body = body;
+        if (body instanceof ByteBuf) {
+            replace((ByteBuf) body);
+        }
         return this;
     }
 

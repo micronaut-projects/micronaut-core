@@ -17,8 +17,6 @@ package io.micronaut.runtime.http.codec
 
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.core.io.buffer.ByteBufferFactory
 import spock.lang.Shared
 import spock.lang.Specification
 

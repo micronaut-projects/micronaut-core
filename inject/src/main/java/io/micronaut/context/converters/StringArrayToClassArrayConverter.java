@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.converters;
 
 import io.micronaut.core.convert.ConversionContext;
@@ -24,7 +25,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * Converts a String[] to a Class[]
+ * Converts a String[] to a Class[].
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +35,9 @@ public class StringArrayToClassArrayConverter implements TypeConverter<Object[],
 
     private final ClassLoader classLoader;
 
+    /**
+     * @param classLoader The class loader
+     */
     public StringArrayToClassArrayConverter(ClassLoader classLoader) {
         this.classLoader = classLoader;
     }

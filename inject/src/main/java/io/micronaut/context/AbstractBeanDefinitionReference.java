@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.Context;
@@ -27,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An uninitialized and unloaded component definition with basic information available regarding its requirements
+ * An uninitialized and unloaded component definition with basic information available regarding its requirements.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,6 +42,10 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private Class beanDefinition;
     private Boolean present;
 
+    /**
+     * @param beanTypeName           The bean type name
+     * @param beanDefinitionTypeName The bean definition type name
+     */
     public AbstractBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
@@ -122,8 +127,12 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         AbstractBeanDefinitionReference that = (AbstractBeanDefinitionReference) o;
 

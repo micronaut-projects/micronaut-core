@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.health;
 
 import io.micronaut.context.annotation.Requires;
@@ -27,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A {@link HealthIndicator} for Eureka
+ * A {@link HealthIndicator} for Eureka.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,6 +39,9 @@ import java.util.List;
 public class EurekaHealthIndicator implements HealthIndicator {
     private final EurekaClient eurekaClient;
 
+    /**
+     * @param eurekaClient The Eureka client
+     */
     public EurekaHealthIndicator(EurekaClient eurekaClient) {
         this.eurekaClient = eurekaClient;
     }

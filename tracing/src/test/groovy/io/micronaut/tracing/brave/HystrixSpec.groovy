@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package io.micronaut.tracing.brave
 import brave.SpanCustomizer
 import io.micronaut.configurations.hystrix.annotation.HystrixCommand
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.tracing.annotation.NewSpan
 import io.reactivex.Single
 import spock.lang.Specification

@@ -21,13 +21,6 @@ import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.core.type.ReturnType
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 /**
  * @author graemerocher

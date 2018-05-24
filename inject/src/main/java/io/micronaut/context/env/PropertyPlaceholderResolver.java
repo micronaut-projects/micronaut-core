@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -20,7 +21,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import java.util.Optional;
 
 /**
- * Interface for implementations that resolve placeholders in configuration and annotations
+ * Interface for implementations that resolve placeholders in configuration and annotations.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -28,15 +29,17 @@ import java.util.Optional;
 public interface PropertyPlaceholderResolver {
 
     /**
-     * Resolve the placeholders and return an Optional String if it was possible to resolve them
+     * Resolve the placeholders and return an Optional String if it was possible to resolve them.
      *
+     * @param str The placeholder to resolve
      * @return The optional string or {@link Optional#empty()} if resolution was not possible
      */
     Optional<String> resolvePlaceholders(String str);
 
     /**
-     * Resolve the placeholders and return an Optional String if it was possible to resolve them
+     * Resolve the placeholders and return an Optional String if it was possible to resolve them.
      *
+     * @param str The placeholder to resolve
      * @return The optional string or {@link Optional#empty()} if resolution was not possible
      * @throws ConfigurationException If the placeholders could not be resolved
      */

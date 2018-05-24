@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Headers
 import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -34,10 +33,15 @@ import spock.lang.Specification
  */
 
 class HeadersSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             'foo.bar':'Another'
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive header"() {
         given:

@@ -19,8 +19,7 @@ package io.micronaut.inject.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 /**
- * Stores data about a compile time element. The underlying object can
- * be a class, field, or method.
+ * Stores data about a compile time element. The underlying object can be a class, field, or method.
  *
  * @author James Kleeh
  * @since 1.0
@@ -63,10 +62,8 @@ public interface Element extends AnnotationMetadata {
     boolean isProtected();
 
     /**
-     * Returns the native underlying type. This API is extended
-     * by all of the inject language implementations. The object
-     * returned by this method will be the language native type
-     * the information is being retrieved from.
+     * Returns the native underlying type. This API is extended by all of the inject language implementations.
+     * The object returned by this method will be the language native type the information is being retrieved from.
      *
      * @return The native type
      */

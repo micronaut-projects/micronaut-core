@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -23,7 +24,7 @@ import io.micronaut.inject.BeanDefinition;
 import javax.annotation.Nullable;
 
 /**
- * Represents an injection point for a method that requires reflection
+ * Represents an injection point for a method that requires reflection.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,12 +32,19 @@ import javax.annotation.Nullable;
 @Internal
 class ReflectionMethodInjectionPoint extends DefaultMethodInjectionPoint {
 
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param methodName         The method name
+     * @param arguments          The arguments
+     * @param annotationMetadata The annotation metadata
+     */
     ReflectionMethodInjectionPoint(
-            BeanDefinition declaringBean,
-            Class<?> declaringType,
-            String methodName,
-            @Nullable Argument[] arguments,
-            @Nullable AnnotationMetadata annotationMetadata) {
+        BeanDefinition declaringBean,
+        Class<?> declaringType,
+        String methodName,
+        @Nullable Argument[] arguments,
+        @Nullable AnnotationMetadata annotationMetadata) {
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }
 

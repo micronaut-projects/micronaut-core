@@ -16,7 +16,6 @@
 
 package io.micronaut.core.value;
 
-
 import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +27,7 @@ import java.util.function.BiConsumer;
 /**
  * A simple type safe abstraction over a map of optional values.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

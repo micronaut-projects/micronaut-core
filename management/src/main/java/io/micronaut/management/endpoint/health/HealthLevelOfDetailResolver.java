@@ -16,8 +16,8 @@
 
 package io.micronaut.management.endpoint.health;
 
-import io.micronaut.context.annotation.Value;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 
 import javax.annotation.Nullable;
 import javax.inject.Named;
@@ -33,34 +33,29 @@ import java.security.Principal;
 @Singleton
 public class HealthLevelOfDetailResolver {
 
-    protected final boolean securityEnabled;
-    protected final EndpointConfiguration endpointConfiguration;
+    /**
+     * True if the health endpoint is sensitive.
+     */
+    protected final boolean sensitive;
 
     /**
-     *
-     * @param securityEnabled Wether micronaut security is enabled
-     * @param endpointConfiguration Health endpoint configuration
+     * @param healthConfiguration Health endpoint configuration
+     * @param defaultConfiguration Default endpoint configuration
      */
-    public HealthLevelOfDetailResolver(@Value("${micronaut.security.enabled:false}") boolean securityEnabled,
-                                       @Nullable @Named("health") EndpointConfiguration endpointConfiguration) {
-        this.securityEnabled = securityEnabled;
-        this.endpointConfiguration = endpointConfiguration;
+    public HealthLevelOfDetailResolver(@Nullable @Named("health") EndpointConfiguration healthConfiguration,
+                                       EndpointDefaultConfiguration defaultConfiguration) {
+        EndpointConfiguration configuration = healthConfiguration == null ? new EndpointConfiguration("health", defaultConfiguration) : healthConfiguration;
+        this.sensitive = configuration.isSensitive().orElse(HealthEndpoint.DEFAULT_SENSITIVE);
     }
 
     /**
+     * Returns the level of detail that should be returned by the endpoint.
      *
      * @param principal Authenticated user
      * @return The {@link HealthLevelOfDetail}
      */
     public HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
-        if (
-                ( securityEnabled && principal == null) ||
-                (
-                    !securityEnabled &&
-                    endpointConfiguration != null &&
-                    (endpointConfiguration.isSensitive().isPresent() && endpointConfiguration.isSensitive().get())
-                )
-        ) {
+        if (principal == null) {
             return HealthLevelOfDetail.STATUS;
         }
         return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;

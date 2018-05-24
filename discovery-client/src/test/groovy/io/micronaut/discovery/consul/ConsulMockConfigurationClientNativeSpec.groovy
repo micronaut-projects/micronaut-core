@@ -47,8 +47,6 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
             (MockConsulServer.ENABLED):true
     ])
 
-
-
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -63,7 +61,6 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
 
     @Shared
     ConsulConfigurationClient configClient = embeddedServer.applicationContext.getBean(ConsulConfigurationClient)
-
 
     void "test read and write key values with ConsulClient"() {
         when:"A property is written"

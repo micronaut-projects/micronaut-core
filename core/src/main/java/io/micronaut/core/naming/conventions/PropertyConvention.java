@@ -25,6 +25,7 @@ import java.util.Locale;
  * @since 1.0
  */
 public enum PropertyConvention {
+
     /**
      * The ID property used in REST endpoints and object mapping.
      */
@@ -32,10 +33,16 @@ public enum PropertyConvention {
 
     private final String lowerCase;
 
+    /**
+     * Default constructor.
+     */
     PropertyConvention() {
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
+    /**
+     * @return The lowercase name
+     */
     public String lowerCaseName() {
         return this.lowerCase;
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.reactor;
 
 import io.micronaut.context.annotation.Requires;
@@ -25,7 +26,7 @@ import reactor.core.publisher.Mono;
 import javax.inject.Singleton;
 
 /**
- * Adds custom support for {@link Mono} to handle NOT_FOUND results
+ * Adds custom support for {@link Mono} to handle NOT_FOUND results.
  *
  * @author graemerocher
  * @since 1.0

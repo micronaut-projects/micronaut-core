@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -23,7 +24,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>Annotation used to configure a bean. Typically used in conjunction with {@link Factory}</p>
+ * <p>Annotation used to configure a bean. Typically used in conjunction with {@link Factory}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

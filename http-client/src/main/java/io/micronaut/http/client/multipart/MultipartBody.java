@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 
@@ -57,37 +57,37 @@ public final class MultipartBody {
      */
     public List<InterfaceHttpData> getData(HttpRequest request, HttpDataFactory factory) {
         List<InterfaceHttpData> data = new ArrayList<>(parts.size());
-        for (Part part: parts) {
+        for (Part part : parts) {
             data.add(part.getData(request, factory));
         }
         return data;
     }
 
     /**
-     *
-     * @return A Builder to build MultipartBody
+     * @return A Builder to build MultipartBody.
      */
     public static Builder builder() {
         return new Builder();
     }
 
     /**
-     * A builder class to add different {@link Part} to {@link MultipartBody}
+     * A builder class to add different {@link Part} to {@link MultipartBody}.
      */
-    public static class Builder {
+    public static final class Builder {
 
         /**
-         * Construct a builder
-         */
-        private Builder() { }
-
-        /**
-         * List of all parts
+         * List of all parts.
          */
         private List<Part> parts = new ArrayList<>();
 
         /**
-         * Add a file object to MultipartBody
+         * Construct a builder.
+         */
+        private Builder() {
+        }
+
+        /**
+         * Add a file object to MultipartBody.
          *
          * @param name Name of the parameter for file object to be passed in multipart request
          * @param file The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
@@ -98,11 +98,11 @@ public final class MultipartBody {
         }
 
         /**
-         * Add a file object to MultipartBody
+         * Add a file object to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
+         * @param name     Name of the parameter for file object to be passed in multipart request
          * @param filename Name of the file
-         * @param file The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
+         * @param file     The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, File file) {
@@ -110,12 +110,12 @@ public final class MultipartBody {
         }
 
         /**
-         * Add a file object to MultipartBody
+         * Add a file object to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
-         * @param filename Name of the file
+         * @param name        Name of the parameter for file object to be passed in multipart request
+         * @param filename    Name of the file
          * @param contentType File content of type {@link MediaType}, possible values could be "text/plain", "application/json" etc
-         * @param file The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
+         * @param file        The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, MediaType contentType, File file) {
@@ -123,11 +123,11 @@ public final class MultipartBody {
         }
 
         /**
-         * Add bytes data to MultipartBody
+         * Add bytes data to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
+         * @param name     Name of the parameter for file object to be passed in multipart request
          * @param filename Name of the file
-         * @param data A byte Array (byte[]) representing the contents of the file
+         * @param data     A byte Array (byte[]) representing the contents of the file
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, byte[] data) {
@@ -135,12 +135,12 @@ public final class MultipartBody {
         }
 
         /**
-         * Add bytes data to MultipartBody
+         * Add bytes data to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
-         * @param filename Name of the file
+         * @param name        Name of the parameter for file object to be passed in multipart request
+         * @param filename    Name of the file
          * @param contentType The content type of File, possible values could be "text/plain", "application/json" etc
-         * @param data A byte Array (byte[]) representing the contents of the file
+         * @param data        A byte Array (byte[]) representing the contents of the file
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, MediaType contentType, byte[] data) {
@@ -148,12 +148,13 @@ public final class MultipartBody {
         }
 
         /**
-         * Add a InputStream data to MultipartBody
+         * Add a InputStream data to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
-         * @param filename Name of the file
-         * @param data An {@link InputStream} data value representing the content of file object
-         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+         * @param name          Name of the parameter for file object to be passed in multipart request
+         * @param filename      Name of the file
+         * @param data          An {@link InputStream} data value representing the content of file object
+         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create
+         *                      {@link io.netty.handler.codec.http.multipart.FileUpload} object
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, InputStream data, long contentLength) {
@@ -161,13 +162,14 @@ public final class MultipartBody {
         }
 
         /**
-         * Add a InputStream data to MultipartBody
+         * Add a InputStream data to MultipartBody.
          *
-         * @param name Name of the parameter for file object to be passed in multipart request
-         * @param filename Name of the file
-         * @param contentType The content type of File, possible values could be "text/plain", "application/json" etc
-         * @param data An {@link InputStream} data value representing the content of file object
-         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+         * @param name          Name of the parameter for file object to be passed in multipart request
+         * @param filename      Name of the file
+         * @param contentType   The content type of File, possible values could be "text/plain", "application/json" etc
+         * @param data          An {@link InputStream} data value representing the content of file object
+         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create
+         *                      {@link io.netty.handler.codec.http.multipart.FileUpload} object
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, MediaType contentType, InputStream data, long contentLength) {
@@ -175,9 +177,9 @@ public final class MultipartBody {
         }
 
         /**
-         * Add a file object to MultipartBody
+         * Add a file object to MultipartBody.
          *
-         * @param name Name of the parameter or the key to be passed in multipart request
+         * @param name  Name of the parameter or the key to be passed in multipart request
          * @param value Plain String value for the parameter
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
@@ -187,7 +189,8 @@ public final class MultipartBody {
         }
 
         /**
-         * This method is used for adding different parts extending {@link AbstractFilePart} class to {@link MultipartBody}
+         * This method is used for adding different parts extending {@link AbstractFilePart} class to
+         * {@link MultipartBody}.
          *
          * @param filePart Any file part, such as {@link FilePart}, {@link InputStreamPart}, {@link BytePart} etc
          * @return A {@link MultipartBody.Builder} to build MultipartBody
@@ -198,7 +201,7 @@ public final class MultipartBody {
         }
 
         /**
-         * Creates {@link MultipartBody} from the provided parts
+         * Creates {@link MultipartBody} from the provided parts.
          *
          * @return The {@link MultipartBody}
          * @throws MultipartException If there are no parts

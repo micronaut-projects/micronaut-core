@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ package io.micronaut.tracing.brave
 
 import brave.SpanCustomizer
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.micronaut.tracing.annotation.NewSpan
 import io.micronaut.tracing.annotation.SpanTag
 import io.reactivex.Single
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -75,6 +75,7 @@ class TraceInterceptorSpec extends Specification {
         reporter.spans[0].tags().get("foo") == "bar"
     }
 
+    @IgnoreIf({System.getenv('TRAVIS')})
     void "test trace mono"() {
         given:
         ApplicationContext applicationContext = buildContext()

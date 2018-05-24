@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.value.OptionalMultiValues;
 
 /**
- * Represents a REST resource in a HATEOS architecture
+ * Represents a REST resource in a HATEOS architecture.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -26,12 +27,12 @@ import io.micronaut.core.value.OptionalMultiValues;
 public interface Resource {
 
     /**
-     * The links attribute
+     * The links attribute.
      */
     String LINKS = "_links";
 
     /**
-     * The embedded attribute
+     * The embedded attribute.
      */
     String EMBEDDED = "_embedded";
 

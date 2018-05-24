@@ -46,7 +46,7 @@ public class HttpStatusCodeRejectionHandler implements RejectionHandler {
     /**
      *
      * @param request {@link HttpRequest} being processed
-     * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access priviledges.
+     * @param forbidden if true indicates that although the user was authenticated, he did not have the necessary access priviledges.
      * @return Return a HTTP Response
      */
     @Override

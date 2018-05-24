@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;
@@ -24,10 +23,11 @@ import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import javax.inject.Singleton;
 
 /**
- * <p>A {@link ServiceInstanceList} for Consul which reads from the {@link EurekaConfiguration}</p>
+ * <p>A {@link io.micronaut.discovery.ServiceInstanceList} for Consul which reads from the {@link EurekaConfiguration}.</p>
  * <p>
  * <p>The reason this is useful is if a {@link io.micronaut.runtime.context.scope.refresh.RefreshEvent} occurs then the
- * {@link EurekaConfiguration} will be updated and the backing list of {@link ServiceInstance} changed at runtime.</p>
+ * {@link EurekaConfiguration} will be updated and the backing list of {@link io.micronaut.discovery.ServiceInstance}
+ * changed at runtime.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,6 +36,9 @@ import javax.inject.Singleton;
 @RequiresEureka
 public class EurekaServiceInstanceList extends DiscoveryServerInstanceList {
 
+    /**
+     * @param configuration The Eureka configuration
+     */
     public EurekaServiceInstanceList(EurekaConfiguration configuration) {
         super(configuration);
     }

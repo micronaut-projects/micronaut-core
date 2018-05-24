@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -24,7 +25,7 @@ import java.lang.annotation.Retention;
 /**
  * <p>Context scope indicates that the classes life cycle is bound to that of the
  * {@link io.micronaut.context.BeanContext} and it should be initialized and shutdown during startup and shutdown of
- * the underlying {@link io.micronaut.context.BeanContext}</p>
+ * the underlying {@link io.micronaut.context.BeanContext}.</p>
  * <p>
  * <p>Micronaut by default treats all {@link Singleton} bean definitions as lazy and will only load them on demand by
  * annotating a bean with @Context you can ensure that the bean is loaded at the same time as the context</p>

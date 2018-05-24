@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.convert.format;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.core.naming.conventions.StringConvention;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * Allows configuration how map property values are injected
- *
+ * Allows configuration how map property values are injected.
  *
  * @author graemerocher
  * @since 1.0
@@ -44,15 +44,18 @@ public @interface MapFormat {
     StringConvention keyFormat() default StringConvention.RAW;
 
     /**
-     * Specifies the type of the map that should be injected
+     * Specifies the type of the map that should be injected.
      */
     enum MapTransformation {
+
         /**
-         * A nested map has the any keys such as {@code foo.bar} transformed into a structure that is a map of maps such as JSON
+         * A nested map has the any keys such as {@code foo.bar} transformed into a structure that is a map of maps
+         * such as JSON.
          */
         NESTED,
+
         /**
-         * A flat map has the keys flattened such that {@code foo.bar} is a single map
+         * A flat map has the keys flattened such that {@code foo.bar} is a single map.
          */
         FLAT
     }

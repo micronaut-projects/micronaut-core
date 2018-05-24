@@ -15,9 +15,6 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Executable
 import io.micronaut.context.AbstractExecutableMethod
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext

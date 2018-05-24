@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
-import groovy.transform.TypeCheckingMode
-import groovy.xml.MarkupBuilder
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
-import io.micronaut.cli.io.support.FileSystemResource
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
-import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
+
 import java.nio.file.Paths
 
 /**
@@ -38,7 +36,7 @@ import java.nio.file.Paths
  * @since 1.0
  */
 @CompileStatic
-class CreateFederationCommand extends CreateServiceCommand {
+class CreateFederationCommand extends CreateAppCommand {
     public static final String NAME = "create-federation"
     public static final String SERVICES_FLAG = "services"
 
@@ -46,11 +44,11 @@ class CreateFederationCommand extends CreateServiceCommand {
 
     CreateFederationCommand() {
         description.description = "Creates a federation of services"
-        description.usage = "create-federation [NAME] --services [SERVICE_NAME,SERVICE_NAME,...]"
+        description.usage = "create-federation [NAME] --services [SERVICENAME-A SERVICENAME-B ...]"
 
         final List<String> flags = getFlags()
         if (flags.contains(SERVICES_FLAG)) {
-            description.flag(name: SERVICES_FLAG, description: "The names of the services to create")
+            description.flag(name: SERVICES_FLAG, description: "The names of the services to create", required:true)
         }
     }
 
@@ -74,6 +72,11 @@ class CreateFederationCommand extends CreateServiceCommand {
         final String federationName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
         final List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
         services = commandLine.optionValue(SERVICES_FLAG)?.toString()?.split(',')?.toList()
+        if (!services) {
+            StringBuilder warning = new StringBuilder("Missing required flag: --services= <service1 service2 service3 ..>")
+            executionContext.console.error(warning.toString())
+            return false
+        }
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
         final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
         final String micronautVersion = MicronautCli.getPackage().getImplementationVersion()
@@ -81,30 +84,30 @@ class CreateFederationCommand extends CreateServiceCommand {
 
         final File serviceDir = inPlace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
 
-        for(String service: services) {
+        for (String service : services) {
             final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-                    appName: service,
-                    baseDir: serviceDir,
-                    profileName: profileName,
-                    micronautVersion: micronautVersion,
-                    features: features,
-                    inplace: false,
-                    build: build,
-                    console: executionContext.console,
-                    skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
+                appName: service,
+                baseDir: serviceDir,
+                profileName: profileName,
+                micronautVersion: micronautVersion,
+                features: features,
+                inplace: false,
+                build: build,
+                console: executionContext.console,
+                skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
             )
             super.handle(cmd)
         }
 
         final CreateServiceCommandObject parent = new CreateServiceCommandObject(
-                appName: federationName,
-                baseDir: executionContext.baseDir,
-                profileName: 'federation',
-                micronautVersion: micronautVersion,
-                features: features,
-                inplace: inPlace,
-                build: build,
-                console: executionContext.console
+            appName: federationName,
+            baseDir: executionContext.baseDir,
+            profileName: 'federation',
+            micronautVersion: micronautVersion,
+            features: features,
+            inplace: inPlace,
+            build: build,
+            console: executionContext.console
         )
         super.handle(parent)
     }
@@ -127,7 +130,7 @@ class CreateFederationCommand extends CreateServiceCommand {
 
     @Override
     protected List<String> getFlags() {
-        [BUILD_FLAG, FEATURES_FLAG, INPLACE_FLAG, SERVICES_FLAG, PROFILE_FLAG]
+        [BUILD_FLAG, FEATURES_FLAG, INPLACE_FLAG, SERVICES_FLAG, PROFILE_FLAG, SERVICES_FLAG]
     }
 
     @Override

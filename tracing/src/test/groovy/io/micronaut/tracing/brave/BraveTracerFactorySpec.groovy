@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,6 @@ import brave.http.HttpClientHandler
 import brave.http.HttpServerHandler
 import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.tracing.brave.sender.HttpClientSender
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer

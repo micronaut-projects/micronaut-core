@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
 
+package io.micronaut.http;
 
 import io.micronaut.http.exceptions.UriSyntaxException;
 
@@ -24,8 +24,9 @@ import java.net.URISyntaxException;
 import java.util.Set;
 
 /**
- * <p>Common interface for HTTP response implementations</p>
+ * <p>Common interface for HTTP response implementations.</p>
  *
+ * @param <B> The Http body type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -42,13 +43,15 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return the first value for the given header or null
+     * Return the first value for the given header or null.
      *
      * @param name The name
      * @return The header value
      */
     default @Nullable String header(@Nullable CharSequence name) {
-        if (name == null) return null;
+        if (name == null) {
+            return null;
+        }
         return getHeaders().get(name);
     }
 
@@ -81,8 +84,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#OK} response with an empty body
+     * Return an {@link HttpStatus#OK} response with an empty body.
      *
+     * @param <T> The response type
      * @return The ok response
      */
     static <T> MutableHttpResponse<T> ok() {
@@ -94,8 +98,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_FOUND} response with an empty body
+     * Return an {@link HttpStatus#NOT_FOUND} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> notFound() {
@@ -107,21 +112,24 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#UNAUTHORIZED} response with an empty body
+     * Return an {@link HttpStatus#UNAUTHORIZED} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> unauthorized() {
         HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-                new IllegalStateException("No Server implementation found on classpath")
+            new IllegalStateException("No Server implementation found on classpath")
         );
 
         return factory.status(HttpStatus.UNAUTHORIZED);
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_FOUND} response with a body
+     * Return an {@link HttpStatus#NOT_FOUND} response with a body.
      *
+     * @param body The response body
+     * @param <T>  The body type
      * @return The response
      */
     static <T> MutableHttpResponse<T> notFound(T body) {
@@ -134,8 +142,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body
+     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> badRequest() {
@@ -147,8 +156,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body
+     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body.
      *
+     * @param body The response body
+     * @param <T>  The body type
      * @return The response
      */
     static <T> MutableHttpResponse<T> badRequest(T body) {
@@ -160,8 +171,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#UNPROCESSABLE_ENTITY} response with an empty body
+     * Return an {@link HttpStatus#UNPROCESSABLE_ENTITY} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> unprocessableEntity() {
@@ -173,8 +185,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body
+     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
      *
+     * @param allowed Allowed Http Methods
+     * @param <T>     The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(HttpMethod... allowed) {
@@ -186,8 +200,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body
+     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
      *
+     * @param allowed Allowed Http Methods
+     * @param <T>     The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(Set<HttpMethod> allowed) {
@@ -199,8 +215,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#INTERNAL_SERVER_ERROR} response with an empty body
+     * Return an {@link HttpStatus#INTERNAL_SERVER_ERROR} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> serverError() {
@@ -212,8 +229,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#ACCEPTED} response with an empty body
+     * Return an {@link HttpStatus#ACCEPTED} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> accepted() {
@@ -225,8 +243,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NO_CONTENT} response with an empty body
+     * Return an {@link HttpStatus#NO_CONTENT} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> noContent() {
@@ -238,8 +257,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_MODIFIED} response with an empty body
+     * Return an {@link HttpStatus#NOT_MODIFIED} response with an empty body.
      *
+     * @param <T> The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> notModified() {
@@ -251,8 +271,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#OK} response with a body
+     * Return an {@link HttpStatus#OK} response with a body.
      *
+     * @param body The response body
+     * @param <T>  The body type
      * @return The ok response
      */
     static <T> MutableHttpResponse<T> ok(T body) {
@@ -263,8 +285,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#CREATED} response with a body
+     * Return an {@link HttpStatus#CREATED} response with a body.
      *
+     * @param body The response body
+     * @param <T>  The body type
      * @return The created response
      */
     static <T> MutableHttpResponse<T> created(T body) {
@@ -277,8 +301,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#CREATED} response with the location of the new resource
+     * Return an {@link HttpStatus#CREATED} response with the location of the new resource.
      *
+     * @param location The location of the new resource
+     * @param <T>      The response type
      * @return The created response
      */
     static <T> MutableHttpResponse<T> created(URI location) {
@@ -293,8 +319,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#SEE_OTHER} response with the location of the new resource
+     * Return an {@link HttpStatus#SEE_OTHER} response with the location of the new resource.
      *
+     * @param location The location of the new resource
+     * @param <T>      The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> seeOther(URI location) {
@@ -309,8 +337,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#TEMPORARY_REDIRECT} response with the location of the new resource
+     * Return an {@link HttpStatus#TEMPORARY_REDIRECT} response with the location of the new resource.
      *
+     * @param location The location of the new resource
+     * @param <T>      The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> temporaryRedirect(URI location) {
@@ -325,8 +355,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#PERMANENT_REDIRECT} response with the location of the new resource
+     * Return an {@link HttpStatus#PERMANENT_REDIRECT} response with the location of the new resource.
      *
+     * @param location The location of the new resource
+     * @param <T>      The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> permanentRedirect(URI location) {
@@ -341,8 +373,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#MOVED_PERMANENTLY} response with the location of the new resource
+     * Return an {@link HttpStatus#MOVED_PERMANENTLY} response with the location of the new resource.
      *
+     * @param location The location of the new resource
+     * @param <T>      The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> redirect(URI location) {
@@ -357,9 +391,10 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
+     * @param <T>    The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status) {
@@ -371,10 +406,11 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return a response for the given status
+     * Return a response for the given status.
      *
      * @param status The status
      * @param reason An alternatively reason message
+     * @param <T>    The response type
      * @return The response
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
@@ -386,7 +422,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Helper method for defining URIs. Rethrows checked exceptions as
+     * Helper method for defining URIs. Rethrows checked exceptions as.
      *
      * @param uri The URI char sequence
      * @return The URI

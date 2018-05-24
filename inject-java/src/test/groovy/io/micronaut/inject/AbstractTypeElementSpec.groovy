@@ -17,13 +17,8 @@ package io.micronaut.inject
 
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.util.Context
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
-import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanConfiguration
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter

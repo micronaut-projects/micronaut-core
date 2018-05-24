@@ -29,7 +29,7 @@ public class LoginFailedEvent extends ApplicationEvent {
     /**
      * Event triggered when an unsuccessful login takes place.
      *
-     * @param source The object on which the Event initially occurred.
+     * @param source the {@link io.micronaut.security.authentication.AuthenticationFailed} object signalising the authentication failure and reason.
      * @throws IllegalArgumentException if source is null.
      */
     public LoginFailedEvent(Object source) {

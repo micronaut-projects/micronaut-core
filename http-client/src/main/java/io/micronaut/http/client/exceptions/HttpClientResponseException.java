@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.exceptions;
 
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.VndError;
 
 import java.util.Optional;
 
 /**
- * An exception that occurs when a response returns an error code equal to or greater than 400
+ * An exception that occurs when a response returns an error code equal to or greater than 400.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,12 +33,21 @@ import java.util.Optional;
 public class HttpClientResponseException extends HttpClientException {
     private final HttpResponse<?> response;
 
+    /**
+     * @param message  The message
+     * @param response The Http response
+     */
     public HttpClientResponseException(String message, HttpResponse<?> response) {
         super(message);
         this.response = response;
         initResponse(response);
     }
 
+    /**
+     * @param message  The message
+     * @param cause    The throwable
+     * @param response The Http response
+     */
     public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response) {
         super(message, cause);
         this.response = response;
@@ -45,7 +56,7 @@ public class HttpClientResponseException extends HttpClientException {
 
     @Override
     public String getMessage() {
-        Optional<VndError> body = getResponse().getBody(VndError.class);
+        Optional<JsonError> body = getResponse().getBody(JsonError.class);
         if (body.isPresent()) {
             return body.get().getMessage();
         } else {
@@ -67,11 +78,15 @@ public class HttpClientResponseException extends HttpClientException {
         return getResponse().getStatus();
     }
 
+    @SuppressWarnings("MagicNumber")
     private void initResponse(HttpResponse<?> response) {
         Optional<MediaType> contentType = response.getContentType();
-        if (contentType.isPresent() && contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
-            // initialize the body so it is available
-            response.getBody(VndError.class);
+        if (contentType.isPresent() && response.getStatus().getCode() > 399) {
+            if (contentType.get().equals(MediaType.APPLICATION_JSON_TYPE)) {
+                response.getBody(JsonError.class);
+            } else if (contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
+                response.getBody(VndError.class);
+            }
         }
     }
 }

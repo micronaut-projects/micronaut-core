@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.processing;
 
 /**
- * Constants for processed type names
+ * Constants for processed type names.
  *
  * @author graemerocher
  * @since 1.0
@@ -24,12 +25,12 @@ package io.micronaut.inject.processing;
 public interface ProcessedTypes {
 
     /**
-     * Constant for {@link javax.annotation.PostConstruct} annotation
+     * Constant for {@link javax.annotation.PostConstruct} annotation.
      */
     String POST_CONSTRUCT = "javax.annotation.PostConstruct";
 
     /**
-     * Constant for {@link @{@link javax.annotation.PreDestroy}} annotation
+     * Constant for {@link javax.annotation.PreDestroy}} annotation.
      */
     String PRE_DESTROY = "javax.annotation.PreDestroy";
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import io.micronaut.context.annotation.Configuration;
@@ -30,12 +31,11 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.SimpleElementVisitor8;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 
 /**
  * An annotation processor that generates {@link io.micronaut.inject.BeanConfiguration} implementations for
- * each package annotated with {@link Configuration}
+ * each package annotated with {@link Configuration}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -54,7 +54,7 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if(annotations.isEmpty()) {
+        if (annotations.isEmpty()) {
             return false;
         }
         AnnotationElementScanner scanner = new AnnotationElementScanner();
@@ -63,11 +63,14 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
         try {
             classWriterOutputVisitor.finish();
         } catch (Exception e) {
-            error("I/O error occurred writing META-INF services information: %s",e);
+            error("I/O error occurred writing META-INF services information: %s", e);
         }
         return false;
     }
 
+    /**
+     * Class to visit annotation elements annotated with {@link Configuration}.
+     */
     class AnnotationElementScanner extends SimpleElementVisitor8<Object, Object> {
 
         @Override
@@ -76,13 +79,13 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(
-                        packageName,
-                        annotationUtils.getAnnotationMetadata(packageElement)
+                    packageName,
+                    annotationUtils.getAnnotationMetadata(packageElement)
                 );
                 try {
                     writer.accept(classWriterOutputVisitor);
                 } catch (IOException e) {
-                    error("I/O error occurred writing Configuration for package [%s]: %s",packageElement, e);
+                    error("I/O error occurred writing Configuration for package [%s]: %s", packageElement, e);
                 }
             }
             return aPackage;

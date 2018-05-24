@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
@@ -24,27 +25,36 @@ import java.security.KeyStore;
 import java.util.Optional;
 
 /**
- * A class to build a key store and a trust store for use
- * in adding SSL support to a server
+ * A class to build a key store and a trust store for use in adding SSL support to a server.
  *
  * @param <T> The server specific type to be built
  * @author James Kleeh
  * @since 1.0
  */
-abstract public class SslBuilder<T> {
+public abstract class SslBuilder<T> {
 
     protected final SslConfiguration ssl;
     private final ResourceResolver resourceResolver;
     private KeyStore keyStoreCache = null;
     private KeyStore trustStoreCache = null;
 
+    /**
+     * @param ssl              The SSL configuration
+     * @param resourceResolver The resource resolver
+     */
     public SslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         this.ssl = ssl;
         this.resourceResolver = resourceResolver;
     }
 
-    abstract public Optional<T> build();
+    /**
+     * @return Builds the SSL configuration wrapped inside an optional
+     */
+    public abstract Optional<T> build();
 
+    /**
+     * @return The {@link TrustManagerFactory}
+     */
     protected TrustManagerFactory getTrustManagerFactory() {
         try {
             Optional<KeyStore> store = getTrustStore();
@@ -57,6 +67,10 @@ abstract public class SslBuilder<T> {
         }
     }
 
+    /**
+     * @return An optional {@link KeyStore}
+     * @throws Exception if there is an error
+     */
     protected Optional<KeyStore> getTrustStore() throws Exception {
         if (trustStoreCache == null) {
             SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
@@ -69,6 +83,9 @@ abstract public class SslBuilder<T> {
         return Optional.of(trustStoreCache);
     }
 
+    /**
+     * @return The {@link KeyManagerFactory}
+     */
     protected KeyManagerFactory getKeyManagerFactory() {
         try {
             Optional<KeyStore> keyStore = getKeyStore();
@@ -86,6 +103,10 @@ abstract public class SslBuilder<T> {
         }
     }
 
+    /**
+     * @return An optional {@link KeyStore}
+     * @throws Exception if there is an error
+     */
     protected Optional<KeyStore> getKeyStore() throws Exception {
         if (keyStoreCache == null) {
             SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
@@ -98,6 +119,13 @@ abstract public class SslBuilder<T> {
         return Optional.of(keyStoreCache);
     }
 
+    /**
+     * @param optionalType     The optional type
+     * @param resource         The resource
+     * @param optionalPassword The optional password
+     * @return A {@link KeyStore}
+     * @throws Exception if there is an error
+     */
     protected KeyStore load(Optional<String> optionalType,
                             String resource,
                             Optional<String> optionalPassword) throws Exception {

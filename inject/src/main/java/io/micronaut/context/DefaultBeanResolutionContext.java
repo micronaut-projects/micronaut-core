@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.CircularDependencyException;
@@ -32,7 +33,7 @@ import java.util.LinkedList;
 import java.util.Optional;
 
 /**
- * Default implementation of the {@link BeanResolutionContext} interface
+ * Default implementation of the {@link BeanResolutionContext} interface.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -44,6 +45,10 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     private final BeanDefinition rootDefinition;
     private final Path path;
 
+    /**
+     * @param context        The bean context
+     * @param rootDefinition The bean root definition
+     */
     @Internal
     public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
         this.context = context;
@@ -75,10 +80,16 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         return Optional.empty();
     }
 
+    /**
+     * Class that represents a default path.
+     */
     class DefaultPath extends LinkedList<Segment> implements Path {
 
         public static final String RIGHT_ARROW = " --> ";
 
+        /**
+         * Default constructor.
+         */
         DefaultPath() {
         }
 
@@ -95,6 +106,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
             return path.toString();
         }
 
+        @SuppressWarnings("MagicNumber")
         @Override
         public String toCircularString() {
             Iterator<Segment> i = descendingIterator();
@@ -137,8 +149,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                 MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
-                }
-                else {
+                } else {
                     path.push(methodSegment);
                 }
             } else {
@@ -174,7 +185,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         private void detectCircularDependency(BeanDefinition declaringType, Argument argument, Segment constructorSegment) {
             if (contains(constructorSegment)) {
                 Segment last = peek();
-                if(last != null) {
+                if (last != null) {
 
                     BeanDefinition declaringBean = last.getDeclaringType();
                     // if the currently injected segment is a constructor argument and the type to be constructed is the
@@ -200,8 +211,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                     } else {
                         push(constructorSegment);
                     }
-                }
-                else {
+                } else {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
                 }
             } else {
@@ -211,9 +221,14 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     }
 
     /**
-     * A segment that represents a constructor
+     * A segment that represents a constructor.
      */
     static class ConstructorSegment extends AbstractSegment {
+
+        /**
+         * @param declaringClass The declaring class
+         * @param argument       The argument
+         */
         ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
         }
@@ -229,12 +244,17 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     }
 
     /**
-     * A segment that represents a method
+     * A segment that represents a method.
      */
     static class MethodSegment extends AbstractSegment {
 
         private final MethodInjectionPoint methodInjectionPoint;
 
+        /**
+         * @param declaringType        The declaring type
+         * @param methodInjectionPoint The method injection point
+         * @param argument             The argument
+         */
         MethodSegment(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             super(declaringType, methodInjectionPoint.getName(), argument);
             this.methodInjectionPoint = methodInjectionPoint;
@@ -250,9 +270,14 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     }
 
     /**
-     * A segment that represents a field
+     * A segment that represents a field.
      */
     static class FieldSegment extends AbstractSegment {
+
+        /**
+         * @param declaringClass      The declaring class
+         * @param fieldInjectionPoint The field injection point
+         */
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                 fieldInjectionPoint.getName(),
@@ -265,11 +290,19 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         }
     }
 
-    static abstract class AbstractSegment implements Segment {
+    /**
+     * Abstract class for a Segment.
+     */
+    abstract static class AbstractSegment implements Segment {
         private final BeanDefinition declaringComponent;
         private final String name;
         private final Argument argument;
 
+        /**
+         * @param declaringClass The declaring class
+         * @param name           The name
+         * @param argument       The argument
+         */
         AbstractSegment(BeanDefinition declaringClass, String name, Argument argument) {
             this.declaringComponent = declaringClass;
             this.name = name;
@@ -293,8 +326,12 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             AbstractSegment that = (AbstractSegment) o;
 
@@ -309,11 +346,19 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
             return result;
         }
 
+        /**
+         * @param declaringType The declaring type
+         * @param baseString    The base string
+         */
         void outputArguments(BeanDefinition declaringType, StringBuilder baseString) {
             Argument[] arguments = declaringType.getConstructor().getArguments();
             outputArguments(baseString, arguments);
         }
 
+        /**
+         * @param baseString The base string
+         * @param arguments  The arguments
+         */
         void outputArguments(StringBuilder baseString, Argument[] arguments) {
             baseString.append('(');
             for (int i = 0; i < arguments.length; i++) {

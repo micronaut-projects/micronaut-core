@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ import java.util.Properties;
 import java.util.Set;
 
 /**
- * Default load that handles Java properties files
+ * Default load that handles Java properties files.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,7 +32,7 @@ import java.util.Set;
 public class PropertiesPropertySourceLoader extends AbstractPropertySourceLoader {
 
     /**
-     * File extension for property source loader
+     * File extension for property source loader.
      */
     public static final String PROPERTIES_EXTENSION = "properties";
 

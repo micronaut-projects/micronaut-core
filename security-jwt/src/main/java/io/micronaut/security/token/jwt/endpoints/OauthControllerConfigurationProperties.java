@@ -43,4 +43,22 @@ public class OauthControllerConfigurationProperties implements OauthControllerCo
     public String getPath() {
         return this.path;
     }
+
+    /**
+     * Sets whether OAuth is enabled
+     *
+     * @param enabled Sets whether OAuth is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the path to the oauth controller
+     *
+     * @param path The path to the oauth controller
+     */
+    public void setPath(String path) {
+        this.path = path;
+    }
 }

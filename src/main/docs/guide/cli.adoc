@@ -1,0 +1,142 @@
+The Micronaut CLI is the recommended way to create new Micronaut projects. The CLI includes commands for generating specific categories of projects, allowing you to choose between build tools, test frameworks, and even pick the language you wish to use in your application. The CLI also provides commands for generating artifacts such as controllers, client interfaces, and serverless functions.
+
+When Micronaut is installed on your computer, you can call the CLI with the `mn` command.
+
+[source,bash]
+----
+$ mn create-app my-app
+----
+
+A Micronaut CLI project can be identified by the `micronaut-cli.yml` file, which will be included at the root of the project (if it was generated via the CLI). This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name, for example:
+
+[source,bash]
+----
+$ mn create-app my-demo-app
+----
+
+Will result in the following `micronaut-cli-yml`.
+
+.micronaut-cli.yml
+[source,yaml]
+----
+profile: service
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java
+----
+
+You can supply your own default package when creating the application by prefixing the application name with the package:
+
+[source,bash]
+----
+$ mn create-app example.my-demo-app
+----
+
+Will result in the following `micronaut-cli-yml`.
+
+.micronaut-cli.yml
+[source,yaml]
+----
+profile: service
+defaultPackage: example
+---
+testFramework: junit
+sourceLanguage: java
+----
+
+TIP: Throughout the user guide, references to CLI features/commands have been provided as applicable.
+
+== Definitions
+
+Projects created with the CLI are based on one of several *profiles*, which consist of a project template (or *skeleton*), optional features, and profile-specific commands. Commands from a profile typically are specific to the profile application type; for example, the `service` profile (designed for creation of web service applications) provides the `create-controller` and `create-client` commands.
+
+CLI commands typically accept at least one *argument*, such as the name of the project or controller to generate.
+
+CLI commands can accept optional *flags* to control their behavior. Some flags accept multiple arguments, which are separated by commas.
+
+
+== Interactive Mode
+
+If you run `mn` without any arguments, the Micronaut CLI will launch in interactive mode. This is a shell-like mode which allows you to run multiple CLI commands without re-initializing the CLI runtime, and is especially suitable when you are making use of code-generation commands (such as `create-controller`), creating multiple projects, or simply exploring the features included in the CLI. Tab-completion is enabled in the CLI, enabling you to hit the `TAB` key to see possible options for a given command or flag.
+
+[source,bash]
+----
+$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn>
+----
+
+
+
+
+== Help and Info
+
+General usage information can be viewed using the `help` command.
+
+[source,bash]
+----
+mn> help
+Usage (optionals marked with *):'
+mn [target] [arguments]*'
+
+| Examples:
+$ mn create-app my-app
+...
+----
+
+For details about a specific command, supply the command name after the `help` command.
+
+[source,bash]
+----
+mn> help create-app
+| Command: create-app
+| Description:
+Creates an application
+
+| Usage:
+create-app [NAME]
+...
+----
+
+
+A list of available profiles can be viewed using the `list-profiles` command.
+
+[source,bash]
+----
+mn> list-profiles
+| Available Profiles
+--------------------
+* function-aws - The function profile for AWS Lambda
+* service-function - The function profile
+* function - The function profile
+* federation - The federation profile
+* service - The service profile
+* base - The base profile
+----
+
+To view details on a specific profile, use the `profile-info` command, followed by the profile name.
+
+[source,bash]
+----
+mn> profile-info service
+Profile: service
+--------------------
+The service profile
+
+Provided Commands:
+--------------------
+* help - Prints help information for a specific command
+* create-job - Creates a job with scheduled method
+* create-bean - Creates a singleton bean
+* create-controller - Creates a controller and associated test
+* create-client - Creates a client interface
+
+Provided Features:
+--------------------
+* discovery-consul - Adds support for Service Discovery with Consul (https://www.consul.io)
+* hibernate-jpa - Adds support for Hibernate/JPA
+* mongo-gorm - Configures GORM for MongoDB for Groovy applications
+...
+----

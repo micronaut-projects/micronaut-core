@@ -25,9 +25,11 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * <p>A Reactive streams {@link org.reactivestreams.Processor} designed to be used within a single thread and manage back pressure state.</p>
+ * <p>A Reactive streams {@link org.reactivestreams.Processor} designed to be used within a single thread and manage
+ * back pressure state.</p>
  * <p>
  * <p>This processor only supports a single {@link Subscriber}</p>
+ *
  * @param <T> The argument type
  * @param <R> The message type
  * @author Graeme Rocher
@@ -63,10 +65,13 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     @Override
     protected void doOnError(Throwable t) {
         currentDownstreamSubscriber().ifPresent(subscriber ->
-                subscriber.onError(t)
+            subscriber.onError(t)
         );
     }
 
+    /**
+     * @param downstreamSubscriber The downstream subscriber
+     */
     protected void subscribeDownstream(Subscriber<? super T> downstreamSubscriber) {
         if (!this.downstreamSubscriber.compareAndSet(null, downstreamSubscriber)) {
             throw new IllegalStateException("Only one subscriber allowed");
@@ -83,6 +88,8 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
             case BUFFERING:
             case FLOWING:
                 provideDownstreamSubscription(downstreamSubscriber);
+            default:
+                // no-op
         }
     }
 

@@ -16,13 +16,6 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.bind.BeanPropertyBinder
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -44,8 +37,13 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class BlockingPojoCrudSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test CRUD operations on generated client that returns blocking responses"() {
         given:
@@ -96,7 +94,6 @@ class BlockingPojoCrudSpec extends Specification {
     }
 
     @Controller("/blocking/pojo/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()

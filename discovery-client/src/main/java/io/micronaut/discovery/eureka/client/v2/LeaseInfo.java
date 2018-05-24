@@ -13,6 +13,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -20,7 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
 
 /**
- * Forked from https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/LeaseInfo.java
+ * Forked from https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/LeaseInfo.java.
  * <p>
  * Represents the <em>lease</em> information with <em>Eureka</em>.
  * <p>
@@ -37,12 +38,12 @@ import com.fasterxml.jackson.annotation.JsonRootName;
 public class LeaseInfo {
 
     /**
-     * Default lease renewal interval
+     * Default lease renewal interval.
      */
     public static final int DEFAULT_LEASE_RENEWAL_INTERVAL = 30;
 
     /**
-     * Default lease duration
+     * Default lease duration.
      */
     public static final int DEFAULT_LEASE_DURATION = 90;
 
@@ -56,6 +57,109 @@ public class LeaseInfo {
     private long evictionTimestamp;
     private long serviceUpTimestamp;
 
+    /**
+     * Default constructor.
+     */
+    LeaseInfo() {
+    }
+
+    /**
+     * Note about renewalTimestamp legacy:
+     * The previous change to use Jackson ser/deser changed the field name for lastRenewalTimestamp to renewalTimestamp
+     * for serialization, which causes an incompatibility with the jacksonNG codec when the server returns data with
+     * field renewalTimestamp and jacksonNG expects lastRenewalTimestamp. Remove this legacy field from client code
+     * in a few releases (once servers are updated to a release that generates json with the correct
+     * lastRenewalTimestamp).
+     *
+     * @param renewalIntervalInSecs      The renewal interval in seconds
+     * @param durationInSecs             The duration in seconds
+     * @param registrationTimestamp      The registration timestamp
+     * @param lastRenewalTimestamp       The last renewal timestamp
+     * @param lastRenewalTimestampLegacy The last renewal timestamp (for legacy)
+     * @param evictionTimestamp          The eviction timestamp
+     * @param serviceUpTimestamp         The service up timestamp
+     */
+    @JsonCreator
+    LeaseInfo(@JsonProperty("renewalIntervalInSecs") int renewalIntervalInSecs,
+              @JsonProperty("durationInSecs") int durationInSecs,
+              @JsonProperty("registrationTimestamp") long registrationTimestamp,
+              @JsonProperty("lastRenewalTimestamp") Long lastRenewalTimestamp,
+              @JsonProperty("renewalTimestamp") long lastRenewalTimestampLegacy,  // for legacy
+              @JsonProperty("evictionTimestamp") long evictionTimestamp,
+              @JsonProperty("serviceUpTimestamp") long serviceUpTimestamp) {
+
+        this.renewalIntervalInSecs = renewalIntervalInSecs;
+        this.durationInSecs = durationInSecs;
+        this.registrationTimestamp = registrationTimestamp;
+        this.evictionTimestamp = evictionTimestamp;
+        this.serviceUpTimestamp = serviceUpTimestamp;
+
+        if (lastRenewalTimestamp == null) {
+            this.lastRenewalTimestamp = lastRenewalTimestampLegacy;
+        } else {
+            this.lastRenewalTimestamp = lastRenewalTimestamp;
+        }
+    }
+
+    /**
+     * Returns the registration timestamp.
+     *
+     * @return time in milliseconds since epoch.
+     */
+    public long getRegistrationTimestamp() {
+        return registrationTimestamp;
+    }
+
+    /**
+     * Returns the last renewal timestamp of lease.
+     *
+     * @return time in milliseconds since epoch.
+     */
+    @JsonProperty("lastRenewalTimestamp")
+    public long getRenewalTimestamp() {
+        return lastRenewalTimestamp;
+    }
+
+    /**
+     * Returns the de-registration timestamp.
+     *
+     * @return time in milliseconds since epoch.
+     */
+    public long getEvictionTimestamp() {
+        return evictionTimestamp;
+    }
+
+    /**
+     * Returns the service UP timestamp.
+     *
+     * @return time in milliseconds since epoch.
+     */
+    public long getServiceUpTimestamp() {
+        return serviceUpTimestamp;
+    }
+
+    /**
+     * Returns client specified setting for renew interval.
+     *
+     * @return time in milliseconds since epoch.
+     */
+    public int getRenewalIntervalInSecs() {
+        return renewalIntervalInSecs;
+    }
+
+    /**
+     * Returns client specified setting for eviction (e.g. how long to wait w/o
+     * renewal event)
+     *
+     * @return time in milliseconds since epoch.
+     */
+    public int getDurationInSecs() {
+        return durationInSecs;
+    }
+
+    /**
+     * A builder class.
+     */
     public static final class Builder {
         private LeaseInfo result;
 
@@ -63,6 +167,9 @@ public class LeaseInfo {
             result = new LeaseInfo();
         }
 
+        /**
+         * @return A new instance of the builder
+         */
         public static Builder newBuilder() {
             return new Builder();
         }
@@ -152,94 +259,5 @@ public class LeaseInfo {
         public LeaseInfo build() {
             return result;
         }
-    }
-
-    LeaseInfo() {
-    }
-
-    /**
-     * TODO: note about renewalTimestamp legacy:
-     * The previous change to use Jackson ser/deser changed the field name for lastRenewalTimestamp to renewalTimestamp
-     * for serialization, which causes an incompatibility with the jacksonNG codec when the server returns data with
-     * field renewalTimestamp and jacksonNG expects lastRenewalTimestamp. Remove this legacy field from client code
-     * in a few releases (once servers are updated to a release that generates json with the correct
-     * lastRenewalTimestamp).
-     */
-    @JsonCreator
-    LeaseInfo(@JsonProperty("renewalIntervalInSecs") int renewalIntervalInSecs,
-              @JsonProperty("durationInSecs") int durationInSecs,
-              @JsonProperty("registrationTimestamp") long registrationTimestamp,
-              @JsonProperty("lastRenewalTimestamp") Long lastRenewalTimestamp,
-              @JsonProperty("renewalTimestamp") long lastRenewalTimestampLegacy,  // for legacy
-              @JsonProperty("evictionTimestamp") long evictionTimestamp,
-              @JsonProperty("serviceUpTimestamp") long serviceUpTimestamp) {
-
-        this.renewalIntervalInSecs = renewalIntervalInSecs;
-        this.durationInSecs = durationInSecs;
-        this.registrationTimestamp = registrationTimestamp;
-        this.evictionTimestamp = evictionTimestamp;
-        this.serviceUpTimestamp = serviceUpTimestamp;
-
-        if (lastRenewalTimestamp == null) {
-            this.lastRenewalTimestamp = lastRenewalTimestampLegacy;
-        } else {
-            this.lastRenewalTimestamp = lastRenewalTimestamp;
-        }
-    }
-
-    /**
-     * Returns the registration timestamp.
-     *
-     * @return time in milliseconds since epoch.
-     */
-    public long getRegistrationTimestamp() {
-        return registrationTimestamp;
-    }
-
-    /**
-     * Returns the last renewal timestamp of lease.
-     *
-     * @return time in milliseconds since epoch.
-     */
-    @JsonProperty("lastRenewalTimestamp")
-    public long getRenewalTimestamp() {
-        return lastRenewalTimestamp;
-    }
-
-    /**
-     * Returns the de-registration timestamp.
-     *
-     * @return time in milliseconds since epoch.
-     */
-    public long getEvictionTimestamp() {
-        return evictionTimestamp;
-    }
-
-    /**
-     * Returns the service UP timestamp.
-     *
-     * @return time in milliseconds since epoch.
-     */
-    public long getServiceUpTimestamp() {
-        return serviceUpTimestamp;
-    }
-
-    /**
-     * Returns client specified setting for renew interval.
-     *
-     * @return time in milliseconds since epoch.
-     */
-    public int getRenewalIntervalInSecs() {
-        return renewalIntervalInSecs;
-    }
-
-    /**
-     * Returns client specified setting for eviction (e.g. how long to wait w/o
-     * renewal event)
-     *
-     * @return time in milliseconds since epoch.
-     */
-    public int getDurationInSecs() {
-        return durationInSecs;
     }
 }

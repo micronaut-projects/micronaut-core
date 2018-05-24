@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
@@ -42,20 +43,20 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
- * of {@link Requires} annotation
+ * of {@link Requires} annotation.
  */
 public class RequiresCondition implements Condition {
 
     private final AnnotationMetadata annotationMetadata;
 
+    /**
+     * @param annotationMetadata The annotation metadata
+     */
     public RequiresCondition(AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata;
     }
@@ -112,6 +113,11 @@ public class RequiresCondition implements Condition {
         return true;
     }
 
+    /**
+     * @param context  The condition context
+     * @param requires The requires
+     * @return Whether matches the condition
+     */
     protected boolean matchesConfiguration(ConditionContext context, Requires requires) {
 
         String configurationName = requires.configuration();
@@ -123,13 +129,13 @@ public class RequiresCondition implements Condition {
         String minimumVersion = requires.version();
         Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
         if (!beanConfiguration.isPresent()) {
-            context.fail("Required configuration ["+configurationName+"] is not active");
+            context.fail("Required configuration [" + configurationName + "] is not active");
             return false;
         } else {
             String version = beanConfiguration.get().getVersion();
             if (version != null && minimumVersion.length() > 0) {
                 boolean result = SemanticVersion.isAtLeast(version, minimumVersion);
-                context.fail("Required configuration ["+configurationName+"] version requirements not met. Required: " + minimumVersion + ", Current: " + version);
+                context.fail("Required configuration [" + configurationName + "] version requirements not met. Required: " + minimumVersion + ", Current: " + version);
                 return result;
             } else {
                 return true;
@@ -171,14 +177,14 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean processRequires(ConditionContext context, Requires annotation) {
-        return  !matchesProperty(context, annotation) ||
-                !matchesMissingProperty(context, annotation) ||
-                !matchesEnvironment(context, annotation) ||
-                !matchesPresenceOfBeans(context, annotation) ||
-                !matchesAbsenceOfBeans(context, annotation) ||
-                !matchesConfiguration(context, annotation) ||
-                !matchesSdk(context,annotation) ||
-                !matchesConditions(context, annotation);
+        return !matchesProperty(context, annotation) ||
+            !matchesMissingProperty(context, annotation) ||
+            !matchesEnvironment(context, annotation) ||
+            !matchesPresenceOfBeans(context, annotation) ||
+            !matchesAbsenceOfBeans(context, annotation) ||
+            !matchesConfiguration(context, annotation) ||
+            !matchesSdk(context, annotation) ||
+            !matchesConditions(context, annotation);
     }
 
     private boolean matchesProperty(ConditionContext context, Requires annotation) {
@@ -191,26 +197,25 @@ public class RequiresCondition implements Condition {
                 String notEquals = annotation.notEquals();
                 boolean hasNotEquals = StringUtils.isNotEmpty(notEquals);
                 if (!propertyResolver.containsProperties(property) && StringUtils.isEmpty(annotation.defaultValue())) {
-                    if(hasNotEquals) {
+                    if (hasNotEquals) {
                         return true;
-                    }
-                    else {
-                        context.fail("Required property ["+property+"] not present");
+                    } else {
+                        context.fail("Required property [" + property + "] not present");
                         return false;
                     }
                 } else if (StringUtils.isNotEmpty(value)) {
                     Optional<String> resolved = resolvePropertyValue(annotation, property, propertyResolver);
                     boolean result = resolved.map(val -> val.equals(value)).orElse(false);
-                    if(!result) {
-                        context.fail("Property ["+property+"] with value ["+resolved.orElse(null)+"] does not equal required value: " + value);
+                    if (!result) {
+                        context.fail("Property [" + property + "] with value [" + resolved.orElse(null) + "] does not equal required value: " + value);
                     }
                     return result;
                 } else if (hasNotEquals) {
                     Optional<String> resolved = resolvePropertyValue(annotation, property, propertyResolver);
                     String resolvedValue = resolved.orElse(null);
                     boolean result = resolvedValue == null || !resolvedValue.equals(notEquals);
-                    if(!result) {
-                        context.fail("Property ["+property+"] with value ["+resolved.orElse(null)+"] should not equal: " + notEquals);
+                    if (!result) {
+                        context.fail("Property [" + property + "] with value [" + resolved.orElse(null) + "] should not equal: " + notEquals);
                     }
                     return result;
                 }
@@ -238,7 +243,7 @@ public class RequiresCondition implements Condition {
             if (beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
                 if (propertyResolver.containsProperties(property)) {
-                    context.fail("Property ["+property+"] present");
+                    context.fail("Property [" + property + "] present");
                     return false;
                 }
             }
@@ -257,8 +262,8 @@ public class RequiresCondition implements Condition {
                     Environment environment = applicationContext.getEnvironment();
                     Set<String> activeNames = environment.getActiveNames();
                     boolean result = Arrays.stream(env).anyMatch(s -> !activeNames.contains(s));
-                    if(!result) {
-                        context.fail("Disallowed environments ["+ArrayUtils.toString(env)+"] are active: " + activeNames);
+                    if (!result) {
+                        context.fail("Disallowed environments [" + ArrayUtils.toString(env) + "] are active: " + activeNames);
                     }
                     return result;
                 }
@@ -272,8 +277,8 @@ public class RequiresCondition implements Condition {
                 Environment environment = applicationContext.getEnvironment();
                 Set<String> activeNames = environment.getActiveNames();
                 boolean result = Arrays.stream(env).anyMatch(activeNames::contains);
-                if(!result) {
-                    context.fail("None of the required environments ["+ArrayUtils.toString(env)+"] are active: " + activeNames);
+                if (!result) {
+                    context.fail("None of the required environments [" + ArrayUtils.toString(env) + "] are active: " + activeNames);
                 }
                 return result;
             }
@@ -288,15 +293,15 @@ public class RequiresCondition implements Condition {
         } else {
             try {
                 boolean conditionResult = conditionClass.newInstance().matches(context);
-                if(!conditionResult) {
-                    context.fail("Custom condition ["+conditionClass+"] failed evaluation");
+                if (!conditionResult) {
+                    context.fail("Custom condition [" + conditionClass + "] failed evaluation");
                 }
                 return conditionResult;
             } catch (Throwable e) {
                 // maybe a Groovy closure
                 Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
                 boolean conditionResult = constructor.flatMap(ctor ->
-                        InstantiationUtils.tryInstantiate(ctor, null, null)
+                    InstantiationUtils.tryInstantiate(ctor, null, null)
                 ).flatMap(obj -> {
                     Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
                     if (method.isPresent()) {
@@ -307,8 +312,8 @@ public class RequiresCondition implements Condition {
                     }
                     return Optional.empty();
                 }).orElse(false);
-                if(!conditionResult) {
-                    context.fail("Custom condition ["+conditionClass+"] failed evaluation");
+                if (!conditionResult) {
+                    context.fail("Custom condition [" + conditionClass + "] failed evaluation");
                 }
                 return conditionResult;
 
@@ -378,7 +383,7 @@ public class RequiresCondition implements Condition {
                 ClassLoader classLoader = context.getBeanContext().getClassLoader();
                 for (String name : names) {
                     if (!ClassUtils.forName(name, classLoader).isPresent()) {
-                        context.fail("Class ["+name+"] is not present");
+                        context.fail("Class [" + name + "] is not present");
                         return false;
                     }
                 }
@@ -398,7 +403,7 @@ public class RequiresCondition implements Condition {
                     if (ArrayUtils.isNotEmpty(names)) {
                         Optional<Class> type = ClassUtils.forName(names[0], beanContext.getClassLoader());
                         if (!type.isPresent()) {
-                            context.fail("Annotation type ["+names[0]+"] not present on classpath");
+                            context.fail("Annotation type [" + names[0] + "] not present on classpath");
                             return false;
                         } else {
                             Environment environment = applicationContext.getEnvironment();
@@ -422,7 +427,7 @@ public class RequiresCondition implements Condition {
         if (ArrayUtils.isNotEmpty(beans)) {
             for (Class type : beans) {
                 if (!beanContext.containsBean(type)) {
-                    context.fail("No bean of type ["+type+"] present within context");
+                    context.fail("No bean of type [" + type + "] present within context");
                     return false;
                 }
             }
@@ -447,7 +452,7 @@ public class RequiresCondition implements Condition {
                     beanDefinitions.removeIf(BeanDefinition::isAbstract);
                     if (!beanDefinitions.isEmpty()) {
                         BeanDefinition<?> existing = beanDefinitions.iterator().next();
-                        context.fail("Existing bean ["+existing.getName()+"] of type ["+type+"] registered in context");
+                        context.fail("Existing bean [" + existing.getName() + "] of type [" + type + "] registered in context");
                         return false;
                     }
                 }

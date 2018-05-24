@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.annotation.Internal;
@@ -32,8 +33,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * An abstract implementation of {@link Resource}
+ * An abstract implementation of {@link Resource}.
  *
+ * @param <Impl> An Abstract resource implementation
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -43,11 +45,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
 
     /**
-     * Add a link with the given reference
+     * Add a link with the given reference.
      *
      * @param ref  The reference
      * @param link The link
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable Link link) {
         if (StringUtils.isNotEmpty(ref) && link != null) {
@@ -58,11 +60,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add a link with the given reference
+     * Add a link with the given reference.
      *
      * @param ref  The reference
      * @param link The link
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl link(@Nullable CharSequence ref, @Nullable String link) {
         if (StringUtils.isNotEmpty(ref) && link != null) {
@@ -73,11 +75,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref      The reference
      * @param resource The resource
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, Resource resource) {
         if (StringUtils.isNotEmpty(ref) && resource != null) {
@@ -88,11 +90,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref      The reference
      * @param resource The resource
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, Resource... resource) {
         if (StringUtils.isNotEmpty(ref) && resource != null) {
@@ -103,11 +105,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Add an embedded resource with the given reference
+     * Add an embedded resource with the given reference.
      *
      * @param ref          The reference
      * @param resourceList The resources
-     * @return This VndError
+     * @return This JsonError
      */
     public Impl embedded(CharSequence ref, List<Resource> resourceList) {
         if (StringUtils.isNotEmpty(ref) && resourceList != null) {
@@ -128,7 +130,9 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     }
 
     /**
-     * Allows de-serializing of links with Jackson
+     * Allows de-serializing of links with Jackson.
+     *
+     * @param links The links
      */
     @SuppressWarnings("unchecked")
     @Internal

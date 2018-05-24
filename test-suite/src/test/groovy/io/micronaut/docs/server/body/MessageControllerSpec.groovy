@@ -19,10 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -58,7 +54,7 @@ class MessageControllerSpec extends Specification {
         given:
         String body = "My Text"
         String response = httpClient.toBlocking().retrieve(
-                HttpRequest.POST('/receive/echoFlow', body)
+                HttpRequest.POST('/receive/echo-flow', body)
                         .contentType(MediaType.TEXT_PLAIN_TYPE),
                 String
         )

@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.interactive.completers
 
 import jline.console.completer.FileNameCompleter
-
 
 /**
  * JLine Completor that does file path matching like FileNameCompletor,
@@ -24,7 +24,7 @@ import jline.console.completer.FileNameCompleter
  * character.
  *
  * @author Peter Ledbrook
- * @since 2.0
+ * @since 1.0
  */
 class EscapingFileNameCompletor extends FileNameCompleter {
     /**

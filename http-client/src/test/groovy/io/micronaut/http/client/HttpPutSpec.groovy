@@ -16,16 +16,6 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Put
-import io.micronaut.http.client.exceptions.HttpClientException
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -48,9 +38,17 @@ import spock.lang.Specification
  */
 class HttpPutSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    @AutoCleanup
+    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     void "test send invalid http method"() {
         given:

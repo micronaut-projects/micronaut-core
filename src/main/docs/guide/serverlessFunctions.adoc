@@ -1,0 +1,5 @@
+Server-less architectures where as a developer you deploy functions that are fully managed by the Cloud environment and are executed in ephemeral processes require a unique approach.
+
+Traditional frameworks like Grails and Spring are not really suitable since low memory consumption and fast startup time are critical, since the Function as a Service (FaaS) server will typically spin up your function for a period using a cold start and then keep it warm.
+
+Micronaut's compile-time approach, fast startup time and low-memory footprint make it a great candidate for using as a framework for developing functions and in fact Micronaut features dedicated support for developing and deploying functions to AWS Lambda (support for other FaaS platforms is planned in the future).

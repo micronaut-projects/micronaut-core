@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
@@ -21,8 +22,9 @@ import io.micronaut.context.DefaultBeanResolutionContext;
 
 /**
  * A bean definition that is provides initialization hooks normally in the form of methods annotated with
- * {@link javax.annotation.PostConstruct}
+ * {@link javax.annotation.PostConstruct}.
  *
+ * @param <T> The bean definition type
  * @author Graeme Rocher
  * @see javax.annotation.PostConstruct
  * @since 1.0
@@ -30,21 +32,23 @@ import io.micronaut.context.DefaultBeanResolutionContext;
 public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks
+     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks.
      *
      * @param context The bean context
      * @param bean    The bean
+     * @return The bean instance
      */
     default T initialize(BeanContext context, T bean) {
         return initialize(new DefaultBeanResolutionContext(context, this), context, bean);
     }
 
     /**
-     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks
+     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks.
      *
      * @param resolutionContext The resolution context
      * @param context           The bean context
      * @param bean              The bean
+     * @return The bean instance
      */
     T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean);
 }

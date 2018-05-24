@@ -15,15 +15,8 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
 import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
-import io.reactivex.internal.subscribers.BlockingFirstSubscriber
-import io.reactivex.internal.subscribers.BlockingSubscriber
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
@@ -47,8 +40,13 @@ import java.nio.charset.StandardCharsets
  */
 class DataStreamSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test read bytebuffer stream"() {
         given:
@@ -135,7 +133,6 @@ class DataStreamSpec extends Specification {
     }
 
     @Controller("/datastream/books")
-    @Singleton
     static class BookController {
 
         @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)

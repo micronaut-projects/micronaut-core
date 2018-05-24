@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.console.parsing
 
-import io.micronaut.cli.util.NameUtils
 import groovy.transform.CompileStatic
+import io.micronaut.cli.util.NameUtils
 
 /**
  * @author Andres Almiray
  * @author Dierk Koenig
  * @author Graeme Rocher
+ * @since 1.0
  */
 @CompileStatic
 class ScriptNameResolver {
@@ -30,7 +32,7 @@ class ScriptNameResolver {
      * The following scriptNames match FooBar: FB, FoB, FBa
      */
     static boolean resolvesTo(String scriptName, String scriptFileName) {
-        def scriptFileNameTokens = NameUtils.getNameFromScript( scriptFileName ).findAll(/[A-Z][a-z]+/)
+        def scriptFileNameTokens = NameUtils.getNameFromScript(scriptFileName).findAll(/[A-Z][a-z]+/)
         def scriptNameTokens = NameUtils.getNameFromScript(scriptName).findAll(/[A-Z][a-z]*/)
 
         if (scriptFileNameTokens.size() != scriptNameTokens.size()) return false

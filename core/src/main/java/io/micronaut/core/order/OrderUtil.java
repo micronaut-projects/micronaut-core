@@ -32,8 +32,6 @@ public class OrderUtil {
 
     /**
      * Provide a comparator for collections.
-     *
-     * @return the comparator
      */
     public static final Comparator<Object> COMPARATOR = (o1, o2) -> {
         int order1 = getOrder(o1);
@@ -43,8 +41,6 @@ public class OrderUtil {
 
     /**
      * Provide a comparator, in reversed order, for collections.
-     *
-     * @return the comparator
      */
     public static final Comparator<Object> REVERSE_COMPARATOR = Collections.reverseOrder(COMPARATOR);
 
@@ -91,7 +87,7 @@ public class OrderUtil {
      *
      * @param objects The array to sort
      */
-    public static void sort(Ordered...objects) {
+    public static void sort(Ordered... objects) {
         Arrays.sort(objects, COMPARATOR);
     }
 
@@ -101,7 +97,7 @@ public class OrderUtil {
      * @param objects The array to sort
      */
     public static void sort(Object[] objects) {
-        Arrays.sort(objects,COMPARATOR);
+        Arrays.sort(objects, COMPARATOR);
     }
 
     private static int getOrder(Object o) {

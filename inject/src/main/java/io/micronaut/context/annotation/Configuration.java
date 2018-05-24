@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import java.lang.annotation.Documented;
@@ -21,7 +22,7 @@ import java.lang.annotation.Target;
 
 /**
  * <p>A configuration is a grouping of bean definitions under a package. A configuration can have requirements applied
- * to it with {@link Requires} such that the entire configuration only loads of the requirements are met</p>
+ * to it with {@link Requires} such that the entire configuration only loads of the requirements are met.</p>
  *
  * @author Graeme Rocher
  * @see Requires

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile
 
 /**
  * A {@link Command} applicable only to a certain {@link Profile}
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 interface ProfileCommand extends Command {
     /**

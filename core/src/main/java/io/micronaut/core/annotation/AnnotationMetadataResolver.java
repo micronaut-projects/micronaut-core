@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,12 @@ import java.lang.reflect.AnnotatedElement;
  * @since 1.0
  */
 public interface AnnotationMetadataResolver {
+
     /**
      * The default resolver.
      */
-    AnnotationMetadataResolver DEFAULT = new AnnotationMetadataResolver() {};
+    AnnotationMetadataResolver DEFAULT = new AnnotationMetadataResolver() {
+    };
 
     /**
      * Resolve the {@link AnnotationSource} for the given type.
@@ -38,7 +40,7 @@ public interface AnnotationMetadataResolver {
      * @return The {@link AnnotationSource}
      */
     default @Nonnull AnnotatedElement resolveElement(Class<?> type) {
-        if(type == null) {
+        if (type == null) {
             return AnnotationSource.EMPTY;
         }
         return type;

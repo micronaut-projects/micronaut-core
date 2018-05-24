@@ -17,8 +17,6 @@ package io.micronaut.inject.generics
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 

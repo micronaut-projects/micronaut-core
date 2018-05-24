@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -25,8 +24,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>Annotation applied to the method or type indicating that a {@link ExecutableMethod} should be produced for
- * this method</p>
+ * <p>Annotation applied to the method or type indicating that a {@link io.micronaut.inject.ExecutableMethod} should be
+ * produced for this method.</p>
  * <p>
  * <p>When applied to a type all public methods will be considered executable and the necessary metadata produced</p>
  * <p>
@@ -41,11 +40,11 @@ import java.lang.annotation.Target;
 public @interface Executable {
 
     /**
-     * Whether the {@link ExecutableMethod} should be processed at startup by the registered
+     * Whether the {@link io.micronaut.inject.ExecutableMethod} should be processed at startup by the registered
      * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances. The default is false to ensure fast
      * startup, but for certain types of components processing at startup is required (for example scheduled tasks)
      *
-     * @return Whether to process the {@link ExecutableMethod} at startup
+     * @return Whether to process the {@link io.micronaut.inject.ExecutableMethod} at startup
      */
     boolean processOnStartup() default false;
 }

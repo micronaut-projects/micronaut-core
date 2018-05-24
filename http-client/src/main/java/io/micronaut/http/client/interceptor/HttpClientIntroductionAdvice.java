@@ -33,8 +33,20 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Headers;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.Client;
 import io.micronaut.http.client.DefaultHttpClient;
@@ -49,6 +61,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -57,6 +70,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -97,9 +111,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
-     * @param beanContext context to resolve beans
+     *
+     * @param beanContext          context to resolve beans
      * @param loadBalancerResolver load balancer resolver
-     * @param transformers transformation classes
+     * @param transformers         transformation classes
      */
     public HttpClientIntroductionAdvice(
         BeanContext beanContext,
@@ -113,6 +128,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Interceptor to apply headers, cookies, parameter and body arguements.
+     *
      * @param context The context
      * @return httpClient or future
      */
@@ -277,8 +293,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<Object> methodDeclaringType = context.getDeclaringType();
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Produces.class, "single", Boolean.class).orElse(false);
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+
+
                 Class<?> argumentType = publisherArgument.getType();
+
+                if (HttpResponse.class.isAssignableFrom(argumentType) || HttpStatus.class.isAssignableFrom(argumentType)) {
+                    isSingle = true;
+                }
+
+                if (!isSingle) {
+                    publisherArgument = Argument.of(List.class, publisherArgument);
+                }
+
                 Publisher<?> publisher;
 
                 MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
@@ -289,7 +317,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (HttpResponse.class.isAssignableFrom(argumentType)) {
                     request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                     publisher = httpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, publisherArgument
                     );
                 } else if (Void.class.isAssignableFrom(argumentType)) {
                     publisher = httpClient.exchange(
@@ -298,6 +326,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else {
                     MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                     request.accept(acceptTypes);
+
                     publisher = httpClient.retrieve(
                         request, publisherArgument
                     );
@@ -384,8 +413,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Resolve the template for the client annotation.
+     *
      * @param clientAnnotation client annotation reference
-     * @param templateString template to be applied
+     * @param templateString   template to be applied
      * @return resolved template contents
      */
     private String resolveTemplate(Client clientAnnotation, String templateString) {
@@ -405,7 +435,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Gets the client registration for the http request.
-     * @param context application contextx
+     *
+     * @param context   application contextx
      * @param clientAnn client annotation
      * @return client registration
      */
@@ -427,7 +458,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             } else if (ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
             }
-            HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
+            HttpClientConfiguration configuration;
+            Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
+                HttpClientConfiguration.class,
+                Qualifiers.byName(clientId[0])
+            );
+            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(clientAnn.configuration()));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
@@ -472,6 +508,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     /**
      * Cleanup method to prevent resource leaking.
+     *
      * @throws IOException
      */
     @Override
@@ -492,7 +529,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         /**
          * Constructor for client registration.
-         * @param httpClient http client for outgoing connection
+         *
+         * @param httpClient  http client for outgoing connection
          * @param contextPath application context path
          */
         ClientRegistration(HttpClient httpClient, String contextPath) {

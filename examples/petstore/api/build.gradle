@@ -1,8 +1,0 @@
-dependencies {
-    compile "io.micronaut:http:${projectVersion}"
-    compile "io.micronaut:runtime:${projectVersion}"
-    compile "io.micronaut:validation:${projectVersion}"
-}
-compileJava {
-    options.compilerArgs += ["-parameters"]
-}

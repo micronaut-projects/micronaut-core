@@ -16,7 +16,6 @@
 package io.micronaut.docs.config.builder
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class VehicleSpec extends Specification {

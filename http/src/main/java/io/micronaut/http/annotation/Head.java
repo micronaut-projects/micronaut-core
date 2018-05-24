@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -25,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#HEAD}
+ * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#HEAD}.
  *
  * @author Graeme Rocher
  * @since 1.0

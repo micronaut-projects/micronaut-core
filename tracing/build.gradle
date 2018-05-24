@@ -14,7 +14,7 @@ dependencies {
     compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
     compileOnly 'io.opentracing.brave:brave-opentracing:0.30.0'
 
-    compileOnly 'io.jaegertracing:jaeger-core:0.27.0-RC1'
+    compileOnly 'io.jaegertracing:jaeger-core:0.27.0'
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
 

@@ -19,6 +19,7 @@ package io.micronaut.core.convert.value;
 import java.util.List;
 
 /**
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

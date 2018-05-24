@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -28,7 +29,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>An annotation that can be applied to classes that implement {@link io.micronaut.http.filter.HttpFilter} to specify the patterns</p>
+ * <p>An annotation that can be applied to classes that implement {@link io.micronaut.http.filter.HttpFilter} to
+ * specify the patterns.</p>
  * <p>
  * <p>Used as an alternative to applying filters manually via the {code Router} API</p>
  *
@@ -48,7 +50,7 @@ public @interface Filter {
     String[] value() default {};
 
     /**
-     * Same as {@link #value()}
+     * Same as {@link #value()}.
      *
      * @return The patterns
      */
@@ -61,10 +63,10 @@ public @interface Filter {
     HttpMethod[] methods() default {};
 
     /**
-     * The clients identifiers this filter applies to. Applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
+     * The service identifiers this filter applies to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
      * Equivalent to the {@code id()} of {@code io.micronaut.http.client.Client}.
      *
-     * @return The client identifiers
+     * @return The service identifiers
      */
-    String[] clients() default {};
+    String[] serviceId() default {};
 }

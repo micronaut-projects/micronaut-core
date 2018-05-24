@@ -15,10 +15,8 @@
  */
 package io.micronaut.docs.intro
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.*
 import spock.lang.Specification
-
+import io.micronaut.context.BeanContext
 /**
  * @author Graeme Rocher
  * @since 1.0

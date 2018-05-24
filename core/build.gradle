@@ -3,11 +3,13 @@ apply plugin: 'com.github.johnrengelman.plugin-shadow'
 
 shadowJar {
     dependencies {
-        exclude(dependency(group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'))
-        exclude(dependency(group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'))
+        exclude(dependency(dependencyVersion("slf4j")))
+        exclude(dependency(dependencyVersion("reactive.streams")))
+        exclude(dependency(dependencyVersion("jsr305")))
     }
     relocate "org.objectweb.asm", "io.micronaut.asm"
     relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+    exclude "module-info.class"
 }
 
 tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
@@ -15,13 +17,15 @@ tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowR
 }
 
 dependencies {
-    shadowCompile group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'
-    shadowCompile group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'
+    shadowCompile dependencyVersion("slf4j")
+    shadowCompile dependencyVersion("reactive.streams")
+    shadowCompile dependencyVersion("jsr305")
 
-    compile group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'
-    compile group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2'
+    compile dependencyVersion("reactive.streams")
+    compile dependencyVersion("jsr305")
     compile "org.ow2.asm:asm:$asmVersion"
     compile "org.ow2.asm:asm-commons:$asmVersion"
     compile "org.ow2.asm:asm-tree:$asmVersion"
     compile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
 }
+

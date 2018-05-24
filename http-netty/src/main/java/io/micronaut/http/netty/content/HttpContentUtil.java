@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.content;
 
 import io.micronaut.core.annotation.Internal;
@@ -24,7 +25,8 @@ import io.netty.handler.codec.http.HttpContent;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Utility methods for generated HTTP content
+ * Utility methods for generated HTTP content.
+ *
  * @author graemerocher
  * @since 1.0
  */
@@ -34,8 +36,8 @@ public class HttpContentUtil {
     public static final byte[] OPEN_BRACKET = "[".getBytes(StandardCharsets.UTF_8);
     public static final byte[] CLOSE_BRACKET = "]".getBytes(StandardCharsets.UTF_8);
     public static final byte[] COMMA = ",".getBytes(StandardCharsets.UTF_8);
+
     /**
-     *
      * @return Produces HTTP content for {@code [}
      */
     public static HttpContent openBracket() {
@@ -52,14 +54,13 @@ public class HttpContentUtil {
     /**
      * @param httpContent The http content to prefix
      * @return Produces HTTP content for {@code ]}
-     *
      */
     public static HttpContent prefixComma(HttpContent httpContent) {
         CompositeByteBuf compositeByteBuf = Unpooled.compositeBuffer(2);
         compositeByteBuf.addComponent(true, Unpooled.wrappedBuffer(COMMA));
         compositeByteBuf.addComponent(true, httpContent.content());
         return httpContent.replace(
-                compositeByteBuf
+            compositeByteBuf
         );
     }
 }

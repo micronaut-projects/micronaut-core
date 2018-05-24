@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cli.profile.commands.events
 
 import groovy.transform.CompileStatic
-
 
 /**
  * Stores command line events
  *
  * @author Graeme Rocher
- * @since 3.0
+ * @since 1.0
  */
 @CompileStatic
 class EventStorage {
@@ -30,14 +30,14 @@ class EventStorage {
     private static Map<String, Collection<Closure>> eventListeners = [:].withDefault { [] }
 
     static void registerEvent(String eventName, Closure callable) {
-        if(!eventListeners[eventName].contains(callable)) {
+        if (!eventListeners[eventName].contains(callable)) {
             eventListeners[eventName] << callable
         }
     }
 
-    static void fireEvent(Object caller, String eventName, Object...args) {
+    static void fireEvent(Object caller, String eventName, Object... args) {
         def listeners = eventListeners[eventName]
-        for(listener in listeners) {
+        for (listener in listeners) {
             listener.delegate = caller
             listener.call args
         }

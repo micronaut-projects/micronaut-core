@@ -30,7 +30,6 @@ import javax.validation.constraints.Size;
  */
 // tag::class[]
 @Controller("/receive")
-@Singleton
 public class MessageController {
 // end::class[]
 
@@ -42,11 +41,11 @@ public class MessageController {
     // end::echo[]
 
     // tag::echoReactive[]
-    @Post(consumes = MediaType.TEXT_PLAIN)
-    Single<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { // <1>
-        return text.collect(StringBuffer::new, StringBuffer::append)
+    @Post(consumes = MediaType.TEXT_PLAIN) // <1>
+    Single<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { //<2>
+        return text.collect(StringBuffer::new, StringBuffer::append) // <3>
                    .map(buffer ->
-                        HttpResponse.ok(buffer.toString()) // <2>
+                        HttpResponse.ok(buffer.toString())
                    );
     }
     // end::echoReactive[]

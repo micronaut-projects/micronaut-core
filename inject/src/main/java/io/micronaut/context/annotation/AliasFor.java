@@ -13,44 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.annotation;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * <p>Allows specifying an annotation member alias. In other words, a value of an annotation member can be used to
  * represent the value of another annotation's member or a another member within the same annotation.</p>
  * <p>
- * <p>The representation is constructed via the {@link AnnotationMetadata} interface</p>
+ * <p>The representation is constructed via the {@link io.micronaut.core.annotation.AnnotationMetadata} interface</p>
  *
  * @author Graeme Rocher
- * @see AnnotationMetadata
+ * @see io.micronaut.core.annotation.AnnotationMetadata
  * @since 1.0
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Documented
+@Repeatable(Aliases.class)
 public @interface AliasFor {
 
     /**
-     * Used to declare aliases of members within the current annotation
+     * Used to declare aliases of members within the current annotation.
+     *
+     * @return The alias
      */
     String value() default "";
 
     /**
-     * The name of the member that <code>this</code> member is an alias for
+     * @return The name of the member that <code>this</code> member is an alias for
      */
     String member() default "";
 
     /**
-     * The type of annotation in which the aliased {@link #member()} is declared.
+     * @return The type of annotation in which the aliased {@link #member()} is declared.
      * If not specified the alias is applied to the current annotation.
      */
     Class<? extends Annotation> annotation() default Annotation.class;

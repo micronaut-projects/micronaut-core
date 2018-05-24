@@ -1,1 +1,56 @@
-TODO
+The previous example presented a trivial example that uses the parameters of a method to represent the body of a `POST` request:
+
+.PetOperations.java
+[source,java]
+----
+include::{testsclient}/annotation/PetOperations.java[tags=save, indent=0]
+----
+
+The `save` method when called will perform an HTTP `POST` with the following JSON by default:
+
+.Example Produced JSON
+[source,json]
+----
+{"name":"Dino", age:10}
+----
+
+You may however want to customize what is sent as the body, the parameters, URI variables and so on. The ann:http.client.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
+
+For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used declare that the contents to send to the server are represented by the `Pet` POJO:
+
+.PetOperations.java
+[source,java]
+----
+@Post("/{name}")
+Single<Pet> save(
+    @NotBlank String name, // <1>
+    @Body @Valid Pet pet) // <2>
+----
+
+<1> The name parameter, included as part of the URI, and declared `@NotBlank`
+<2> The `pet` parameter, used to encode the body and declared `@Valid`
+
+The following table summarizes the parameter annotations, their purpose and provides an example:
+
+
+.Parameter Binding Annotations
+|===
+|Annotation|Description |Example
+
+|ann:http.annotation.Body[]
+|Allows to specify the parameter that is the body of the request
+|`@Body String body`
+
+|ann:http.annotation.CookieValue[]
+|Allows specifying parameters that should be sent as cookies
+|`@CookieValue String myCookie`
+
+|ann:http.annotation.Header[]
+|Allows specifying parameters that should be sent as HTTP headers
+|`@Header String contentType`
+
+|ann:context.annotation.Parameter[]
+|Allows customizing the name of the URI parameter to bind from
+|`@Parameter('userAge') Integer age`
+
+|===

@@ -19,6 +19,7 @@ ioc:
     metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
   conditionalBeans: Conditional Beans
+  replaces: Bean Replacement
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
@@ -52,18 +53,18 @@ httpServer:
   title: The HTTP Server
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
-  producesAnnotation: Response Content-Type
-  consumesAnnotation: Accepted Request Content-Type
   routing: HTTP Routing
-  staticResources: Serving Static Resources
   binding: Simple Request Binding
   requestResponse: The HttpRequest and HttpResponse
+  producesAnnotation: Response Content-Type
+  consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
     jsonBinding: JSON Binding with Jackson
-  contentNegotiation: Content Negotiation
+  staticResources: Serving Static Resources
+#  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data
   uploads: File Uploads
@@ -78,25 +79,35 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
-  lowLevelHttpClient: Using the Low-Level HTTP Client
+  lowLevelHttpClient:
+    title: Using the Low-Level HTTP Client
+    clientBasics: Sending your first HTTP request
+    clientPostRequests: Posting a Request Body
+    clientUploads: Multipart Client Uploads
+    clientStreaming: Streaming JSON over HTTP
+    clientConfiguration: Configuring HTTP clients
   clientAnnotation:
-    title: Compile-Time HTTP Clients with @Client
+    title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
     clientHeaders: Customizing Request Headers
+    clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    clientConfiguration: Configuring HTTP Clients
-  multipartRequest: Multipart Request Handling
+    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
 cloud:
-  title: Cloud Ready Features
-  configurationSharing: Configuration Sharing
+  title: Cloud Native Features
+  cloudConfiguration:
+    title: Cloud Configuration
+    distributedConfiguration: Distributed Configuration
+    distributedConfigurationConsul: Consul Support
+#    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
-    serviceDiscoveryRoute53: AWS Route 53 Support
+#    serviceDiscoveryRoute53: AWS Route 53 Support
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
@@ -104,9 +115,19 @@ cloud:
     title: Distributed Tracing
     zipkin: Tracing with Zipkin
     jaeger: Tracing with Jaeger
-  serverlessFunctions:
-    title: Serverless Function Support
-    lambdaFunctions: AWS Lambda Function Support
+serverlessFunctions:
+  title: Serverless Functions
+  writingFunctions:
+    title: Writing Functions
+    functionApplication: FunctionApplication
+    functionBean: FunctionBean
+    groovyFunctions: Groovy Functions
+  runningFunctions:
+    title: Running Functions
+    functionWeb: Functions as Web Applications
+    functionCLI: Functions as CLI Applications
+  lambdaFunctions: Deploying Functions to AWS Lambda 
+  callingFunctions: Calling Functions with FunctionClient
 dataAccess:
   title: Configurations for Data Access
   sqlSupport: Configuring a SQL Data Source
@@ -114,8 +135,10 @@ dataAccess:
   mongoSupport: Configuring MongoDB
   neo4jSupport: Configuring Neo4j
   redisSupport: Configuring Redis
+  cassandraSupport: Configuring Cassandra
 languageSupport:
   title: Language Support
+  java: Micronaut for Java
   groovy: Micronaut for Groovy
   kotlin: Micronaut for Kotlin
 management:
@@ -123,7 +146,7 @@ management:
   buildingEndpoints:
     title: Creating Endpoints
     endpointAnnotation: The Endpoint Annotation
-    endpointMethod: Executable Method
+    endpointMethod: Endpoint Methods
     endpointConfiguration: Endpoint Configuration
   providedEndpoints:
     title: Built-In Endpoints
@@ -135,10 +158,17 @@ management:
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
-  session: Session Authentication
-  token:
-    title: Token Authentication
+  authenticationProviders: Authentication Providers
+  securityRule:
+      title: Security Rules
+      ipPattern: IP Pattern Rule
+      secured: Secured Annotation
+      interceptUrlMap: Intercept URL Map
+      builtInEndpointsAccess: Built-In Endpoints Security
+  authenticationStrategies:
+    title: Authentication Strategies
     basicAuth: Basic Auth
+    session: Session Authentication
     jwt:
       title: JSON Web Token
       reader:
@@ -150,20 +180,19 @@ security:
         jwtGeneratorSignature: JWT Signature
         jwtGeneratorEncryption: Encrypted JWTs
       jwtValidation: JWT Token Validation
-  securityRule:
-    title: Security Rules
-    ipPattern: IP Pattern Rule
-    secured: Secured Annotation
-    interceptUrlMap: Intercept URL Map
-    builtInEndpointsAccess: Built-In Endpoints Security
-  render:
-    title: Token Render
+      claimsGeneration: Claims Generation
+      render:
+        title: Token Render
   endpoints:
     title: Built-In Security Controllers
-    login:
-      title: Login Controller
-      authenticationProviders: Authentication Providers
+    login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
   securityEvents: Security Events
+cli:
+  title: Micronaut CLI
+  createProject: Creating a Project
+  profiles: Profiles
+  features: Features
+  commands: Commands
 

@@ -18,6 +18,7 @@ package io.micronaut.upload;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
@@ -28,6 +29,8 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.BiConsumer;
+import io.reactivex.functions.BiFunction;
+import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
@@ -82,40 +85,23 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receivePublisher(Flowable<byte[]> data) {
-        StringBuilder builder = new StringBuilder();
-        AtomicLong length = new AtomicLong(0);
-        ReplaySubject<HttpResponse> subject = ReplaySubject.create();
-        data
-            .subscribeOn(Schedulers.io())
-            .subscribe(
-        new Subscriber<byte[]>() {
-            Subscription subscription;
-            @Override
-            public void onSubscribe(Subscription s) {
-                s.request(1);
-                this.subscription = s;
-            }
+    public Single<HttpResponse> receivePublisher(Flowable<byte[]> data) {
+        return data.reduce(new StringBuilder(), (stringBuilder, bytes) ->
 
-            @Override
-            public void onNext(byte[] bytes) {
-                builder.append(new String(bytes));
-                length.addAndGet(bytes.length);
-                subscription.request(1);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                subject.onError(t);
-            }
-
-            @Override
-            public void onComplete() {
-                subject.onNext(HttpResponse.ok(builder.toString()));
-                subject.onComplete();
-            }
-        });
-        return subject.toFlowable(BackpressureStrategy.ERROR);
+                {
+                    StringBuilder append = stringBuilder.append(new String(bytes));
+                    System.out.println("bytes.length = " + bytes.length);
+                    return append;
+                }
+        )
+        .map((Function<StringBuilder, HttpResponse>) stringBuilder ->
+                {
+                    System.out.println("stringBuilder.length() = " + stringBuilder.length());
+                    MutableHttpResponse<String> res = HttpResponse.ok(stringBuilder.toString());
+                    System.out.println("res = " + res);
+                    return res;
+                }
+        );
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
@@ -129,12 +115,16 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receiveTwoFlowParts(@Part("data") Flowable<String> dataPublisher, @Part("title") Flowable<String> titlePublisher) {
+    public Publisher<HttpResponse> receiveTwoFlowParts(
+            @Part("data") Flowable<String> dataPublisher,
+            @Part("title") Flowable<String> titlePublisher) {
         return titlePublisher.zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data ));
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receiveMultipleCompleted(Flowable<CompletedFileUpload> data, String title) {
+    public Publisher<HttpResponse> receiveMultipleCompleted(
+            Flowable<CompletedFileUpload> data,
+            String title) {
         List<Map> results = new ArrayList<>();
 
         ReplaySubject<HttpResponse> subject = ReplaySubject.create();
@@ -174,7 +164,8 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Single<HttpResponse> receiveMultipleStreaming(Flowable<StreamingFileUpload> data) {
+    public Single<HttpResponse> receiveMultipleStreaming(
+            Flowable<StreamingFileUpload> data) {
         return data.subscribeOn(Schedulers.io()).flatMap((StreamingFileUpload upload) -> {
             return Flowable.fromPublisher(upload).map(PartData::getBytes);
         }).collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))

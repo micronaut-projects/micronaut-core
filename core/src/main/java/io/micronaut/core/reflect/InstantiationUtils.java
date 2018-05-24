@@ -68,10 +68,16 @@ public class InstantiationUtils {
             }
             return Optional.empty();
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Tried, but could not instantiate type: " + type, e);
+            try {
+                Constructor<T> defaultConstructor = type.getDeclaredConstructor();
+                defaultConstructor.setAccessible(true);
+                return tryInstantiate(defaultConstructor);
+            } catch (Throwable e1) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Tried, but could not instantiate type: " + type, e);
+                }
+                return Optional.empty();
             }
-            return Optional.empty();
         }
     }
 
@@ -87,8 +93,8 @@ public class InstantiationUtils {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Tried, but could not instantiate type: " + type, e);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Tried, but could not instantiate type: " + type, e);
             }
             return Optional.empty();
         }
@@ -113,7 +119,8 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
-     * @param type The type
+     * @param type        The type
+     * @param classLoader The classloader
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      */
@@ -130,7 +137,9 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
-     * @param type The type
+     * @param type         The type
+     * @param requiredType The required type
+     * @param <T>          The type
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      */

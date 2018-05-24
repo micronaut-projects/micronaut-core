@@ -1,0 +1,33 @@
+Although Micronaut's design is based on a compile time approach and does not rely on Spring dependency injection, there is still a lot of value in the Spring ecosystem that does not depend directly on the Spring container.
+
+You may wish to use existing Spring projects within Micronaut and configure beans to be used within Micronaut.
+
+You may also wish to leverage existing AOP advice from Spring. One example of this is Spring's support for declarative transactions with `@Transactional`.
+
+Micronaut provides support for Spring based transaction management without requiring Spring itself. You simply need to add the `spring` module to your application dependencies:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:spring"
+----
+
+NOTE: If you use Micronaut's <<hibernateSupport,Hibernate support>> you already get this dependency and a `HibernateTransactionManager` is configured for you.
+
+This is done by defining a Micronaut ann:spring.tx.annotation.Transactional[] annotation that uses ann:context.annotation.AliasFor[] in a manner that every time you set a value with ann:spring.tx.annotation.Transactional[] it aliases the value to equivalent value in Spring's version of `@Transactional`.
+
+The benefit here is you can use Micronaut's compile-time, reflection free AOP to declare programmatic Spring transactions. For example:
+
+.Using @Transactional
+[source,java]
+----
+import io.micronaut.spring.tx.annotation.*;
+...
+
+@Transactional
+public Book saveBook(String title) {
+    ...
+}
+----
+
+NOTE: Micronaut's version of ann:spring.tx.annotation.Transactional[] is also annotated with ann:core.annotation.Blocking[] ensuring that all methods annotated with use the I/O thread pool when executing within the HTTP server

@@ -17,7 +17,7 @@
 package io.micronaut.core.naming;
 
 /**
- * An interface for components that a named.
+ * An interface for components that are named.
  *
  * @author Graeme Rocher
  * @since 1.0

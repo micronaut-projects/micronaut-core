@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -21,8 +22,9 @@ import io.micronaut.core.type.Argument;
 import java.util.Optional;
 
 /**
- * A wrapper around an {@link HttpMessage}
+ * A wrapper around an {@link HttpMessage}.
  *
+ * @param <B> The message body
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -30,10 +32,16 @@ public class HttpMessageWrapper<B> implements HttpMessage<B> {
 
     private final HttpMessage<B> delegate;
 
+    /**
+     * @param delegate The Http message
+     */
     public HttpMessageWrapper(HttpMessage<B> delegate) {
         this.delegate = delegate;
     }
 
+    /**
+     * @return The Http message
+     */
     public HttpMessage<B> getDelegate() {
         return delegate;
     }

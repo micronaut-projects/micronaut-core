@@ -7,7 +7,7 @@ ease the refresh, you can enable link:{api}/io/micronaut/security/token/jwt/endp
 
 | Configuration Property | Default Value | Possible Values
 
-| `micronaut.security.endpoints.oauth.enabled` | false | true or false
+| `micronaut.security.endpoints.oauth.enabled` | false | `true` or `false`
 | `micronaut.security.endpoints.oauth.path` | `/oauth/access_token` | default path for `POST` requests.
 
 
@@ -21,7 +21,7 @@ By default, issued Refresh tokens never expire, and can be used to obtain a new 
 .Sample HTTP request to obtain an access token
 ----
 POST /myApp/oauth/access_token HTTP/1.1
-Host: server.example.com
+Host: micronaut.example
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=refresh_token&refresh_token=eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ....

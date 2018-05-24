@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -151,7 +152,13 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
                 LOG.error("Google compute metadataUrl value is invalid!: " + configuration.getMetadataUrl(), me);
             }
 
-        } catch (IOException ioe) {
+        }
+        catch (FileNotFoundException fnfe) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No metadata found at: " + configuration.getMetadataUrl() + "?recursive=true", fnfe);
+            }
+        }
+        catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
             }

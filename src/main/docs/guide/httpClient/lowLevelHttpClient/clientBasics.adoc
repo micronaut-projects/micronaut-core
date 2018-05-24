@@ -1,0 +1,151 @@
+==== Obtaining a HttpClient
+
+There are a few ways by which you can obtain a reference to a api:http.client.HttpClient[]. The most common way is using the api:http.client.Client[] annotation. For example:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client("https://api.twitter.com/1.1") @Inject RxHttpClient httpClient;
+----
+
+The above example will inject a client that targets the Twitter API.
+
+The api:http.client.Client[] annotation is also a custom scope that will manage the creation of api:http.client.HttpClient[] instances and ensure they are shutdown when the application shuts down.
+
+The value you pass to the api:http.client.Client[] annotation can be one of the following:
+
+* A absolute URI. Example `https://api.twitter.com/1.1`
+* A relative URI, in which case the server targeted will be the current server (useful for testing)
+* A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
+
+Another way to create an `HttpClient` is with the `create` static method of the api:http.client.RxHttpClient[], however this approach is not recommended as you will have to ensure you manually shutdown the client and of course no dependency injection will occur for the created client.
+
+==== Performing an HTTP GET
+
+Generally there are two methods of interest when working with the `HttpClient`. The first method is called `retrieve`, which will execute an HTTP request and return the body in whichever type you request (by default a `String`) as an RxJava rx:Flowable[].
+
+The `retrieve` method accepts an api:http.HttpRequest[] object or a `String` URI to the endpoint you wish to request.
+
+The following example shows how to use `retrieve` to execute an HTTP `GET` and receive the response body as a `String`:
+
+.Using retrieve
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=simple, indent=0]
+----
+
+Note that in this example, for illustration purposes we are calling `toBlocking()` to return a blocking version of the client. However, in production code you should not do this and instead rely on the non-blocking nature of the Micronaut HTTP server.
+
+For example the following `@Controller` method calls another endpoint in a non-blocking manner:
+
+
+.Using the HTTP client without blocking
+[source,java]
+----
+include::{testsclient}/basics/HelloController.java[tags=imports, indent=0]
+
+include::{testsclient}/basics/HelloController.java[tags=nonblocking, indent=0]
+----
+
+<1> The method `hello` returns a rx:Maybe[] which may or may not emit an item. If an item is not emitted a 404 is returned.
+<2> The `retrieve` method is called which returns a rx:Flowable[] which has a `firstElement` method that returns the first emitted item or nothing
+
+TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which will limit the throughput and scalability of your application).
+
+==== Debugging / Tracing the HTTP Client
+
+To debug the requests being sent and received from the HTTP client you can enable tracing logging via your `logback.xml` file:
+
+.logback.xml
+[source,xml]
+----
+<logger name="io.micronaut.http.client" level="TRACE"/>
+----
+
+==== Customizing the HTTP Request
+
+The previous example demonstrated using the static methods of the api:http.HttpRequest[] interface to construct a api:http.MutableHttpRequest[] instance. Like the name suggests a `MutableHttpRequest` can be mutated including the ability to add headers, customize the request body and so on. For example:
+
+.Passing an HttpRequest to retrieve
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=headers, indent=0]
+----
+
+The above example adds an additional header called `X-My-Header` to the request before it is sent. The api:http.MutableHttpRequest[] interface has a bunch more convenience methods that make it easy to modify the request in common ways.
+
+
+==== Reading JSON Responses
+
+Typically with Microservices a message encoding format is used such as JSON. Micronaut's HTTP client leverages Jackson for JSON parsing hence whatever type Jackson can decode can passed as a second argument to `retrieve`.
+
+For example consider the following `@Controller` method that returns a JSON response:
+
+.Returning JSON from a controller
+[source,java]
+----
+include::{testsclient}/basics/HelloController.java[tags=json, indent=0]
+----
+
+The method above returns a POJO of type `Message` which looks like:
+
+.Message POJO
+[source,java]
+----
+include::{testsclient}/basics/Message.java[tags=imports, indent=0]
+
+include::{testsclient}/basics/Message.java[tags=class, indent=0]
+----
+
+NOTE: Jackson annotations are used to map the constructor
+
+On the client end you can call this endpoint and decode the JSON into a map using the `retrieve` method as follows:
+
+.Decoding the response body to a Map
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=jsonmap, indent=0]
+----
+
+The above examples decodes the response into a jdk:java.util.Map[], representing the JSON. If you wish to customize the type of the key and string you can use the `Argument.of(..)` method:
+
+.Decoding the response body to a Map
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=jsonmaptypes, indent=0]
+----
+
+<1> The `Argument.of` method is used to return a `Map` whether the key and value are typed as `String`
+
+
+Whilst retrieving JSON as a map can be desirable, more often than not you will want to decode objects into Plain Old Java Objects (POJOs). To do that simply pass the type instead:
+
+.Decoding the response body to a POJO
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=jsonpojo, indent=0]
+----
+
+Note how you can use the same Java type on both the client and the server. The implication of this is that typically you will want to define a common API project where you define the interfaces and types that define your API.
+
+==== Decoding Other Content Types
+
+If the server you are communicating with uses a custom content type that is not JSON by default Micronaut's HTTP client will not know how to decode this type.
+
+To resolve this issue you can register api:http.codec.MediaTypeCodec[] as a bean and it will be automatically picked up and used to decode (or encode) messages.
+
+==== Receiving the Full HTTP Response
+
+Sometimes, receiving just the object is not enough and you need information about the response. In this case, instead of `retrieve` you should use the `exchange` method:
+
+.Recieving the Full HTTP Response
+[source,java]
+----
+include::{testsclient}/basics/HelloControllerTest.java[tags=pojoresponse, indent=0]
+----
+
+<1> The `exchange` method is used to receive the api:http.HttpResponse[]
+<2> The body can be retrieved using the `getBody(..)` method of the response
+<3> Other aspects of the response, such as the api:http.HttpStatus[] can be checked
+
+The above example receives the full api:http.HttpResponse[] object from which you can obtain headers and other useful information.

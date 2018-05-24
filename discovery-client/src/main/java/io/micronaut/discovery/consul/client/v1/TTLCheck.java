@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -23,7 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A TTL check
+ * A TTL check.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,6 +32,9 @@ import java.util.Optional;
 public class TTLCheck extends NewCheck {
     private Duration ttl;
 
+    /**
+     * @return The optional TTL
+     */
     @JsonProperty("TTL")
     public Optional<String> getTtl() {
         if (ttl != null) {
@@ -46,6 +50,9 @@ public class TTLCheck extends NewCheck {
         return Optional.ofNullable(this.ttl);
     }
 
+    /**
+     * @param ttl The TTL
+     */
     @JsonProperty("TTL")
     void setTtl(String ttl) {
         this.ttl = ConversionService.SHARED.convert(ttl, Duration.class).orElseThrow(() -> new IllegalArgumentException("Invalid TTL Returned"));
@@ -64,9 +71,15 @@ public class TTLCheck extends NewCheck {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
         TTLCheck ttlCheck = (TTLCheck) o;
         return Objects.equals(ttl, ttlCheck.ttl);
     }

@@ -32,11 +32,18 @@ public class MapPropertyResolver implements PropertyResolver {
     private final Map<String, Object> map;
     private final ConversionService<?> conversionService;
 
+    /**
+     * @param map The map to resolves the properties from
+     */
     public MapPropertyResolver(Map<String, Object> map) {
         this.map = map;
         this.conversionService = ConversionService.SHARED;
     }
 
+    /**
+     * @param map               The map to resolves the properties from
+     * @param conversionService The conversion service
+     */
     public MapPropertyResolver(Map<String, Object> map, ConversionService conversionService) {
         this.map = map;
         this.conversionService = conversionService;

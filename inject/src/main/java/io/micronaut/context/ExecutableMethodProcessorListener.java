@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.context.processor.AnnotationProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -30,7 +30,8 @@ import java.util.Optional;
 
 /**
  * <p>A {@link BeanCreatedEventListener} that will monitor the creation of {@link ExecutableMethodProcessor} instances
- * and call {@link AnnotationProcessor#process(BeanDefinition, Object)} for each available {@link ExecutableMethod}</p>
+ * and call {@link io.micronaut.context.processor.AnnotationProcessor#process(BeanDefinition, Object)} for each
+ * available {@link ExecutableMethod}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

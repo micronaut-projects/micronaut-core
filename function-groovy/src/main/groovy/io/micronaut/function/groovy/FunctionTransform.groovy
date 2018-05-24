@@ -237,7 +237,6 @@ class FunctionTransform implements ASTTransformation {
 
                         }
                     }
-                    AstAnnotationUtils.invalidateCache()
                     new InjectTransform().visit(nodes, source)
                 }
 

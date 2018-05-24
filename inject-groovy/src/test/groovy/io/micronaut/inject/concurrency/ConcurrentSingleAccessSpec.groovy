@@ -17,13 +17,10 @@ package io.micronaut.inject.concurrency
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 import javax.inject.Singleton
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.ConcurrentSkipListSet
 
 /**
  * Created by graemerocher on 17/05/2017.

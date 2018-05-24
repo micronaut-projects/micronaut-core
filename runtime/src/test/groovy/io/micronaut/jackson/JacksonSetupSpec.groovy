@@ -15,13 +15,11 @@
  */
 package io.micronaut.jackson
 
-import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
-import io.micronaut.jackson.JacksonConfiguration
 import spock.lang.Specification
 
 /**

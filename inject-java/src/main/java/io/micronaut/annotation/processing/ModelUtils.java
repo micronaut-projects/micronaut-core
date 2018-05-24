@@ -13,7 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
+
+import static javax.lang.model.element.Modifier.ABSTRACT;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.type.TypeKind.ARRAY;
+import static javax.lang.model.type.TypeKind.ERROR;
+import static javax.lang.model.type.TypeKind.NONE;
+import static javax.lang.model.type.TypeKind.VOID;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
@@ -22,7 +34,12 @@ import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -36,11 +53,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.Modifier.*;
-import static javax.lang.model.type.TypeKind.*;
-
 /**
- * Provides utility method for working with the annotation processor AST
+ * Provides utility method for working with the annotation processor AST.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -51,13 +65,17 @@ class ModelUtils {
     private final Elements elementUtils;
     private final Types typeUtils;
 
+    /**
+     * @param elementUtils The {@link Elements}
+     * @param typeUtils    The {@link Types}
+     */
     ModelUtils(Elements elementUtils, Types typeUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
     }
 
     /**
-     * Obtains the {@link TypeElement} for an given element
+     * Obtains the {@link TypeElement} for an given element.
      *
      * @param element The element
      * @return The {@link TypeElement}
@@ -70,7 +88,8 @@ class ModelUtils {
     }
 
     /**
-     * The binary name of the type as a String
+     * The binary name of the type as a String.
+     *
      * @param typeElement The type element
      * @return The class name
      */
@@ -83,7 +102,7 @@ class ModelUtils {
     }
 
     /**
-     * Resolves a setter method for a field
+     * Resolves a setter method for a field.
      *
      * @param field The field
      * @return An optional setter method
@@ -114,7 +133,7 @@ class ModelUtils {
     }
 
     /**
-     * The name of a setter for the given field name
+     * The name of a setter for the given field name.
      *
      * @param fieldName The field name
      * @return The setter name
@@ -124,12 +143,13 @@ class ModelUtils {
     }
 
     /**
-     * The constructor inject for the given class element
+     * The constructor inject for the given class element.
      *
      * @param classElement The class element
      * @return The constructor
      */
-    @Nullable ExecutableElement concreteConstructorFor(TypeElement classElement) {
+    @Nullable
+    ExecutableElement concreteConstructorFor(TypeElement classElement) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
             return null;
@@ -148,6 +168,10 @@ class ModelUtils {
         return element.orElse(null);
     }
 
+    /**
+     * @param classElement The {@link TypeElement}
+     * @return A list of {@link ExecutableElement}
+     */
     List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
         List<ExecutableElement> ctors =
             ElementFilter.constructorsIn(classElement.getEnclosedElements());
@@ -157,16 +181,18 @@ class ModelUtils {
     }
 
     /**
-     * Obtains the class for a given primitive type name
+     * Obtains the class for a given primitive type name.
+     *
      * @param primitiveType The primitive type name
      * @return The primtitive type class
      */
     Class<?> classOfPrimitiveFor(String primitiveType) {
-        return ClassUtils.getPrimitiveType(primitiveType).orElseThrow(()-> new IllegalArgumentException("Unknown primitive type: " + primitiveType));
+        return ClassUtils.getPrimitiveType(primitiveType).orElseThrow(() -> new IllegalArgumentException("Unknown primitive type: " + primitiveType));
     }
 
     /**
-     * Obtains the class for the given primitive type array
+     * Obtains the class for the given primitive type array.
+     *
      * @param primitiveType The primitive type
      * @return The class
      */
@@ -199,7 +225,8 @@ class ModelUtils {
     }
 
     /**
-     * Obtains the super type element for a given type element
+     * Obtains the super type element for a given type element.
+     *
      * @param element The type element
      * @return The super type element or null if none exists
      */
@@ -212,6 +239,10 @@ class ModelUtils {
         return (TypeElement) kind.asElement();
     }
 
+    /**
+     * @param typeElement The {@link TypeElement}
+     * @return The resolved type reference or the qualified name for the type element
+     */
     Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
         if (type != null) {
@@ -222,7 +253,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the given element is the java.lang.Object class
+     * Return whether the given element is the java.lang.Object class.
+     *
      * @param element The element
      * @return True if it is java.lang.Object
      */
@@ -231,11 +263,14 @@ class ModelUtils {
     }
 
     /**
-     * Resolves a type reference for the given element. A type reference is either a reference to the concrete {@link Class} or a String representing the type name
+     * Resolves a type reference for the given element. A type reference is either a reference to the concrete
+     * {@link Class} or a String representing the type name.
+     *
      * @param element The element
      * @return The type reference
      */
-    @Nullable Object resolveTypeReference(Element element) {
+    @Nullable
+    Object resolveTypeReference(Element element) {
         if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             return resolveTypeReferenceForTypeElement(typeElement);
@@ -244,7 +279,9 @@ class ModelUtils {
     }
 
     /**
-     * Resolves a type reference for the given type element. A type reference is either a reference to the concrete {@link Class} or a String representing the type name
+     * Resolves a type reference for the given type element. A type reference is either a reference to the concrete
+     * {@link Class} or a String representing the type name.
+     *
      * @param typeElement The type
      * @return The type reference
      */
@@ -254,19 +291,35 @@ class ModelUtils {
     }
 
     /**
-     * Resolves a type reference for the given type mirror. A type reference is either a reference to the concrete {@link Class} or a String representing the type name
+     * Resolves a type name for the given name.
+     *
+     * @param type The type
+     * @return The type reference
+     */
+    String resolveTypeName(TypeMirror type) {
+        Object reference = resolveTypeReference(type);
+        if (reference instanceof Class) {
+            return ((Class) reference).getName();
+        }
+        return reference.toString();
+    }
+
+    /**
+     * Resolves a type reference for the given type mirror. A type reference is either a reference to the concrete
+     * {@link Class} or a String representing the type name.
+     *
      * @param type The type
      * @return The type reference
      */
     Object resolveTypeReference(TypeMirror type) {
         Object result = Void.TYPE;
         if (type.getKind().isPrimitive()) {
-            result = classOfPrimitiveFor(type.toString());
+            result = resolvePrimitiveTypeReference(type);
         } else if (type.getKind() == ARRAY) {
             ArrayType arrayType = (ArrayType) type;
             TypeMirror componentType = arrayType.getComponentType();
             if (componentType.getKind().isPrimitive()) {
-                result = classOfPrimitiveArrayFor(componentType.toString());
+                result = classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName());
             } else {
                 result = typeUtils.erasure(type).toString();
             }
@@ -282,7 +335,8 @@ class ModelUtils {
     }
 
     /**
-     * Returns whether an element is package private
+     * Returns whether an element is package private.
+     *
      * @param element The element
      * @return True if it is package provide
      */
@@ -294,11 +348,11 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the given method or field is inherited but not public
+     * Return whether the given method or field is inherited but not public.
      *
-     * @param concreteClass The concrete class
+     * @param concreteClass  The concrete class
      * @param declaringClass The declaring class of the field
-     * @param methodOrField The method or field
+     * @param methodOrField  The method or field
      * @return True if it is inherited and not public
      */
     boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, Element methodOrField) {
@@ -311,7 +365,7 @@ class ModelUtils {
     }
 
     /**
-     * Tests if candidate method is overridden from a given class or subclass
+     * Tests if candidate method is overridden from a given class or subclass.
      *
      * @param overridden   the candidate overridden method
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
@@ -336,7 +390,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the element is private
+     * Return whether the element is private.
+     *
      * @param element The element
      * @return True if it is private
      */
@@ -345,7 +400,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the element is protected
+     * Return whether the element is protected.
+     *
      * @param element The element
      * @return True if it is protected
      */
@@ -354,7 +410,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the element is public
+     * Return whether the element is public.
+     *
      * @param element The element
      * @return True if it is public
      */
@@ -363,7 +420,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the element is abstract
+     * Return whether the element is abstract.
+     *
      * @param element The element
      * @return True if it is abstract
      */
@@ -372,7 +430,8 @@ class ModelUtils {
     }
 
     /**
-     * Return whether the element is static
+     * Return whether the element is static.
+     *
      * @param element The element
      * @return True if it is static
      */
@@ -381,9 +440,9 @@ class ModelUtils {
     }
 
 
-
     /**
-     * Return whether the element is final
+     * Return whether the element is final.
+     *
      * @param element The element
      * @return True if it is final
      */
@@ -392,12 +451,23 @@ class ModelUtils {
     }
 
     /**
-     * Is the given type mirror an optional
+     * Is the given type mirror an optional.
      *
      * @param mirror The mirror
      * @return True if it is
      */
     boolean isOptional(TypeMirror mirror) {
         return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
+    }
+
+    private Class resolvePrimitiveTypeReference(TypeMirror type) {
+        Class result;
+        if (type instanceof DeclaredType) {
+            DeclaredType dt = (DeclaredType) type;
+            result = classOfPrimitiveFor(dt.asElement().getSimpleName().toString());
+        } else {
+            result = classOfPrimitiveFor(type.toString());
+        }
+        return result;
     }
 }

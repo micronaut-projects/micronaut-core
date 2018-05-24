@@ -42,8 +42,13 @@ import javax.inject.Singleton
  */
 class JsonStreamSpec  extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test read JSON stream demand all"() {
         given:
@@ -121,7 +126,6 @@ class JsonStreamSpec  extends Specification {
 
     }
     @Controller("/jsonstream/books")
-    @Singleton
     static class BookController {
 
         @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)

@@ -21,15 +21,6 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceLoader
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
-import io.micronaut.context.env.DefaultEnvironment
-import io.micronaut.context.env.Environment
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.env.PropertySourceLoader
-import io.micronaut.context.env.yaml.YamlPropertySourceLoader
-import io.micronaut.core.io.service.ServiceDefinition
-import io.micronaut.core.io.service.SoftServiceLoader
-import io.micronaut.jackson.env.EnvJsonPropertySourceLoader
-import io.micronaut.jackson.env.JsonPropertySourceLoader
 import spock.lang.Specification
 
 /**

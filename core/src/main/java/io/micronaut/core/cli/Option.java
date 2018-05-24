@@ -27,6 +27,10 @@ public class Option {
     private String name;
     private String description;
 
+    /**
+     * @param name        The name
+     * @param description The description
+     */
     public Option(String name, String description) {
         if (name == null || name.length() == 0) {
             throw new IllegalArgumentException("illegal option specified");

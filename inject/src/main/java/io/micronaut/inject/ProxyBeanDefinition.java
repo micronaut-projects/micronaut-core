@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 /**
- * Marker interface for a {@link BeanDefinition} that is an AOP proxy
+ * Marker interface for a {@link BeanDefinition} that is an AOP proxy.
  *
+ * @param <T> The bean definition type
  * @author Graeme Rocher
  * @since 1.0
  */

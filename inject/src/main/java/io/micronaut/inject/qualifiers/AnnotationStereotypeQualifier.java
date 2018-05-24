@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
@@ -22,8 +23,9 @@ import java.lang.annotation.Annotation;
 import java.util.stream.Stream;
 
 /**
- * A {@link Qualifier} that qualifies based on a bean stereotype
+ * A {@link Qualifier} that qualifies based on a bean stereotype.
  *
+ * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -31,7 +33,10 @@ class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     private final Class<? extends Annotation> stereotype;
 
-    public AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
+    /**
+     * @param stereotype The stereotype
+     */
+    AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
         this.stereotype = stereotype;
     }
 

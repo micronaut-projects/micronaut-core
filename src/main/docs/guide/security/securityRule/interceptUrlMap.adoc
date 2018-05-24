@@ -10,4 +10,4 @@ include::{testssecurity}/security/securityRule/intercepturlmap/InterceptUrlMapSp
 <3> Enable access for users who are granted any of the specified roles.
 
 As you see in the previous code listing, any endpoint is identified by a combination of pattern
-an an optional HTTP Method
+and an optional HTTP Method

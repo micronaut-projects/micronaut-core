@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelOption;
 
+import javax.annotation.Nullable;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
@@ -32,7 +33,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Configuration for the {@link HttpClient}
+ * Configuration for the {@link HttpClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,7 +41,7 @@ import java.util.concurrent.ThreadFactory;
 public abstract class HttpClientConfiguration {
 
     /**
-     * Constant for localhost
+     * Constant for localhost.
      */
     public static final String LOCALHOST = "localhost";
 
@@ -49,11 +50,15 @@ public abstract class HttpClientConfiguration {
     private Integer numOfThreads = null;
 
     /**
-     * The thread factory to use for creating threads
+     * The thread factory to use for creating threads.
      */
     private Class<? extends ThreadFactory> threadFactory;
 
+    private Duration connectTimeout;
+
     private Duration readTimeout = Duration.ofSeconds(10);
+
+    private Duration shutdownTimeout = Duration.ofMillis(100);
 
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
 
@@ -69,12 +74,19 @@ public abstract class HttpClientConfiguration {
 
     private boolean followRedirects = true;
 
+    /**
+     * Default constructor.
+     */
     public HttpClientConfiguration() {
     }
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
     public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
-        if (applicationConfiguration != null)
+        if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
+        }
     }
 
     /**
@@ -85,7 +97,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets whether redirects should be followed (defaults to true)
+     * Sets whether redirects should be followed (defaults to true).
      *
      * @param followRedirects Whether redirects should be followed
      */
@@ -101,7 +113,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the default charset to use
+     * Sets the default charset to use.
      *
      * @param defaultCharset The charset to use
      */
@@ -111,7 +123,7 @@ public abstract class HttpClientConfiguration {
 
     /**
      * @return The Netty channel options.
-     * @see Bootstrap#options()
+     * @see io.netty.bootstrap.Bootstrap#options()
      */
     public Map<ChannelOption, Object> getChannelOptions() {
         return channelOptions;
@@ -119,7 +131,7 @@ public abstract class HttpClientConfiguration {
 
     /**
      * @param channelOptions The Netty channel options
-     * @see Bootstrap#options()
+     * @see io.netty.bootstrap.Bootstrap#options()
      */
     public void setChannelOptions(Map<ChannelOption, Object> channelOptions) {
         this.channelOptions = channelOptions;
@@ -133,12 +145,46 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the read timeout
+     * @return The default connect timeout. Defaults to Netty default.
+     */
+    public Optional<Duration> getConnectTimeout() {
+        return Optional.ofNullable(connectTimeout);
+    }
+
+    /**
+     * The amount of time to wait for shutdown.
+     *
+     * @return The shutdown timeout
+     */
+    public Optional<Duration> getShutdownTimeout() {
+        return Optional.ofNullable(shutdownTimeout);
+    }
+
+    /**
+     * Sets the amount of time to wait for shutdown of client thread pools.
+     *
+     * @param shutdownTimeout The shutdown time
+     */
+    public void setShutdownTimeout(@Nullable Duration shutdownTimeout) {
+        this.shutdownTimeout = shutdownTimeout;
+    }
+
+    /**
+     * Sets the read timeout.
      *
      * @param readTimeout The read timeout
      */
-    public void setReadTimeout(Duration readTimeout) {
+    public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets the connect timeout.
+     *
+     * @param connectTimeout The connect timeout
+     */
+    public void setConnectTimeout(@Nullable Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
     /**
@@ -149,10 +195,11 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the number of threads the client should use for requests
+     * Sets the number of threads the client should use for requests.
+     *
      * @param numOfThreads The number of threads the client should use for requests
      */
-    public void setNumOfThreads(Integer numOfThreads) {
+    public void setNumOfThreads(@Nullable Integer numOfThreads) {
         this.numOfThreads = numOfThreads;
     }
 
@@ -164,7 +211,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets a thread factory
+     * Sets a thread factory.
      *
      * @param threadFactory The thread factory
      */
@@ -180,7 +227,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the maximum content length the client can consume
+     * Sets the maximum content length the client can consume.
      *
      * @param maxContentLength The maximum content length the client can consume
      */
@@ -189,7 +236,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.
      * <p>
      * Alternatively configure a {@code java.net.ProxySelector}
      *
@@ -199,12 +246,15 @@ public abstract class HttpClientConfiguration {
         return proxyType;
     }
 
+    /**
+     * @param proxyType The proxy type
+     */
     public void setProxyType(Proxy.Type proxyType) {
         this.proxyType = proxyType;
     }
 
     /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.
      * <p>
      * Alternatively configure a {@code java.net.ProxySelector}
      *
@@ -215,7 +265,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets a proxy address
+     * Sets a proxy address.
      *
      * @param proxyAddress The proxy address
      */
@@ -232,7 +282,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the proxy user name to use
+     * Sets the proxy user name to use.
+     *
      * @param proxyUsername The proxy user name to use
      */
     public void setProxyUsername(String proxyUsername) {
@@ -240,7 +291,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return The proxy password to use
+     * @return The proxy password to use.
      */
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
@@ -248,7 +299,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the proxy password
+     * Sets the proxy password.
      *
      * @param proxyPassword The proxy password
      */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
@@ -26,8 +27,9 @@ import java.util.stream.Stream;
 
 /**
  * An interface for wrapping a {@link BeanDefinition} with another that delegates and potentially decorates the
- * {@link BeanDefinition} instance
+ * {@link BeanDefinition} instance.
  *
+ * @param <T> The bean definition type
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.annotation.Internal;
@@ -22,7 +23,7 @@ import io.netty.handler.codec.http.cookie.DefaultCookie;
 import java.util.Objects;
 
 /**
- * A wrapper around a Netty cookie
+ * A wrapper around a Netty cookie.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,10 +33,17 @@ public class NettyCookie implements Cookie {
 
     private final io.netty.handler.codec.http.cookie.Cookie nettyCookie;
 
+    /**
+     * @param nettyCookie The Netty cookie
+     */
     public NettyCookie(io.netty.handler.codec.http.cookie.Cookie nettyCookie) {
         this.nettyCookie = nettyCookie;
     }
 
+    /**
+     * @param name  The name
+     * @param value The value
+     */
     public NettyCookie(String name, String value) {
         Objects.requireNonNull(name, "Argument name cannot be null");
         Objects.requireNonNull(value, "Argument value cannot be null");
@@ -43,6 +51,9 @@ public class NettyCookie implements Cookie {
         this.nettyCookie = new DefaultCookie(name, value);
     }
 
+    /**
+     * @return The Netty cookie
+     */
     public io.netty.handler.codec.http.cookie.Cookie getNettyCookie() {
         return nettyCookie;
     }

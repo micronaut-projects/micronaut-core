@@ -92,10 +92,12 @@ class MyBean {
     void "test executable responses"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
-        ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
 
         expect:
+        applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).isPresent()
+        ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
         method.invoke(args as Object[]) == result
+
 
         where:
         methodName            | argTypes         | args             | result

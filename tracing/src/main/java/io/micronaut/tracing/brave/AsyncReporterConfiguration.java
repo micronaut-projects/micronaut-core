@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ public class AsyncReporterConfiguration {
      * Create a configuration for async Reporting on {@link zipkin2.Span} instances.
      *
      * @param configuration BraveTracer configuration
-     * @param sender For sending list of spans to a transport such as http or Kafka
+     * @param sender        For sending list of spans to a transport such as http or Kafka
      */
     public AsyncReporterConfiguration(BraveTracerConfiguration configuration, Sender sender) {
         if (configuration == null) {
@@ -56,7 +56,8 @@ public class AsyncReporterConfiguration {
     }
 
     /**
-     * Obtains the {@link AsyncReporter.Builder}.
+     * Obtains the {@link zipkin2.reporter.AsyncReporter.Builder}.
+     *
      * @return The builder
      */
     public AsyncReporter.Builder getBuilder() {
@@ -65,6 +66,7 @@ public class AsyncReporterConfiguration {
 
     /**
      * Sets the {@link ReporterMetrics} instance to use.
+     *
      * @param metrics The metrics instance
      */
     @Inject

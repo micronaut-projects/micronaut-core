@@ -50,6 +50,7 @@ import java.io.InputStream;
  * @author Eugene Kuleshov
  * @author Graeme Rocher
  */
+@SuppressWarnings("MagicNumber")
 class AnnotationClassReader {
 
     /**
@@ -60,12 +61,6 @@ class AnnotationClassReader {
      * called.
      */
     public static final int SKIP_DEBUG = 2;
-
-    /**
-     * Start index of the class header information (access, name...) in
-     * {@link #b b}.
-     */
-    public final int header;
 
     /**
      * Pseudo access flag to distinguish between the synthetic attribute and the
@@ -154,11 +149,17 @@ class AnnotationClassReader {
     static final boolean ANNOTATIONS = true;
 
     /**
+     * Start index of the class header information (access, name...) in
+     * {@link #b b}.
+     */
+    final int header;
+
+    /**
      * The class to be parsed. <i>The content of this array must not be
      * modified. This field is intended for {@link Attribute} sub classes, and
      * is normally not needed by class generators or adapters.</i>
      */
-    public final byte[] b;
+    final byte[] b;
 
     /**
      * The start index of each constant pool item in {@link #b b}, plus one. The
@@ -193,6 +194,28 @@ class AnnotationClassReader {
      */
     private AnnotationClassReader(final byte[] b) {
         this(b, 0, b.length);
+    }
+
+    /**
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
+     *
+     * @param is an input stream from which to read the class.
+     * @throws IOException if a problem occurs during reading.
+     */
+    public AnnotationClassReader(final InputStream is) throws IOException {
+        this(readClass(is, false));
+    }
+
+    /**
+     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
+     *
+     * @param name the binary qualified name of the class to be read.
+     * @throws IOException if an exception occurs during reading.
+     */
+    public AnnotationClassReader(final String name) throws IOException {
+        this(readClass(
+            ClassLoader.getSystemResourceAsStream(name.replace('.', '/')
+                + ".class"), true));
     }
 
     /**
@@ -316,28 +339,6 @@ class AnnotationClassReader {
     }
 
     /**
-     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
-     *
-     * @param is an input stream from which to read the class.
-     * @throws IOException if a problem occurs during reading.
-     */
-    public AnnotationClassReader(final InputStream is) throws IOException {
-        this(readClass(is, false));
-    }
-
-    /**
-     * Constructs a new {@link org.objectweb.asm.ClassReader} object.
-     *
-     * @param name the binary qualified name of the class to be read.
-     * @throws IOException if an exception occurs during reading.
-     */
-    public AnnotationClassReader(final String name) throws IOException {
-        this(readClass(
-            ClassLoader.getSystemResourceAsStream(name.replace('.', '/')
-                + ".class"), true));
-    }
-
-    /**
      * Reads the bytecode of a class.
      *
      * @param is    an input stream from which to read the class.
@@ -392,6 +393,7 @@ class AnnotationClassReader {
      * {@link #AnnotationClassReader(byte[]) ClassReader}).
      *
      * @param classVisitor the visitor that must visit this class.
+     * @param flags        the class access flags
      */
     public void accept(final ClassVisitor classVisitor, final int flags) {
         accept(classVisitor, new Attribute[0], flags);
@@ -411,6 +413,7 @@ class AnnotationClassReader {
      *                     the constant pool, or has syntactic or semantic links with a
      *                     class element that has been transformed by a class adapter
      *                     between the reader and the writer</i>.
+     * @param flags        the class access flags
      */
     public void accept(final ClassVisitor classVisitor,
                        final Attribute[] attrs, final int flags) {
@@ -721,6 +724,8 @@ class AnnotationClassReader {
                     default:
                         v = readAnnotationValues(v - 3, buf, false, av.visitArray(name));
                 }
+            default:
+                // no-op
         }
         return v;
     }
@@ -899,7 +904,8 @@ class AnnotationClassReader {
             return s;
         }
         index = items[item];
-        return strings[item] = readUTF(index + 2, readUnsignedShort(index), buf);
+        strings[item] = readUTF(index + 2, readUnsignedShort(index), buf);
+        return strings[item];
     }
 
     /**
@@ -943,6 +949,8 @@ class AnnotationClassReader {
                     cc = (char) ((cc << 6) | (c & 0x3F));
                     st = 1;
                     break;
+                default:
+                    // no-op
             }
         }
         return new String(buf, 0, strLen);

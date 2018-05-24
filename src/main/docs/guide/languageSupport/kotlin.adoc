@@ -1,6 +1,6 @@
 Support for Kotlin in Micronaut is built upon the https://kotlinlang.org/docs/reference/kapt.html[Kapt] compiler plugin, which includes support for Java annotation processors. To use Kotlin in your Micronaut application, you will simply need to add the proper dependencies to configure and run kapt on your `kt` source files. Kapt will create Java "stub" classes for each of your Kotlin classes, which can then by processed by Micronaut's Java annotation processor. The stubs are not included in the final compiled application.
 
-TIP: Learn more about kapt and its features from the https://kotlinlang.org/docs/reference/kapt.htm[official documentation.]
+TIP: Learn more about kapt and its features from the https://kotlinlang.org/docs/reference/kapt.html[official documentation.]
 
 If you are using Gradle, you can use the https://docs.gradle.org/current/userguide/application_plugin.html[Application] plugin to run your application with the kapt compilation step in your build:
 
@@ -31,9 +31,9 @@ repositories {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<3>
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
-    kapt "io.micronaut:inject-java:$projectVersion" //<4>
+    kapt "io.micronaut:inject-java" //<4>
 
-    kaptTest "io.micronaut:inject-java:$projectVersion" //<5>
+    kaptTest "io.micronaut:inject-java" //<5>
 }
 
 test {
@@ -51,13 +51,13 @@ compileTestKotlin {
 <1> Apply the Kotlin and Kapt plugins
 <2> Set a `mainClassName` (required by the Application plugin)
 <3> Add the Kotlin standard libraries
-<4> Add the `inject-java` dependency under the `kapt` scope, so classes in src/main are processed
-<5> Add the `inject-java` dependency under the `kaptTest` scope, so classes in src/test are processed.
+<4> Add the `inject-java` dependency under the `kapt` scope, so classes in `src/main` are processed
+<5> Add the `inject-java` dependency under the `kaptTest` scope, so classes in `src/test` are processed.
 
 With a `build.gradle` file similar to the above, you can now run your Micronaut application using the `run` task (provided by the Application plugin):
 
 [source,bash]
-~ ./gradlew run
+$ ./gradlew run
 
 You can now use Kotlin in your Micronaut project:
 

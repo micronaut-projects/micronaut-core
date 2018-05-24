@@ -22,7 +22,6 @@ import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.health.HealthStatus
 import io.micronaut.management.health.indicator.HealthResult
 import io.reactivex.Flowable
-import org.neo4j.driver.v1.Driver
 import spock.lang.Specification
 
 /**

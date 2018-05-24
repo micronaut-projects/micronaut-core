@@ -16,8 +16,10 @@
 
 package io.micronaut.jackson.bind;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,12 +28,14 @@ import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.inject.Singleton;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -50,7 +54,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     private final int arraySizeThreshhold;
 
     /**
-     * @param objectMapper To read/write JSON
+     * @param objectMapper  To read/write JSON
      * @param configuration The configuration for Jackson JSON parser
      */
     public JacksonBeanPropertyBinder(ObjectMapper objectMapper, JacksonConfiguration configuration) {
@@ -107,19 +111,45 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
      * @return The new conversion error
      */
     protected ConversionErrorException newConversionError(Object object, Exception e) {
-        ConversionError conversionError = new ConversionError() {
-            @Override
-            public Exception getCause() {
-                return e;
-            }
+        if (e instanceof InvalidFormatException) {
+            InvalidFormatException ife = (InvalidFormatException) e;
+            Object originalValue = ife.getValue();
+            ConversionError conversionError = new ConversionError() {
+                @Override
+                public Exception getCause() {
+                    return e;
+                }
 
-            @Override
-            public Optional<Object> getOriginalValue() {
-                return Optional.ofNullable(object);
+                @Override
+                public Optional<Object> getOriginalValue() {
+                    return Optional.ofNullable(originalValue);
+                }
+            };
+            Class type = object != null ? object.getClass() : Object.class;
+            List<JsonMappingException.Reference> path = ife.getPath();
+            String name;
+            if (!path.isEmpty()) {
+                name = path.get(path.size() - 1).getFieldName();
+            } else {
+                name = NameUtils.decapitalize(type.getSimpleName());
             }
-        };
-        Class type = object != null ? object.getClass() : Object.class;
-        return new ConversionErrorException(Argument.of(type), conversionError);
+            return new ConversionErrorException(Argument.of(ife.getTargetType(), name), conversionError);
+        } else {
+
+            ConversionError conversionError = new ConversionError() {
+                @Override
+                public Exception getCause() {
+                    return e;
+                }
+
+                @Override
+                public Optional<Object> getOriginalValue() {
+                    return Optional.empty();
+                }
+            };
+            Class type = object != null ? object.getClass() : Object.class;
+            return new ConversionErrorException(Argument.of(type), conversionError);
+        }
     }
 
     private ObjectNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {

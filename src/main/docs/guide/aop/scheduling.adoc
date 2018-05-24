@@ -1,12 +1,12 @@
 Like Spring and Grails, Micronaut features a api:scheduling.annotation.Scheduled[] annotation that can be used for scheduling background tasks.
 
-=== Using the @Scheduled Annotation
+== Using the @Scheduled Annotation
 
 The api:scheduling.annotation.Scheduled[] annotation can be added to any method of a bean and you should set either the `fixedRate`, `fixedDelay` or `cron` members.
 
 NOTE: Remember that the scope of the bean has an impact on behaviour. a `@Singleton` bean will share state (the fields of the instance) for each execution, whilst with a `@Prototype` bean a new instance is created for each execution.
 
-==== Scheduling at a Fixed Rate
+=== Scheduling at a Fixed Rate
 
 To schedule a task at a fixed rate, use the `fixedRate` member. For example:
 
@@ -18,7 +18,7 @@ include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=fixedRate, indent=
 
 The task above will execute every 5 minutes.
 
-==== Scheduling with a Fixed Delay
+=== Scheduling with a Fixed Delay
 
 To schedule a task so that is runs 5 minutes after the termination of the previous task use the `fixedDelay` member. For example:
 
@@ -28,7 +28,7 @@ To schedule a task so that is runs 5 minutes after the termination of the previo
 include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=fixedDelay, indent=0]
 ----
 
-==== Scheduling a Cron Task
+=== Scheduling a Cron Task
 
 To schedule a https://en.wikipedia.org/wiki/Cron[Cron] task use the `cron` member:
 
@@ -40,16 +40,16 @@ include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=cron, indent=0]
 
 The above example will run the task every Tuesday morning at 10:15AM.
 
-=== Programmatically Scheduling Tasks
+== Programmatically Scheduling Tasks
 
-If you wish to programmatically schedule tasks, then you can use the api:scheduled.TaskScheduler[] bean which can be injected as follows:
+If you wish to programmatically schedule tasks, then you can use the api:scheduling.TaskScheduler[] bean which can be injected as follows:
 
 [source,java]
 ----
 @Inject @Named(TaskExecutors.SCHEDULED) TaskScheduler taskScheduler;
 ----
 
-=== Configuring Scheduled Tasks with Annotation Metadata
+== Configuring Scheduled Tasks with Annotation Metadata
 
 If you wish to make your application's tasks configurable then you can use annotation metadata and property placeholder configuration to do so. For example:
 
@@ -61,7 +61,7 @@ include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=configured, indent
 
 The above example allows the task execution frequency to be configured with the property `my.task.rate` and the initial delay to be configured with the property `my.task.delay`.
 
-=== Configuring the Scheduled Task Thread Pool
+== Configuring the Scheduled Task Thread Pool
 
 Tasks executed by `@Scheduled` are by default run on a jdk:java.util.concurrent.ScheduledExecutorService[] that is configured to have twice the number of threads as available processors.
 

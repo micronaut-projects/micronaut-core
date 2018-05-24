@@ -1,1 +1,32 @@
-TODO
+The HTTP server is built on http://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
+
+To configure the number of threads used by the Netty https://netty.io/4.0/api/io/netty/channel/EventLoop.html[EventLoop], you can use `application.yml`:
+
+.Configuring Netty Event Loop Threads
+[source,yaml]
+----
+micronaut:
+    server:
+        netty:
+           worker:
+              threads: 8 # number of netty worker threads
+----
+
+NOTE: The default value is the value of the system property `io.netty.eventLoopThreads` or if not specified the available processors x 2
+
+When dealing with blocking operations, Micronaut will shift the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
+
+.Configuring the Server I/O Thread Pool
+[source,yaml]
+----
+micronaut:
+    executors:
+        io:
+           type: fixed
+           nThreads: 75
+----
+
+The above configuration will create a fixed thread pool with 75 threads.
+
+
+

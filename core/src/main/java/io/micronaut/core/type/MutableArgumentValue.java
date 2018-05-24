@@ -19,6 +19,7 @@ package io.micronaut.core.type;
 /**
  * A mutable version of the {@link ArgumentValue} interface.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */

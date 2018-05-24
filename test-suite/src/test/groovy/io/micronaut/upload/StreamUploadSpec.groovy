@@ -41,7 +41,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveFileUpload", requestBody)
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE), String
         ))
@@ -67,7 +67,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveFileUpload", requestBody)
+                HttpRequest.POST("/upload/receive-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -96,7 +96,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receivePublisher", requestBody)
+                HttpRequest.POST("/upload/receive-publisher", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -123,7 +123,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveTwoFlowParts", requestBody)
+                HttpRequest.POST("/upload/receive-two-flow-parts", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -150,7 +150,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveFlowData", requestBody)
+                HttpRequest.POST("/upload/receive-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
@@ -169,7 +169,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("title", "bar")
                 .build()
         flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveFlowData", requestBody)
+                HttpRequest.POST("/upload/receive-flow-data", requestBody)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
@@ -193,7 +193,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveMultipleFlowData", requestBody)
+                HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
@@ -214,7 +214,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("title", "bar")
                 .build()
         flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveMultipleFlowData", requestBody)
+                HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
@@ -236,7 +236,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveMultipleCompleted", requestBody)
+                HttpRequest.POST("/upload/receive-multiple-completed", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
@@ -258,7 +258,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveMultipleStreaming", requestBody)
+                HttpRequest.POST("/upload/receive-multiple-streaming", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
@@ -280,7 +280,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/upload/receiveMultiplePublishers", requestBody)
+                HttpRequest.POST("/upload/receive-multiple-publishers", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String

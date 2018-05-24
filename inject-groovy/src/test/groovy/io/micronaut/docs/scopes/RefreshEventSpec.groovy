@@ -17,7 +17,6 @@ package io.micronaut.docs.scopes
 
 import groovy.json.JsonOutput
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
@@ -28,7 +27,6 @@ import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -48,7 +46,7 @@ class RefreshEventSpec extends Specification {
             'micronaut.server.port':port,
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     String getUrl() {
         "http://localhost:$port"

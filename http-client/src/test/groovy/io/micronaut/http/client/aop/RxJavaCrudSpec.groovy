@@ -15,17 +15,11 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
-import io.reactivex.Flowable
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
 import io.micronaut.http.annotation.Get
@@ -33,7 +27,6 @@ import io.micronaut.http.annotation.Patch
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -47,8 +40,13 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class RxJavaCrudSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test it is possible to implement CRUD operations with RxJava"() {
         given:
@@ -79,6 +77,14 @@ class RxJavaCrudSpec extends Specification {
         book.title == "The Stand"
         book.id == 1
 
+
+        when:'the full response is resolved'
+        HttpResponse<Book> bookAndResponse = client.getResponse(book.id).blockingGet()
+
+        then:"The response is valid"
+        bookAndResponse.status() == HttpStatus.OK
+        bookAndResponse.body().title == "The Stand"
+
         when:
         book = client.update(book.id, "The Shining").blockingGet()
 
@@ -106,7 +112,6 @@ class RxJavaCrudSpec extends Specification {
     }
 
     @Controller("/rxjava/books")
-    @Singleton
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
@@ -118,6 +123,15 @@ class RxJavaCrudSpec extends Specification {
             if(book)
                 return Maybe.just(book)
             Maybe.empty()
+        }
+
+        @Override
+        Single<HttpResponse<Book>> getResponse(Long id) {
+            Book book = books.get(id)
+            if(book) {
+                return Single.just(HttpResponse.ok(book))
+            }
+            return Single.just(HttpResponse.notFound())
         }
 
         @Override
@@ -158,6 +172,9 @@ class RxJavaCrudSpec extends Specification {
 
         @Get("/{id}")
         Maybe<Book> get(Long id)
+
+        @Get("/res/{id}")
+        Single<HttpResponse<Book>> getResponse(Long id)
 
         @Get('/')
         Single<List<Book>> list()

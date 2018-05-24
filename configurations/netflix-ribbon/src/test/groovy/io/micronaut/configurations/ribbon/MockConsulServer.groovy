@@ -42,7 +42,6 @@ import java.util.concurrent.ConcurrentHashMap
  * @since 1.0
  */
 @Controller("/v1")
-@Singleton
 class MockConsulServer implements ConsulOperations {
 
     Map<String, List<ServiceEntry>> services = new ConcurrentHashMap<>()
