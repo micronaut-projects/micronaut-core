@@ -14,12 +14,20 @@ import java.time.Duration;
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.METRICS_ENABLED;
 import static io.micronaut.configuration.metrics.micrometer.graphite.GraphiteConfiguration.GRAPHITE_ENABLED;
 
+/**
+ * The GraphiteMeterRegistryFactory that will configure and create a graphite meter registry.
+ */
 @Factory
 public class GraphiteMeterRegistryFactory {
 
     private final GraphiteConfig graphiteConfig;
 
-    GraphiteMeterRegistryFactory(final GraphiteConfigurationProperties graphiteConfiguration) {
+    /**
+     * Sets the underlying graphite meter registry properties.
+     *
+     * @param graphiteConfigurationProperties graphite properties
+     */
+    GraphiteMeterRegistryFactory(final GraphiteConfigurationProperties graphiteConfigurationProperties) {
         this.graphiteConfig = new GraphiteConfig() {
             @Override
             public String get(String key) {
@@ -28,22 +36,22 @@ public class GraphiteMeterRegistryFactory {
 
             @Override
             public String host() {
-                return graphiteConfiguration.getHost();
+                return graphiteConfigurationProperties.getHost();
             }
 
             @Override
             public int port() {
-                return graphiteConfiguration.getPort();
+                return graphiteConfigurationProperties.getPort();
             }
 
             @Override
             public boolean enabled() {
-                return graphiteConfiguration.isEnabled();
+                return graphiteConfigurationProperties.isEnabled();
             }
 
             @Override
             public Duration step() {
-                return Duration.parse(graphiteConfiguration.getStep());
+                return Duration.parse(graphiteConfigurationProperties.getStep());
             }
         };
     }

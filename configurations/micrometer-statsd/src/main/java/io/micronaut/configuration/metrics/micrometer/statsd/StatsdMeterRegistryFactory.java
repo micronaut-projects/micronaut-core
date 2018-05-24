@@ -15,12 +15,20 @@ import java.time.Duration;
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.METRICS_ENABLED;
 import static io.micronaut.configuration.metrics.micrometer.statsd.StatsdConfiguration.STATSD_ENABLED;
 
+/**
+ * The StatsdMeterRegistryFactory that will configure and create a statsd meter registry.
+ */
 @Factory
 public class StatsdMeterRegistryFactory {
 
     private final StatsdConfig statsdConfig;
 
-    StatsdMeterRegistryFactory(final StatsdConfigurationProperties statsdConfiguration) {
+    /**
+     * Sets the underlying statsd meter registry properties.
+     *
+     * @param statsdConfigurationProperties statsd properties
+     */
+    StatsdMeterRegistryFactory(final StatsdConfigurationProperties statsdConfigurationProperties) {
         this.statsdConfig = new StatsdConfig() {
             @Override
             public String get(String key) {
@@ -29,27 +37,27 @@ public class StatsdMeterRegistryFactory {
 
             @Override
             public StatsdFlavor flavor() {
-                return statsdConfiguration.getFlavor();
+                return statsdConfigurationProperties.getFlavor();
             }
 
             @Override
             public boolean enabled() {
-                return statsdConfiguration.isEnabled();
+                return statsdConfigurationProperties.isEnabled();
             }
 
             @Override
             public String host() {
-                return statsdConfiguration.getHost();
+                return statsdConfigurationProperties.getHost();
             }
 
             @Override
             public int port() {
-                return statsdConfiguration.getPort();
+                return statsdConfigurationProperties.getPort();
             }
 
             @Override
             public Duration step() {
-                return Duration.parse(statsdConfiguration.getStep());
+                return Duration.parse(statsdConfigurationProperties.getStep());
             }
         };
     }
