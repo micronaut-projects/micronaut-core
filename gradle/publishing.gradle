@@ -169,8 +169,8 @@ bintray {
     publications = ['maven']
     publish = true
     pkg {
-        repo = 'micronaut-core'
-        userOrg = 'micronaut-projects'
+        repo = 'core-releases-local'
+        userOrg = 'micronaut'
         name = project.name
         desc = "${project.title} - ${project.projectDesc}".toString()
         websiteUrl = projectUrl
