@@ -52,15 +52,15 @@ class GradleBuildTokens {
         dependencies = dependencies.unique()
 
         dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "    ${dep.scope} \"${artifactStr}\"".toString()
+            String artifactStr = resolveArtifactString(dep, 4)
+            "    ${dep.scope}${artifactStr}".toString()
         }.unique().join(ln)
 
         def buildRepositories = profile.buildRepositories.collect(repositoryUrl.curry(8)).unique().join(ln)
 
         buildDependencies = buildDependencies.collect() { Dependency dep ->
-            String artifactStr = resolveArtifactString(dep)
-            "        classpath \"${artifactStr}\"".toString()
+            String artifactStr = resolveArtifactString(dep, 8)
+            "        classpath${artifactStr}".toString()
         }.unique().join(ln)
 
         def buildPlugins = profile.buildPlugins.collect() { String name ->
@@ -92,10 +92,38 @@ class GradleBuildTokens {
         ["services": serviceString]
     }
 
-    protected String resolveArtifactString(Dependency dep) {
+    protected String resolveArtifactString(Dependency dep, int spaces) {
         def artifact = dep.artifact
         def v = artifact.version.replace('BOM', '')
+        StringBuilder artifactString = new StringBuilder()
+        if (dep.exclusions != null && !dep.exclusions.empty) {
+            artifactString.append('(')
+        } else {
+            artifactString.append(' ')
+        }
+        artifactString.append('"')
+        artifactString.append(artifact.groupId)
+        artifactString.append(':').append(artifact.artifactId)
+        if (v) {
+            artifactString.append(':').append(v)
+        }
+        artifactString.append('"')
 
-        return v ? "${artifact.groupId}:${artifact.artifactId}:${v}" : "${artifact.groupId}:${artifact.artifactId}"
+        def ln = System.getProperty("line.separator")
+
+        if (dep.exclusions != null && !dep.exclusions.empty) {
+            artifactString.append(") {").append(ln)
+            for (e in dep.exclusions) {
+                artifactString.append(" " * (spaces)).append("    ")
+                    .append("exclude")
+
+                artifactString.append(" group: ").append('"').append(e.groupId).append('",')
+                artifactString.append(" module: ").append('"').append(e.artifactId).append('"')
+
+                artifactString.append(ln)
+            }
+            artifactString.append(" " * spaces).append("}")
+        }
+        return artifactString.toString()
     }
 }

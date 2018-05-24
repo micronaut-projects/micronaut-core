@@ -169,29 +169,38 @@ abstract class AbstractProfile implements Profile {
 
         def dependencyMap = profileConfig.get("dependencies")
 
-        if (dependencyMap instanceof Map) {
-            for (entry in ((Map) dependencyMap)) {
-                def scope = entry.key
-                def value = entry.value
-                if (value instanceof List) {
-                    if ("excludes".equals(scope)) {
-                        List<Exclusion> exclusions = []
-                        for (dep in ((List) value)) {
-                            def artifact = new DefaultArtifact(dep.toString())
-                            exclusions.add new Exclusion(artifact.groupId ?: null, artifact.artifactId ?: null, artifact.classifier ?: null, artifact.extension ?: null)
-                        }
-                        exclusionDependencySelector = new ExclusionDependencySelector(exclusions)
-                    } else {
+        if (dependencyMap instanceof List) {
+            List<Exclusion> exclusions = []
 
-                        for (dep in ((List) value)) {
-                            String coords = dep.toString()
-                            if (coords.count(':') == 1) {
-                                coords = "$coords:BOM"
-                            }
-                            dependencies.add new Dependency(new DefaultArtifact(coords), scope.toString())
+            for (entry in ((List) dependencyMap)) {
+                if (entry instanceof Map) {
+                    def scope = (String)entry.scope
+                    String coords = (String)entry.coords
+
+                    if ("excludes".equals(scope)) {
+                        def artifact = new DefaultArtifact(coords)
+                        exclusions.add new Exclusion(artifact.groupId ?: null, artifact.artifactId ?: null, artifact.classifier ?: null, artifact.extension ?: null)
+                    } else {
+                        if (coords.count(':') == 1) {
+                            coords = "$coords:BOM"
                         }
+                        Dependency dependency = new Dependency(new DefaultArtifact(coords), scope.toString())
+                        if (entry.containsKey('excludes')) {
+                            List<Exclusion> dependencyExclusions = new ArrayList<>()
+                            List excludes = (List)entry.excludes
+
+                            for (ex in excludes) {
+                                if (ex instanceof Map) {
+                                    dependencyExclusions.add(new Exclusion((String)ex.group, (String)ex.module, (String)ex.classifier, (String)ex.extension))
+                                }
+                            }
+                            dependency = dependency.setExclusions(dependencyExclusions)
+                        }
+                        dependencies.add(dependency)
                     }
                 }
+
+                exclusionDependencySelector = new ExclusionDependencySelector(exclusions)
             }
         }
 
