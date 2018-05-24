@@ -27,7 +27,7 @@ env:
   - secure: ZPS9nGWmiixNMETGyxGP0/u/VCZmpZTJkaWp5Bo1BGZlsXSJ5ymGKhLIoMKWK4J5MyjRTQa2+Ib7Ac2fo5+KK3T5Sll4v62F0FLMiEZHEYbrE20zgZ2qkabl8Rr3w0Ymgv6/vlOz8LUJfRzziXHanP5lojBSWbwImqSNR9ejpe+L0hHVhDF1ylKUEO/IhadhjI6ohfoehTfqBG4kew5M1lg9fQzd0lF95wt8i8CdeUSwrhrfFuRzgEuBMAKNGOvLK6ApMCP0WdEyo13YDdx8qUlCcA/uxFcajHGAxMEO0pc/f58QTgve51ShHnJ8GlFh/siaBp+EAHKE9iuOGDWkVfVprE/Q8/aPnQfB8tzVuA4IcIQdkdX2BKy71eJkIejZyFf80b6Kk8jQEVsx7g4DmshFNZkO+18tLKjnPDat5cRceqJAjtRiga+7caaLzlzozpSxLi2z6c4CZWyRgm2ZIgTbjLIyCiE3kbjVB3w5eQu/9v3fwtejU6Q6uR/fGafx58Ym/q9X0WDrdS2WPANAqLa+Sjv5ERqJHFlN3ixnXtXlFaxJCt4zvQeLJdupy/Nug9EhRVpdPUm0IeFtdFSO9JBtIqmNveY59bzl5LJDqJjse0BSRhxh7Sm4UDarRk9E4qRhHSd4G9sPMSc/dJjBcDtRxU0aYbKvB/JemvIWeE0=
 install: "/bin/true"
 script:
-   - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./travis-build-r.sh; fi'
+   - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./travis-build-pr.sh; fi'
    - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./travis-build.sh; fi'
 after_deploy:
 - "./gradlew sdkMajorRelease"
