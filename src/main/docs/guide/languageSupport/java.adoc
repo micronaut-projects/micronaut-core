@@ -2,7 +2,23 @@ For Java, Micronaut uses a Java api:annotation.processing.BeanDefinitionInjectPr
 
 The major advantage here is that you pay a slight cost at compile time, but at runtime Micronaut is largely reflection-free, fast and consumes very little memory.
 
-== IDE Considerations
+=== Using Micronaut with Java 9+
+
+Micronaut is built with Java 8, however works fine with Java 9/10 and above as well. The classes that Micronaut generates sit along side existing classes within the same package, hence do not violate anything regarding the Java module system.
+
+There are some considerations to take into account when using Java 9/10 with Micronaut.
+
+==== The javax.annotation package
+
+The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy` etc. is no longer part of the core JDK but instead a module. If you run under Java 9+ you will need to import the module or add the dependency to your classpath:
+
+.Adding the `javax.annotation` dependency
+[source,groovy]
+----
+compile 'javax.annotation:javax.annotation-api:1.3.2'
+----
+
+=== IDE Considerations
 
 You can use any IDE to develop Micronaut, if you depend on your configured build tool (Gradle or Maven) to build the application.
 
@@ -47,4 +63,3 @@ Or alternatively it is recommended that you compile all byte code with `-paramet
 ----
 compileJava.options.compilerArgs += '-parameters'
 ----
-
