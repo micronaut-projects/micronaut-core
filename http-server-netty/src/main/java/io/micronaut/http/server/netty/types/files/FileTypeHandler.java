@@ -95,7 +95,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             }
         }
 
-        response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
+        if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+            response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
+        }
         setDateAndCacheHeaders(response, lastModified);
         if (request.getHeaders().isKeepAlive()) {
             response.header(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);

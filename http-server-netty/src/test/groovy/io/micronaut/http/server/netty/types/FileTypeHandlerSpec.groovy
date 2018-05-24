@@ -17,7 +17,9 @@ package io.micronaut.http.server.netty.types
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -117,6 +119,21 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
+    void "test the content type is honored when an attached file response is returned"() {
+        when:
+        def response = rxClient.exchange('/test/custom-content-type', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/plain"
+        response.header(CONTENT_DISPOSITION) == "attachment; filename=\"temp.html\""
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT") )
+        response.body() == "<html><head></head><body>HTML Page</body></html>"
+    }
+
     void "test supports"() {
         when:
         FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
@@ -156,6 +173,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get
         AttachedFile differentName() {
             new AttachedFile(tempFile, "abc.xyz")
+        }
+
+        @Get
+        HttpResponse<AttachedFile> customContentType() {
+            HttpResponse.ok(new AttachedFile(tempFile, "temp.html")).contentType(MediaType.TEXT_PLAIN_TYPE)
         }
     }
 }
