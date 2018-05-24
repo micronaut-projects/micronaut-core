@@ -1,5 +1,8 @@
+dist: trusty
+addons:
+  chrome: stable
+sudo: required
 language: java
-sudo: false
 jdk:
 - openjdk8
 env:
