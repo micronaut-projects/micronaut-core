@@ -975,6 +975,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (responseBody.isPresent()) {
 
                 Object body = responseBody.get();
+
+                Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
+                        .findTypeHandler(body.getClass());
+                if (typeHandler.isPresent()) {
+                    NettyCustomizableResponseTypeHandler th = typeHandler.get();
+                    setBodyContent(response, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
+                    return response;
+                }
+
                 if (specifiedMediaType.isPresent())  {
 
                     Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
@@ -982,14 +991,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         MediaTypeCodec codec = registeredCodec.get();
                         return encodeBodyWithCodec(response, body, codec, responseMediaType, context);
                     }
-                }
-
-                Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
-                                                                                            .findTypeHandler(body.getClass());
-                if (typeHandler.isPresent()) {
-                    NettyCustomizableResponseTypeHandler th = typeHandler.get();
-                    setBodyContent(response, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
-                    return response;
                 }
 
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(defaultResponseMediaType, body.getClass());
