@@ -23,7 +23,8 @@ ioc:
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
-  annotationMetadata: Bean Annotation Metadata  
+  annotationMetadata: Bean Annotation Metadata
+  springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
   title: Application Configuration
@@ -189,9 +190,6 @@ security:
     logout: Logout Controller
     refresh: Refresh Controller
   securityEvents: Security Events
-spring:
-  title: Micronaut And Spring
-  micronautBeans: Adding Micronaut Beans To A Spring Context
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
