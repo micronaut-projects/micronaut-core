@@ -2,6 +2,6 @@ Configuration in Micronaut takes inspiration from both Spring Boot and Grails an
 
 Configuration can by default be provided in either Java properties, YAML, JSON or Groovy files. The convention is to search for a file called `application.yml`, `application.properties`, `application.json` or `application.groovy`.
 
-In addition, Micronaut will search for the system properties and environment variables for configuration allow the ability to conveniently override settings at the system property or environment variable level.
+In addition, just like Spring and Grails, Micronaut allows overriding any property via system properties or environment variables.
 
 Each source of configuration is modeled with the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] interface and the mechanism is extensible allowing the implementation of additional link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] implementations.
