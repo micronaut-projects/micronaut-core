@@ -20,7 +20,6 @@ import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import org.springframework.beans.factory.FactoryBean;
 
-import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -50,12 +49,9 @@ class MicronautSpringBeanFactory implements FactoryBean {
 
     @Override
     public Object getObject() throws Exception {
-        Collection<?> beans = micronautContext.getBeansOfType(micronautBeanType);
-        if (beans.size() == 1) {
-            Optional<?> beanOptional = beans.stream().findFirst();
-            if (beanOptional.isPresent()) {
-                return beanOptional.get();
-            }
+        Optional bean = micronautContext.findBean(micronautBeanType);
+        if (bean.isPresent()) {
+            return bean.get();
         }
 
         throw new BeanInstantiationException("Could Not Create Bean [" + micronautBeanType + "]");
