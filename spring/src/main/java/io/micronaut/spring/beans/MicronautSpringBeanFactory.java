@@ -32,7 +32,6 @@ class MicronautSpringBeanFactory implements FactoryBean {
     private DefaultApplicationContext micronautContext;
 
     /**
-     *
      * @param micronautBeanType The type of bean this factory will create
      */
     public void setMicronautBeanType(Class micronautBeanType) {
@@ -40,7 +39,6 @@ class MicronautSpringBeanFactory implements FactoryBean {
     }
 
     /**
-     *
      * @param micronautContext The Micronaut application context
      */
     public void setMicronautContext(DefaultApplicationContext micronautContext) {
