@@ -29,6 +29,11 @@ class StatsdConfigurationProperties implements StatsdConfiguration {
         return flavor;
     }
 
+    /**
+     * Set statsd flavor.
+     * @see StatsdFlavor
+     * @param flavor the statsd flavor
+     */
     public void setFlavor(StatsdFlavor flavor) {
         this.flavor = flavor;
     }
@@ -38,6 +43,11 @@ class StatsdConfigurationProperties implements StatsdConfiguration {
         return enabled;
     }
 
+    /**
+     * Set enabled flag.
+     *
+     * @param enabled enable statsd metrics
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
@@ -47,6 +57,11 @@ class StatsdConfigurationProperties implements StatsdConfiguration {
         return port;
     }
 
+    /**
+     * Set statsd port.
+     *
+     * @param port port of statsd listener
+     */
     public void setPort(int port) {
         this.port = port;
     }
@@ -56,6 +71,11 @@ class StatsdConfigurationProperties implements StatsdConfiguration {
         return host;
     }
 
+    /**
+     * Set the hostname.
+     *
+     * @param host hostname
+     */
     public void setHost(String host) {
         this.host = host;
     }
@@ -65,6 +85,12 @@ class StatsdConfigurationProperties implements StatsdConfiguration {
         return step;
     }
 
+    /**
+     * Set the step interval for reporting.
+     *
+     * @see java.time.Duration#parse(CharSequence)
+     * @param step Parsable step string
+     */
     public void setStep(String step) {
         this.step = step;
     }

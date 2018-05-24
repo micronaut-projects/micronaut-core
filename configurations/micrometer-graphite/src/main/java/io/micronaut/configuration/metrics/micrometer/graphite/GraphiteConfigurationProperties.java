@@ -3,7 +3,7 @@ package io.micronaut.configuration.metrics.micrometer.graphite;
 import io.micronaut.context.annotation.ConfigurationProperties;
 
 /**
- * Graphite properties implementation
+ * Graphite properties implementation.
  */
 @ConfigurationProperties(GraphiteConfiguration.GRAPHITE_CONFIG)
 class GraphiteConfigurationProperties implements GraphiteConfiguration {
@@ -26,6 +26,11 @@ class GraphiteConfigurationProperties implements GraphiteConfiguration {
         return enabled;
     }
 
+    /**
+     * Set enabled flag.
+     *
+     * @param enabled enable graphite metrics
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
@@ -35,6 +40,11 @@ class GraphiteConfigurationProperties implements GraphiteConfiguration {
         return host;
     }
 
+    /**
+     * Set the hostname.
+     *
+     * @param host hostname
+     */
     public void setHost(String host) {
         this.host = host;
     }
@@ -44,6 +54,12 @@ class GraphiteConfigurationProperties implements GraphiteConfiguration {
         return step;
     }
 
+    /**
+     * Set the step interval for reporting.
+     *
+     * @see java.time.Duration#parse(CharSequence)
+     * @param step Parsable step string
+     */
     public void setStep(String step) {
         this.step = step;
     }
@@ -53,6 +69,11 @@ class GraphiteConfigurationProperties implements GraphiteConfiguration {
         return port;
     }
 
+    /**
+     * Port to communicate with graphite.
+     *
+     * @param port port number
+     */
     public void setPort(int port) {
         this.port = port;
     }
