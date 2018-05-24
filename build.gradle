@@ -230,6 +230,8 @@ subprojects { subproject ->
     }
 
     tasks.withType(Test) {
+        jvmArgs '-Duser.country=US'
+        jvmArgs '-Duser.language=en'
         testLogging {
             showStandardStreams = !System.getenv("TRAVIS")
             exceptionFormat = 'full'
