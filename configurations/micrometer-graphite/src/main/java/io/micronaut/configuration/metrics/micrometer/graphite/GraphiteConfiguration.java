@@ -1,21 +1,23 @@
 package io.micronaut.configuration.metrics.micrometer.graphite;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory;
 
 /**
- * Collect Graphite configuration.
+ * Graphite properties interface
  */
-@ConfigurationProperties(GraphiteMeterRegistryFactory.GRAPHITE_CONFIG)
-final class GraphiteConfiguration {
+interface GraphiteConfiguration {
 
-    boolean enabled = false;
+    String GRAPHITE_CONFIG = MeterRegistryFactory.CFG_ROOT + "export.graphite";
+    String GRAPHITE_ENABLED = GRAPHITE_CONFIG + ".enabled";
+    String GRAPHITE_HOST = GRAPHITE_CONFIG + ".host";
+    String GRAPHITE_STEP = GRAPHITE_CONFIG + ".step";
+    String GRAPHITE_PORT = GRAPHITE_CONFIG + ".port";
 
-    String host = "mygraphitehost";
+    boolean isEnabled();
 
-    /**
-     * Must parse as valid Duration.
-     *
-     * @see java.time.Duration#parse(CharSequence)
-     */
-    String step = "PT1M"; // default 1 minute
+    String getHost();
+
+    String getStep();
+
+    int getPort();
 }
