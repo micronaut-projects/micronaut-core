@@ -293,6 +293,7 @@ apply from:"gradle/docs.gradle"
 // generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
 allprojects {
     apply plugin: 'idea'
+
     idea {
         module {
             outputDir file('build/classes/java/main')
@@ -300,4 +301,43 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
+
+    tasks.withType(Test) {
+        ignoreFailures = true
+    }
+}
+
+task aggregateReports {
+    group 'verification'
+    doLast() {
+        def html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Micronaut reports</title></head><body><ul>"
+        subprojects.each { subproject ->
+            if ( subproject.tasks.find { Task task -> task.name == 'test' } ) {
+              def link = ''
+              if (new File("${subproject.buildDir}/reports/tests/test").exists()) {
+                  mkdir("${rootProject.buildDir}/reports/${subproject.name}/test")
+                  copy {
+                      from "${subproject.buildDir}/reports/tests/test"
+                      into "${rootProject.buildDir}/reports/${subproject.name}/test"
+                  }
+                  link += " <a href='${subproject.name}/test/index.html'>test</a>"
+              }
+
+              if (new File("${subproject.buildDir}/reports/checkstyle").exists()) {
+                  mkdir("${rootProject.buildDir}/reports/${subproject.name}/checkstyle")
+                  copy {
+                      from "${subproject.buildDir}/reports/checkstyle"
+                      into "${rootProject.buildDir}/reports/${subproject.name}/checkstyle"
+                  }
+                  link += " <a href='${subproject.name}/checkstyle/index.html'>checkstyle</a></li>"
+              }
+              if (link) {
+                  html += "<li>${subproject.name} $link"
+              }
+            }
+        }
+        html += "</ul></body></html>"
+        File f = new File("${rootProject.buildDir}/reports/index.html")
+        f.text = html
+    }
 }
