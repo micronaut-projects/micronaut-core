@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.model.InvokeRequest;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.function.client.FunctionDefinition;
 
 /**
- * Builds an {@link InvokeRequest} for each definition under {@code aws.lambda.functions}
+ * Builds an {@link InvokeRequest} for each definition under {@code aws.lambda.functions}.
  *
  * @author graemerocher
  * @since 1.0
@@ -33,10 +34,13 @@ import io.micronaut.function.client.FunctionDefinition;
 public class AWSInvokeRequestDefinition implements FunctionDefinition {
     public static final String AWS_LAMBDA_FUNCTIONS = AWSLambdaConfiguration.PREFIX + ".functions";
 
-
     @ConfigurationBuilder
     protected InvokeRequest invokeRequest;
 
+    /**
+     * Constructor.
+     * @param name configured name from a property
+     */
     public AWSInvokeRequestDefinition(@Parameter String name) {
         this.invokeRequest = new InvokeRequest();
         this.invokeRequest.setFunctionName(name);

@@ -1,4 +1,16 @@
-Micronaut includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty]. A "Hello World" server application written in Java can be seen below:
+Micronaut includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty].
+
+The design of the HTTP server in Micronaut is optimized for interchanging messages between Microservices, typically in JSON, and is not intended as a full server-side MVC framework. For example, there is currently no support for server-side views or features typical of a traditional server-side MVC framework.
+
+The goal of the HTTP server is to make it as easy as possible to expose APIs that can be consumed by HTTP clients, whatever language they may be written in. To use the HTTP server you must have the `http-server-netty` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:http-server-netty"
+----
+
+A "Hello World" server application written in Java can be seen below:
 
 
 .Micronaut Server Hello World

@@ -1,23 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Executable;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
@@ -30,11 +30,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
  * <p>Indicates that the role of a class is a controller within an application.</p>
- *
+ * <p>
  * <p>By default all public methods of a controller are considered {@link Executable} and
  * the necessary classes generated to perform the invocation.</p>
  *
@@ -48,10 +46,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Executable
 @DefaultScope(Singleton.class)
 public @interface Controller {
+
     /**
      * <p>This attribute returns the base URI of the controller. If not specified the URI will be
-     * formulated from the controller class name without the "Controller" suffix (ie. {@code MessageController becomes} {@code /message}).</p>
-     *
+     * formulated from the controller class name without the "Controller" suffix (ie. {@code MessageController becomes}
+     * {@code /message}).</p>
+     * <p>
      * <p>A value of {@code /} can be used to map a controller
      * to the root URI.</p>
      *

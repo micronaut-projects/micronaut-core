@@ -1,10 +1,29 @@
 Handling of file uploads has special treatment in Micronaut. Support is provided for streaming of uploads in a non-blocking manner through streaming uploads or completed uploads.
 
-== Streaming File Uploads
+To receive data from a multipart request, set the `consumes` argument of the method annotation to api:http.MediaType#MULTIPART_FORM_DATA[]. For example:
 
-To receive a file as soon as the first chunk is available, you can use the api:http.multipart.StreamingFileUpload[] interface:
+[source,java]
+----
+@Post(consumes = MediaType.MULTIPART_FORM_DATA)
+HttpResponse upload( ... )
+----
 
-.Using the Streaming File Upload Interface
+== Route Arguments
+
+How the files are received by your method is determined by the type of the arguments. Data can be received a chunk at a time or when an upload is completed.
+
+TIP: If the route argument name can't or shouldn't match the name of the part in the request, simply add the api:http.annotation.Part[@Part] annotation to the argument and specify the name that is expected to be in the request.
+
+=== Chunk Data Types
+
+api:io.micronaut.http.multipart.PartData[] is the data type used to represent a chunk of data received in a multipart request. There are methods on the api:io.micronaut.http.multipart.PartData[] interface to convert the data to a `byte[]`, link:{javase}java/io/InputStream.html[InputStream], or a link:{javase}java/nio/ByteBuffer.html[ByteBuffer].
+
+NOTE: Data can only be retrieved from a api:io.micronaut.http.multipart.PartData[] once. The underlying buffer will be released which causes further attempts to fail.
+
+Route arguments of type rs:Publisher[Publisher<PartData>] will be treated as only intended to receive a single file and each chunk of the received file will be sent downstream. If the generic type is something other than api:io.micronaut.http.multipart.PartData[], conversion will be attempted using Micronaut's conversion service. Conversions to `String` and `byte[]` are supported by default.
+
+If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.StreamingFileUpload[] has been created that is a rs:Publisher[Publisher<PartData>], but also has file information like the content type and file name.
+
 [source,java]
 ----
 include::{testsuite}/server/upload/UploadController.java[tags=imports, indent=0]
@@ -21,17 +40,11 @@ include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
 <3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method is used to transfer the file to the server. The method returns a rs:Publisher[]
 <4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
-WARNING: Note that the api:http.multipart.FileUpload.getInputStream()[], api:http.multipart.FileUpload.getBytes()[] and api:http.multipart.FileUpload.getByteBuffer()[] methods of api:http.server.netty.multipart.StreamingFileUpload[] can only be called *once*. The data will be released after the first invocation.
+=== Whole Data Types
 
-=== Other Streaming Types
+Route arguments that are not publishers will cause the route execution to be delayed until the upload has finished. The received data will attempt to be converted to the requested type. Conversions to a `String` or `byte[]` are supported by default. In addition, the file can be converted to a POJO if a media type codec has been registered that supports the media type of the file. A media type codec is included by default that allows conversion of JSON files to POJOs.
 
-In addition to the api:http.server.netty.multipart.StreamingFileUpload[] class, it is possible to have a route argument of a `Publisher<byte[]>` to receive a publisher of the bytes of the file.
-
-//TODO: Add code example
-
-== Completed File Uploads
-
-To delay route execution until the entire file has been read from the request, you can use the api:http.server.netty.multipart.CompletedFileUpload[] class:
+If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.CompletedFileUpload[] has been created that has methods to retrieve the data of the file, but also has file information like the content type and file name.
 
 [source,java]
 ----
@@ -46,25 +59,35 @@ include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, i
 
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
-<3> The `CompletedFileUpload` instance gives access to metadata about the upload (such as `filename` and `size`), as well as access to the file's contents as an `InputStream` or byte array.
+<3> The `CompletedFileUpload` instance gives access to metadata about the upload as well as access to the file's contents.
 
-WARNING: Note that the api:http.multipart.FileUpload.getInputStream()[], api:http.multipart.FileUpload.getBytes()[] and api:http.multipart.FileUpload.getByteBuffer()[] methods of api:http.server.netty.multipart.CompletedFileUpload[] can only be called *once*. The data will be released after the first invocation.
+== Multiple Uploads
 
-=== Other Completed Types
+=== Different Names
 
-In addition to the api:http.server.netty.multipart.CompletedFileUpload[] class, it is possible to have a route argument of a `byte[]` to receive just the bytes of the file, or `String` to convert the contents of the file to a `String`.
+If a multipart request supplies multiple uploads that each have a different part name, simply create an argument to your route that receives each part. For example:
 
 [source,java]
 ----
-include::{testsuite}/server/upload/UploadController.java[tags=completedImports, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=bytesUpload, indent=4]
-
-}
+HttpResponse upload(String title, String name)
 ----
 
-<1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
-<2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
-<3> Note that you do not have access to metadata (such as file name) about the upload in this approach.
+A route method signature like the above will expect 2 different parts with the names "title" and "name".
+
+=== Same Name
+
+To handle receiving multiple parts with the same part name, the argument must be a rs:Publisher[]. When used in one of the following ways, the publisher will emit one item per file found with the specified name. The publisher must accept one of the following types:
+
+* api:http.multipart.StreamingFileUpload[]
+* api:http.multipart.CompletedFileUpload[]
+* Any POJO assuming a media codec is found that supports the content type
+* Another rs:Publisher[] that accepts one of the chunked data types described above
+
+For example:
+[source,java]
+----
+HttpResponse upload(Publisher<StreamingFileUpload> files)
+HttpResponse upload(Publisher<CompletedFileUpload> files)
+HttpResponse upload(Publisher<MyObject> files)
+HttpResponse upload(Publisher<Publisher<PartData>> files)
+----

@@ -1,39 +1,45 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.value.OptionalValues;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Specialization of {@link ConvertibleValues} where each name has multiple possible values
+ * Specialization of {@link ConvertibleValues} where each name has multiple possible values.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     /**
-     * Get all the values for the given name without applying conversion
+     * Get all the values for the given name without applying conversion.
      *
      * @param name The header name
      * @return All the values
@@ -41,7 +47,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     List<V> getAll(CharSequence name);
 
     /**
-     * Get a value without applying any conversion
+     * Get a value without applying any conversion.
      *
      * @param name The name of the value
      * @return The raw value or null
@@ -56,10 +62,11 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     default boolean isEmpty() {
         return this == ConvertibleMultiValuesMap.EMPTY || names().isEmpty();
     }
+
     /**
      * Performs the given action for each header. Note that in the case
      * where multiple values exist for the same header then the consumer will be invoked
-     * multiple times for the same key
+     * multiple times for the same key.
      *
      * @param action The action to be performed for each entry
      * @throws NullPointerException if the specified action is null
@@ -88,7 +95,9 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
 
             @Override
             public Map.Entry<String, List<V>> next() {
-                if(!hasNext()) throw new NoSuchElementException();
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
 
                 String name = headerNames.next();
                 return new Map.Entry<String, List<V>>() {
@@ -112,7 +121,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     }
 
     /**
-     * Get the first value of the given header
+     * Get the first value of the given header.
      *
      * @param name The header name
      * @return The first value or null if it is present
@@ -122,13 +131,12 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
         return getFirst(name, type.orElse(Object.class));
     }
 
-
     /**
-     * Find a header and convert it to the given type
+     * Find a header and convert it to the given type.
      *
-     * @param name The name of the header
+     * @param name         The name of the header
      * @param requiredType The required type
-     * @param <T> The generic type
+     * @param <T>          The generic type
      * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
      */
     default <T> Optional<T> getFirst(CharSequence name, Class<T> requiredType) {
@@ -136,46 +144,48 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     }
 
     /**
-     * Find a header and convert it to the given type
+     * Find a header and convert it to the given type.
      *
-     * @param name The name of the header
+     * @param name         The name of the header
      * @param requiredType The required type
-     * @param <T> The generic type
+     * @param <T>          The generic type
      * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
      */
     default <T> Optional<T> getFirst(CharSequence name, Argument<T> requiredType) {
         V v = get(name);
-        if(v != null) {
+        if (v != null) {
             return ConversionService.SHARED.convert(v, ConversionContext.of(requiredType));
         }
         return Optional.empty();
     }
+
     /**
-     * Find a header and convert it to the given type
+     * Find a header and convert it to the given type.
      *
-     * @param name The name of the header
+     * @param name         The name of the header
      * @param requiredType The required type
      * @param defaultValue The default value
-     * @param <T> The generic type
+     * @param <T>          The generic type
      * @return The first value of the default supplied value if it is isn't present
      */
     default <T> T getFirst(CharSequence name, Class<T> requiredType, T defaultValue) {
         return getFirst(name, requiredType).orElse(defaultValue);
     }
+
     /**
-     * Creates a new {@link OptionalValues} for the given type and values
+     * Creates a new {@link io.micronaut.core.value.OptionalValues} for the given type and values.
      *
      * @param values A map of values
-     * @param <T> The target generic type
+     * @param <T>    The target generic type
      * @return The values
      */
-    static <T> ConvertibleMultiValues<T> of( Map<CharSequence, List<T>> values ) {
+    static <T> ConvertibleMultiValues<T> of(Map<CharSequence, List<T>> values) {
         return new ConvertibleMultiValuesMap<>(values);
     }
 
-
     /**
-     * An empty {@link ConvertibleValues}
+     * An empty {@link ConvertibleValues}.
+     *
      * @param <V> The generic type
      * @return The empty {@link ConvertibleValues}
      */

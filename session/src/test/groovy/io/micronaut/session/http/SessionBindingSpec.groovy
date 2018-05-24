@@ -1,35 +1,34 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.session.http
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.annotation.Controller
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.session.annotation.SessionValue
-import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.Specification
 
+import javax.annotation.Nullable
 import javax.inject.Singleton
 
 /**
@@ -40,29 +39,33 @@ class SessionBindingSpec extends Specification {
 
     void "test bind simple session argument using HTTP header processing"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        OkHttpClient httpClient = new OkHttpClient()
-
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        def response = httpClient.newCall(request.build())
-                  .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get() == "not in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
 
-
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-                                       .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         cleanup:
@@ -72,29 +75,33 @@ class SessionBindingSpec extends Specification {
 
     void "test bind simple session argument using Cookie processing"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        OkHttpClient httpClient = new OkHttpClient()
-
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        def response = httpClient.newCall(request.build())
-                .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get() == "not in session"
         response.header(HttpHeaders.SET_COOKIE)
 
         when:
         def sessionId = response.header(HttpHeaders.SET_COOKIE)
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple")
+                        .header(HttpHeaders.COOKIE, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
 
-
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-                .header(HttpHeaders.COOKIE, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.SET_COOKIE)
 
         cleanup:
@@ -103,56 +110,84 @@ class SessionBindingSpec extends Specification {
 
     void "test bind optional session"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        OkHttpClient httpClient = new OkHttpClient()
-
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
-        def response = httpClient.newCall(request.build())
-                .execute()
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/optional"), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "no session"
+        response.getBody().get() == "no session"
         !response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
-        response = httpClient.newCall(request.build())
-                .execute()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/simple"), String
+        ))
+        response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "not in session"
+        response.getBody().get() == "not in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
 
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/optional")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
 
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
-                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
         then:
-        response.body().string() == "value in session"
+        response.getBody().get() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
-        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/value"))
-                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
-        response = httpClient.newCall(request.build())
-                .execute()
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/value")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
 
         then:
-        response.body().string() == "value in session"
-        response.header(HttpHeaders.AUTHORIZATION_INFO)
+        response.getBody().get() == "value in session"
+
+        when:
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/value-nullable")
+                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+                , String
+        ))
+        response = flowable.blockingFirst()
+
+        then:
+        response.getBody().get() == "value in session"
+
+        when:
+        flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/sessiontest/value-nullable")
+                , String
+        ))
+        response = flowable.blockingFirst()
+
+        then:
+        response.getBody().get() == "no value in session"
+
 
         cleanup:
         embeddedServer.stop()
     }
 
     @Controller('/sessiontest')
-    @Singleton
     static class SessionController {
 
         @Get
@@ -170,6 +205,10 @@ class SessionBindingSpec extends Specification {
             )
         }
 
+        @Get
+        String valueNullable(@SessionValue @Nullable String myValue) {
+            return myValue ?:  "no value in session"
+        }
 
         @Get
         String optional(Optional<Session> session) {

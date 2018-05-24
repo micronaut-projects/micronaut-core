@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import org.objectweb.asm.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import org.objectweb.asm.Type;
 
 import javax.annotation.concurrent.Immutable;
 
 /**
- * Stores data to be used when visiting a configuration builder method
+ * Stores data to be used when visiting a configuration builder method.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -41,12 +41,13 @@ class ConfigBuilderState {
     private final AnnotationMetadata annotationMetadata;
 
     /**
-     * Constructs a config builder
-     * @param type The builder type
-     * @param name The name of the field or method
-     * @param isMethod Is the configuration builder resolver a method
+     * Constructs a config builder.
+     *
+     * @param type               The builder type
+     * @param name               The name of the field or method
+     * @param isMethod           Is the configuration builder resolver a method
      * @param annotationMetadata The annotation metadata
-     * @param metadataBuilder The metadata builder
+     * @param metadataBuilder    The metadata builder
      */
     ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
         this.type = AbstractClassFileWriter.getTypeReference(type);
@@ -56,22 +57,37 @@ class ConfigBuilderState {
         this.annotationMetadata = annotationMetadata;
     }
 
+    /**
+     * @return The configuration metadata builder
+     */
     public ConfigurationMetadataBuilder<?> getMetadataBuilder() {
         return metadataBuilder;
     }
 
+    /**
+     * @return The name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @return The type
+     */
     public Type getType() {
         return type;
     }
 
+    /**
+     * @return Whther is a method
+     */
     public boolean isMethod() {
         return invokeMethod;
     }
 
+    /**
+     * @return The annotation metadata
+     */
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

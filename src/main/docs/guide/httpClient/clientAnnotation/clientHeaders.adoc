@@ -1,0 +1,34 @@
+Customizing the request headers deserves special mention as there are several ways that can be accomplished.
+
+
+== Populating Headers Using Configuration
+
+The ann:http.annotation.Header[] annotation can be declared at the type level and is repeatable such that it is possible to drive the request headers sent via configuration using annotation metadata.
+
+The following example serves to illustrate this:
+
+.Defining Headers via Configuration
+[source,java]
+----
+include::{testsclient}/annotation/headers/PetClient.java[tags=class, indent=0]
+----
+
+The above example defines a ann:http.annotation.Header[] annotation on the `PetClient` interface that reads a property using property placeholder configuration called `pet.client.id`.
+
+In your application configuration you then set the following in `application.yml` to populate the value:
+
+.Configuring Headers in YAML
+[source,yaml]
+----
+pet:
+    client:
+        id: foo
+----
+
+Alternatively you can supply a `PET_CLIENT_ID` environment variable and the value will be populated.
+
+== Populating Headers using an Client Filter
+
+Alternatively if you need the ability to dynamically populate headers an alternative is to use a <<clientFilter, Client Filter>>.
+
+For more information on writing client filters see the <<clientFilter, Client Filters>> section of the guide.

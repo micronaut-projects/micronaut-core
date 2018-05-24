@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,11 @@
  */
 package io.micronaut.http.client.retry
 
-import io.micronaut.context.ApplicationContext
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
@@ -34,9 +32,13 @@ import spock.lang.Specification
  * @since 1.0
  */
 class HttpClientRetryWithFallbackSpec extends Specification{
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
 
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test simple blocking retry"() {
         given:

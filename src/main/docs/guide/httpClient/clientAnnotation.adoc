@@ -1,0 +1,107 @@
+Now that you have gathered an understanding of the workings of the lower level HTTP client, it is time to take a look at Micronaut's support for declarative clients via the api:http.client.Client[] annotation.
+
+Essentially, the `@Client` annotation can be declared on any interface or abstract class and through the use of <<introductionAdvice, Introduction Advice>> the abstract methods will be implemented for you at compile time, greatly simplifying the creation of HTTP clients.
+
+Let's start with a simple example. Given the following class:
+
+.Pet.java
+[source,java]
+----
+include::{testsclient}/annotation/Pet.java[tags=class, indent=0]
+----
+
+You can define a common interface for saving new `Pet` instances:
+
+.PetOperations.java
+[source,java]
+----
+include::{testsclient}/annotation/PetOperations.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetOperations.java[tags=class, indent=0]
+----
+
+Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. Also, as you can see you can use `javax.validation` constraints to validate arguments.
+
+Additionally, to use the `javax.validation` features you should have the `validation` and `hibernate-validator` dependencies on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:validation"
+compile "io.micronaut.configuration:hibernate-validator"
+----
+
+On the server-side of Micronaut you can implement the `PetOperations` interface:
+
+.PetController.java
+[source,java]
+----
+include::{testsclient}/annotation/PetController.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetController.java[tags=class, indent=0]
+----
+
+You can then define a declarative client in `src/test/java` that uses `@Client` to automatically, at compile time, implement a client:
+
+.PetClient.java
+[source,java]
+----
+include::{testsclient}/annotation/PetClient.java[tags=imports, indent=0]
+
+include::{testsclient}/annotation/PetClient.java[tags=class, indent=0]
+----
+
+<1> The api:http.client.Client[] annotation is used with a value relative to the current server. In this case `/pets`
+<2> The interface extends from `PetOperations`
+<3> The `save` method is overridden. See warning below.
+
+WARNING: Notice in the above example we override the `save` method. This is necessary if you compile without the `-parameters` option since Java does not retain parameters names in the byte code otherwise. If you compile with `-parameters` then overriding is not necessary.
+
+Once you have defined a client you can simply `@Inject` it wherever you may need it.
+
+Recall that the value of `@Client` can be:
+
+* An absolute URI. Example `https://api.twitter.com/1.1`
+* A relative URI, in which case the server targeted will be the current server (useful for testing)
+* A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
+
+In a production deployment you would typically use a service ID and <<serviceDiscovery, Service Discovery>> to discover services automatically.
+
+Another important thing to notice regarding the `save` method in the example above is that is returns a rx:Single[] type.
+
+This is a non-blocking reactive type and typically you want your HTTP clients not to block. There are cases where you may want to write an HTTP client that does block (such as in unit test cases), but this are rare.
+
+The following table illustrates common return types usable with ann:http.client.Client[]:
+
+.Micronaut Response Types
+|===
+|Type|Description|Example Signature
+
+|rs:Publisher[]
+|Any type that implements the rs:Publisher[] interface
+|`Flowable<String> hello()`
+
+|api:http.HttpResponse[]
+|An api:http.HttpResponse[] and optional response body type
+|+Single<HttpResponse<<String>>> hello()+
+
+|rs:Publisher[]
+|A rs:Publisher[] implementation that emits a POJO
+|`Mono<Book> hello()`
+
+|jdk:java.util.concurrent.CompletableFuture[]
+|A Java `CompletableFuture` instance
+|`CompletableFuture<String> hello()`
+
+|jdk:java.lang.CharSequence[]
+|A blocking native type. Such as `String`
+|`String hello()`
+
+|T
+|Any simple POJO type.
+|`Book show()`
+|===
+
+Generally, any reactive type that can be converted to the rs:Publisher[] interface is supported as a return type including (but not limited to) the reactive types defined by RxJava 1.x, RxJava 2.x and Reactor 3.x.
+
+Returning jdk:java.util.concurrent.CompletableFuture[] instances is also supported. Note that returning any other type _will result in a blocking request_ and is not recommended other than for testing.

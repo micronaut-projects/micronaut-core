@@ -1,27 +1,23 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty.configuration
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.PropertySource
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.server.cors.CorsOriginConfiguration
@@ -49,11 +45,8 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
-        server.start()
 
         then:
-        server != null
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
@@ -61,6 +54,14 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !config.host.isPresent()
         config.parent.threads == 8
         config.worker.threads == 8
+
+        then:
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        server != null
+
 
         cleanup:
         beanContext.close()

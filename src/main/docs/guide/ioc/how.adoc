@@ -1,6 +1,6 @@
 At this point, you may be wondering how Micronaut performs the above dependency injection without requiring reflection.
 
-The key is a set of AST transformations and annotation processors that generate classes that implement the link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] interface.
+The key is a set of AST transformations (for Groovy) and annotation processors (for Java) that generate classes that implement the link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] interface.
 
 The ASM byte-code library is used to generate classes and because Micronaut knows ahead of time the injection points, there is no need to scan all of the methods, fields, constructors, etc. at runtime like other frameworks such as Spring do.
 

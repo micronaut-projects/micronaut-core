@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.converters;
 
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.client.LoadBalancer;
@@ -27,7 +26,7 @@ import java.net.URL;
 import java.util.function.Function;
 
 /**
- * Converters from URL to {@link LoadBalancer} interface
+ * Converters from URL to {@link LoadBalancer} interface.
  *
  * @author graemerocher
  * @since 1.0

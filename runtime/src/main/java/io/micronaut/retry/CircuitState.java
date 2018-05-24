@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.retry;
 
 /**
- * State for Circuit breaker phases
+ * State for Circuit breaker phases.
  *
  * @author graemerocher
  * @since 1.0
  */
 public enum CircuitState {
+
     /**
-     * The circuit is open and downstream logic should not be invoked
+     * The circuit is open and downstream logic should not be invoked.
      */
     OPEN,
+
     /**
-     * The circuit is closed and downstream logic should proceed as normal
+     * The circuit is closed and downstream logic should proceed as normal.
      */
     CLOSED,
+
     /**
-     * The circuit has just closed to allow a single downstream call to check if it is backup
+     * The circuit has just closed to allow a single downstream call to check if it is backup.
      */
     HALF_OPEN
 }

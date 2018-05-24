@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.reactivex.Flowable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.reactivex.Flowable;
 
 import java.net.URL;
 
 /**
- * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface
+ * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface.
  *
  * @author graemerocher
  * @since 1.0
@@ -86,5 +85,4 @@ public interface RxHttpClient extends HttpClient {
     static RxHttpClient create(URL url) {
         return new DefaultHttpClient(url);
     }
-
 }

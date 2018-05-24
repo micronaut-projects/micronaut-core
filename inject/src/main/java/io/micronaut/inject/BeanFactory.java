@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,33 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanResolutionContext;
-import io.micronaut.context.exceptions.BeanInstantiationException;
 
 /**
- * <p>An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete instance.
- * This interface is generally implemented by a build time tool such as an AST transformation framework that will build the
- * code necessary to construct a valid bean instance.</p>
+ * <p>An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete
+ * instance.
+ * This interface is generally implemented by a build time tool such as an AST transformation framework that will build
+ * the code necessary to construct a valid bean instance.</p>
  *
- * @see io.micronaut.inject.writer.BeanDefinitionWriter
- *
+ * @param <T> The bean type
  * @author Graeme Rocher
+ * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 1.0
  */
 public interface BeanFactory<T> {
 
     /**
-     * builds a bean instance
+     * Builds a bean instance.
      *
-     * @param context The context
+     * @param context    The context
      * @param definition The definition
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
@@ -49,10 +47,11 @@ public interface BeanFactory<T> {
     }
 
     /**
-     * builds a bean instance
+     * Builds a bean instance.
      *
-     * @param context The context
-     * @param definition The definition
+     * @param resolutionContext The bean resolution context
+     * @param context           The context
+     * @param definition        The definition
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */

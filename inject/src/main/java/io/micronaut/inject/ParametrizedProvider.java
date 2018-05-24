@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import javax.inject.Provider;
 import java.util.Map;
 
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
+ * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}.
  *
+ * @param <T> The type
  * @author graemerocher
  * @since 1.0
  */
@@ -36,11 +38,10 @@ public interface ParametrizedProvider<T> extends Provider<T> {
      * @param argumentValues The argument values to use
      * @return The bean
      */
-    T get(Object...argumentValues);
+    T get(Object... argumentValues);
 
     @Override
     default T get() {
         return get((Map<String, Object>) null);
     }
-
 }

@@ -2,7 +2,61 @@ Introduction advice is distinct from Around advice in that it involves providing
 
 Examples of introduction advice include things like http://gorm.grails.org[GORM] or http://projects.spring.io/spring-data[Spring Data] that will both automatically implement persistence logic for you.
 
-TODO: Introduction advice example
+Micronaut's api:http.client.Client[] annotation is another example of introduction advice where Micronaut will, at compile time, implement HTTP client interfaces for you.
 
+The way you implement Introduction advice is very similar to how you implement Around advice.
+
+You start off by defining an annotation that will power the introduction advice. As an example, say you want to implement advice that will return a stubbed value for every method in an interface (a common requirement in testing frameworks). Consider the following `@Stub` annotation:
+
+.Introduction Advice Annotation Example
+[source,java]
+----
+include::{testsjava}/aop/introduction/Stub.java[tags=imports, indent=0]
+
+include::{testsjava}/aop/introduction/Stub.java[tags=class, indent=0]
+----
+
+<1> The introduction advice is annotated with api:aop.Introduction[]
+<2> The api:context.annotation.Type[] annotation is used to refer to the implementor of the advise. In this case `StubIntroduction`
+<3> The api:context.annotation.Bean[] annotation is added so that all types annotated with `@Stub` become beans
+
+The `StubIntroduction` class referred to in the previous example must then implement the api:aop.MethodInterceptor[] interface, just like around advice.
+
+The following is an example implementation:
+
+.StubIntroduction.java
+[source,java]
+----
+include::{testsjava}/aop/introduction/StubIntroduction.java[tags=imports, indent=0]
+
+include::{testsjava}/aop/introduction/StubIntroduction.java[tags=class, indent=0]
+----
+
+<1> The class is annotated with `@Singleton` and implements the api:aop.MethodInterceptor[] interface
+<2> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
+<3> Otherwise `null` is returned
+
+To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with `@Stub`:
+
+
+.StubExample.java
+[source,java]
+----
+include::{testsjava}/aop/introduction/StubExample.java[tags=class, indent=0]
+----
+
+All abstract methods will delegate to the `StubIntroduction` class to be implemented.
+
+The following test demonstrates the behaviour or `StubIntroduction`:
+
+.Testing Introduction Advice
+[source,java]
+----
+include::{testsjava}/aop/introduction/IntroductionTest.java[tags=test, indent=0]
+----
+
+Note that if the introduction advice cannot implement the method the `proceed` method of the api:aop.MethodInvocationContext[] should be called. This gives the opportunity for other introduction advice interceptors to implement the method, otherwise a `UnsupportedOperationException` will be thrown if no advice can implement the method.
+
+In addition, if multiple introduction advice are present you may wish to override the `getOrder()` method of api:aop.MethodInterceptor[] to control the priority of advise.
 
 The following sections cover core advice types that are built into Micronaut and provided by the framework.

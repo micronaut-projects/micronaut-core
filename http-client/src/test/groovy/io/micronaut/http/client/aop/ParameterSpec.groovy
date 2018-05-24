@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,8 +30,13 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ParameterSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run()
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive parameter"() {
         given:

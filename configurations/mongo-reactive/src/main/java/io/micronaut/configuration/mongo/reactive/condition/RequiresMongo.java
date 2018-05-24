@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive.condition;
 
 import com.mongodb.reactivestreams.client.MongoClient;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.configuration.mongo.reactive.MongoSettings;
 import io.micronaut.context.annotation.Requires;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * A custom requirement for MongoDB
+ * A custom requirement for MongoDB.
  *
  * @author graemerocher
  * @since 1.0

@@ -60,16 +60,17 @@ publishing {
     repositories {
         maven {
             credentials {
-                def u = System.getenv("ARTIFACTORY_USERNAME") ?: project.hasProperty("artifactoryPublishUsername") ? project.artifactoryPublishUsername : ''
-                def p = System.getenv("ARTIFACTORY_PASSWORD") ?: project.hasProperty("artifactoryPublishPassword") ? project.artifactoryPublishPassword : ''
-                username = u
-                password = p
+                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
+                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+
+                username = ossUser
+                password = ossPass
             }
             if(isBuildSnapshot) {
-                url  "https://repo.grails.org/grails/libs-snapshots-local"
+                url  "https://oss.sonatype.org/content/repositories/snapshots"
             }
             else {
-                url "https://repo.grails.org/grails/libs-releases-local"
+                url "https://repo.micronaut.io/artifactory/libs-releases-local"
             }
         }
     }
@@ -168,8 +169,8 @@ bintray {
     publications = ['maven']
     publish = true
     pkg {
-        repo = 'grails-core'
-        userOrg = 'grails'
+        repo = 'core-releases-local'
+        userOrg = 'micronaut'
         name = project.name
         desc = "${project.title} - ${project.projectDesc}".toString()
         websiteUrl = projectUrl

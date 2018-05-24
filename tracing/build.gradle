@@ -1,0 +1,32 @@
+dependencies {
+
+    compile 'io.opentracing:opentracing-api:0.31.0'
+    compile 'io.opentracing:opentracing-util:0.31.0'
+    compile project(":runtime")
+    compile project(":http-client")
+
+    // the following are Tracing implementations and instrumentations which
+    // are optionally loaded and not required
+    compileOnly project(":inject-java")
+    compileOnly project(":configurations:netflix-hystrix")
+    compileOnly 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
+    compileOnly 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
+    compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
+    compileOnly 'io.opentracing.brave:brave-opentracing:0.30.0'
+
+    compileOnly 'io.jaegertracing:jaeger-core:0.27.0'
+    compileOnly dependencyVersion("reactor")
+    compileOnly dependencyVersion("rxjava1.interop")
+
+
+    testCompile project(":configurations:netflix-hystrix")
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+
+    testCompile dependencyVersion("reactor")
+    testCompile 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
+    testCompile 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
+    testCompile 'io.opentracing.brave:brave-opentracing:0.30.0'
+
+}

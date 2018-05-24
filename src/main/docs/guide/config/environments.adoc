@@ -8,3 +8,17 @@ include::{testsjava}/env/EnvironmentTest.java[tags=env, indent=0]
 ----
 
 The active environment names serve the purpose of allowing loading different configuration files depending on the environment and also using the link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotation to conditionally load beans or bean link:{api}/io/micronaut/context/annotation/Configuration.html[@Configuration] packages.
+
+In addition, Micronaut will attempt to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment will be automatically active.
+
+Additional active environments can be specified using the `micronaut.environments` system property or the `MICRONAUT_ENVIRONMENTS` environment variable. These can be specified as a comma separated list. For example:
+
+.Specifying environments
+[source,bash]
+----
+$ java -Dmicronaut.environments=foo,bar -jar myapp.jar
+----
+
+The above activates environments called `foo` and `bar`.
+
+Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.

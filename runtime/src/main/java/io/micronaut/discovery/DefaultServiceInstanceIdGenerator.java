@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 
@@ -23,10 +23,9 @@ import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.StringJoiner;
-import java.util.StringTokenizer;
 
 /**
- * The default generate for Instance IDs
+ * The default implementation to generate Instance IDs.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -34,6 +33,9 @@ import java.util.StringTokenizer;
 @Singleton
 public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGenerator {
 
+    /**
+     * Default constructor.
+     */
     protected DefaultServiceInstanceIdGenerator() {
     }
 
@@ -41,25 +43,22 @@ public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGener
     @Override
     public String generateId(Environment environment, ServiceInstance serviceInstance) {
         Optional<String> cloudFoundryId = environment.getProperty("vcap.application.instance_id", String.class);
-        if(cloudFoundryId.isPresent()) {
+        if (cloudFoundryId.isPresent()) {
             return cloudFoundryId.get();
-        }
-        else {
+        } else {
             StringJoiner joiner = new StringJoiner(":");
             String applicationName = serviceInstance.getId();
 
             joiner.add(applicationName);
-            if(serviceInstance instanceof EmbeddedServerInstance) {
+            if (serviceInstance instanceof EmbeddedServerInstance) {
                 EmbeddedServerInstance esi = (EmbeddedServerInstance) serviceInstance;
                 Optional<String> id = esi.getEmbeddedServer().getApplicationConfiguration().getInstance().getId();
-                if(id.isPresent()) {
+                if (id.isPresent()) {
                     joiner.add(id.get());
-                }
-                else {
+                } else {
                     joiner.add(String.valueOf(esi.getPort()));
                 }
-            }
-            else {
+            } else {
                 joiner.add(String.valueOf(serviceInstance.getPort()));
             }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
@@ -22,6 +23,8 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -30,18 +33,33 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -56,53 +74,79 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
-    private static EnvironmentsAndPackage environmentsAndPackage;
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
-    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
+    private static final String FILE_SEPARATOR = ",";
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String PCF_ENV = "VCAP_SERVICES";
+    private static final String HEROKU_DYNO = "DYNO";
+
+    protected final ClassPathResourceLoader resourceLoader;
+
+    private EnvironmentsAndPackage environmentsAndPackage;
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ClassPathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
+    private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
 
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
+    /**
+     * @param classLoader The class loader
+     * @param names       The names
+     */
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
         this(classLoader, ConversionService.SHARED, names);
     }
 
+    /**
+     * @param names The names
+     */
     public DefaultEnvironment(String... names) {
         this(DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED, names);
     }
 
+    /**
+     * @param classLoader       The class loader
+     * @param conversionService The conversion service
+     * @param names             The names
+     */
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
         this(ClassPathResourceLoader.defaultLoader(classLoader), conversionService, names);
     }
 
+    /**
+     * @param resourceLoader    The resource loader
+     * @param conversionService The conversion service
+     * @param names             The names
+     */
+    @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
         specifiedNames.addAll(environmentsAndPackage.enviroments);
-        Package aPackage = environmentsAndPackage.aPackage;
-        if(aPackage != null) {
-            packages.add(aPackage.getName());
+        String aPackage = environmentsAndPackage.aPackage;
+        if (aPackage != null) {
+            packages.add(aPackage);
         }
         this.classLoader = resourceLoader.getClassLoader();
         this.names = specifiedNames;
         conversionService.addConverter(
-                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-                Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -119,6 +163,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public Stream<Class> scan(Class<? extends Annotation> annotation, String... packages) {
+        return annotationScanner.scan(annotation, packages);
+    }
+
+    @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
@@ -131,8 +180,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(),propertySource);
-        if(isRunning() && !reading.get()) {
+        propertySources.put(propertySource.getName(), propertySource);
+        if (isRunning() && !reading.get()) {
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
@@ -145,7 +194,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addPackage(String pkg) {
-        if(!this.packages.contains(pkg)) {
+        if (!this.packages.contains(pkg)) {
             this.packages.add(pkg);
         }
         return this;
@@ -153,7 +202,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addConfigurationExcludes(@Nullable String... names) {
-        if(names != null) {
+        if (names != null) {
             configurationExcludes.addAll(Arrays.asList(names));
         }
         return this;
@@ -161,7 +210,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addConfigurationIncludes(String... names) {
-        if(names != null) {
+        if (names != null) {
             configurationIncludes.addAll(Arrays.asList(names));
         }
         return this;
@@ -184,8 +233,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment start() {
-        if(running.compareAndSet(false, true)) {
-            if(reading.compareAndSet(false, true)) {
+        if (running.compareAndSet(false, true)) {
+            if (reading.compareAndSet(false, true)) {
+
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
             }
@@ -211,12 +261,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String,Object>[] copiedCatalog = copyCatalog();
+        Map<String, Object>[] copiedCatalog = copyCatalog();
         refresh();
         return diffCatalog(copiedCatalog, catalog);
     }
-
-
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
@@ -238,224 +286,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;
-    }
-
-    /**
-     * Creates the default annotation scanner
-     *
-     * @param classLoader The class loader
-     * @return The scanner
-     */
-    protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
-        return new CachingClassPathAnnotationScanner(classLoader);
-    }
-
-    protected String getPropertySourceRootName() {
-        return DEFAULT_NAME;
-    }
-
-    protected void readPropertySources(String name) {
-        List<PropertySource> propertySources = readPropertySourceList(name);
-        OrderUtil.sort(propertySources);
-        for (PropertySource propertySource : propertySources) {
-            processPropertySource(propertySource, propertySource.getConvention());
-        }
-    }
-
-    protected List<PropertySource> readPropertySourceList(String name) {
-        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
-        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
-        if(propertySourceLoaders.isEmpty()) {
-            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
-        }
-        else {
-            for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
-            }
-        }
-        if(!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
-            propertySources.add(new SystemPropertiesPropertySource());
-        }
-        if(!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
-            propertySources.add(new EnvironmentPropertySource());
-        }
-        return propertySources;
-    }
-
-    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
-        return SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
-    }
-
-    /**
-     * Obtains the {@link PropertySourceLoader} instances
-     * @return A collection of {@link PropertySourceLoader}
-     */
-    @Override
-    public Collection<PropertySourceLoader> getPropertySourceLoaders() {
-        Collection<PropertySourceLoader> propertySourceLoaderList = this.propertySourceLoaderList;
-        if (propertySourceLoaderList == null) {
-            synchronized (this) { // double check
-                propertySourceLoaderList = this.propertySourceLoaderList;
-                if (propertySourceLoaderList == null) {
-                    this.propertySourceLoaderList = propertySourceLoaderList = evaluatePropertySourceLoaders();
-                }
-            }
-        }
-        return propertySourceLoaderList;
-    }
-
-    private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
-        SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
-        Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
-        for (ServiceDefinition<PropertySourceLoader> definition : definitions) {
-            if(definition.isPresent()) {
-                PropertySourceLoader loader = definition.load();
-                allLoaders.add(loader);
-            }
-        }
-        return allLoaders;
-    }
-
-    private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
-        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
-        defaultPropertySource.ifPresent(propertySources::add);
-        Set<String> activeNames = getActiveNames();
-        for (String activeName : activeNames) {
-            Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
-            propertySource.ifPresent(propertySources::add);
-        }
-    }
-
-    private static EnvironmentsAndPackage getEnvironmentsAndPackage() {
-        EnvironmentsAndPackage environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
-        if (environmentsAndPackage == null) {
-            synchronized (EnvironmentsAndPackage.class) { // double check
-                environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
-                if (environmentsAndPackage == null) {
-                    DefaultEnvironment.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
-                }
-            }
-        }
-        return environmentsAndPackage;
-    }
-
-    private static EnvironmentsAndPackage deduceEnvironments() {
-        EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
-        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-        Set<String> enviroments = environmentsAndPackage.enviroments;
-        for (StackTraceElement stackTraceElement : stackTrace) {
-            String methodName = stackTraceElement.getMethodName();
-            if(methodName.contains("$spock_")) {
-                String className = stackTraceElement.getClassName();
-                String packageName = NameUtils.getPackageName(className);
-                environmentsAndPackage.aPackage = Package.getPackage(packageName);
-                enviroments.add(TEST);
-            }
-            else if("main".equals(methodName)) {
-                String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
-                if(environmentsAndPackage.aPackage == null) {
-                    environmentsAndPackage.aPackage = Package.getPackage(packageName);
-                }
-            }
-            else {
-                String className = stackTraceElement.getClassName();
-                if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                    enviroments.add(TEST);
-                }
-                else if(className.startsWith("com.android")) {
-                    enviroments.add(ANDROID);
-                }
-            }
-        }
-        ComputePlatform computePlatform = determineCloudProvider();
-        if (computePlatform != null) {
-            switch (computePlatform) {
-                case GOOGLE_COMPUTE:
-                    //instantiate bean for GC metadata discovery
-                    enviroments.add(GOOGLE_COMPUTE);
-                    break;
-                case AMAZON_EC2:
-                    //instantiate bean for ec2 metadata discovery
-                    enviroments.add(AMAZON_EC2);
-                    break;
-                case AZURE:
-                    // not implemented
-                    enviroments.add(AZURE);
-                    break;
-                case IBM:
-                    // not implemented
-                    enviroments.add(IBM);
-                    break;
-                case OTHER:
-                    // do nothing here
-                    break;
-            }
-
-        }
-        if(LOG.isInfoEnabled() && !enviroments.isEmpty()) {
-            LOG.info("Established active environments: {}", enviroments);
-        }
-
-        return environmentsAndPackage;
-    }
-
-
-
-    private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
-        Map<String, Object> changes = new LinkedHashMap<>();
-        for (int i = 0; i < original.length; i++) {
-            Map<String, Object> map = original[i];
-            Map<String, Object> newMap = newCatalog[i];
-            boolean hasNew = newMap != null;
-            boolean hasOld = map != null;
-            if(!hasOld && hasNew) {
-                changes.putAll(newMap);
-            }
-            else {
-                if(!hasNew && hasOld) {
-                    changes.putAll(map);
-                }
-                else if(hasOld && hasNew) {
-                    diffMap(map, newMap, changes);
-                }
-            }
-        }
-        return changes;
-    }
-
-    private void diffMap(Map<String, Object> map, Map<String, Object> newMap, Map<String, Object> changes) {
-        for (Map.Entry<String, Object> entry : newMap.entrySet()) {
-            String key = entry.getKey();
-            Object newValue = entry.getValue();
-            if(!map.containsKey(key)) {
-                changes.put(key, newValue);
-            }
-            else {
-                Object oldValue = map.get(key);
-                boolean hasNew = newValue != null;
-                boolean hasOld = oldValue != null;
-                if(hasNew && !hasOld) {
-                    changes.put(key, null);
-                }
-                else if(hasOld && !hasNew) {
-                    changes.put(key, oldValue);
-                }
-                else if(hasNew && hasOld && !newValue.equals(oldValue)) {
-                    changes.put(key, oldValue);
-                }
-            }
-        }
-    }
-
-    private Map<String, Object>[] copyCatalog() {
-        Map<String, Object>[] newCatalog = new Map[catalog.length];
-        for (int i = 0; i < catalog.length; i++) {
-            Map<String, Object> entry = catalog[i];
-            if(entry != null) {
-                newCatalog[i] = new LinkedHashMap<>(entry);
-            }
-        }
-        return newCatalog;
     }
 
     @Override
@@ -483,20 +313,363 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return resourceLoader.forBase(basePath);
     }
 
-    private static ComputePlatform determineCloudProvider() {
+    /**
+     * Creates the default annotation scanner.
+     *
+     * @param classLoader The class loader
+     * @return The scanner
+     */
+    protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
+        return new CachingClassPathAnnotationScanner(classLoader);
+    }
 
+    /**
+     * @return The property source root name
+     */
+    protected String getPropertySourceRootName() {
+        return DEFAULT_NAME;
+    }
+
+    /**
+     * @param name The name to read property sources
+     */
+    protected void readPropertySources(String name) {
+        List<PropertySource> propertySources = readPropertySourceList(name);
+        propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(PROPERTY_SOURCES_KEY)));
+        propertySources.addAll(readPropertySourceListFromFiles(
+            readPropertySourceListKeyFromEnvironment())
+        );
+        OrderUtil.sort(propertySources);
+        for (PropertySource propertySource : propertySources) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Processing property source: {}", propertySource.getName());
+            }
+            processPropertySource(propertySource, propertySource.getConvention());
+        }
+    }
+
+    /**
+     * Reads the value of MICRONAUT_CONFIG_FILES environment variable.
+     *
+     * @return The comma-separated list of files
+     */
+    protected String readPropertySourceListKeyFromEnvironment() {
+        return System.getenv(StringUtils.convertDotToUnderscore(PROPERTY_SOURCES_KEY));
+    }
+
+    /**
+     * Resolve the property sources for files passed via system property and system env.
+     *
+     * @param files The comma separated list of files
+     * @return The list of property sources for each file
+     */
+    protected List<PropertySource> readPropertySourceListFromFiles(String files) {
+        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
+        Optional<Collection<String>> filePathList = Optional.ofNullable(files)
+            .filter(value -> !value.isEmpty())
+            .map(value -> value.split(FILE_SEPARATOR))
+            .map(Arrays::asList)
+            .map(Collections::unmodifiableList);
+
+        filePathList.ifPresent(list -> {
+            if (!list.isEmpty()) {
+                list.forEach(filePath -> {
+                    if (!propertySourceLoaders.isEmpty()) {
+                        String extension = NameUtils.extension(filePath);
+                        String fileName = NameUtils.filename(filePath);
+                        Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
+                        if (propertySourceLoader.isPresent()) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                            }
+                            readPropertySourceFromLoader(fileName, filePath, propertySourceLoader.get(), propertySources);
+                        } else {
+                            throw new ConfigurationException("Unsupported properties file format: " + fileName);
+                        }
+                    }
+                });
+            }
+        });
+        return propertySources;
+    }
+
+    /**
+     * @param name The name to resolver property sources
+     * @return The list of property sources
+     */
+    protected List<PropertySource> readPropertySourceList(String name) {
+        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
+        if (propertySourceLoaders.isEmpty()) {
+            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
+        } else {
+            for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                }
+                loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
+            }
+        }
+        if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
+            propertySources.add(new SystemPropertiesPropertySource());
+        }
+        if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
+            propertySources.add(new EnvironmentPropertySource());
+        }
+        return propertySources;
+    }
+
+    /**
+     * @return Loaded properties as a {@link SoftServiceLoader}
+     */
+    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+        return SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
+    }
+
+    /**
+     * Obtains the {@link PropertySourceLoader} instances.
+     *
+     * @return A collection of {@link PropertySourceLoader}
+     */
+    @Override
+    public Collection<PropertySourceLoader> getPropertySourceLoaders() {
+        Collection<PropertySourceLoader> propertySourceLoaderList = this.propertySourceLoaderList;
+        if (propertySourceLoaderList == null) {
+            synchronized (this) { // double check
+                propertySourceLoaderList = this.propertySourceLoaderList;
+                if (propertySourceLoaderList == null) {
+                    propertySourceLoaderList = evaluatePropertySourceLoaders();
+                    this.propertySourceLoaderList = propertySourceLoaderList;
+                }
+            }
+        }
+        return propertySourceLoaderList;
+    }
+
+    @SuppressWarnings("MagicNumber")
+    private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
+        SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
+        Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
+        for (ServiceDefinition<PropertySourceLoader> definition : definitions) {
+            if (definition.isPresent()) {
+                PropertySourceLoader loader = definition.load();
+                allLoaders.add(loader);
+                Set<String> extensions = loader.getExtensions();
+                for (String extension : extensions) {
+                    loaderByFormatMap.put(extension, loader);
+                }
+            }
+        }
+        return allLoaders;
+    }
+
+    private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
+        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
+        defaultPropertySource.ifPresent(propertySources::add);
+        Set<String> activeNames = getActiveNames();
+        for (String activeName : activeNames) {
+            Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
+            propertySource.ifPresent(propertySources::add);
+        }
+    }
+
+    /**
+     * Read the property source.
+     *
+     * @param fileName             Name of the file to be used as property source name
+     * @param filePath             Absolute file path
+     * @param propertySourceLoader The appropriate property source loader
+     * @param propertySources      List of property sources to add to
+     * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
+     */
+    private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
+        ResourceResolver resourceResolver = new ResourceResolver();
+        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
+        ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
+        try {
+            Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
+            if (inputStream.isPresent()) {
+                Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
+                propertySources.add(PropertySource.of(properties));
+            }
+        } catch (IOException e) {
+            throw new ConfigurationException("Unsupported properties file: " + fileName);
+        }
+    }
+
+    private EnvironmentsAndPackage getEnvironmentsAndPackage() {
+        EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
+        if (environmentsAndPackage == null) {
+            synchronized (EnvironmentsAndPackage.class) { // double check
+                environmentsAndPackage = this.environmentsAndPackage;
+                if (environmentsAndPackage == null) {
+                    environmentsAndPackage = deduceEnvironments();
+                    this.environmentsAndPackage = environmentsAndPackage;
+                }
+            }
+        }
+        return environmentsAndPackage;
+    }
+
+    private static EnvironmentsAndPackage deduceEnvironments() {
+
+
+        EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        Set<String> enviroments = environmentsAndPackage.enviroments;
+
+        // analyze stack to check for Android / Test env
+        for (StackTraceElement stackTraceElement : stackTrace) {
+            String methodName = stackTraceElement.getMethodName();
+            if (methodName.contains("$spock_")) {
+                String className = stackTraceElement.getClassName();
+                environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
+                enviroments.add(TEST);
+            } else if ("main".equals(methodName)) {
+                String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
+                if (environmentsAndPackage.aPackage == null) {
+                    environmentsAndPackage.aPackage = packageName;
+                }
+            } else {
+                String className = stackTraceElement.getClassName();
+                if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
+                    enviroments.add(TEST);
+                } else if (className.startsWith("com.android")) {
+                    enviroments.add(ANDROID);
+                }
+            }
+        }
+
+        if (!enviroments.contains(ANDROID)) {
+            // deduce k8s
+            if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                enviroments.add(Environment.KUBERNETES);
+                enviroments.add(Environment.CLOUD);
+            }
+            // deduce CF
+            if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                enviroments.add(Environment.CLOUD_FOUNDRY);
+                enviroments.add(Environment.CLOUD);
+            }
+
+            // deduce heroku
+            if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                enviroments.add(Environment.HEROKU);
+                enviroments.add(Environment.CLOUD);
+            }
+
+            ComputePlatform computePlatform = determineCloudProvider();
+            if (computePlatform != null) {
+                switch (computePlatform) {
+                    case GOOGLE_COMPUTE:
+                        //instantiate bean for GC metadata discovery
+                        enviroments.add(GOOGLE_COMPUTE);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case AMAZON_EC2:
+                        //instantiate bean for ec2 metadata discovery
+                        enviroments.add(AMAZON_EC2);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case AZURE:
+                        // not yet implemented
+                        enviroments.add(AZURE);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case IBM:
+                        // not yet implemented
+                        enviroments.add(IBM);
+                        enviroments.add(Environment.CLOUD);
+                        break;
+                    case OTHER:
+                        // do nothing here
+                        break;
+                    default:
+                        // no-op
+                }
+            }
+        }
+
+        Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
+            System.getenv(ENVIRONMENTS_ENV))
+            .filter(StringUtils::isNotEmpty)
+            .flatMap(s -> Arrays.stream(s.split(",")))
+            .map(String::trim)
+            .forEach(enviroments::add);
+
+        if (LOG.isInfoEnabled() && !enviroments.isEmpty()) {
+            LOG.info("Established active environments: {}", enviroments);
+        }
+
+        return environmentsAndPackage;
+    }
+
+    private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        for (int i = 0; i < original.length; i++) {
+            Map<String, Object> map = original[i];
+            Map<String, Object> newMap = newCatalog[i];
+            boolean hasNew = newMap != null;
+            boolean hasOld = map != null;
+            if (!hasOld && hasNew) {
+                changes.putAll(newMap);
+            } else {
+                if (!hasNew && hasOld) {
+                    changes.putAll(map);
+                } else if (hasOld && hasNew) {
+                    diffMap(map, newMap, changes);
+                }
+            }
+        }
+        return changes;
+    }
+
+    private void diffMap(Map<String, Object> map, Map<String, Object> newMap, Map<String, Object> changes) {
+        for (Map.Entry<String, Object> entry : newMap.entrySet()) {
+            String key = entry.getKey();
+            Object newValue = entry.getValue();
+            if (!map.containsKey(key)) {
+                changes.put(key, newValue);
+            } else {
+                Object oldValue = map.get(key);
+                boolean hasNew = newValue != null;
+                boolean hasOld = oldValue != null;
+                if (hasNew && !hasOld) {
+                    changes.put(key, null);
+                } else if (hasOld && !hasNew) {
+                    changes.put(key, oldValue);
+                } else if (hasNew && hasOld && !newValue.equals(oldValue)) {
+                    changes.put(key, oldValue);
+                }
+            }
+        }
+    }
+
+    private Map<String, Object>[] copyCatalog() {
+        Map<String, Object>[] newCatalog = new Map[catalog.length];
+        for (int i = 0; i < catalog.length; i++) {
+            Map<String, Object> entry = catalog[i];
+            if (entry != null) {
+                newCatalog[i] = new LinkedHashMap<>(entry);
+            }
+        }
+        return newCatalog;
+    }
+
+    private static ComputePlatform determineCloudProvider() {
         String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
-        if (computePlatform!=null) {
+        if (computePlatform != null) {
 
             try {
                 return ComputePlatform.valueOf(computePlatform);
             } catch (IllegalArgumentException e) {
-                throw new ConfigurationException("Illegal value specified for ["+ CLOUD_PLATFORM_PROPERTY +"]: " + computePlatform);
+                throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
             }
 
         }
         boolean isWindows = System.getProperty("os.name")
-                .toLowerCase().startsWith("windows");
+            .toLowerCase().startsWith("windows");
 
         if (isWindows) {
             if (isEC2Windows()) {
@@ -523,19 +696,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return ComputePlatform.BARE_METAL;
     }
 
-
-
+    @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
             URL url = new URL("http://metadata.google.internal");
-            HttpURLConnection con = (HttpURLConnection)url.openConnection();
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setReadTimeout(500);
             con.setConnectTimeout(500);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
             BufferedReader in = new BufferedReader(
-                    new InputStreamReader(con.getInputStream()));
+                new InputStreamReader(con.getInputStream()));
             String inputLine;
             StringBuffer response = new StringBuffer();
 
@@ -543,8 +715,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 response.append(inputLine);
             }
             in.close();
-            if (con.getHeaderField("Metadata-Flavor")!=null &&
-                    con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
+            if (con.getHeaderField("Metadata-Flavor") != null &&
+                con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
                 return true;
             }
 
@@ -555,7 +727,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isEC2Linux() {
-
         try {
             String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
             if (contents.startsWith("ec2")) {
@@ -601,12 +772,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
+    /**
+     * Helper class for handling environments and package.
+     */
     private static class EnvironmentsAndPackage {
-        Package aPackage;
+        String aPackage;
         Set<String> enviroments = new HashSet<>(1);
     }
-
 }
-
-
-

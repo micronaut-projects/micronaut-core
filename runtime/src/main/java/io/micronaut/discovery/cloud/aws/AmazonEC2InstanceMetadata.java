@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.aws;
 
 import io.micronaut.context.env.ComputePlatform;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Amazon's EC2
+ * Represents {@link ComputeInstanceMetadata} for Amazon's EC2.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -36,12 +37,8 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     // anything non-standard goes in here
     Map<String, String> metadata;
 
-    // quick way to lookup tags
-    private Map<String, String> tags;
-
     //network interfaces to get ip addresses
     List<NetworkInterface> interfaces;
-
 
     String availabilityZone;
     String localHostname;
@@ -53,7 +50,6 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     String account;
     String imageId;
 
-
     // should we keep these broken out or require people to look in the interfaces?
     String publicIpV4;
     String publicIpV6;
@@ -62,6 +58,8 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
 
     boolean cached = false;
 
+    // quick way to lookup tags
+    private Map<String, String> tags;
 
     @Override
     public String getImageId() {

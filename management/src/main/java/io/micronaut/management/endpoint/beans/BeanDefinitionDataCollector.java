@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.beans;
 
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinition;
 import org.reactivestreams.Publisher;
 
 import java.util.Collection;
 
 /**
- * <p>Used to respond with bean information used for the {@link BeansEndpoint}</p>
+ * <p>Used to respond with bean information used for the {@link BeansEndpoint}.</p>
  *
+ * @param <T> The type
  * @author James Kleeh
  * @since 1.0
  */
@@ -32,7 +33,7 @@ public interface BeanDefinitionDataCollector<T> {
     /**
      * @param beanDefinitions A collection of bean definitions
      * @return A publisher that returns data representing all of
-     *         the given bean definitions
+     * the given bean definitions
      */
     Publisher<T> getData(Collection<BeanDefinition<?>> beanDefinitions);
 }

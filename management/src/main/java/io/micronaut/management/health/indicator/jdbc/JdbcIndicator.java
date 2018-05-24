@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
@@ -33,21 +34,37 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+/**
+ * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the jdbc
+ * status.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
 @Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = "false")
 public class JdbcIndicator implements HealthIndicator {
 
     private static final String NAME = "jdbc";
+    private static final int CONNECTION_TIMEOUT = 3;
 
     private final ExecutorService executorService;
     private final DataSource[] dataSources;
     private final HealthAggregator healthAggregator;
 
+    /**
+     * @param executorService  The executor service
+     * @param dataSources      The data sources
+     * @param healthAggregator The health aggregator
+     */
     @Inject
     public JdbcIndicator(@Named(TaskExecutors.IO) ExecutorService executorService,
                          DataSource[] dataSources,
@@ -58,7 +75,7 @@ public class JdbcIndicator implements HealthIndicator {
     }
 
     private Publisher<HealthResult> getResult(DataSource dataSource) {
-        if(executorService == null) {
+        if (executorService == null) {
             throw new IllegalStateException("I/O ExecutorService is null");
         }
         return new AsyncSingleResultPublisher<>(executorService, () -> {
@@ -68,7 +85,7 @@ public class JdbcIndicator implements HealthIndicator {
             Connection connection = null;
             try {
                 connection = dataSource.getConnection();
-                if (connection.isValid(3)) {
+                if (connection.isValid(CONNECTION_TIMEOUT)) {
                     DatabaseMetaData metaData = connection.getMetaData();
                     key = metaData.getURL();
                     details = new LinkedHashMap<>(1);
@@ -98,7 +115,7 @@ public class JdbcIndicator implements HealthIndicator {
             if (throwable.isPresent()) {
                 builder.exception(throwable.get());
                 builder.status(HealthStatus.DOWN);
-            } else  {
+            } else {
                 builder.status(HealthStatus.UP);
                 builder.details(details);
             }
@@ -112,8 +129,7 @@ public class JdbcIndicator implements HealthIndicator {
             return Flowable.empty();
         }
         return healthAggregator.aggregate(NAME, Flowable.merge(
-                Arrays.stream(dataSources).map((ds) -> getResult(ds)).collect(Collectors.toList())
+            Arrays.stream(dataSources).map((ds) -> getResult(ds)).collect(Collectors.toList())
         ));
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery;
 
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
@@ -25,9 +23,15 @@ import io.micronaut.http.HttpHeaders;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
+ * The default implementation for {@link ServiceInstance}.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -42,21 +46,24 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
     private HealthStatus status = HealthStatus.UP;
     private ConvertibleValues<String> metadata = ConvertibleValues.empty();
 
+    /**
+     * Construct a default implementation for the given service identified by id and URI.
+     *
+     * @param id  The identifier of the service used for purposes of service discovery
+     * @param uri The service URI
+     */
     DefaultServiceInstance(String id, URI uri) {
         this.id = id;
 
         String userInfo = uri.getUserInfo();
-        if(StringUtils.isNotEmpty(userInfo)) {
+        if (StringUtils.isNotEmpty(userInfo)) {
             try {
                 this.uri = new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
-                this.metadata = ConvertibleValues.of(Collections.singletonMap(
-                        HttpHeaders.AUTHORIZATION_INFO, userInfo
-                ));
+                this.metadata = ConvertibleValues.of(Collections.singletonMap(HttpHeaders.AUTHORIZATION_INFO, userInfo));
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("ServiceInstance URI is invalid: " + e.getMessage(), e);
             }
-        }
-        else {
+        } else {
             this.uri = uri;
         }
     }
@@ -103,8 +110,12 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DefaultServiceInstance that = (DefaultServiceInstance) o;
         return Objects.equals(id, that.id) &&
                 Objects.equals(uri, that.uri);
@@ -142,7 +153,7 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public Builder status(HealthStatus status) {
-        if(status != null) {
+        if (status != null) {
             this.status = status;
         }
         return this;
@@ -150,11 +161,10 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public Builder metadata(Map<String, String> metadata) {
-        if(metadata != null) {
-            if(this.metadata == ConvertibleValues.EMPTY) {
+        if (metadata != null) {
+            if (this.metadata == ConvertibleValues.EMPTY) {
                 this.metadata = ConvertibleValues.of(metadata);
-            }
-            else {
+            } else {
                 Map<String, String> newMetadata = new LinkedHashMap<>();
                 for (Map.Entry<String, String> entry : this.metadata) {
                     newMetadata.put(entry.getKey(), entry.getValue());
@@ -173,6 +183,6 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public String toString() {
-        return getURI().toString() + " (" + getId() +")";
+        return getURI().toString() + " (" + getId() + ")";
     }
 }

@@ -1,30 +1,24 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.web.router.qualifier;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.inject.BeanType;
-import io.micronaut.context.Qualifier;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.MediaType;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.inject.BeanType;
 
@@ -35,15 +29,20 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A {@link Bean} {@link Qualifier} that qualifies based on the
- * value of the media type defined in the {@link Consumes} annotation
+ * A {@link io.micronaut.context.annotation.Bean} {@link Qualifier} that qualifies based on the value of the media type
+ * defined in the {@link Consumes} annotation.
  *
+ * @param <T> The Type
  * @author Graeme Rocher
  * @since 1.0
  */
 public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
+
     private final MediaType contentType;
 
+    /**
+     * @param contentType The content type as {@link MediaType}
+     */
     public ConsumesMediaTypeQualifier(MediaType contentType) {
         this.contentType = contentType;
     }
@@ -51,20 +50,24 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate -> {
-                    Optional<MediaType[]> consumes = candidate.getAnnotationMetadata().getValue(Consumes.class, MediaType[].class);
-                    if (consumes.isPresent()) {
-                        Set<String> consumedTypes = Arrays.stream(consumes.get()).map(MediaType::getExtension).collect(Collectors.toSet());
-                        return consumedTypes.contains(contentType.getExtension());
-                    }
-                    return false;
+                Optional<MediaType[]> consumes = candidate.getAnnotationMetadata().getValue(Consumes.class, MediaType[].class);
+                if (consumes.isPresent()) {
+                    Set<String> consumedTypes = Arrays.stream(consumes.get()).map(MediaType::getExtension).collect(Collectors.toSet());
+                    return consumedTypes.contains(contentType.getExtension());
                 }
+                return false;
+            }
         );
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         ConsumesMediaTypeQualifier that = (ConsumesMediaTypeQualifier) o;
 

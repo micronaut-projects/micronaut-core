@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -33,8 +29,10 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Defines a bean definition and its requirements. A bean definition must have a singled injectable constructor or a no-args constructor.
+ * Defines a bean definition and its requirements. A bean definition must have a singled injectable constructor or a
+ * no-args constructor.
  *
+ * @param <T> The bean type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -44,7 +42,6 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The scope of the bean
      */
     Optional<Class<? extends Annotation>> getScope();
-
 
     /**
      * @return Whether the scope is singleton
@@ -57,7 +54,8 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     boolean isProvided();
 
     /**
-     * @return Whether the bean declared with {@link EachProperty} or {@link io.micronaut.context.annotation.EachBean}
+     * @return Whether the bean declared with {@link io.micronaut.context.annotation.EachProperty} or
+     * {@link io.micronaut.context.annotation.EachBean}
      */
     boolean isIterable();
 
@@ -94,14 +92,14 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     Collection<FieldInjectionPoint> getInjectedFields();
 
     /**
-     * All the methods that should be called once the bean has been fully initialized and constructed
+     * All the methods that should be called once the bean has been fully initialized and constructed.
      *
      * @return Methods to call post construct
      */
     Collection<MethodInjectionPoint> getPostConstructMethods();
 
     /**
-     * All the methods that should be called when the object is to be destroyed
+     * All the methods that should be called when the object is to be destroyed.
      *
      * @return Methods to call pre-destroy
      */
@@ -113,37 +111,39 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     String getName();
 
     /**
-     * Finds a single {@link ExecutableMethod} for the given name and argument types
+     * Finds a single {@link ExecutableMethod} for the given name and argument types.
      *
      * @param name          The method name
      * @param argumentTypes The argument types
+     * @param <R>           The return type
      * @return An optional {@link ExecutableMethod}
      */
     <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes);
 
     /**
-     * Finds possible methods for the given method name
+     * Finds possible methods for the given method name.
      *
      * @param name The method name
+     * @param <R>  The return type
      * @return The possible methods
      */
     <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
 
     /**
-     * Inject the given bean with the context
+     * Inject the given bean with the context.
      *
      * @param context The context
-     * @param bean The bean
+     * @param bean    The bean
      * @return The injected bean
      */
     T inject(BeanContext context, T bean);
 
     /**
-     * Inject the given bean with the context
+     * Inject the given bean with the context.
      *
      * @param resolutionContext the resolution context
-     * @param context The context
-     * @param bean The bean
+     * @param context           The context
+     * @param bean              The bean
      * @return The injected bean
      */
     T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
@@ -151,28 +151,28 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
-    Collection<ExecutableMethod<T,?>> getExecutableMethods();
+    Collection<ExecutableMethod<T, ?>> getExecutableMethods();
 
 
     /**
-     * Finds a single {@link ExecutableMethod} for the given name and argument types
+     * Finds a single {@link ExecutableMethod} for the given name and argument types.
      *
      * @param name          The method name
      * @param argumentTypes The argument types
+     * @param <R>           The return type
      * @return An optional {@link ExecutableMethod}
      * @throws IllegalStateException If the method cannot be found
      */
     @SuppressWarnings("unchecked")
     default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
         return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
-                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
+            .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
     }
 
     /**
      * @return Whether the bean definition is abstract
      */
     default boolean isAbstract() {
-        return Modifier.isAbstract( getBeanType().getModifiers() );
+        return Modifier.isAbstract(getBeanType().getModifiers());
     }
-
 }

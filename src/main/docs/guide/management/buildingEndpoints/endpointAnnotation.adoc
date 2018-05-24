@@ -1,1 +1,51 @@
-TODO
+An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
+
+[source,java]
+.FooEndpoint.java
+----
+@Endpoint("foo")
+class FooEndpoint {
+    ...
+}
+----
+
+If a single `String` argument is supplied to the annotation, it will be used as the endpoint id.
+
+It is possible to supply additional (named) arguments to the annotation. Other possible arguments to `@Endpoint` are described in the table below:
+
+.Endpoint Arguments
+|===
+|Argument|Description |Endpoint Example
+
+|`String id`
+|The endpoint id (or name)
+|`@Endpoint(id = "foo")`
+
+|`String prefix`
+|Prefix used for configuring the endpoint (see <<endpointConfiguration, Endpoint Configuration>>)
+|`@Endpoint(prefix = "foo")`
+
+
+|`boolean defaultEnabled`
+|Sets whether the endpoint is enabled when no configuration is set (see <<endpointConfiguration, Endpoint Configuration>>)
+|`@Endpoint(defaultEnabled = false)`
+
+|`boolean defaultSensitive`
+|Sets whether the endpoint is sensitive if no configuration is set (see <<endpointConfiguration, Endpoint Configuration>>)
+|`@Endpoint(defaultSensitive = false)`
+
+|===
+
+== Example of custom Endpoint
+
+The following example `Endpoint` class will create an endpoint accessible at `/date`:
+
+[source,groovy]
+.CurrentDateEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
+
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
+  //.. endpoint methods
+include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
+----

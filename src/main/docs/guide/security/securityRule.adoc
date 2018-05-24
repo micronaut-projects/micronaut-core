@@ -1,0 +1,3 @@
+The decision to allow access to a particular endpoint to anonymous or authenticated users is determined by a collection of
+Security Rules. Micronaut ships with several built-in security rules. If they don't fulfil your needs,
+you can implement your own link:{api}/io/micronaut/security/rules/SecurityRule.html[SecurityRule].

@@ -1,0 +1,23 @@
+To get started writing serverless function you must add the appropriate Micronaut `function` dependency to your classpath. For example, to create functions for AWS Lambda, add the `function-aws` dependency.  The supported providers are listed in the table below.
+
+.Function Providers
+|===
+|Provider|Dependency
+
+|AWS Lambda
+| `io.micronaut:function-aws`
+|===
+
+NOTE: If you are using Groovy, there is a single compile-time dependency to be added: `"io.micronaut:function-groovy"` Please see <<groovyFunctions,Groovy Functions>>.
+
+Add the appropriate dependency to your project, For example, in `build.gradle`:
+
+.Example build.gradle
+[source,groovy]
+----
+dependencies {
+    ...
+    compile "io.micronaut:function-aws"
+    ...
+}
+----

@@ -1,16 +1,38 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -22,65 +44,69 @@ import java.util.stream.Stream;
  */
 public class ReflectionUtils {
     public static final Class[] EMPTY_CLASS_ARRAY = new Class[0];
-    private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS
-            = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
-        {
-            put(boolean.class, Boolean.class);
-            put(byte.class, Byte.class);
-            put(char.class, Character.class);
-            put(double.class, Double.class);
-            put(float.class, Float.class);
-            put(int.class, Integer.class);
-            put(long.class, Long.class);
-            put(short.class, Short.class);
-            put(void.class, Void.class);
-        }
-    });
+    private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS =
+        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
+            {
+                put(boolean.class, Boolean.class);
+                put(byte.class, Byte.class);
+                put(char.class, Character.class);
+                put(double.class, Double.class);
+                put(float.class, Float.class);
+                put(int.class, Integer.class);
+                put(long.class, Long.class);
+                put(short.class, Short.class);
+                put(void.class, Void.class);
+            }
+        });
 
-    private static final Map<Class<?>, Class<?>> WRAPPER_TO_PRIMITIVE
-            = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
-        {
-            put(Boolean.class, boolean.class);
-            put(Byte.class, byte.class);
-            put(Character.class, char.class);
-            put(Double.class, double.class);
-            put(Float.class, float.class);
-            put(Integer.class, int.class);
-            put(Long.class, long.class);
-            put(Short.class, short.class);
-            put(Void.class, void.class);
-        }
-    });
+    private static final Map<Class<?>, Class<?>> WRAPPER_TO_PRIMITIVE =
+        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
+            {
+                put(Boolean.class, boolean.class);
+                put(Byte.class, byte.class);
+                put(Character.class, char.class);
+                put(Double.class, double.class);
+                put(Float.class, float.class);
+                put(Integer.class, int.class);
+                put(Long.class, long.class);
+                put(Short.class, short.class);
+                put(Void.class, void.class);
+            }
+        });
 
-    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES
-            = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
-        {
-            put(Byte.class, Byte.BYTES);
-            put(Character.class, Character.BYTES);
-            put(Double.class, Double.BYTES);
-            put(Float.class, Float.BYTES);
-            put(Integer.class, Integer.BYTES);
-            put(Long.class, Long.BYTES);
-            put(Short.class, Short.BYTES);
-        }
-    });
+    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES =
+        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
+            {
+                put(Byte.class, Byte.BYTES);
+                put(Character.class, Character.BYTES);
+                put(Double.class, Double.BYTES);
+                put(Float.class, Float.BYTES);
+                put(Integer.class, Integer.BYTES);
+                put(Long.class, Long.BYTES);
+                put(Short.class, Short.BYTES);
+            }
+        });
 
     /**
-     * Is the method a setter
+     * Is the method a setter.
      *
      * @param name The method name
      * @param args The arguments
      * @return True if it is
      */
     public static boolean isSetter(String name, Class[] args) {
-        if (StringUtils.isEmpty(name) || args == null)return false;
-        if (args.length != 1) return false;
+        if (StringUtils.isEmpty(name) || args == null) {
+            return false;
+        }
+        if (args.length != 1) {
+            return false;
+        }
 
         return NameUtils.isSetterName(name);
     }
 
     /**
-     * Obtain the wrapper type for the given primitive type
+     * Obtain the wrapper type for the given primitive.
      *
      * @param primitiveType The primitive type
      * @return The wrapper type
@@ -94,7 +120,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtain the primitive type for the given wrapper type
+     * Obtain the primitive type for the given wrapper type.
      *
      * @param wrapperType The primitive type
      * @return The wrapper type
@@ -107,8 +133,9 @@ public class ReflectionUtils {
             return wrapperType;
         }
     }
+
     /**
-     * Obtains a declared method
+     * Obtains a declared method.
      *
      * @param type       The type
      * @param methodName The method name
@@ -124,11 +151,27 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtains a declared method
+     * Obtains a method.
+     *
+     * @param type       The type
+     * @param methodName The method name
+     * @param argTypes   The argument types
+     * @return An optional {@link Method}
+     */
+    public static Optional<Method> getMethod(Class type, String methodName, Class... argTypes) {
+        try {
+            return Optional.of(type.getMethod(methodName, argTypes));
+        } catch (NoSuchMethodException e) {
+            return findMethod(type, methodName, argTypes);
+        }
+    }
+
+    /**
+     * Obtains a declared method.
      *
      * @param type     The type
      * @param argTypes The argument types
-     * @param <T> The generic type
+     * @param <T>      The generic type
      * @return The method
      */
     public static <T> Optional<Constructor<T>> findConstructor(Class<T> type, Class... argTypes) {
@@ -140,39 +183,39 @@ public class ReflectionUtils {
     }
 
     /**
-     * Invokes a method
+     * Invokes a method.
      *
-     * @param instance The instance
-     * @param method The method
+     * @param instance  The instance
+     * @param method    The method
      * @param arguments The arguments
-     * @param <R> The return type
-     * @param <T> The instance type
+     * @param <R>       The return type
+     * @param <T>       The instance type
      * @return The result
      */
     public static <R, T> R invokeMethod(T instance, Method method, Object... arguments) {
         try {
             return (R) method.invoke(instance, arguments);
         } catch (IllegalAccessException e) {
-            throw new InvocationException("Illegal access invoking method ["+method+"]: " + e.getMessage(), e);
+            throw new InvocationException("Illegal access invoking method [" + method + "]: " + e.getMessage(), e);
         } catch (InvocationTargetException e) {
-            throw new InvocationException("Exception occurred invoking method ["+method+"]: " + e.getMessage(), e);
+            throw new InvocationException("Exception occurred invoking method [" + method + "]: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
-     * @param type The type
-     * @param name The name
+     * @param type          The type
+     * @param name          The name
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
     public static Optional<Method> findMethod(Class type, String name, Class... argumentTypes) {
         Class currentType = type;
-        while(currentType != null) {
+        while (currentType != null) {
             Method[] methods = currentType.isInterface() ? currentType.getMethods() : currentType.getDeclaredMethods();
             for (Method method : methods) {
-                if(name.equals(method.getName()) && Arrays.equals(argumentTypes, method.getParameterTypes())) {
+                if (name.equals(method.getName()) && Arrays.equals(argumentTypes, method.getParameterTypes())) {
                     return Optional.of(method);
                 }
             }
@@ -182,10 +225,10 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
-     * @param type The type
-     * @param name The name
+     * @param type          The type
+     * @param name          The name
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
@@ -194,15 +237,15 @@ public class ReflectionUtils {
             return type.getDeclaredMethod(name, argumentTypes);
         } catch (NoSuchMethodException e) {
             return findMethod(type, name, argumentTypes)
-                    .orElseThrow(()-> newNoSuchMethodError(type, name, argumentTypes));
+                .orElseThrow(() -> newNoSuchMethodError(type, name, argumentTypes));
         }
     }
 
     /**
-     * Finds an internal method defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist
+     * Finds an internal method defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist.
      *
-     * @param type The type
-     * @param name The name
+     * @param type          The type
+     * @param name          The name
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      * @throws NoSuchMethodError If the method doesn't exist
@@ -213,16 +256,16 @@ public class ReflectionUtils {
             return type.getDeclaredMethod(name, argumentTypes);
         } catch (NoSuchMethodException e) {
             return findMethod(type, name, argumentTypes)
-                    .orElseThrow(()-> newNoSuchMethodInternalError(type, name, argumentTypes));
+                .orElseThrow(() -> newNoSuchMethodInternalError(type, name, argumentTypes));
         }
     }
 
-
     /**
-     * Finds an internal constructor defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist
+     * Finds an internal constructor defined by the Micronaut API and throws a {@link NoSuchMethodError} if it doesn't exist.
      *
-     * @param type The type
+     * @param type          The type
      * @param argumentTypes The argument types
+     * @param <T>           The type
      * @return An {@link Optional} contains the method or empty
      * @throws NoSuchMethodError If the method doesn't exist
      */
@@ -234,8 +277,9 @@ public class ReflectionUtils {
             throw newNoSuchConstructorInternalError(type, argumentTypes);
         }
     }
+
     /**
-     * Finds a field on the given type for the given name
+     * Finds a field on the given type for the given name.
      *
      * @param type The type
      * @param name The name
@@ -246,47 +290,51 @@ public class ReflectionUtils {
             return type.getDeclaredField(name);
         } catch (NoSuchFieldException e) {
             Optional<Field> field = findField(type, name);
-            return field.orElseThrow(()-> new NoSuchFieldError("No field '"+name+"' found for type: " + type.getName()));
+            return field.orElseThrow(() -> new NoSuchFieldError("No field '" + name + "' found for type: " + type.getName()));
         }
     }
 
     /**
-     * Finds a field in the type or super type
+     * Finds a field in the type or super type.
+     *
      * @param type The type
      * @param name The field name
      * @return An {@link Optional} of field
      */
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
-        if(!declaredField.isPresent()) {
+        if (!declaredField.isPresent()) {
             type = type.getSuperclass();
-            while(type != null) {
+            while (type != null) {
                 declaredField = findField(type, name);
-                if(declaredField.isPresent()) break;
+                if (declaredField.isPresent()) {
+                    break;
+                }
             }
         }
         return declaredField;
     }
 
     /**
-     * Finds a field in the type or super type
-     * @param type The type
-     * @param name The field name
+     * Finds a field in the type or super type.
+     *
+     * @param type  The type
+     * @param name  The field name
+     * @param value The value
      */
     public static void setFieldIfPossible(Class type, String name, Object value) {
         Optional<Field> declaredField = findDeclaredField(type, name);
-        if(declaredField.isPresent()) {
+        if (declaredField.isPresent()) {
             Field field = declaredField.get();
             Optional<?> converted = ConversionService.SHARED.convert(value, field.getType());
-            if(converted.isPresent()) {
+            if (converted.isPresent()) {
                 field.setAccessible(true);
                 try {
                     field.set(type, converted.get());
                 } catch (IllegalAccessException e) {
                     // ignore
                 }
-            }
-            else {
+            } else {
                 field.setAccessible(true);
                 try {
                     field.set(type, null);
@@ -296,8 +344,9 @@ public class ReflectionUtils {
             }
         }
     }
+
     /**
-     * Finds a method on the given type for the given name
+     * Finds a method on the given type for the given name.
      *
      * @param type The type
      * @param name The name
@@ -306,10 +355,10 @@ public class ReflectionUtils {
     public static Stream<Method> findMethodsByName(Class type, String name) {
         Class currentType = type;
         Set<Method> methodSet = new HashSet<>();
-        while(currentType != null) {
+        while (currentType != null) {
             Method[] methods = currentType.isInterface() ? currentType.getMethods() : currentType.getDeclaredMethods();
             for (Method method : methods) {
-                if(name.equals(method.getName())) {
+                if (name.equals(method.getName())) {
                     methodSet.add(method);
                 }
             }
@@ -318,7 +367,12 @@ public class ReflectionUtils {
         return methodSet.stream();
     }
 
-    public static Optional<Field> findDeclaredField(Class type, String name)  {
+    /**
+     * @param type The type
+     * @param name The field name
+     * @return An optional with the declared field
+     */
+    public static Optional<Field> findDeclaredField(Class type, String name) {
         try {
             Field declaredField = type.getDeclaredField(name);
             return Optional.of(declaredField);
@@ -327,20 +381,30 @@ public class ReflectionUtils {
         }
     }
 
+    /**
+     * @param aClass A class
+     * @return All the interfaces
+     */
     public static Set<Class> getAllInterfaces(Class<?> aClass) {
         Set<Class> interfaces = new HashSet<>();
         return populateInterfaces(aClass, interfaces);
     }
 
+    /**
+     * @param aClass     A class
+     * @param interfaces The interfaces
+     * @return A set with the interfaces
+     */
+    @SuppressWarnings("Duplicates")
     protected static Set<Class> populateInterfaces(Class<?> aClass, Set<Class> interfaces) {
         Class<?>[] theInterfaces = aClass.getInterfaces();
         interfaces.addAll(Arrays.asList(theInterfaces));
         for (Class<?> theInterface : theInterfaces) {
             populateInterfaces(theInterface, interfaces);
         }
-        if(!aClass.isInterface()) {
+        if (!aClass.isInterface()) {
             Class<?> superclass = aClass.getSuperclass();
-            while(superclass != null) {
+            while (superclass != null) {
                 populateInterfaces(superclass, interfaces);
                 superclass = superclass.getSuperclass();
             }
@@ -348,25 +412,30 @@ public class ReflectionUtils {
         return interfaces;
     }
 
+    /**
+     * @param declaringType The declaring type
+     * @param name          The method name
+     * @param argumentTypes The argument types
+     * @return A {@link NoSuchMethodError}
+     */
     public static NoSuchMethodError newNoSuchMethodError(Class declaringType, String name, Class[] argumentTypes) {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
-        return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName() + ". Most likely cause of this error is that an unsupported or older version of a dependency is present on the classpath. Check your classpath, and ensure the incompatible classes are not present and/or recompile classes as necessary.");
+        return new NoSuchMethodError("Required method " + name + "(" + argsAsText + ") not found for class: " + declaringType.getName() + ". Most likely cause of this error is that an unsupported or older version of a dependency is present on the classpath. Check your classpath, and ensure the incompatible classes are not present and/or recompile classes as necessary.");
     }
 
     private static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
-        return new NoSuchMethodError("Micronaut method "+ declaringType.getName() +"."+name+"("+argsAsText+") not found. Most likely reason for this issue is that you are running a newer version of Micronaut with code compiled against an older version. Please recompile the offending classes");
+        return new NoSuchMethodError("Micronaut method " + declaringType.getName() + "." + name + "(" + argsAsText + ") not found. Most likely reason for this issue is that you are running a newer version of Micronaut with code compiled against an older version. Please recompile the offending classes");
     }
-
 
     private static NoSuchMethodError newNoSuchConstructorInternalError(Class declaringType, Class[] argumentTypes) {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
-        return new NoSuchMethodError("Micronaut constructor "+ declaringType.getName() +"("+argsAsText+") not found. Most likely reason for this issue is that you are running a newer version of Micronaut with code compiled against an older version. Please recompile the offending classes");
+        return new NoSuchMethodError("Micronaut constructor " + declaringType.getName() + "(" + argsAsText + ") not found. Most likely reason for this issue is that you are running a newer version of Micronaut with code compiled against an older version. Please recompile the offending classes");
     }
 }

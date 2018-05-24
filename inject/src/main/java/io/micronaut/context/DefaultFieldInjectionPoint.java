@@ -1,122 +1,169 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.context;
 
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.annotation.Internal;
 
+import javax.annotation.Nullable;
+import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.Objects;
 
 /**
- * Represents an injection point for a field
+ * Represents an injection point for a field.
  *
+ * @param <T> The field type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
-    private final String name;
-    private final Field field;
-    private final Annotation qualifier;
-    private final BeanDefinition declaringComponent;
-    private final boolean requiresReflection;
+    private final BeanDefinition declaringBean;
+    private final Class declaringType;
+    private final Class<T> fieldType;
+    private final String field;
+    private final AnnotationMetadata annotationMetadata;
+    private final Argument[] typeArguments;
 
-    private Argument<T> argument = null;
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param fieldType          The field type
+     * @param field              The name of the field
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments      the generic type arguments
+     */
+    DefaultFieldInjectionPoint(
+        BeanDefinition declaringBean,
+        Class declaringType,
+        Class<T> fieldType,
+        String field,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument[] typeArguments) {
 
-    DefaultFieldInjectionPoint(BeanDefinition declaringComponent, Field field, Annotation qualifier, boolean requiresReflection) {
+        this.declaringBean = declaringBean;
+        this.declaringType = declaringType;
+        this.fieldType = fieldType;
         this.field = field;
-        this.field.setAccessible(true);
-        this.name = field.getName();
-        this.declaringComponent = declaringComponent;
-        this.qualifier = qualifier;
-        this.requiresReflection = requiresReflection;
+        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+        this.typeArguments = ArrayUtils.isEmpty(typeArguments) ? Argument.ZERO_ARGUMENTS : typeArguments;
     }
 
     @Override
-    public Annotation getQualifier() {
-        return this.qualifier;
+    public String toString() {
+        return fieldType.getSimpleName() + " " + field;
     }
 
     @Override
-    public boolean requiresReflection() {
-        return requiresReflection;
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DefaultFieldInjectionPoint<?> that = (DefaultFieldInjectionPoint<?>) o;
+        return Objects.equals(declaringType, that.declaringType) &&
+            Objects.equals(fieldType, that.fieldType) &&
+            Objects.equals(field, that.field);
     }
 
     @Override
-    public BeanDefinition getDeclaringBean() {
-        return this.declaringComponent;
+    public int hashCode() {
+        return Objects.hash(declaringType, fieldType, field);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
     }
 
     @Override
     public String getName() {
-        return this.name;
+        return field;
     }
 
     @Override
     public Field getField() {
-        return this.field;
+        return ReflectionUtils.getRequiredField(declaringType, this.field);
     }
 
     @Override
     public Class<T> getType() {
-        return (Class<T>) this.field.getType();
+        return fieldType;
     }
 
     @Override
-    public void set(Object object, T instance) {
+    public Annotation getQualifier() {
+        return annotationMetadata.getAnnotationTypeByStereotype(Qualifier.class)
+            .map(annotationMetadata::getAnnotation)
+            .orElse(null);
+    }
+
+    @Override
+    public void set(T instance, Object object) {
+        Field field = getField();
         try {
-            field.set(object, instance);
-        } catch (IllegalAccessException e) {
-            throw new BeanInstantiationException("Exception occured injecting field ["+field+"]: " + e.getMessage(), e);
+            field.setAccessible(true);
+            field.set(instance, object);
+        } catch (Throwable e) {
+            e.printStackTrace();
         }
     }
 
     @Override
     public Argument<T> asArgument() {
-        if(argument == null) {
-            Class[] typeArguments = GenericTypeUtils.resolveGenericTypeArguments(field);
-            List<Argument<?>> arguments = Collections.emptyList();
-            if(typeArguments != null && typeArguments.length > 0) {
-                TypeVariable<? extends Class<?>>[] typeParameters = field.getType().getTypeParameters();
-                if(typeParameters.length == typeArguments.length) {
-                    arguments = new ArrayList<>();
-                    for (int i = 0; i < typeParameters.length; i++) {
-                        TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
-                        String name = typeParameter.getName();
-                        arguments.add(Argument.of(typeArguments[i], name));
-                    }
-                }
-            }
-            argument = Argument.of(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
-        }
-        return argument;
+        return Argument.of(
+            fieldType,
+            field,
+            annotationMetadata,
+            typeArguments
+        );
     }
 
     @Override
-    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-        return field.getAnnotation(annotationClass);
+    public BeanDefinition getDeclaringBean() {
+        return declaringBean;
+    }
+
+    @Override
+    public boolean requiresReflection() {
+        return false;
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return getAnnotationMetadata().getAnnotation(annotationClass);
     }
 
     @Override
     public Annotation[] getAnnotations() {
-        return field.getAnnotations();
+        return getAnnotationMetadata().getAnnotations();
     }
 
     @Override
     public Annotation[] getDeclaredAnnotations() {
-        return field.getDeclaredAnnotations();
-    }
-
-    @Override
-    public String toString() {
-        return field.toString();
+        return getAnnotationMetadata().getDeclaredAnnotations();
     }
 }

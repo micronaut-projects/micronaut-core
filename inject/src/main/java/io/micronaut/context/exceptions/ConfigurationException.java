@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.exceptions;
 
 /**
- * An exception that occurs during configuration setup
+ * An exception that occurs during configuration setup.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class ConfigurationException extends RuntimeException {
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
     public ConfigurationException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     */
     public ConfigurationException(String message) {
         super(message);
     }

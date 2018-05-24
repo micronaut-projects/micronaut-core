@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.context.env;
 
 import io.micronaut.core.order.Ordered;
@@ -5,14 +21,16 @@ import io.micronaut.core.order.Ordered;
 import java.util.Map;
 
 /**
- * A PropertySource is a location to resolve property values from. The property keys are are available via the {@link #iterator()} method.
+ * A PropertySource is a location to resolve property values from. The property keys are are available via the
+ * {@link #iterator()} method.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface PropertySource extends Iterable<String>, Ordered {
+
     /**
-     * the name of the property source with values supplied directly from the context
+     * The name of the property source with values supplied directly from the context.
      */
     String CONTEXT = "context";
 
@@ -20,11 +38,11 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @return The name of the property source
      */
     String getName();
+
     /**
-     * Get a property value of the given key
+     * Get a property value of the given key.
      *
      * @param key The key
-     *
      * @return The value
      */
     Object get(String key);
@@ -37,10 +55,10 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
      * @param name The name of the property source
-     * @param map The map
+     * @param map  The map
      * @return The {@link PropertySource}
      */
     static PropertySource of(String name, Map<String, Object> map) {
@@ -48,10 +66,10 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
-     * @param name The name of the property source
-     * @param map The map
+     * @param name       The name of the property source
+     * @param map        The map
      * @param convention The convention type of the property source
      * @return The {@link PropertySource}
      */
@@ -65,10 +83,10 @@ public interface PropertySource extends Iterable<String>, Ordered {
     }
 
     /**
-     * Create a {@link PropertySource} from the given map
+     * Create a {@link PropertySource} from the given map.
      *
-     * @param name The name of the property source
-     * @param map The map
+     * @param name     The name of the property source
+     * @param map      The map
      * @param priority The priority to order by
      * @return The {@link PropertySource}
      */
@@ -80,8 +98,9 @@ public interface PropertySource extends Iterable<String>, Ordered {
             }
         };
     }
+
     /**
-     * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map
+     * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map.
      *
      * @param map The map
      * @return The {@link PropertySource}
@@ -90,14 +109,18 @@ public interface PropertySource extends Iterable<String>, Ordered {
         return new MapPropertySource(Environment.DEFAULT_NAME, map);
     }
 
-
+    /**
+     * Property convention.
+     */
     enum PropertyConvention {
+
         /**
-         * Upper case separated by under scores (environment variable style)
+         * Upper case separated by under scores (environment variable style).
          */
         ENVIRONMENT_VARIABLE,
+
         /**
-         * Lower case separated by dots (java properties file style)
+         * Lower case separated by dots (java properties file style).
          */
         JAVA_PROPERTIES
     }

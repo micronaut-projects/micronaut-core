@@ -1,0 +1,22 @@
+When you use JWT authentication and the built-in <<login, LoginController>>,
+the JWT tokens are returned to the client as part of an OAuth 2.0 https://tools.ietf.org/html/RFC6749[RFC6749] access token response.
+
+An example of such a response is:
+
+[source, json]
+----
+HTTP/1.1 200 OK
+Content-Type: application/json;charset=UTF-8
+Cache-Control: no-store
+Pragma: no-cache
+{
+    "access_token":"eyJhbGciOiJIUzI1NiJ9...",
+    "token_type":"Bearer",
+    "expires_in":3600,
+    "refresh_token":"tGzv3JOkF0XG5Qx2TlKWIA...",
+    "username": "euler",
+    "roles": [
+        "ROLE_USER"
+    ],
+}
+----

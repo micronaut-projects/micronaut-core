@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.ssl;
 
 /**
- * An enum describing the type of client authentication
+ * An enum describing the type of client authentication.
  *
  * @author James Kleeh
  * @since 1.0
@@ -24,12 +25,12 @@ package io.micronaut.http.ssl;
 public enum ClientAuthentication {
 
     /**
-     * Required
+     * Required.
      */
     NEED,
 
     /**
-     * Desired but not required
+     * Desired but not required.
      */
     WANT
 }

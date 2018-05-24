@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.AWSLambdaAsync;
@@ -24,13 +25,13 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
+import io.micronaut.function.client.FunctionInvoker;
+import io.micronaut.function.client.FunctionInvokerChooser;
+import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
-import io.micronaut.function.client.FunctionInvoker;
-import io.micronaut.function.client.FunctionInvokerChooser;
-import io.micronaut.function.client.exceptions.FunctionExecutionException;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -40,8 +41,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * A {@link FunctionInvoker} for invoking functions on AWS
+ * A {@link FunctionInvoker} for invoking functions on AWS.
  *
+ * @param <I> input type
+ * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
@@ -49,16 +52,25 @@ import java.util.concurrent.Future;
 @Singleton
 public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, FunctionInvokerChooser {
 
+    private static final int STATUS_CODE_ERROR = 300;
     private final AWSLambdaAsync asyncClient;
     private final ByteBufferFactory byteBufferFactory;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final ExecutorService ioExecutor;
 
+    /**
+     * Constructor.
+     * @param asyncClient asyncClient
+     * @param byteBufferFactory byteBufferFactory
+     * @param jsonMediaTypeCodec jsonMediaTypeCodec
+     * @param ioExecutor ioExecutor
+     */
     protected AWSLambdaFunctionExecutor(
-            AWSLambdaAsync asyncClient,
-            ByteBufferFactory byteBufferFactory,
-            JsonMediaTypeCodec jsonMediaTypeCodec,
-            @Named(TaskExecutors.IO) ExecutorService ioExecutor) {
+        AWSLambdaAsync asyncClient,
+        ByteBufferFactory byteBufferFactory,
+        JsonMediaTypeCodec jsonMediaTypeCodec,
+        @Named(TaskExecutors.IO) ExecutorService ioExecutor) {
+
         this.asyncClient = asyncClient;
         this.byteBufferFactory = byteBufferFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
@@ -74,13 +86,13 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
         boolean isReactiveType = Publishers.isConvertibleToPublisher(outputType.getType());
         if (isReactiveType) {
             Flowable<Object> invokeFlowable = Flowable.just(invokeRequest)
-                    .flatMap(req -> {
-                        encodeInput(input, invokeRequest);
+                .flatMap(req -> {
+                    encodeInput(input, invokeRequest);
 
-                        Future<InvokeResult> future = asyncClient.invokeAsync(req);
-                        return Flowable.fromFuture(future, Schedulers.from(ioExecutor));
-                    })
-                    .map(invokeResult -> decodeResult(definition,(Argument<O>) outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), invokeResult));
+                    Future<InvokeResult> future = asyncClient.invokeAsync(req);
+                    return Flowable.fromFuture(future, Schedulers.from(ioExecutor));
+                })
+                .map(invokeResult -> decodeResult(definition, (Argument<O>) outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), invokeResult));
 
             invokeFlowable = invokeFlowable.onErrorResumeNext(throwable -> {
                 return Flowable.error(new FunctionExecutionException("Error executing AWS Lambda [" + definition.getName() + "]: " + throwable.getMessage(), throwable));
@@ -101,13 +113,12 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
 
     private Object decodeResult(FunctionDefinition definition, Argument<O> outputType, InvokeResult invokeResult) {
         Integer statusCode = invokeResult.getStatusCode();
-        if (statusCode >= 300) {
+        if (statusCode >= STATUS_CODE_ERROR) {
             throw new FunctionExecutionException("Error executing AWS Lambda [" + definition.getName() + "]: " + invokeResult.getFunctionError());
         }
         io.micronaut.core.io.buffer.ByteBuffer byteBuffer = byteBufferFactory.copiedBuffer(invokeResult.getPayload());
-        return jsonMediaTypeCodec.decode(
-                outputType,
-                byteBuffer);
+
+        return jsonMediaTypeCodec.decode(outputType, byteBuffer);
     }
 
     private void encodeInput(I input, InvokeRequest invokeRequest) {

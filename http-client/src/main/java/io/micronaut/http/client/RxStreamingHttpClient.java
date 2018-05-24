@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.reactivex.Flowable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.reactivex.Flowable;
 
 import java.net.URL;
 import java.util.Map;
 
 /**
- * Extended version of {@link StreamingHttpClient} that exposes an RxJava 2.x interface
+ * Extended version of {@link StreamingHttpClient} that exposes an RxJava 2.x interface.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient {
+
     @Override
     <I> Flowable<ByteBuffer<?>> dataStream(HttpRequest<I> request);
 
@@ -47,7 +47,7 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
 
     @Override
     default <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Class<O> type) {
-        return (Flowable<O>)StreamingHttpClient.super.jsonStream(request, type);
+        return (Flowable<O>) StreamingHttpClient.super.jsonStream(request, type);
     }
 
     /**

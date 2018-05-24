@@ -1,0 +1,53 @@
+Although not required to use Micronaut, the Micronaut CLI is the quickest way to create a new server application.
+
+Using the CLI you can create a new Micronaut application in either Groovy, Java or Kotlin (the default is Java).
+
+The following command creates a new "Hello World" server application in Java with a Gradle build:
+
+[source,bash]
+----
+$ mn create-app hello-world
+----
+
+TIP: You can supply `--build maven` if you wish to create a Maven based build instead
+
+The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle a build. The application can be run with `./gradlew run`:
+
+[source,bash]
+----
+$ ./gradlew run
+> Task :run
+[main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 972ms. Server Running: http://localhost:28933
+----
+
+By default the Micronaut HTTP server is configured to run on a random port, but you can alter that by adding the following configuration to `src/main/resources/application.yml`:
+
+[source,yaml]
+----
+micronaut:
+    server:
+        port: 8080
+----
+
+
+In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller written in Java and located in `src/main/java/example/helloworld`:
+
+.src/main/java/example/helloworld/HelloController.java
+[source,java]
+----
+include::{testsuite}/server/intro/HelloController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/HelloController.java[tags=class, indent=0]
+----
+
+<1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
+<2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation is used to map the `index` method to all requests that use an HTTP `GET`
+<3> A String "Hello World" is returned as the result
+
+If you start the application and send a request to the `/hello` URI then the text "Hello World" is returned:
+
+[source,bash]
+----
+$ curl http://localhost:8080/hello
+Hello World
+----

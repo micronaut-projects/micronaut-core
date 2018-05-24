@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,41 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanConfiguration;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
-import io.micronaut.context.AbstractBeanConfiguration;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.service.ServiceDescriptorGenerator;
-import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Optional;
 
 /**
- * Writes configuration classes for configuration packages using ASM
+ * Writes configuration classes for configuration packages using ASM.
  *
+ * @author Graeme Rocher
  * @see BeanConfiguration
  * @see io.micronaut.context.annotation.Configuration
- * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
+    /**
+     * Suffix for generated configuration classes.
+     */
     public static final String CLASS_SUFFIX = "$BeanConfiguration";
     private final String packageName;
     private final String configurationClassName;
     private final String configurationClassInternalName;
 
+    /**
+     * @param packageName        The package name
+     * @param annotationMetadata The annotation metadata
+     */
     public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
         super(packageName + '.' + CLASS_SUFFIX, annotationMetadata);
         this.packageName = packageName;
@@ -58,24 +61,20 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-        if(annotationMetadataWriter != null) {
+        if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(classWriterOutputVisitor);
         }
-        try(OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-        Optional<File> file = classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class);
-        if(file.isPresent()) {
-            ServiceDescriptorGenerator.generate(configurationClassName, file.get());
-        }
+        classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName);
     }
 
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         try {
-
             Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
             Type beanConfigurationType = Type.getType(superType);
 

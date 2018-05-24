@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.discovery.DiscoveryClient;
@@ -22,7 +23,7 @@ import javax.inject.Singleton;
 
 /**
  * A factory class that can be replaced at runtime for creating {@link LoadBalancer} instances that load balance
- * between available clients provided by the {@link DiscoveryClient}
+ * between available clients provided by the {@link DiscoveryClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,12 +33,15 @@ public class DiscoveryClientLoadBalancerFactory {
 
     private final DiscoveryClient discoveryClient;
 
+    /**
+     * @param discoveryClient The discover client
+     */
     public DiscoveryClientLoadBalancerFactory(DiscoveryClient discoveryClient) {
         this.discoveryClient = discoveryClient;
     }
 
     /**
-     * Creates a {@link LoadBalancer} for the given service ID
+     * Creates a {@link LoadBalancer} for the given service ID.
      *
      * @param serviceID The service ID
      * @return The {@link LoadBalancer}

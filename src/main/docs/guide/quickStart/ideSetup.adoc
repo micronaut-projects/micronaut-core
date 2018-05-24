@@ -1,0 +1,34 @@
+The application created in the previous section contains a "main class" located in `src/main/java` that looks like the following:
+
+[source,java]
+----
+package example.micronaut;
+
+import io.micronaut.runtime.Micronaut;
+
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.run(Application.class);
+    }
+}
+----
+
+This is the class that is run when running the application via Gradle or via deployment. You can also run the main class directly within your IDE if it is configured correctly.
+
+== Configuring IntelliJ IDEA
+
+The recommended IDE to use for Micronaut is Intellij IDEA. To import a Micronaut project into IntelliJ IDEA simply open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
+
+For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
+
+image::intellij-annotation-processors.png[Intellij Settings,1024,768]
+
+Once you have enabled annotation processing in IntelliJ you can run the application and tests directly within the IDE without the need of an external build tool such as Gradle or Maven.
+
+== Configuring Eclipse IDE
+
+If you wish to use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
+
+As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
+

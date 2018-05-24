@@ -1,0 +1,24 @@
+In distributed systems, failure happens and it is best to be prepared for it and handle it in as graceful a manner possible.
+
+In addition, when developing Microservices it is quite common to work on a single Microservice without other Microservices the project requires being available.
+
+With that in mind Micronaut features a native fallback mechanism that is integrated into <<retry, Retry Advice>> that allows falling back to another implementation in the case of failure.
+
+Using the ann:retry.annotation.Fallback[] annotation you can declare a fallback implementation of a client that will be picked up and used once all possible retries have been exhausted.
+
+In fact the mechanism is not strictly linked to Retry, you can declare any class as ann:retry.annotation.Recoverable[] and if a method call fails (or, in the case of reactive types, an error is emitted) a class annotated with `@Fallback` will be searched for.
+
+To illustrate this consider again the `PetOperations` interface declared earlier. You can define a `PetFallback` class that will be called in the case of failure:
+
+.Defining a Fallback
+[source,java]
+----
+include::{testsclient}/annotation/retry/PetFallback.java[tags=class, indent=0]
+----
+
+TIP: If you purely want to use fallbacks to help with testing against external Microservices you can define fallbacks in the `src/test/java` directory so they are not included in production code.
+
+
+As you can see the fallback does not perform any network operations and is quite simple, hence will provide a successful result in the case of an external system being down.
+
+Of course, the actual behaviour of the fallback is down to you. You could for example implement a fallback that pulls data from a local cache when the real data is not available, and sends alert emails to operations about downtime or whatever.

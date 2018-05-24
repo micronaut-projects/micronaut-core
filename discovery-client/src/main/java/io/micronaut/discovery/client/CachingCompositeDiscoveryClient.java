@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.reactivex.Flowable;
 import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
@@ -27,11 +24,13 @@ import io.micronaut.discovery.CompositeDiscoveryClient;
 import io.micronaut.discovery.DefaultCompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.reactivex.Flowable;
 
 import java.util.List;
 
 /**
- * Replaces the default {@link io.micronaut.discovery.DefaultCompositeDiscoveryClient} with one that caches the return values
+ * Replaces the default {@link io.micronaut.discovery.DefaultCompositeDiscoveryClient} with one that caches the return
+ * values.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +39,10 @@ import java.util.List;
 @Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
 @Replaces(DefaultCompositeDiscoveryClient.class)
 public class CachingCompositeDiscoveryClient extends CompositeDiscoveryClient {
+
+    /**
+     * @param discoveryClients The discovery clients
+     */
     public CachingCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);
     }

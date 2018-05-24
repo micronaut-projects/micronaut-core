@@ -1,4 +1,4 @@
-Micronaut supports CORS(link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+Micronaut supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
 
 .CORS Configuration Example
 [source,yaml]
@@ -35,7 +35,7 @@ The same configuration properties can be applied to each configuration. See link
 
 When a CORS request is made, configurations are searched for allowed origins that are an exact match or match the request origin through a regular expression.
 
-=== Allowed Origins
+== Allowed Origins
 
 To allow any origin for a given configuration, simply don't include the `allowedOrigins` key in your configuration.
 
@@ -57,7 +57,7 @@ micronaut:
                         - ^http(|s)://www\.google\.com$
 ----
 
-=== Allowed Methods
+== Allowed Methods
 
 To allow any request method for a given configuration, simply don't include the `allowedHeaders` key in your configuration.
 
@@ -77,7 +77,7 @@ micronaut:
                         - PUT
 ----
 
-=== Allowed Headers
+== Allowed Headers
 
 To allow any request header for a given configuration, simply don't include the `allowedHeaders` key in your configuration.
 
@@ -97,7 +97,7 @@ micronaut:
                         - Authorization
 ----
 
-=== Exposed Headers
+== Exposed Headers
 
 To configure the list of headers that are sent in the response to a CORS request through the `Access-Control-Expose-Headers` header, include a list of strings for the `exposedHeaders` key in your configuration. By default no headers are exposed.
 
@@ -115,7 +115,7 @@ micronaut:
                         - Authorization
 ----
 
-=== Allow Credentials
+== Allow Credentials
 
 Credentials are allowed by default for CORS requests. To disallow credentials, simply set the `allowCredentials` option to `false`.
 
@@ -131,7 +131,7 @@ micronaut:
                     allowCredentials: false
 ----
 
-=== Max Age
+== Max Age
 
 The default maximum age that preflight requests can be cached is 30 minutes. To change that behavior, specify a value in seconds.
 

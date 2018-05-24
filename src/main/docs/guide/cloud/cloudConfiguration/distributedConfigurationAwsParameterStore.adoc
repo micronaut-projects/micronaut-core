@@ -1,0 +1,47 @@
+AWS Configuration Sharing
+----
+
+Micronaut supports configuration sharing via Consul, Eureka, and AWS System Manager Parameter Store.
+
+
+AWS System Manager Parameter Store
+----
+
+You can configure shared properties by going into the AWS Console -> System Manager -> Parameter Store
+Micronaut will use a hierarchy to read the configuration values, and supports String, StringList, and SecureString types.
+You can make environment specific confurations as well by appending the '_' to the environment name for example 'application_test' is the name, and value can be some key=value pairs comma separated.
+Don't use the underscore otherwise in the name.
+
+For example:
+
+
+.Names as Hierarchy
+[source,groovy]
+----
+application/
+    /specialConfig
+application_test/
+    /specialConfig2
+application_dev
+    /specialDevConfig
+----
+
+Each level of the tree can be composed of key=value pairs. If you want multiple key value pairs, set the type to 'StringList'.
+For special secure information, like keys or passwords, use the type "SecureString". KMS will be automatically invoked when you
+add and retrieve values and decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned
+to you encrypted and you must manually decrypt them.
+
+configuration properties:
+
+
+.Configuration Properties Example
+[source,groovy]
+----
+aws.client.systemManager.parameterStore.enabled - values true/false will turn on or off this feature
+aws.client.systemManager.parameterStore.useSecureParameters - true/false - ask AWS to automatically decrypt SecureString type with KMS
+aws.client.systemManager.parameterStore.rootHierarchyPath - String - you can use a custom root path the application will look for configurations in. The default is '/config/application'.
+----
+
+
+
+

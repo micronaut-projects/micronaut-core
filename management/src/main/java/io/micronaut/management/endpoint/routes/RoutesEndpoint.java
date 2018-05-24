@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.routes;
 
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.web.router.Router;
-import io.micronaut.http.annotation.HttpMethodMapping;
-import org.reactivestreams.Publisher;
+import io.reactivex.Single;
 
 /**
- * <p>Exposes an {@link Endpoint} to display application routes</p>
- *
- * @see HttpMethodMapping
+ * <p>Exposes an {@link Endpoint} to display application routes.</p>
  *
  * @author James Kleeh
+ * @see io.micronaut.http.annotation.HttpMethodMapping
  * @since 1.0
  */
 @Endpoint("routes")
@@ -35,13 +34,20 @@ public class RoutesEndpoint {
     private final Router router;
     private final RouteDataCollector routeDataCollector;
 
+    /**
+     * @param router The {@link Router}
+     * @param routeDataCollector The {@link RouteDataCollector}
+     */
     public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
         this.router = router;
         this.routeDataCollector = routeDataCollector;
     }
 
+    /**
+     * @return The routes as a {@link Single}
+     */
     @Read
-    public Publisher getRoutes() {
-        return routeDataCollector.getData(router.uriRoutes());
+    public Single getRoutes() {
+        return Single.fromPublisher(routeDataCollector.getData(router.uriRoutes()));
     }
 }

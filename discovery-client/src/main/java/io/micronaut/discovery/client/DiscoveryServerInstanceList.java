@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.client;
 
 import io.micronaut.discovery.ServiceInstance;
@@ -23,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Abstract {@link ServiceInstanceList} implementation for Discovery servers like Eureka and Consul
+ * Abstract {@link ServiceInstanceList} implementation for Discovery servers like Eureka and Consul.
  *
  * @author graemerocher
  * @since 1.0
@@ -32,6 +33,9 @@ public abstract class DiscoveryServerInstanceList implements ServiceInstanceList
 
     private final DiscoveryClientConfiguration configuration;
 
+    /**
+     * @param configuration The discovery client configuration
+     */
     public DiscoveryServerInstanceList(DiscoveryClientConfiguration configuration) {
         this.configuration = configuration;
     }
@@ -39,13 +43,12 @@ public abstract class DiscoveryServerInstanceList implements ServiceInstanceList
     @Override
     public List<ServiceInstance> getInstances() {
         List<ServiceInstance> allZones = configuration.getAllZones();
-        if(!allZones.isEmpty()) {
+        if (!allZones.isEmpty()) {
             return allZones;
-        }
-        else {
+        } else {
             String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
             return Collections.singletonList(
-                    ServiceInstance.builder(getID(), URI.create(spec)).build()
+                ServiceInstance.builder(getID(), URI.create(spec)).build()
             );
         }
     }

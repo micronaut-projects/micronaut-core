@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.io.scan;
 
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,7 +27,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Loads resources from the classpath
+ * Loads resources from the classpath.
  *
  * @author James Kleeh
  * @since 1.0
@@ -37,7 +38,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     private final String basePath;
 
     /**
-     * Default constructor
+     * Default constructor.
      *
      * @param classLoader The class loader for loading resources
      */
@@ -46,10 +47,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     /**
-     * Use when resources should have a standard base path
+     * Use when resources should have a standard base path.
      *
      * @param classLoader The class loader for loading resources
-     * @param basePath The path to look for resources under
+     * @param basePath    The path to look for resources under
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
         this.classLoader = classLoader;
@@ -57,7 +58,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     /**
-     * Obtains a resource as a stream
+     * Obtains a resource as a stream.
      *
      * @param path The path
      * @return An optional resource
@@ -67,7 +68,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     /**
-     * Obtains a resource URL
+     * Obtains a resource URL.
      *
      * @param path The path
      * @return An optional resource
@@ -77,7 +78,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     /**
-     * Obtains a stream of resource URLs
+     * Obtains a stream of resource URLs.
      *
      * @param path The path
      * @return A resource stream
@@ -104,10 +105,15 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return classLoader;
     }
 
+    /**
+     * @param basePath The path to load resources
+     * @return The resouce loader
+     */
     public ResourceLoader forBase(String basePath) {
         return new DefaultClassPathResourceLoader(classLoader, basePath);
     }
 
+    @SuppressWarnings("MagicNumber")
     private String normalize(String path) {
         if (path != null) {
             if (path.startsWith("classpath:")) {
@@ -123,6 +129,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return path;
     }
 
+    @SuppressWarnings("MagicNumber")
     private String prefixPath(String path) {
         if (path.startsWith("classpath:")) {
             path = path.substring(10);

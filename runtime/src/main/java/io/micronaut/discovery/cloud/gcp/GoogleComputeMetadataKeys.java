@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.cloud.gcp;
 
 /**
- * Models common Google compute instance metadata keys
+ * Models common Google compute instance metadata keys.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
@@ -56,14 +57,17 @@ public enum GoogleComputeMetadataKeys {
 
     private final String name;
 
+    /**
+     * @param name The name of the metadata key represented in AWS Metadata.
+     */
     GoogleComputeMetadataKeys(String name) {
         this.name = name;
     }
 
+    /**
+     * @return The name of the metadata key represented in AWS Metadata.
+     */
     public String getName() {
         return name;
     }
-
-
-
 }

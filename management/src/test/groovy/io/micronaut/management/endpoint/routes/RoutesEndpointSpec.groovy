@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ class RoutesEndpointSpec extends Specification {
 
     void "test routes endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName])
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName, 'endpoints.routes.sensitive': false], "test")
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -44,13 +44,14 @@ class RoutesEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; io.micronaut.management.endpoint.refresh.RefreshEndpoint.refresh()"
+        result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; io.micronaut.management.endpoint.refresh.RefreshEndpoint.refresh(java.lang.Boolean force)"
         result['{[/test],method=[GET],produces=[application/json]}']['method'] == "java.lang.String io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.index()"
         result['{[/test/generics],method=[PUT],produces=[application/json]}']['method'] == "java.util.Map<java.lang.String, java.lang.Integer> io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.generics()"
-        result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "org.reactivestreams.Publisher io.micronaut.management.endpoint.routes.RoutesEndpoint.getRoutes()"
+        result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "io.reactivex.Single io.micronaut.management.endpoint.routes.RoutesEndpoint.getRoutes()"
         result['{[/test/post],method=[POST],produces=[application/json]}']['method'] == "io.micronaut.http.HttpResponse io.micronaut.management.endpoint.routes.RoutesEndpointSpec\$TestController.post(java.lang.Integer number, java.lang.String text)"
 
         cleanup:
+        rxClient.close()
         embeddedServer?.close()
     }
 

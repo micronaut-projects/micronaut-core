@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequestFactory;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
@@ -28,12 +25,13 @@ import io.micronaut.http.uri.UriTemplate;
 import java.util.Map;
 
 /**
- * Implementation of the {@link HttpRequestFactory} interface for Netty
+ * Implementation of the {@link HttpRequestFactory} interface for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class NettyClientHttpRequestFactory implements HttpRequestFactory {
+
     @Override
     public <T> MutableHttpRequest<T> get(String uri) {
         return new NettyClientHttpRequest<>(HttpMethod.GET, uri);
@@ -77,15 +75,13 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
 
     @SuppressWarnings("unchecked")
     private <T> MutableHttpRequest<T> buildRequest(String uri, T body, HttpMethod method) {
-        if(uri.indexOf('{') > -1 && body != null) {
-            if(body instanceof Map) {
+        if (uri.indexOf('{') > -1 && body != null) {
+            if (body instanceof Map) {
                 uri = UriTemplate.of(uri).expand((Map<String, Object>) body);
-            }
-            else {
+            } else {
                 uri = UriTemplate.of(uri).expand(BeanMap.of(body));
             }
         }
-        return new NettyClientHttpRequest<T>(method, uri)
-                        .body(body);
+        return new NettyClientHttpRequest<T>(method, uri).body(body);
     }
 }

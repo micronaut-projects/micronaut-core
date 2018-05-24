@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.cors;
 
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpMethod;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Stores configuration for CORS
+ * Stores configuration for CORS.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -31,11 +32,14 @@ import java.util.*;
 public class CorsOriginConfiguration {
 
     /**
-     * Constant to represent any value
+     * Constant to represent any value.
      */
-    public static List<String> ANY = Collections.singletonList("*");
-    public static List<HttpMethod> ANY_METHOD = Collections.emptyList();
+    public static final List<String> ANY = Collections.singletonList("*");
 
+    /**
+     * Constant to represent any method.
+     */
+    public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
@@ -43,7 +47,6 @@ public class CorsOriginConfiguration {
     private List<String> exposedHeaders = Collections.emptyList();
     private boolean allowCredentials = true;
     private Long maxAge = 1800L;
-
 
     /**
      * @return The allowed origins
@@ -53,11 +56,12 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed origins
+     * Sets the allowed origins.
+     *
      * @param allowedOrigins The allow origins
      */
     public void setAllowedOrigins(@Nullable List<String> allowedOrigins) {
-        if(allowedOrigins != null) {
+        if (allowedOrigins != null) {
             this.allowedOrigins = allowedOrigins;
         }
     }
@@ -70,12 +74,12 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed methods
+     * Sets the allowed methods.
      *
      * @param allowedMethods The allowed methods
      */
     public void setAllowedMethods(@Nullable List<HttpMethod> allowedMethods) {
-        if(allowedMethods != null) {
+        if (allowedMethods != null) {
             this.allowedMethods = allowedMethods;
         }
     }
@@ -88,12 +92,12 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the allowed headers
+     * Sets the allowed headers.
      *
      * @param allowedHeaders The allowed headers
      */
     public void setAllowedHeaders(@Nullable List<String> allowedHeaders) {
-        if(allowedHeaders != null) {
+        if (allowedHeaders != null) {
             this.allowedHeaders = allowedHeaders;
         }
     }
@@ -106,12 +110,12 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the exposed headers
+     * Sets the exposed headers.
      *
      * @param exposedHeaders The exposed headers
      */
     public void setExposedHeaders(@Nullable List<String> exposedHeaders) {
-        if(exposedHeaders != null) {
+        if (exposedHeaders != null) {
             this.exposedHeaders = exposedHeaders;
         }
     }
@@ -124,7 +128,7 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets whether to allow credentials
+     * Sets whether to allow credentials.
      *
      * @param allowCredentials The credentials
      */
@@ -140,15 +144,14 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * Sets the max age
+     * Sets the max age.
      *
      * @param maxAge The max age
      */
     public void setMaxAge(@Nullable Long maxAge) {
-        if(maxAge == null) {
+        if (maxAge == null) {
             this.maxAge = -1L;
-        }
-        else {
+        } else {
             this.maxAge = maxAge;
         }
     }

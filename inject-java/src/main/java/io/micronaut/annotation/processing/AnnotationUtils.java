@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 
-import javax.inject.Qualifier;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -31,51 +32,56 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Utility methods for annotations
+ * Utility methods for annotations.
  *
  * @author Graeme Rocher
  * @author Dean Wette
  */
+@SuppressWarnings("ConstantName")
 public class AnnotationUtils {
 
-    private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(100).build();
+    private static final int CACHE_SIZE = 100;
+    private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(CACHE_SIZE).build();
 
     private final Elements elementUtils;
 
+    /**
+     * @param elementUtils The {@link Elements}
+     */
     AnnotationUtils(Elements elementUtils) {
         this.elementUtils = elementUtils;
     }
 
     /**
-     * Return whether the given element is annotated with the given annotation stereotype
+     * Return whether the given element is annotated with the given annotation stereotype.
      *
-     * @param element The element
+     * @param element    The element
      * @param stereotype The stereotype
      * @return True if it is
      */
-    boolean hasStereotype(Element element, Class<? extends Annotation> stereotype) {
+    protected boolean hasStereotype(Element element, Class<? extends Annotation> stereotype) {
         return hasStereotype(element, stereotype.getName());
     }
 
     /**
-     * Return whether the given element is annotated with the given annotation stereotypes
+     * Return whether the given element is annotated with the given annotation stereotypes.
      *
-     * @param element The element
+     * @param element     The element
      * @param stereotypes The stereotypes
      * @return True if it is
      */
-    boolean hasStereotype(Element element, String... stereotypes) {
+    protected boolean hasStereotype(Element element, String... stereotypes) {
         return hasStereotype(element, Arrays.asList(stereotypes));
     }
 
     /**
-     * Return whether the given element is annotated with any of the given annotation stereotypes
+     * Return whether the given element is annotated with any of the given annotation stereotypes.
      *
-     * @param element The element
+     * @param element     The element
      * @param stereotypes The stereotypes
      * @return True if it is
      */
-    boolean hasStereotype(Element element, List<String> stereotypes) {
+    protected boolean hasStereotype(Element element, List<String> stereotypes) {
         if (element == null) {
             return false;
         }
@@ -84,7 +90,7 @@ public class AnnotationUtils {
         }
         AnnotationMetadata annotationMetadata = getAnnotationMetadata(element);
         for (String stereotype : stereotypes) {
-            if(annotationMetadata.hasStereotype(stereotype)) {
+            if (annotationMetadata.hasStereotype(stereotype)) {
                 return true;
             }
         }
@@ -92,7 +98,8 @@ public class AnnotationUtils {
     }
 
     /**
-     * Get the annotation metadata for the given element
+     * Get the annotation metadata for the given element.
+     *
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
@@ -101,8 +108,9 @@ public class AnnotationUtils {
     }
 
     /**
-     * Get the annotation metadata for the given element
-     * @param parent The parent
+     * Get the annotation metadata for the given element.
+     *
+     * @param parent  The parent
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
@@ -111,16 +119,8 @@ public class AnnotationUtils {
     }
 
     /**
-     * Resolve the {@link Qualifier} to use for the given element
-     * @param element The element
-     * @return The Qualifier or null
-     */
-    String resolveQualifier(Element element) {
-        return getAnnotationMetadata(element).getAnnotationNameByStereotype(Qualifier.class).orElse(null);
-    }
-
-    /**
-     * Check whether the method is annotated
+     * Check whether the method is annotated.
+     *
      * @param method The method
      * @return True if it is annotated with non internal annotations
      */
@@ -128,12 +128,19 @@ public class AnnotationUtils {
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             String typeName = annotationMirror.getAnnotationType().toString();
-            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(typeName)) {
+            if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(typeName)) {
                 return true;
             }
         }
         return false;
     }
 
+    /**
+     * Invalidates any cached metadata.
+     */
+    @Internal
+    static void invalidateCache() {
+        annotationMetadataCache.invalidateAll();
+    }
 
 }

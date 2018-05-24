@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,10 @@
 package io.micronaut
 
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.builder.AstBuilder
-import org.codehaus.groovy.control.CompilerConfiguration
-import io.micronaut.ast.groovy.InjectTransform
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -63,13 +55,18 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
-
-        ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
+        ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
+    }
+
+    ClassNode buildClassNode(String source, String cls) {
+        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+
+        ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
+        return element
     }
 
 

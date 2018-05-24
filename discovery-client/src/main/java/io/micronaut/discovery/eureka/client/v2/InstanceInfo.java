@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -31,10 +32,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 /**
- * Represents an application instance in Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations
- *
+ * Represents an application instance in Eureka. See https://github.com/Netflix/eureka/wiki/Eureka-REST-operations.
+ * <p>
  * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java
  *
  * @author graemerocher
@@ -42,9 +42,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @JsonRootName("instance")
 public class InstanceInfo implements ConfigurableInstanceInfo {
+
+    /**
+     * Eureka default port.
+     */
     public static final int DEFAULT_PORT = 7001;
-    public static final int DEFAULT_SECURE_PORT = 0; // secure port disabled by default
-    public static final int DEFAULT_COUNTRY_ID = 1; // US
+
+    /**
+     * Secure port disabled by default.
+     */
+    public static final int DEFAULT_SECURE_PORT = 0;
+
+    /**
+     * US by default.
+     */
+    public static final int DEFAULT_COUNTRY_ID = 1;
 
     private String asgName;
     private String hostName;
@@ -67,31 +79,51 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     private Map<String, String> metadata = new ConcurrentHashMap<>();
 
     /**
-     * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java
+     * Based on https://github.com/Netflix/eureka/blob/master/eureka-client/src/main/java/com/netflix/appinfo/InstanceInfo.java.
      *
+     * @param instanceId           The instance id
+     * @param appName              The application name
+     * @param appGroupName         The application group name
+     * @param ipAddr               The IP addres
+     * @param port                 The port
+     * @param securePort           The secure port
+     * @param homePageUrl          The homepage URL
+     * @param statusPageUrl        The status page URL
+     * @param healthCheckUrl       The health check URL
+     * @param secureHealthCheckUrl The secure health check URL
+     * @param vipAddress           The VIP address
+     * @param secureVipAddress     The secure VIP address
+     * @param countryId            The country ID
+     * @param dataCenterInfo       The data center info
+     * @param hostName             The hostname
+     * @param status               The status
+     * @param overriddenstatus     The overridden status
+     * @param leaseInfo            The lease info
+     * @param metadata             The metadata
+     * @param asgName              The asg name
      */
     @JsonCreator
     InstanceInfo(
-            @JsonProperty("instanceId") String instanceId,
-            @JsonProperty("app") String appName,
-            @JsonProperty("appGroupName") String appGroupName,
-            @JsonProperty("ipAddr") String ipAddr,
-            @JsonProperty("port") PortWrapper port,
-            @JsonProperty("securePort") PortWrapper securePort,
-            @JsonProperty("homePageUrl") String homePageUrl,
-            @JsonProperty("statusPageUrl") String statusPageUrl,
-            @JsonProperty("healthCheckUrl") String healthCheckUrl,
-            @JsonProperty("secureHealthCheckUrl") String secureHealthCheckUrl,
-            @JsonProperty("vipAddress") String vipAddress,
-            @JsonProperty("secureVipAddress") String secureVipAddress,
-            @JsonProperty("countryId") int countryId,
-            @JsonProperty("dataCenterInfo") DataCenterInfo dataCenterInfo,
-            @JsonProperty("hostName") String hostName,
-            @JsonProperty("status") Status status,
-            @JsonProperty("overriddenstatus") Status overriddenstatus,
-            @JsonProperty("leaseInfo") LeaseInfo leaseInfo,
-            @JsonProperty("metadata") HashMap<String, String> metadata,
-            @JsonProperty("asgName") String asgName) {
+        @JsonProperty("instanceId") String instanceId,
+        @JsonProperty("app") String appName,
+        @JsonProperty("appGroupName") String appGroupName,
+        @JsonProperty("ipAddr") String ipAddr,
+        @JsonProperty("port") PortWrapper port,
+        @JsonProperty("securePort") PortWrapper securePort,
+        @JsonProperty("homePageUrl") String homePageUrl,
+        @JsonProperty("statusPageUrl") String statusPageUrl,
+        @JsonProperty("healthCheckUrl") String healthCheckUrl,
+        @JsonProperty("secureHealthCheckUrl") String secureHealthCheckUrl,
+        @JsonProperty("vipAddress") String vipAddress,
+        @JsonProperty("secureVipAddress") String secureVipAddress,
+        @JsonProperty("countryId") int countryId,
+        @JsonProperty("dataCenterInfo") DataCenterInfo dataCenterInfo,
+        @JsonProperty("hostName") String hostName,
+        @JsonProperty("status") Status status,
+        @JsonProperty("overriddenstatus") Status overriddenstatus,
+        @JsonProperty("leaseInfo") LeaseInfo leaseInfo,
+        @JsonProperty("metadata") HashMap<String, String> metadata,
+        @JsonProperty("asgName") String asgName) {
         this.instanceId = instanceId;
         this.app = appName;
         this.appGroupName = appGroupName;
@@ -113,7 +145,6 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
 
         // ---------------------------------------------------------------
         // for compatibility
-
         if (metadata == null) {
             this.metadata = Collections.emptyMap();
         } else {
@@ -121,36 +152,33 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         }
     }
 
-    @Override
-    public String toString() {
-        return getId();
-    }
-
     /**
-     * Creates an {@link InstanceInfo}
+     * Creates an {@link InstanceInfo}.
      *
-     * @param host The host name
-     * @param appName The application name
+     * @param host       The host name
+     * @param appName    The application name
      * @param instanceId The instance identifier
      */
     public InstanceInfo(String host, @NotBlank String appName, @NotBlank String instanceId) {
         this(host, DEFAULT_PORT, appName, instanceId);
     }
+
     /**
      * Creates an {@link InstanceInfo}. The {@link #getInstanceId()} will default to the value of the host
      *
-     * @param host The host name
+     * @param host    The host name
      * @param appName The application name
      */
     public InstanceInfo(String host, @NotBlank String appName) {
         this(host, DEFAULT_PORT, appName, host);
     }
+
     /**
      * Creates an {@link InstanceInfo}. This constructor will perform an IP Address lookup based on the host name
      *
-     * @param host The host name
-     * @param port The port
-     * @param appName The application name
+     * @param host       The host name
+     * @param port       The port
+     * @param appName    The application name
      * @param instanceId The instance identifier
      */
     public InstanceInfo(String host, int port, @NotBlank String appName, @NotBlank String instanceId) {
@@ -160,22 +188,23 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     /**
      * Creates an {@link InstanceInfo}.
      *
-     * @param host The host name
-     * @param port The port
-     * @param appName The application name
+     * @param host       The host name
+     * @param port       The port
+     * @param ipAddress  The IP address
+     * @param appName    The application name
      * @param instanceId The instance identifier
      */
     public InstanceInfo(String host, int port, String ipAddress, String appName, String instanceId) {
-        if(StringUtils.isEmpty(host)) {
+        if (StringUtils.isEmpty(host)) {
             throw new IllegalArgumentException("Argument [hostName] cannot be null or blank");
         }
-        if(StringUtils.isEmpty(appName)) {
+        if (StringUtils.isEmpty(appName)) {
             throw new IllegalArgumentException("Argument [appName] cannot be null or blank");
         }
-        if(StringUtils.isEmpty(instanceId)) {
+        if (StringUtils.isEmpty(instanceId)) {
             throw new IllegalArgumentException("Argument [instanceId] cannot be null or blank");
         }
-        if(StringUtils.isEmpty(ipAddress)) {
+        if (StringUtils.isEmpty(ipAddress)) {
             throw new IllegalArgumentException("Argument [ipAddress] cannot be null or blank");
         }
         this.hostName = host;
@@ -185,8 +214,13 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         this.instanceId = instanceId;
     }
 
+    @Override
+    public String toString() {
+        return getId();
+    }
+
     /**
-     * The host name of the application instance
+     * The host name of the application instance.
      */
     @Override
     @NotBlank
@@ -215,16 +249,18 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         }
         return hostName;
     }
+
     /**
-     * The port of the application instance
+     * The port of the application instance.
      */
     @Override
     @JsonIgnore
     public int getPort() {
         return port;
     }
+
     /**
-     * The secure port of the application instance
+     * The secure port of the application instance.
      */
     @Override
     @JsonIgnore
@@ -232,17 +268,23 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         return securePort;
     }
 
+    /**
+     * @return The port
+     */
     @JsonProperty("port")
     PortWrapper getPortWrapper() {
-        if(port < 1) {
+        if (port < 1) {
             return new PortWrapper(false, 0);
         }
         return new PortWrapper(true, port);
     }
 
+    /**
+     * @return The secure port
+     */
     @JsonProperty("securePort")
     PortWrapper getSecurePortWrapper() {
-        if(securePort < 1) {
+        if (securePort < 1) {
             return new PortWrapper(false, 0);
         }
         return new PortWrapper(true, securePort);
@@ -255,13 +297,13 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
 
     @Override
     public void setPort(int port) {
-        if(port >= 0) {
+        if (port >= 0) {
             this.port = port;
         }
     }
 
     /**
-     * The application name
+     * The application name.
      */
     @Override
     @NotBlank
@@ -270,7 +312,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The application group name
+     * The application group name.
      */
     @Override
     public String getAppGroupName() {
@@ -278,7 +320,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The instance id
+     * The instance id.
      */
     @Override
     @NotBlank
@@ -287,7 +329,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The country id
+     * The country id.
      */
     @Override
     @Min(1L)
@@ -296,7 +338,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The IP address of the instance
+     * The IP address of the instance.
      */
     @Override
     @NotBlank
@@ -311,7 +353,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The {@link DataCenterInfo} instance
+     * The {@link DataCenterInfo} instance.
      */
     @Override
     @NotNull
@@ -320,7 +362,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * The {@link LeaseInfo} instance
+     * The {@link LeaseInfo} instance.
      */
     @Override
     public LeaseInfo getLeaseInfo() {
@@ -328,7 +370,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * @return The instance metadata
+     * @return The instance metadata.
      */
     @Override
     public Map<String, String> getMetadata() {
@@ -340,7 +382,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      */
     @Override
     public String getStatusPageUrl() {
-        if(this.statusPageUrl == null) {
+        if (this.statusPageUrl == null) {
             return getHealthCheckUrl();
         }
         return statusPageUrl;
@@ -351,7 +393,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      */
     @Override
     public String getHomePageUrl() {
-        if(this.homePageUrl == null) {
+        if (this.homePageUrl == null) {
             return "http://" + this.hostName + portString();
         }
         return homePageUrl;
@@ -362,7 +404,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      */
     @Override
     public String getHealthCheckUrl() {
-        if(this.healthCheckUrl == null) {
+        if (this.healthCheckUrl == null) {
             return "http://" + this.hostName + portString() + "/health";
         }
         return healthCheckUrl;
@@ -374,7 +416,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     @Override
     @NotBlank
     public String getVipAddress() {
-        if(this.vipAddress == null) {
+        if (this.vipAddress == null) {
             return this.app;
         }
         return vipAddress;
@@ -386,7 +428,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     @Override
     @NotBlank
     public String getSecureVipAddress() {
-        if(this.secureVipAddress == null) {
+        if (this.secureVipAddress == null) {
             return this.app;
         }
         return secureVipAddress;
@@ -397,7 +439,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      */
     @Override
     public String getSecureHealthCheckUrl() {
-        if(this.secureHealthCheckUrl == null) {
+        if (this.secureHealthCheckUrl == null) {
             return "https://" + this.hostName + securePortString() + "/health";
         }
         return secureHealthCheckUrl;
@@ -412,7 +454,8 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
     }
 
     /**
-     * Sets the instance ID
+     * Sets the instance ID.
+     *
      * @param instanceId The instance ID
      */
     @Override
@@ -427,7 +470,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
 
     @Override
     public void setHomePageUrl(String homePageUrl) {
-        if(!StringUtils.isEmpty(homePageUrl)) {
+        if (!StringUtils.isEmpty(homePageUrl)) {
             this.homePageUrl = homePageUrl;
         }
     }
@@ -439,70 +482,70 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
 
     @Override
     public void setCountryId(int countryId) {
-        if(countryId > 0) {
+        if (countryId > 0) {
             this.countryId = countryId;
         }
     }
 
     @Override
     public void setStatusPageUrl(String statusPageUrl) {
-        if(!StringUtils.isEmpty(statusPageUrl)) {
+        if (!StringUtils.isEmpty(statusPageUrl)) {
             this.statusPageUrl = statusPageUrl;
         }
     }
 
     @Override
     public void setHealthCheckUrl(String healthCheckUrl) {
-        if(!StringUtils.isEmpty(healthCheckUrl)) {
+        if (!StringUtils.isEmpty(healthCheckUrl)) {
             this.healthCheckUrl = healthCheckUrl;
         }
     }
 
     @Override
     public void setSecureHealthCheckUrl(String secureHealthCheckUrl) {
-        if(!StringUtils.isEmpty(secureHealthCheckUrl)) {
+        if (!StringUtils.isEmpty(secureHealthCheckUrl)) {
             this.secureHealthCheckUrl = secureHealthCheckUrl;
         }
     }
 
     @Override
     public void setDataCenterInfo(DataCenterInfo dataCenterInfo) {
-        if(dataCenterInfo != null) {
+        if (dataCenterInfo != null) {
             this.dataCenterInfo = dataCenterInfo;
         }
     }
 
     @Override
     public void setStatus(Status status) {
-        if(status != null) {
+        if (status != null) {
             this.status = status;
         }
     }
 
     @Override
     public void setAppGroupName(String appGroupName) {
-        if(StringUtils.isNotEmpty(appGroupName)) {
+        if (StringUtils.isNotEmpty(appGroupName)) {
             this.appGroupName = appGroupName;
         }
     }
 
     @Override
     public void setIpAddr(String ipAddr) {
-        if(StringUtils.isNotEmpty(ipAddr)) {
+        if (StringUtils.isNotEmpty(ipAddr)) {
             this.ipAddr = ipAddr;
         }
     }
 
     @Override
     public void setVipAddress(String vipAddress) {
-        if(StringUtils.isNotEmpty(vipAddress)) {
+        if (StringUtils.isNotEmpty(vipAddress)) {
             this.vipAddress = vipAddress;
         }
     }
 
     @Override
     public void setSecureVipAddress(String secureVipAddress) {
-        if(StringUtils.isNotEmpty(secureVipAddress)) {
+        if (StringUtils.isNotEmpty(secureVipAddress)) {
             this.secureVipAddress = secureVipAddress;
         }
     }
@@ -511,13 +554,29 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      * @param metadata Sets the application metadata
      */
     public void setMetadata(Map<String, String> metadata) {
-        if(metadata != null) {
+        if (metadata != null) {
             this.metadata = metadata;
         }
     }
 
+    private String portString() {
+        return port > 0 ? ":" + this.port : "";
+    }
+
+    private String securePortString() {
+        return securePort > 0 ? ":" + this.securePort : "";
+    }
+
+    private static String lookupIp(String host) {
+        try {
+            return InetAddress.getByName(host).getHostAddress();
+        } catch (UnknownHostException e) {
+            throw new IllegalArgumentException("Unable to lookup host IP address: " + host, e);
+        }
+    }
+
     /**
-     * The instance status according to Eureka
+     * The instance status according to Eureka.
      */
     public enum Status {
         UP, DOWN, STARTING, OUT_OF_SERVICE, UNKNOWN;
@@ -531,37 +590,32 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
 
         private final boolean enabled;
         private final int port;
+
+        /**
+         * @param enabled Whether is enabled
+         * @param port    The port
+         */
         @JsonCreator
         public PortWrapper(@JsonProperty("@enabled") boolean enabled, @JsonProperty("$") int port) {
             this.enabled = enabled;
             this.port = port;
         }
 
+        /**
+         * @return Whether is enabled
+         */
         @JsonProperty("@enabled")
         public boolean isEnabled() {
             return enabled;
         }
 
+        /**
+         * @return The port
+         */
         @JsonProperty("$")
         public int getPort() {
             return port;
         }
 
     }
-    private String portString() {
-        return port > 0  ? ":" + this.port: "";
-    }
-
-    private String securePortString() {
-        return securePort > 0  ? ":" + this.securePort: "";
-    }
-
-    private static String lookupIp(String host)  {
-        try {
-            return InetAddress.getByName(host).getHostAddress();
-        } catch (UnknownHostException e) {
-            throw new IllegalArgumentException("Unable to lookup host IP address: " + host, e);
-        }
-    }
-
 }

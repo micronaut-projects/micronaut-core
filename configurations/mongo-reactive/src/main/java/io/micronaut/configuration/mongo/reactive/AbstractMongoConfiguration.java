@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.ConnectionString;
@@ -34,6 +35,10 @@ public abstract class AbstractMongoConfiguration {
 
     private final ApplicationConfiguration applicationConfiguration;
 
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     */
     public AbstractMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
     }
@@ -47,23 +52,24 @@ public abstract class AbstractMongoConfiguration {
     }
 
     /**
-     * @return The MongoDB {@link ConnectionString}
-     */
-    public Optional<ConnectionString> getConnectionString() {
-        if(StringUtils.isNotEmpty(uri)) {
-            return Optional.of(new ConnectionString(uri));
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Sets the MongoDB URI
+     * Sets the MongoDB URI.
+     *
      * @param uri The MongoDB URI
      */
     public void setUri(String uri) {
-        if(StringUtils.isNotEmpty(uri)) {
+        if (StringUtils.isNotEmpty(uri)) {
             this.uri = uri;
         }
+    }
+
+    /**
+     * @return The MongoDB {@link ConnectionString}
+     */
+    public Optional<ConnectionString> getConnectionString() {
+        if (StringUtils.isNotEmpty(uri)) {
+            return Optional.of(new ConnectionString(uri));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -71,6 +77,10 @@ public abstract class AbstractMongoConfiguration {
      */
     public abstract MongoClientOptions buildOptions();
 
+    /**
+     * Get the application name or return the default.
+     * @return applicationName
+     */
     protected String getApplicationName() {
         return applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
     }

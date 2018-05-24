@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing;
 
 import io.micronaut.context.annotation.Configuration;
-import io.micronaut.inject.writer.BeanConfigurationWriter;
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.core.io.service.ServiceDescriptorGenerator;
-import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.writer.BeanConfigurationWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -33,45 +30,62 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.SimpleElementVisitor8;
-import javax.tools.JavaFileObject;
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Optional;
 import java.util.Set;
 
+/**
+ * An annotation processor that generates {@link io.micronaut.inject.BeanConfiguration} implementations for
+ * each package annotated with {@link Configuration}.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 @SupportedAnnotationTypes({
     "io.micronaut.context.annotation.Configuration"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
+@Internal
 public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
+    public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
     }
 
     @Override
-    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (annotations.isEmpty()) {
+            return false;
+        }
         AnnotationElementScanner scanner = new AnnotationElementScanner();
         Set<? extends Element> elements = roundEnv.getRootElements();
         ElementFilter.packagesIn(elements).forEach(element -> element.accept(scanner, element));
-        return true;
+        try {
+            classWriterOutputVisitor.finish();
+        } catch (Exception e) {
+            error("I/O error occurred writing META-INF services information: %s", e);
+        }
+        return false;
     }
 
+    /**
+     * Class to visit annotation elements annotated with {@link Configuration}.
+     */
     class AnnotationElementScanner extends SimpleElementVisitor8<Object, Object> {
+
         @Override
         public Object visitPackage(PackageElement packageElement, Object p) {
             Object aPackage = super.visitPackage(packageElement, p);
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
-                BeanConfigurationWriter writer = new BeanConfigurationWriter(packageName, annotationUtils.getAnnotationMetadata(packageElement));
+                BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                    packageName,
+                    annotationUtils.getAnnotationMetadata(packageElement)
+                );
                 try {
-                    BeanDefinitionWriterVisitor visitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
-                    writer.accept(visitor);
+                    writer.accept(classWriterOutputVisitor);
                 } catch (IOException e) {
-                    error("Unexpected error: %s", e.getMessage());
+                    error("I/O error occurred writing Configuration for package [%s]: %s", packageElement, e);
                 }
             }
             return aPackage;

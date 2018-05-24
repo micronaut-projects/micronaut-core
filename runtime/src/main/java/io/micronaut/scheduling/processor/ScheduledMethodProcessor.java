@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.scheduling.processor;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.TaskScheduler;
-import io.micronaut.scheduling.annotation.Scheduled;
-import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
@@ -43,21 +34,26 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ScheduledFuture;
 
 /**
- * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation
+ * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
-public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable{
+public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
 
     private final BeanContext beanContext;
     private final ConversionService<?> conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
 
+    /**
+     * @param beanContext       The bean context for DI of beans annotated with {@link javax.inject.Inject}
+     * @param conversionService To convert one type to another
+     */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService) {
         this.beanContext = beanContext;
@@ -73,20 +69,22 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
             String initialDelayStr = scheduledAnnotation.initialDelay();
             Duration initialDelay = null;
-            if(StringUtils.hasText(initialDelayStr)) {
-                initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(()->
-                        new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
+            if (StringUtils.hasText(initialDelayStr)) {
+                initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
+                    new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
                 );
             }
 
-
-            TaskScheduler taskScheduler = beanContext.findBean(TaskScheduler.class, Qualifiers.byName(scheduledAnnotation.scheduler()))
-                    .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduledAnnotation.scheduler()));
-
+            TaskScheduler taskScheduler = beanContext
+                .findBean(TaskScheduler.class, Qualifiers.byName(scheduledAnnotation.scheduler()))
+                .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduledAnnotation.scheduler()));
 
             Runnable task = () -> {
-                io.micronaut.context.Qualifier<Object> qualifer = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class)
-                        .map(type -> Qualifiers.byAnnotation(beanDefinition, type)).orElse(null);
+                io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
+                    .getAnnotationTypeByStereotype(Qualifier.class)
+                    .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
+                    .orElse(null);
+
                 Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
                 Object bean = beanContext.getBean(beanType, qualifer);
                 if (method.getArguments().length == 0) {
@@ -95,39 +93,26 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             };
 
             String cronExpr = scheduledAnnotation.cron();
-            if(StringUtils.isNotEmpty(cronExpr)) {
+            if (StringUtils.isNotEmpty(cronExpr)) {
                 taskScheduler.schedule(cronExpr, task);
-            }
-            else if(StringUtils.isNotEmpty(fixedRate)) {
+            } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
-                Duration duration = converted.orElseThrow(()->
+                Duration duration = converted.orElseThrow(() ->
                     new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
                 );
 
-
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(
-                        initialDelay,
-                        duration,
-                        task
-                );
+                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
                 scheduledTasks.add(scheduledFuture);
-            }
-            else {
+            } else {
                 String fixedDelay = scheduledAnnotation.fixedDelay();
-                if(StringUtils.isNotEmpty(fixedDelay)) {
+                if (StringUtils.isNotEmpty(fixedDelay)) {
                     Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
-                    Duration duration = converted.orElseThrow(()->
-                            new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
+                    Duration duration = converted.orElseThrow(() ->
+                        new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
                     );
 
-
-                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(
-                            initialDelay,
-                            duration,
-                            task
-                    );
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
                     scheduledTasks.add(scheduledFuture);
-
                 }
             }
         }
@@ -136,7 +121,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     public void close() throws IOException {
         for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
-            if( !scheduledTask.isCancelled()) {
+            if (!scheduledTask.isCancelled()) {
                 scheduledTask.cancel(false);
             }
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.async;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.channels.ClosedChannelException;
 
 /**
- * A future that executes the standard close procedure
+ * A future that executes the standard close procedure.
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -37,15 +41,20 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultCloseHandler.class);
 
-
     private final ChannelHandlerContext context;
     private final HttpRequest<?> request;
     private final int statusCode;
 
+    /**
+     * @param context    The channel handler context
+     * @param request    The Http request
+     * @param statusCode The status code
+     */
     public DefaultCloseHandler(
-            ChannelHandlerContext context,
-            HttpRequest<?> request,
-            int statusCode) {
+        ChannelHandlerContext context,
+        HttpRequest<?> request,
+        int statusCode) {
+
         this.context = context;
         this.request = request;
         this.statusCode = statusCode;
@@ -64,9 +73,9 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
                 // if we have arrived to this point something has gone wrong streaming the response the client
                 // so we just queue an internal server error response to return to the client
                 context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-                       .addListener(ChannelFutureListener.CLOSE);
+                    .addListener(ChannelFutureListener.CLOSE);
             }
-        } else if (!request.getHeaders().isKeepAlive() || statusCode >= 300) {
+        } else if (!request.getHeaders().isKeepAlive() || statusCode >= HttpStatus.MULTIPLE_CHOICES.getCode()) {
             future.channel().close();
         }
     }

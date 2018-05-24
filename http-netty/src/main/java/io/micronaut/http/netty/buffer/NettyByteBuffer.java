@@ -1,27 +1,31 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http.netty.buffer;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.ArrayUtils;
-import io.netty.buffer.*;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.util.ArrayUtils;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -29,15 +33,19 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 /**
- * A {@link ByteBuffer} implementation for Netty
+ * A {@link ByteBuffer} implementation for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
+
     private ByteBuf delegate;
 
+    /**
+     * @param delegate The {@link ByteBuf}
+     */
     NettyByteBuffer(ByteBuf delegate) {
         this.delegate = delegate;
     }
@@ -149,15 +157,15 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public ByteBuffer write(ByteBuffer... buffers) {
-        if(ArrayUtils.isNotEmpty(buffers)) {
+        if (ArrayUtils.isNotEmpty(buffers)) {
             ByteBuf[] byteBufs = Arrays.stream(buffers)
-                    .map(buffer -> {
-                        if (buffer instanceof NettyByteBuffer) {
-                            return ((NettyByteBuffer) buffer).asNativeBuffer();
-                        } else {
-                            return Unpooled.wrappedBuffer(buffer.asNioBuffer());
-                        }
-                    }).toArray(ByteBuf[]::new);
+                .map(buffer -> {
+                    if (buffer instanceof NettyByteBuffer) {
+                        return ((NettyByteBuffer) buffer).asNativeBuffer();
+                    } else {
+                        return Unpooled.wrappedBuffer(buffer.asNioBuffer());
+                    }
+                }).toArray(ByteBuf[]::new);
             return write(byteBufs);
         }
         return this;
@@ -165,33 +173,35 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public ByteBuffer write(java.nio.ByteBuffer... buffers) {
-        if(ArrayUtils.isNotEmpty(buffers)) {
+        if (ArrayUtils.isNotEmpty(buffers)) {
             ByteBuf[] byteBufs = Arrays.stream(buffers)
-                    .map(Unpooled::wrappedBuffer).toArray(ByteBuf[]::new);
+                .map(Unpooled::wrappedBuffer).toArray(ByteBuf[]::new);
             return write(byteBufs);
         }
         return this;
     }
 
+    /**
+     * @param byteBufs The {@link ByteBuf}s
+     * @return The {@link ByteBuffer}
+     */
     public ByteBuffer write(ByteBuf... byteBufs) {
-        if(this.delegate instanceof CompositeByteBuf) {
+        if (this.delegate instanceof CompositeByteBuf) {
             CompositeByteBuf compositeByteBuf = (CompositeByteBuf) this.delegate;
             compositeByteBuf.addComponents(true, byteBufs);
-        }
-        else {
+        } else {
             ByteBuf current = this.delegate;
             CompositeByteBuf composite = current.alloc().compositeBuffer(byteBufs.length + 1);
             this.delegate = composite;
             composite.addComponent(true, current);
             composite.addComponents(true, byteBufs);
-
         }
         return this;
     }
 
     @Override
     public ByteBuffer slice(int index, int length) {
-        return new NettyByteBuffer( delegate.slice(index, length) );
+        return new NettyByteBuffer(delegate.slice(index, length));
     }
 
     @Override

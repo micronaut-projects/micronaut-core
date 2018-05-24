@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.types;
 
 /**
- * Used when a special type handler encounters an error
+ * Used when a special type handler encounters an error.
  *
  * @author James Kleeh
  * @since 1.0
  */
 public class CustomizableResponseTypeException extends RuntimeException {
 
+    /**
+     * @param msg The message
+     */
     public CustomizableResponseTypeException(String msg) {
         super(msg);
     }
 
+    /**
+     * @param msg   The message
+     * @param cause The throwable
+     */
     public CustomizableResponseTypeException(String msg, Throwable cause) {
         super(msg, cause);
     }

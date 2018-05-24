@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.retry;
 
-import io.micronaut.retry.annotation.Retryable;
+package io.micronaut.retry;
 
 import javax.annotation.Nullable;
 import java.time.Duration;
@@ -23,7 +22,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * An interface that encapsulates the current state of a {@link Retryable} operation
+ * An interface that encapsulates the current state of a {@link io.micronaut.retry.annotation.Retryable} operation.
  *
  * @author graemerocher
  * @since 1.0
@@ -31,7 +30,10 @@ import java.util.OptionalDouble;
 public interface RetryState {
 
     /**
-     * Should a retry attempt occur
+     * Should a retry attempt occur.
+     *
+     * @param exception The error
+     *
      * @return True if it should
      */
     boolean canRetry(Throwable exception);
@@ -67,14 +69,14 @@ public interface RetryState {
     Optional<Duration> getMaxDelay();
 
     /**
-     * Opens the retry state
+     * Opens the retry state.
      */
     default void open() {
         // no-op for stateless retry
     }
 
     /**
-     * Closes the {@link RetryState}. This method is called when
+     * Closes the {@link RetryState}.
      *
      * @param exception An exception if an error occurred or null if the operation completed as expected
      */

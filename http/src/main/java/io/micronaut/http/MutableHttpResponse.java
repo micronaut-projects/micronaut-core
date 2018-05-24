@@ -1,49 +1,50 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookie;
 
 import javax.annotation.Nullable;
 import java.nio.charset.Charset;
-import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * A version of the {@link HttpResponse} interface that is mutable allowing the ability to set headers, character encoding etc.
+ * A version of the {@link HttpResponse} interface that is mutable allowing the ability to set headers,
+ * character encoding etc.
  *
+ * @param <B> The body response type
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMessage<B> {
 
     /**
-     * Adds the specified cookie to the response.  This method can be called
-     * multiple times to set more than one cookie.
+     * Adds the specified cookie to the response.  This method can be called multiple times to set more than one cookie.
      *
      * @param cookie the Cookie to return to the client
+     * @return This response object
      */
     MutableHttpResponse<B> cookie(Cookie cookie);
 
     /**
-     * Sets the body
+     * Sets the body.
      *
      * @param body The body
      * @return This response object
@@ -52,9 +53,11 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     MutableHttpResponse<B> body(@Nullable B body);
 
     /**
-     * Sets the response status
+     * Sets the response status.
      *
-     * @param status The status
+     * @param status  The status
+     * @param message The message
+     * @return This response object
      */
     MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
 
@@ -65,7 +68,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
 
     @Override
     default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
-        return (MutableHttpResponse<B>) MutableHttpMessage.super.header(name,value);
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.header(name, value);
     }
 
     @Override
@@ -74,28 +77,29 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     }
 
     /**
-     * Sets the response encoding. Should be called after {@link #contentType(MediaType)}
+     * Sets the response encoding. Should be called after {@link #contentType(MediaType)}.
      *
      * @param encoding The encoding to use
+     * @return This response object
      */
     default MutableHttpResponse<B> characterEncoding(CharSequence encoding) {
         if (encoding != null) {
             getContentType().ifPresent(mediaType ->
-                    contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())))
+                contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())))
             );
         }
         return this;
     }
 
     /**
-     * Sets the response encoding
+     * Sets the response encoding.
      *
      * @param encoding The encoding to use
+     * @return The encoded reponse object
      */
     default MutableHttpResponse<B> characterEncoding(Charset encoding) {
         return characterEncoding(encoding.toString());
     }
-
 
     @Override
     default MutableHttpResponse<B> contentLength(long length) {
@@ -112,11 +116,16 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
         return (MutableHttpResponse<B>) MutableHttpMessage.super.contentType(mediaType);
     }
 
+    @Override
+    default MutableHttpResponse<B> contentEncoding(CharSequence encoding) {
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentEncoding(encoding);
+    }
+
     /**
-     * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response
+     * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response.
      *
      * @param locale The locale
-     * @return This response
+     * @return This response object
      */
     default MutableHttpResponse<B> locale(Locale locale) {
         getHeaders().add(HttpHeaders.CONTENT_LANGUAGE, locale.toString());
@@ -124,32 +133,33 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     }
 
     /**
-     * Sets the response status
+     * Sets the response status.
      *
      * @param status The status
+     * @return This response object
      */
     default MutableHttpResponse<B> status(int status) {
         return status(HttpStatus.valueOf(status));
     }
 
     /**
-     * Sets the response status
+     * Sets the response status.
      *
-     * @param status The status
+     * @param status  The status
+     * @param message The message
+     * @return This response object
      */
     default MutableHttpResponse<B> status(int status, CharSequence message) {
         return status(HttpStatus.valueOf(status), message);
     }
 
-
     /**
-     * Sets the response status
+     * Sets the response status.
      *
      * @param status The status
+     * @return This response object
      */
     default MutableHttpResponse<B> status(HttpStatus status) {
         return status(status, null);
     }
-
-
 }

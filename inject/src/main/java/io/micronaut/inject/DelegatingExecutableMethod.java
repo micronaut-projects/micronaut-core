@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -22,17 +23,19 @@ import io.micronaut.core.type.ReturnType;
 import java.lang.reflect.Method;
 
 /**
- * An interface for {@link ExecutableMethod} instances that delegate to an underlying {@link ExecutableMethod}
+ * An interface for {@link ExecutableMethod} instances that delegate to an underlying {@link ExecutableMethod}.
  *
+ * @param <T> The type
+ * @param <R> The result
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface DelegatingExecutableMethod<T,R> extends ExecutableMethod<T,R> {
+public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R> {
 
     /**
      * @return The target
      */
-    ExecutableMethod<T,R> getTarget();
+    ExecutableMethod<T, R> getTarget();
 
     @Override
     default Method getTargetMethod() {

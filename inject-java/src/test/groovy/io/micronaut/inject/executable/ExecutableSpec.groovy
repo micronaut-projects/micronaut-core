@@ -1,35 +1,65 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package io.micronaut.inject.executable
 
 import io.micronaut.context.AbstractExecutableMethod
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
-import io.micronaut.inject.MethodExecutionHandle
-import io.micronaut.context.AbstractExecutableMethod
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.inject.ExecutionHandle
-import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.MethodExecutionHandle
 import spock.lang.Specification
 
-class ExecutableSpec extends Specification {
+import javax.inject.Named
+import javax.inject.Singleton
+
+class ExecutableSpec extends AbstractTypeElementSpec {
+
+    void "test executable compile spec"() {
+        given:"A bean that defines no explicit scope"
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Executable
+class MyBean {
+    public String methodOne(@javax.inject.Named("foo") String one) {
+        return "good";
+    }
+    
+    public String methodTwo(String one, String two) {
+        return "good";
+    }
+    
+    public String methodZero() {
+        return "good";
+    }
+}
+
+
+''')
+        then:"the default scope is singleton"
+        beanDefinition.executableMethods.size() == 3
+        beanDefinition.executableMethods[0].methodName == 'methodOne'
+        beanDefinition.executableMethods[0].getArguments()[0].getAnnotation(Named).value() == 'foo'
+    }
 
     void "test executable metadata"() {
         given:
@@ -62,10 +92,12 @@ class ExecutableSpec extends Specification {
     void "test executable responses"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
-        ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
 
         expect:
+        applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).isPresent()
+        ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
         method.invoke(args as Object[]) == result
+
 
         where:
         methodName            | argTypes         | args             | result

@@ -1,21 +1,26 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.aop.writer;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.HotSwappableInterceptedProxy;
+import io.micronaut.aop.Intercepted;
+import io.micronaut.aop.InterceptedProxy;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
@@ -30,59 +35,69 @@ import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.writer.*;
-import org.objectweb.asm.*;
+import io.micronaut.inject.writer.AbstractClassFileWriter;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.ExecutableMethodWriter;
+import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
+
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * A class that generates AOP proxy classes at compile time
+ * A class that generates AOP proxy classes at compile time.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor {
+    public static final int HASHCODE = 31;
+    public static final int MAX_LOCALS = 3;
 
     public static final Method METHOD_GET_PROXY_TARGET = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    ExecutionHandleLocator.class,
-                    "getProxyTargetMethod",
-                    Class.class,
-                    String.class,
-                    Class[].class
-            )
+        ReflectionUtils.getRequiredInternalMethod(
+            ExecutionHandleLocator.class,
+            "getProxyTargetMethod",
+            Class.class,
+            String.class,
+            Class[].class
+        )
     );
     public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-            BeanLocator.class,
-            "getProxyTargetBean",
-            Class.class,
-            Qualifier.class
+        BeanLocator.class,
+        "getProxyTargetBean",
+        Class.class,
+        Qualifier.class
     ));
-    private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
-    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
-
-    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
-
-    private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
-            new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
-    );
-
-    private static final String FIELD_INTERCEPTORS = "$interceptors";
-    private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
-    private static final String FIELD_PROXY_METHODS = "$proxyMethods";
-    private static final Type FIELD_TYPE_PROXY_METHODS = Type.getType(ExecutableMethod[].class);
-    private static final Type EXECUTABLE_METHOD_TYPE = Type.getType(ExecutableMethod.class);
-    private static final Type INTERCEPTOR_ARRAY_TYPE = Type.getType(Interceptor[].class);
     public static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
     public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
     public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
@@ -94,6 +109,23 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public static final Type TYPE_LOCK = Type.getType(Lock.class);
     public static final Type TYPE_BEAN_LOCATOR = Type.getType(BeanLocator.class);
     public static final String METHOD_RESOLVE_TARGET = "$resolveTarget";
+
+    private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
+
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
+
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
+
+    private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
+        new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
+    );
+
+    private static final String FIELD_INTERCEPTORS = "$interceptors";
+    private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
+    private static final String FIELD_PROXY_METHODS = "$proxyMethods";
+    private static final Type FIELD_TYPE_PROXY_METHODS = Type.getType(ExecutableMethod[].class);
+    private static final Type EXECUTABLE_METHOD_TYPE = Type.getType(ExecutableMethod.class);
+    private static final Type INTERCEPTOR_ARRAY_TYPE = Type.getType(Interceptor[].class);
 
     private final String packageName;
     private final String targetClassShortName;
@@ -112,7 +144,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final boolean isIntroduction;
     private boolean isProxyTarget;
 
-
     private MethodVisitor constructorWriter;
     private List<ExecutableMethodWriter> proxiedMethods = new ArrayList<>();
     private Set<MethodRef> proxiedMethodsRefSet = new HashSet<>();
@@ -122,29 +153,33 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int interceptorArgumentIndex;
     private int beanContextArgumentIndex = -1;
     private Map<String, Object> constructorArgumentTypes;
-    private Map<String, Object> constructorQualfierTypes;
+    private Map<String, AnnotationMetadata> constructArgumentMetadata;
     private Map<String, Map<String, Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
     private List<Runnable> deferredInjectionPoints = new ArrayList<>();
+    private AnnotationMetadata constructorAnnotationMedata;
+    private boolean constructorRequriesReflection;
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
-     *
+     * <p>
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
      *
-     * @param parent The parent {@link BeanDefinitionWriter}
+     * @param parent           The parent {@link BeanDefinitionWriter}
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
     public AopProxyWriter(BeanDefinitionWriter parent,
                           Object... interceptorTypes) {
         this(parent, OptionalValues.empty(), interceptorTypes);
     }
+
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
-     *
+     * <p>
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
      *
-     * @param parent The parent {@link BeanDefinitionWriter}
+     * @param parent           The parent {@link BeanDefinitionWriter}
+     * @param settings         optional setting
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
     public AopProxyWriter(BeanDefinitionWriter parent,
@@ -168,21 +203,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
         this.interfaceTypes = Collections.emptySet();
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
-                NameUtils.getPackageName(proxyFullName),
-                proxyShortName,
-                parent.getAnnotationMetadata());
+            NameUtils.getPackageName(proxyFullName),
+            proxyShortName,
+            parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
     }
 
     /**
-     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link Introduction} advise
+     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *
-     * @param packageName The package name
-     * @param className The class name
-     * @param isInterface Is the target of the advise an interface
+     * @param packageName        The package name
+     * @param className          The class name
+     * @param isInterface        Is the target of the advise an interface
      * @param annotationMetadata The annotation metadata
-     * @param interfaceTypes The additional interfaces to implement
-     * @param interceptorTypes The interceptor types
+     * @param interfaceTypes     The additional interfaces to implement
+     * @param interceptorTypes   The interceptor types
      */
     public AopProxyWriter(String packageName,
                           String className,
@@ -206,12 +241,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
-                NameUtils.getPackageName(proxyFullName),
-                proxyShortName,
-                annotationMetadata);
+            NameUtils.getPackageName(proxyFullName),
+            proxyShortName,
+            annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
+    @Override
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         String[] interfaces = getImplementedInterfaceInternalNames();
         classWriter.visit(V1_8, ACC_PUBLIC, className, null, superType.getInternalName(), interfaces);
@@ -225,8 +261,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitBeanDefinitionConstructor() {
-        visitBeanDefinitionConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    public void visitBeanDefinitionConstructor(AnnotationMetadata annotationMetadata,
+                                               boolean requiresReflection) {
+        visitBeanDefinitionConstructor(
+            annotationMetadata,
+            requiresReflection,
+            Collections.emptyMap(),
+            Collections.emptyMap(),
+            Collections.emptyMap()
+        );
     }
 
     @Override
@@ -266,41 +309,48 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public String getBeanDefinitionName() {
-        return  proxyBeanDefinitionWriter.getBeanDefinitionName();
+        return proxyBeanDefinitionWriter.getBeanDefinitionName();
     }
 
     /**
-     * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor()} should be called at least once
+     * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor(AnnotationMetadata, boolean)}  should be called at least once
      *
-     * @param argumentTypes  The argument names and types. Should be an ordered map should as {@link LinkedHashMap}
-     * @param qualifierTypes The argument names and qualifier types. Should be an ordered map should as {@link LinkedHashMap}
-     * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
+     * @param argumentTypes              The argument names and types. Should be an ordered map should as {@link LinkedHashMap}
+     * @param argumentAnnotationMetadata The argument names and metadata
+     * @param genericTypes               The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
-    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
+    @Override
+    public void visitBeanDefinitionConstructor(
+        AnnotationMetadata annotationMetadata,
+        boolean requiresReflection,
+        Map<String, Object> argumentTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+        Map<String, Map<String, Object>> genericTypes) {
+        this.constructorAnnotationMedata = annotationMetadata;
+        this.constructorRequriesReflection = requiresReflection;
         this.constructorArgumentTypes = argumentTypes;
-        this.constructorQualfierTypes = qualifierTypes;
+        this.constructArgumentMetadata = argumentAnnotationMetadata;
         this.constructorGenericTypes = genericTypes;
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
         this.beanContextArgumentIndex = argumentTypes.size();
         constructorNewArgumentTypes.put("beanContext", BeanContext.class);
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
-    }
 
-    @Override
-    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, qualifierTypes, genericTypes);
     }
 
     /**
-     * Visit a method that is to be proxied
+     * Visit a method that is to be proxied.
      *
-     * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType     The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName     The method name
-     * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes The qualifier types of each argument. Can be null.
-     * @param genericTypes   The generic types of each argument. Can be null.
+     * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType                 The return type of the method. Either a Class or a string representing the name of the type
+     * @param genericReturnType          The generic return type
+     * @param returnTypeGenericTypes     Map containing the return generic types
+     * @param methodName                 The method name
+     * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types of each argument. Can be null.
+     * @param annotationMetadata         metadata
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
@@ -308,12 +358,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
-                                  Map<String, Object> qualifierTypes,
+                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata) {
 
         // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
-        visitExecutableMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
+        visitExecutableMethod(
+            declaringType,
+            returnType,
+            genericReturnType,
+            returnTypeGenericTypes,
+            methodName,
+            argumentTypes,
+            argumentAnnotationMetadata,
+            genericTypes,
+            annotationMetadata);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -321,16 +380,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         boolean isPrimitive = isPrimitive(returnType);
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList);
-        if(isProxyTarget) {
+        if (isProxyTarget) {
             // if the target class is being proxied then the method will be looked up from the parent bean definition.
             // Therefore no need to generate a bridge
-            if(!proxyTargetMethods.contains(methodKey)) {
+            if (!proxyTargetMethods.contains(methodKey)) {
                 int index = proxyMethodCount++;
                 proxyTargetMethods.add(methodKey);
                 buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
             }
-        }
-        else if(!proxiedMethodsRefSet.contains(methodKey)){
+        } else if (!proxiedMethodsRefSet.contains(methodKey)) {
             int index = proxyMethodCount++;
             // if the target is not being proxied then we generate a subclass where only the proxied methods are overridden
             // Each overridden method calls super.blah(..) thus maintaining class semantics better and providing smaller more efficient
@@ -346,8 +404,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
 
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, annotationMetadata
-            ) {
+                proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, annotationMetadata) {
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
                     // load this
@@ -362,10 +419,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
                     }
                     invokeMethodVisitor.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
-                    if(isVoidReturn) {
+                    if (isVoidReturn) {
                         invokeMethodVisitor.visitInsn(ACONST_NULL);
-                    }
-                    else {
+                    } else {
                         AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
                     }
                     invokeMethodVisitor.visitInsn(ARETURN);
@@ -374,17 +430,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
+            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes);
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
             String overrideDescriptor = buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
 
-
             // now build a bridge to invoke the original method
-
             MethodVisitor bridgeWriter = classWriter.visitMethod(ACC_STATIC | ACC_SYNTHETIC,
-                    bridgeName, bridgeDesc, null, null);
+                bridgeName, bridgeDesc, null, null);
             GeneratorAdapter bridgeGenerator = new GeneratorAdapter(bridgeWriter, ACC_STATIC + ACC_SYNTHETIC, bridgeName, bridgeDesc);
             for (int i = 0; i < bridgeArguments.size(); i++) {
                 bridgeGenerator.loadArg(i);
@@ -394,13 +448,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
             bridgeWriter.visitEnd();
         }
-
-
     }
 
     private String buildMethodOverride(Object returnType, String methodName, int index, List<Object> argumentTypeList, int argumentCount, boolean isVoidReturn) {
         // override the original method
-
         String desc = getMethodDescriptor(returnType, argumentTypeList);
         MethodVisitor overridden = classWriter.visitMethod(ACC_PUBLIC, methodName, desc, null, null);
         GeneratorAdapter overriddenMethodGenerator = new GeneratorAdapter(overridden, ACC_PUBLIC, methodName, desc);
@@ -433,11 +484,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         // second argument: this or target
         overriddenMethodGenerator.loadThis();
-        if( isProxyTarget ) {
-            if(hotswap || lazy) {
-               overriddenMethodGenerator.invokeInterface(Type.getType(InterceptedProxy.class), Method.getMethod("java.lang.Object interceptedTarget()") );
-            }
-            else {
+        if (isProxyTarget) {
+            if (hotswap || lazy) {
+                overriddenMethodGenerator.invokeInterface(Type.getType(InterceptedProxy.class), Method.getMethod("java.lang.Object interceptedTarget()"));
+            } else {
                 overriddenMethodGenerator.getField(proxyType, FIELD_TARGET, getTypeReference(targetClassFullName));
             }
         }
@@ -458,6 +508,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             pushBoxPrimitiveIfNecessary(argType, overriddenMethodGenerator);
             overriddenMethodGenerator.visitInsn(AASTORE);
         }
+
         // invoke MethodInterceptorChain constructor
         overriddenMethodGenerator.invokeConstructor(TYPE_METHOD_INTERCEPTOR_CHAIN, Method.getMethod(CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN));
         int chainVar = overriddenMethodGenerator.newLocal(TYPE_METHOD_INTERCEPTOR_CHAIN);
@@ -467,9 +518,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         overriddenMethodGenerator.visitMethodInsn(INVOKEVIRTUAL, TYPE_INTERCEPTOR_CHAIN.getInternalName(), "proceed", getMethodDescriptor(Object.class.getName()), false);
         if (isVoidReturn) {
             returnVoid(overriddenMethodGenerator);
-        }
-        else {
-
+        } else {
             pushCastToType(overriddenMethodGenerator, returnType);
             pushReturnValue(overriddenMethodGenerator, returnType);
         }
@@ -486,19 +535,25 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         if (constructorArgumentTypes == null) {
             throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         }
+        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
+        this.constructArgumentMetadata = new LinkedHashMap<>(this.constructArgumentMetadata);
+        this.constructArgumentMetadata.put("interceptors", new DefaultAnnotationMetadata() {{
+            addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
+                "value", Arrays.stream(interceptorTypes).map(Type::getClassName).toArray()
+            ));
+        }});
         String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
         ClassWriter proxyClassWriter = this.classWriter;
         this.constructorWriter = proxyClassWriter.visitMethod(
-                ACC_PUBLIC,
-                CONSTRUCTOR_NAME,
-                constructorDescriptor,
-                null,
-                null);
+            ACC_PUBLIC,
+            CONSTRUCTOR_NAME,
+            constructorDescriptor,
+            null,
+            null);
 
         // Add the interceptor @Type(..) annotation
-        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
         AnnotationVisitor interceptorTypeAnn = constructorWriter.visitParameterAnnotation(
-                interceptorArgumentIndex, Type.getDescriptor(io.micronaut.context.annotation.Type.class), true
+            interceptorArgumentIndex, Type.getDescriptor(io.micronaut.context.annotation.Type.class), true
         ).visitArray("value");
         for (Type interceptorType : interceptorTypes) {
             interceptorTypeAnn.visit(null, interceptorType);
@@ -509,11 +564,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         GeneratorAdapter proxyConstructorGenerator = this.constructorGenerator;
 
         proxyConstructorGenerator.loadThis();
-        if(isInterface) {
+        if (isInterface) {
             proxyConstructorGenerator.invokeConstructor(TYPE_OBJECT, METHOD_DEFAULT_CONSTRUCTOR);
-        }
-        else {
-
+        } else {
             Collection<Object> existingArguments = constructorArgumentTypes.values();
             for (int i = 0; i < existingArguments.size(); i++) {
                 proxyConstructorGenerator.loadArg(i);
@@ -522,26 +575,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
-        if(!isInterface) {
-            proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(
-                    targetClassFullName,
-                    constructorArgumentTypes,
-                    constructorQualfierTypes,
-                    constructorGenericTypes
-
-            );
-        }
-        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
-
+        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(
+            constructorAnnotationMedata,
+            constructorRequriesReflection,
+            constructorNewArgumentTypes,
+            constructArgumentMetadata,
+            constructorGenericTypes);
 
         GeneratorAdapter targetDefinitionGenerator = null;
-        if(parentWriter != null) {
+        if (parentWriter != null) {
             proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
             ClassVisitor pcw = proxyBeanDefinitionWriter.getClassWriter();
             targetDefinitionGenerator = new GeneratorAdapter(pcw.visitMethod(ACC_PUBLIC,
-                    METHOD_PROXY_TARGET_TYPE.getName(),
-                    METHOD_PROXY_TARGET_TYPE.getDescriptor(),
-                    null, null
+                METHOD_PROXY_TARGET_TYPE.getName(),
+                METHOD_PROXY_TARGET_TYPE.getDescriptor(),
+                null, null
 
             ), ACC_PUBLIC, METHOD_PROXY_TARGET_TYPE.getName(), METHOD_PROXY_TARGET_TYPE.getDescriptor());
             targetDefinitionGenerator.loadThis();
@@ -549,85 +597,82 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             targetDefinitionGenerator.returnValue();
         }
 
-
         Class interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
         Type targetType = getTypeReference(targetClassFullName);
 
         // add the $beanLocator field
-
-        if(isProxyTarget) {
+        if (isProxyTarget) {
             proxyClassWriter.visitField(
-                    ACC_PRIVATE | ACC_FINAL,
-                    FIELD_BEAN_LOCATOR,
-                    TYPE_BEAN_LOCATOR.getDescriptor(),
-                    null,
-                    null
+                ACC_PRIVATE | ACC_FINAL,
+                FIELD_BEAN_LOCATOR,
+                TYPE_BEAN_LOCATOR.getDescriptor(),
+                null,
+                null
             );
 
-            if(lazy) {
+            if (lazy) {
                 interceptedInterface = InterceptedProxy.class;
-            }
-            else {
+            } else {
                 interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
 
                 // add the $target field for the target bean
                 int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
                 proxyClassWriter.visitField(
-                        modifiers,
-                        FIELD_TARGET,
-                        targetType.getDescriptor(),
-                        null,
-                        null
+                    modifiers,
+                    FIELD_TARGET,
+                    targetType.getDescriptor(),
+                    null,
+                    null
                 );
-                if(hotswap) {
+                if (hotswap) {
                     // Add ReadWriteLock field
                     // private final ReentrantReadWriteLock $target_rwl = new ReentrantReadWriteLock();
                     proxyClassWriter.visitField(
-                            ACC_PRIVATE | ACC_FINAL,
-                            FIELD_READ_WRITE_LOCK,
-                            TYPE_READ_WRITE_LOCK.getDescriptor(),
-                            null,null
+                        ACC_PRIVATE | ACC_FINAL,
+                        FIELD_READ_WRITE_LOCK,
+                        TYPE_READ_WRITE_LOCK.getDescriptor(),
+                        null, null
                     );
                     proxyConstructorGenerator.loadThis();
                     proxyConstructorGenerator.newInstance(TYPE_READ_WRITE_LOCK);
                     proxyConstructorGenerator.dup();
-                    proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR );
+                    proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR);
                     proxyConstructorGenerator.putField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
 
                     // Add Read Lock field
                     // private final Lock $target_rl = $target_rwl.readLock();
                     proxyClassWriter.visitField(
-                            ACC_PRIVATE | ACC_FINAL,
-                            FIELD_READ_LOCK,
-                            TYPE_LOCK.getDescriptor(),
-                            null,null
+                        ACC_PRIVATE | ACC_FINAL,
+                        FIELD_READ_LOCK,
+                        TYPE_LOCK.getDescriptor(),
+                        null, null
                     );
                     proxyConstructorGenerator.loadThis();
                     proxyConstructorGenerator.loadThis();
                     proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
                     proxyConstructorGenerator.invokeInterface(
-                            Type.getType(ReadWriteLock.class),
-                            Method.getMethod(Lock.class.getName() + " readLock()")
+                        Type.getType(ReadWriteLock.class),
+                        Method.getMethod(Lock.class.getName() + " readLock()")
                     );
-                    proxyConstructorGenerator.putField(proxyType, FIELD_READ_LOCK, TYPE_LOCK );
+                    proxyConstructorGenerator.putField(proxyType, FIELD_READ_LOCK, TYPE_LOCK);
 
                     // Add Write Lock field
                     // private final Lock $target_wl = $target_rwl.writeLock();
                     proxyClassWriter.visitField(
-                            ACC_PRIVATE | ACC_FINAL,
-                            FIELD_WRITE_LOCK,
-                            Type.getDescriptor(Lock.class),
-                            null,null
+                        ACC_PRIVATE | ACC_FINAL,
+                        FIELD_WRITE_LOCK,
+                        Type.getDescriptor(Lock.class),
+                        null, null
                     );
 
                     proxyConstructorGenerator.loadThis();
                     proxyConstructorGenerator.loadThis();
                     proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
                     proxyConstructorGenerator.invokeInterface(
-                            Type.getType(ReadWriteLock.class),
-                            Method.getMethod(Lock.class.getName() + " writeLock()")
+                        Type.getType(ReadWriteLock.class),
+                        Method.getMethod(Lock.class.getName() + " writeLock()")
                     );
-                    proxyConstructorGenerator.putField(proxyType, FIELD_WRITE_LOCK, TYPE_LOCK );
+                    proxyConstructorGenerator.putField(proxyType, FIELD_WRITE_LOCK, TYPE_LOCK);
                 }
             }
             // assign the bean locator
@@ -638,7 +683,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             Method resolveTargetMethodDesc = writeResolveTargetMethod(proxyClassWriter, targetType);
 
-            if(!lazy) {
+            if (!lazy) {
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.invokeVirtual(proxyType, resolveTargetMethodDesc);
@@ -650,39 +695,36 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             // Write the swap method
             // e. T swap(T newInstance);
-            if(hotswap && !lazy) {
+            if (hotswap && !lazy) {
                 writeSwapMethod(proxyClassWriter, targetType);
             }
         }
 
         String[] interfaces = getImplementedInterfaceInternalNames();
-        if(isInterface) {
+        if (isInterface) {
             String[] adviceInterfaces = {
-                    getInternalName(targetClassFullName),
-                    Type.getInternalName(interceptedInterface)
+                getInternalName(targetClassFullName),
+                Type.getInternalName(interceptedInterface)
             };
-            interfaces = ArrayUtils.concat( interfaces, adviceInterfaces);
-        }
-        else {
+            interfaces = ArrayUtils.concat(interfaces, adviceInterfaces);
+        } else {
             String[] adviceInterfaces = {Type.getInternalName(interceptedInterface)};
-            interfaces = ArrayUtils.concat( interfaces, adviceInterfaces);
+            interfaces = ArrayUtils.concat(interfaces, adviceInterfaces);
         }
         proxyClassWriter.visit(V1_8, ACC_PUBLIC,
-                proxyInternalName,
-                null,
-                isInterface ? TYPE_OBJECT.getInternalName() : getTypeReference(targetClassFullName).getInternalName(),
-                interfaces);
-
-
+            proxyInternalName,
+            null,
+            isInterface ? TYPE_OBJECT.getInternalName() : getTypeReference(targetClassFullName).getInternalName(),
+            interfaces);
 
         // set $proxyMethods field
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.push(proxyMethodCount);
         proxyConstructorGenerator.newArray(EXECUTABLE_METHOD_TYPE);
         proxyConstructorGenerator.putField(
-                proxyType,
-                FIELD_PROXY_METHODS,
-                FIELD_TYPE_PROXY_METHODS
+            proxyType,
+            FIELD_PROXY_METHODS,
+            FIELD_TYPE_PROXY_METHODS
         );
 
         // set $interceptors field
@@ -690,14 +732,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyConstructorGenerator.push(proxyMethodCount);
         proxyConstructorGenerator.newArray(INTERCEPTOR_ARRAY_TYPE);
         proxyConstructorGenerator.putField(
-                proxyType,
-                FIELD_INTERCEPTORS,
-                FIELD_TYPE_INTERCEPTORS
+            proxyType,
+            FIELD_INTERCEPTORS,
+            FIELD_TYPE_INTERCEPTORS
         );
 
         // now initialize the held values
-        if(isProxyTarget) {
-            if(proxyTargetMethods.size() == proxyMethodCount) {
+        if (isProxyTarget) {
+            if (proxyTargetMethods.size() == proxyMethodCount) {
 
                 Iterator<MethodRef> iterator = proxyTargetMethods.iterator();
                 for (int i = 0; i < proxyMethodCount; i++) {
@@ -705,7 +747,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
                     // The following will initialize the array of $proxyMethod instances
                     // Eg. this.$proxyMethods[0] = $PARENT_BEAN.getRequiredMethod("test", new Class[]{String.class});
-
                     proxyConstructorGenerator.loadThis();
 
                     // Step 1: dereference the array - this.$proxyMethods[0]
@@ -720,8 +761,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
                     pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.argumentTypes);
                     proxyConstructorGenerator.invokeInterface(
-                            Type.getType(ExecutionHandleLocator.class),
-                            METHOD_GET_PROXY_TARGET
+                        Type.getType(ExecutionHandleLocator.class),
+                        METHOD_GET_PROXY_TARGET
                     );
                     // Step 3: store the result in the array
                     proxyConstructorGenerator.visitInsn(AASTORE);
@@ -731,11 +772,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     pushResolveInterceptorsCall(proxyConstructorGenerator, i);
                 }
             }
-        }
-        else {
+        } else {
 
             for (int i = 0; i < proxyMethodCount; i++) {
-
                 ExecutableMethodWriter executableMethodWriter = proxiedMethods.get(i);
 
                 // The following will initialize the array of $proxyMethod instances
@@ -750,7 +789,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(proxyFullName)));
                 proxyConstructorGenerator.visitInsn(AASTORE);
                 pushResolveInterceptorsCall(proxyConstructorGenerator, i);
-
             }
         }
 
@@ -763,18 +801,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         this.constructorWriter.visitEnd();
         proxyBeanDefinitionWriter.visitBeanDefinitionEnd();
-        if(targetDefinitionGenerator != null) {
-            targetDefinitionGenerator.visitMaxs(1,1);
+        if (targetDefinitionGenerator != null) {
+            targetDefinitionGenerator.visitMaxs(1, 1);
             targetDefinitionGenerator.visitEnd();
         }
 
         proxyClassWriter.visitEnd();
     }
 
-
-
     /**
-     * Write the proxy to the given compilation directory
+     * Write the proxy to the given compilation directory.
      *
      * @param compilationDir The target compilation directory
      * @throws IOException
@@ -785,7 +821,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Write the class to output via a visitor that manages output destination
+     * Write the class to output via a visitor that manages output destination.
      *
      * @param visitor the writer output visitor
      * @throws IOException If an error occurs
@@ -802,20 +838,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSetterInjectionPoint(
-            Object declaringType,
-            Object qualifierType,
-            boolean requiresReflection,
-            Object fieldType,
-            String fieldName,
-            String setterName,
-            Map<String, Object> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterInjectionPoint(
-                declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
-        ));
-    }
-
-    @Override
     public void visitSuperBeanDefinition(String name) {
         proxyBeanDefinitionWriter.visitSuperBeanDefinition(name);
     }
@@ -827,98 +849,173 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public void visitSetterValue(
-            Object declaringType,
-            Object qualifierType,
-            boolean requiresReflection,
-            Object fieldType,
-            String fieldName,
-            String setterName,
-            Map<String, Object> genericTypes,
-            boolean isOptional) {
+        Object declaringType,
+        AnnotationMetadata annotationMetadata,
+        boolean requiresReflection,
+        Object fieldType,
+        String fieldName,
+        String setterName,
+        Map<String, Object> genericTypes,
+        boolean isOptional) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(
-                declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
+            declaringType, annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
         ));
     }
 
     @Override
-    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object valueType, String setterName, Map<String, Object> genericTypes, boolean isOptional) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(declaringType, qualifierType, requiresReflection, valueType, setterName, genericTypes, isOptional));
+    public void visitSetterValue(
+        Object declaringType,
+        AnnotationMetadata setterMetadata,
+        boolean requiresReflection,
+        Object valueType,
+        String setterName,
+        Map<String, Object> genericTypes,
+        AnnotationMetadata setterArgumentMetadata,
+        boolean isOptional) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitSetterValue(
+                declaringType,
+                setterMetadata,
+                requiresReflection,
+                valueType,
+                setterName,
+                genericTypes,
+                setterArgumentMetadata,
+                isOptional)
+        );
     }
 
     @Override
     public void visitPostConstructMethod(
-            Object declaringType,
-            boolean requiresReflection,
-            Object returnType,
-            String methodName,
-            Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes) {
+        Object declaringType,
+        boolean requiresReflection,
+        Object returnType,
+        String methodName,
+        Map<String, Object> argumentTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+        Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPostConstructMethod(
-                declaringType,requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes
-        ));
+            declaringType,
+            requiresReflection,
+            returnType,
+            methodName,
+            argumentTypes,
+            argumentAnnotationMetadata,
+            genericTypes,
+            annotationMetadata));
     }
 
     @Override
     public void visitPreDestroyMethod(
-            Object declaringType,
-            boolean requiresReflection,
-            Object returnType,
-            String methodName,
-            Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes));
+        Object declaringType,
+        boolean requiresReflection,
+        Object returnType,
+        String methodName,
+        Map<String, Object> argumentTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+        Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitPreDestroyMethod(
+                declaringType,
+                requiresReflection,
+                returnType,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata)
+        );
     }
 
     @Override
     public void visitMethodInjectionPoint(
-            Object declaringType,
-            boolean requiresReflection,
-            Object returnType,
-            String methodName,
-            Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes));
+        Object declaringType,
+        boolean requiresReflection,
+        Object returnType,
+        String methodName,
+        Map<String, Object> argumentTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+        Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitMethodInjectionPoint(
+                declaringType,
+                requiresReflection,
+                returnType,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata)
+        );
     }
 
     @Override
     public ExecutableMethodWriter visitExecutableMethod(
-            Object declaringType,
-            Object returnType,
-            Object genericReturnType,
-            Map<String, Object> returnTypeGenericTypes,
-            String methodName,
-            Map<String, Object> argumentTypes,
-            Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes,
-            AnnotationMetadata annotationMetadata) {
+        Object declaringType,
+        Object returnType,
+        Object genericReturnType,
+        Map<String, Object> returnTypeGenericTypes,
+        String methodName,
+        Map<String, Object> argumentTypes,
+        Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+        Map<String, Map<String, Object>> genericTypes,
+        AnnotationMetadata annotationMetadata) {
         deferredInjectionPoints.add(() ->
-                proxyBeanDefinitionWriter.visitExecutableMethod(
-                        declaringType,
-                        returnType,
-                        genericReturnType,
-                        returnTypeGenericTypes,
-                        methodName,
-                        argumentTypes,
-                        qualifierTypes,
-                        genericTypes,
-                        annotationMetadata
-                )
+            proxyBeanDefinitionWriter.visitExecutableMethod(
+                declaringType,
+                returnType,
+                genericReturnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                argumentAnnotationMetadata,
+                genericTypes,
+                annotationMetadata
+            )
         );
         return null;
     }
 
     @Override
-    public void visitFieldInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldInjectionPoint(declaringType, qualifierType, requiresReflection, fieldType, fieldName));
+    public void visitFieldInjectionPoint(
+        Object declaringType,
+        Object fieldType,
+        String fieldName,
+        boolean requiresReflection,
+        AnnotationMetadata annotationMetadata,
+        @Nullable Map<String, Object> typeArguments) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitFieldInjectionPoint(
+                declaringType,
+                fieldType,
+                fieldName,
+                requiresReflection,
+                annotationMetadata,
+                typeArguments
+            )
+        );
     }
 
     @Override
-    public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
-        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional));
-
+    public void visitFieldValue(
+        Object declaringType,
+        Object fieldType,
+        String fieldName,
+        boolean requiresReflection,
+        AnnotationMetadata annotationMetadata,
+        @Nullable Map<String, Object> typeArguments,
+        boolean isOptional) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitFieldValue(
+                declaringType,
+                fieldType,
+                fieldName,
+                requiresReflection,
+                annotationMetadata,
+                typeArguments,
+                isOptional
+            )
+        );
     }
 
     @Override
@@ -937,13 +1034,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderField(Object type, String field, AnnotationMetadata annotationMetadata,ConfigurationMetadataBuilder metadataBuilder) {
-        proxyBeanDefinitionWriter.visitConfigBuilderField(type, field, annotationMetadata,metadataBuilder);
+    public void visitConfigBuilderField(Object type, String field, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+        proxyBeanDefinitionWriter.visitConfigBuilderField(type, field, annotationMetadata, metadataBuilder);
     }
 
     @Override
-    public void visitConfigBuilderMethod(Object type, String methodName,AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
-        proxyBeanDefinitionWriter.visitConfigBuilderMethod(type, methodName,annotationMetadata, metadataBuilder);
+    public void visitConfigBuilderMethod(Object type, String methodName, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+        proxyBeanDefinitionWriter.visitConfigBuilderMethod(type, methodName, annotationMetadata, metadataBuilder);
     }
 
     @Override
@@ -981,13 +1078,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         return parentWriter != null ? parentWriter.getBeanDefinitionName() : null;
     }
 
-
+    /**
+     * visitInterceptorTypes.
+     *
+     * @param interceptorTypes types
+     */
     public void visitInterceptorTypes(Object... interceptorTypes) {
-        if(interceptorTypes != null) {
+        if (interceptorTypes != null) {
             this.interceptorTypes.addAll(Arrays.asList(interceptorTypes));
         }
     }
-
 
     private void readUnlock(GeneratorAdapter interceptedTargetVisitor) {
         invokeMethodOnLock(interceptedTargetVisitor, FIELD_READ_LOCK, Method.getMethod("void unlock()"));
@@ -1014,10 +1114,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private Method writeResolveTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
         Method resolveTargetMethodDesc = Method.getMethod(targetClassFullName + " " + METHOD_RESOLVE_TARGET + "()");
         GeneratorAdapter resolveTargetMethod = new GeneratorAdapter(proxyClassWriter.visitMethod(
-                ACC_PRIVATE,
-                resolveTargetMethodDesc.getName(),
-                resolveTargetMethodDesc.getDescriptor(),
-                null,null
+            ACC_PRIVATE,
+            resolveTargetMethodDesc.getName(),
+            resolveTargetMethodDesc.getDescriptor(),
+            null, null
 
         ), ACC_PRIVATE, METHOD_RESOLVE_TARGET, resolveTargetMethodDesc.getDescriptor());
 
@@ -1033,13 +1133,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         resolveTargetMethod.visitInsn(ACONST_NULL);
 
         resolveTargetMethod.invokeInterface(
-                TYPE_BEAN_LOCATOR,
-                METHOD_GET_PROXY_TARGET_BEAN
+            TYPE_BEAN_LOCATOR,
+            METHOD_GET_PROXY_TARGET_BEAN
 
         );
         pushCastToType(resolveTargetMethod, targetClassFullName);
         resolveTargetMethod.returnValue();
-        resolveTargetMethod.visitMaxs(1,1);
+        resolveTargetMethod.visitMaxs(1, 1);
         return resolveTargetMethodDesc;
     }
 
@@ -1049,16 +1149,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Label l1 = new Label();
         Label l2 = new Label();
         swapGenerator.visitTryCatchBlock(
-                l0,
-                l1,
-                l2,
-                null
+            l0,
+            l1,
+            l2,
+            null
         );
         // add write lock
         writeLock(swapGenerator);
         swapGenerator.visitLabel(l0);
         swapGenerator.loadThis();
-        swapGenerator.getField(proxyType,FIELD_TARGET, targetType);
+        swapGenerator.getField(proxyType, FIELD_TARGET, targetType);
         // release write lock
         int localRef = swapGenerator.newLocal(targetType);
         swapGenerator.storeLocal(localRef);
@@ -1080,44 +1180,42 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         swapGenerator.loadLocal(var);
         swapGenerator.throwException();
 
-        swapGenerator.visitMaxs(2,3);
+        swapGenerator.visitMaxs(2, MAX_LOCALS);
         swapGenerator.visitEnd();
     }
-
 
     private void writeInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType, Method resolveTargetMethodDesc) {
         // add interceptedTarget() method
         GeneratorAdapter interceptedTargetVisitor = startPublicMethod(
-                proxyClassWriter,
-                "interceptedTarget",
-                Object.class.getName());
+            proxyClassWriter,
+            "interceptedTarget",
+            Object.class.getName());
 
-        if(lazy) {
+        if (lazy) {
             interceptedTargetVisitor.loadThis();
             interceptedTargetVisitor.invokeVirtual(proxyType, resolveTargetMethodDesc);
             interceptedTargetVisitor.returnValue();
-        }
-        else {
+        } else {
             int localRef = -1;
             Label l1 = null;
             Label l2 = null;
-            if(hotswap) {
+            if (hotswap) {
                 Label l0 = new Label();
                 l1 = new Label();
                 l2 = new Label();
                 interceptedTargetVisitor.visitTryCatchBlock(
-                        l0,
-                        l1,
-                        l2,
-                        null
+                    l0,
+                    l1,
+                    l2,
+                    null
                 );
                 // add read lock
                 readLock(interceptedTargetVisitor);
                 interceptedTargetVisitor.visitLabel(l0);
             }
             interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.getField(proxyType,FIELD_TARGET, targetType);
-            if(hotswap) {
+            interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+            if (hotswap) {
                 // release read lock
                 localRef = interceptedTargetVisitor.newLocal(targetType);
                 interceptedTargetVisitor.storeLocal(localRef);
@@ -1126,7 +1224,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 interceptedTargetVisitor.loadLocal(localRef);
             }
             interceptedTargetVisitor.returnValue();
-            if(localRef > -1) {
+            if (localRef > -1) {
                 interceptedTargetVisitor.visitLabel(l2);
                 // release read lock in finally
                 int var = interceptedTargetVisitor.newLocal(targetType);
@@ -1137,7 +1235,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             }
         }
 
-        interceptedTargetVisitor.visitMaxs(1,2);
+        interceptedTargetVisitor.visitMaxs(1, 2);
         interceptedTargetVisitor.visitEnd();
     }
 
@@ -1159,39 +1257,47 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         // Third argument ie. interceptors
         proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
-        if(isIntroduction) {
+        if (isIntroduction) {
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD));
-        }
-        else {
+        } else {
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_AROUND_INTERCEPTORS_METHOD));
         }
         proxyConstructorGenerator.visitInsn(AASTORE);
     }
 
+    /**
+     * Method Reference class with names and a list of argument types. Used as the targets.
+     */
     private class MethodRef {
-        final String name;
-        final List<Object> argumentTypes;
+        protected final String name;
+        protected final List<Object> argumentTypes;
 
-        public MethodRef(String name, List<Object> argumentTypes) {
+        MethodRef(String name, List<Object> argumentTypes) {
             this.name = name;
             this.argumentTypes = argumentTypes;
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
 
             MethodRef methodRef = (MethodRef) o;
 
-            if (!name.equals(methodRef.name)) return false;
+            if (!name.equals(methodRef.name)) {
+                return false;
+            }
             return argumentTypes.equals(methodRef.argumentTypes);
         }
 
         @Override
         public int hashCode() {
             int result = name.hashCode();
-            result = 31 * result + argumentTypes.hashCode();
+            result = HASHCODE * result + argumentTypes.hashCode();
             return result;
         }
     }

@@ -1,4 +1,4 @@
 dependencies {
-    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compile dependencyVersion("groovy")
     compile project(':inject')
 }

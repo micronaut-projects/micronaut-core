@@ -1,0 +1,15 @@
+The majority of frameworks in use on the JVM were designed at a time when the Cloud and Microservices didn't exist and hence are filled with legacy, consume more memory due to being designed to run on traditional Java containers and include Cloud support as an add-on.
+
+Micronaut is designed from the ground-up for building Microservices for the Cloud. In other words Micronaut truly embraces the industries current favorite buzzword: Cloud Native.
+
+Integrated directly into the runtime is support for features such as:
+
+* Distributed Configuration
+* Service Discovery
+* Client Side Load Balancing
+* Distributed Tracing
+* Serverless Functions
+
+Many of the features in Micronaut and heavily inspired by features from Spring and Grails. This is by design and helps developers who are already familiar with systems such as Spring Cloud.
+
+The following sections cover these features and how to use them.

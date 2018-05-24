@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 /**
  * An extended version of {@link HttpRequest} that allows mutating headers, the body etc.
  *
+ * @param <B> The request body type
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,6 +37,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      * Sets the specified cookie on the request.
      *
      * @param cookie the Cookie to return to the client
+     * @return The http request
      */
     MutableHttpRequest<B> cookie(Cookie cookie);
 
@@ -45,12 +48,13 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     MutableHttpHeaders getHeaders();
 
     /**
-     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header
+     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header.
+     *
      * @param mediaTypes The media types
      * @return This request
      */
-    default MutableHttpRequest<B> accept(MediaType...mediaTypes) {
-        if(ArrayUtils.isNotEmpty(mediaTypes)) {
+    default MutableHttpRequest<B> accept(MediaType... mediaTypes) {
+        if (ArrayUtils.isNotEmpty(mediaTypes)) {
             String acceptString = Arrays.stream(mediaTypes).collect(Collectors.joining(","));
             header(HttpHeaders.ACCEPT, acceptString);
         }
@@ -65,6 +69,11 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     default MutableHttpRequest<B> header(CharSequence name, CharSequence value) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.header(name, value);
+    }
+
+    @Override
+    default MutableHttpRequest<B> basicAuth(CharSequence username, CharSequence password) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.basicAuth(username, password);
     }
 
     @Override
@@ -85,5 +94,10 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     default MutableHttpRequest<B> contentType(MediaType mediaType) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.contentType(mediaType);
+    }
+
+    @Override
+    default MutableHttpRequest<B> contentEncoding(CharSequence encoding) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.contentEncoding(encoding);
     }
 }

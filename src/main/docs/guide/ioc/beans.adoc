@@ -1,6 +1,6 @@
 Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
 
-The following is a simply example:
+The following is a simple example:
 
 [source,groovy]
 ----
@@ -17,7 +17,7 @@ include::{testsdir}/intro/Vehicle.groovy[tags=class, indent=0]
 <2> A `V8Engine` implementation is defined and marked with `Singleton` scope
 <3> The `Engine` is injected via constructor injection
 
-To perform dependency injection simply instantiate an instance of link:{api}/io/micronaut/context/BeanContext.html[BeanContext] and call the `run()` method as per the following example:
+To perform dependency injection simply run the  link:{api}/io/micronaut/context/BeanContext.html[BeanContext] using the `run()` method and lookup a bean using `getBean(Class)`, as per the following example:
 
 [source,groovy]
 ----

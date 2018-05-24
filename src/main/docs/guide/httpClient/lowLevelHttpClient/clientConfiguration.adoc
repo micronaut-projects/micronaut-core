@@ -1,0 +1,48 @@
+The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> called api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
+
+.Altering default HTTP client configuration
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            readTimeout: 5s
+----
+
+The above example sets of `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
+
+If you wish to have a separate configuration per client then there are a couple of options. An option that fits nicely with <<serviceDiscovery, Service Discovery>> is to define a named bean that is a subclass of api:http.client.HttpClientConfiguration[].
+
+For example given an injected client for a service called `hello` using `@Client`:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client("hello") @Inject RxHttpClient httpClient;
+----
+
+To configure the property of the HTTP client you can define the following bean:
+
+.Defining an HTTP client configuration bean
+[source,java]
+----
+@Named("hello")
+@Singleton
+class HelloConfiguration extends HttpClientConfiguration {
+   public HelloConfiguration(ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
+    }
+}
+----
+
+Alternatively if you are not using service discovery then you can use the `configuration` member of `@Client` to refer to a specific type:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client(value="https://api.twitter.com/1.1",
+        configuration=TwitterHttpClientConfiguration.class)
+@Inject
+RxHttpClient httpClient;
+----
+

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,23 +15,13 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.discovery.consul.client.v1.CatalogEntry
-import io.micronaut.discovery.consul.client.v1.ConsulClient
-import io.micronaut.discovery.consul.client.v1.HTTPCheck
-import io.micronaut.discovery.consul.client.v1.HealthEntry
-import io.micronaut.discovery.consul.client.v1.NewServiceEntry
-import io.micronaut.discovery.consul.client.v1.ServiceEntry
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.http.HttpStatus
-import io.micronaut.discovery.consul.client.v1.*;
+import io.micronaut.discovery.consul.client.v1.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer

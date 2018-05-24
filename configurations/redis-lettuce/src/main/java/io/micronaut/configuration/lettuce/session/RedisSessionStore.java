@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.configuration.lettuce.session;
 
 import io.lettuce.core.Range;
@@ -88,8 +89,9 @@ import static io.micronaut.configuration.lettuce.session.RedisSessionStore.Redis
 @Replaces(InMemorySessionStore.class)
 public class RedisSessionStore extends RedisPubSubAdapter<String, String> implements SessionStore<RedisSessionStore.RedisSession> {
 
-    private static final Logger LOG  = LoggerFactory.getLogger(RedisSessionStore.class);
     public static final String REDIS_SESSION_ENABLED = SessionSettings.HTTP + ".redis.enabled";
+    private static final int EXPIRATION_SECONDS = 5;
+    private static final Logger LOG  = LoggerFactory.getLogger(RedisSessionStore.class);
     private final RedisSessionCommands sessionCommands;
     private final RedisHttpSessionConfiguration sessionConfiguration;
     private final SessionIdGenerator sessionIdGenerator;
@@ -101,6 +103,15 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
     private final byte[] activeSessionsSet;
     private final RedisHttpSessionConfiguration.WriteMode writeMode;
 
+    /**
+     * Constructor.
+     * @param sessionIdGenerator sessionIdGenerator
+     * @param sessionConfiguration sessionConfiguration
+     * @param beanLocator beanLocator
+     * @param conversionService conversionService
+     * @param scheduledExecutorService scheduledExecutorService
+     * @param eventPublisher eventPublisher
+     */
     public RedisSessionStore(
             SessionIdGenerator sessionIdGenerator,
             RedisHttpSessionConfiguration sessionConfiguration,
@@ -118,7 +129,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         this.sessionConfiguration = sessionConfiguration;
         this.charset = sessionConfiguration.getCharset();
         StatefulConnection statefulConnection = findRedisConnection(sessionConfiguration, beanLocator);
-        StatefulRedisPubSubConnection<String,String> pubSubConnection = findRedisPubSubConnection(sessionConfiguration, beanLocator);
+        StatefulRedisPubSubConnection<String, String> pubSubConnection = findRedisPubSubConnection(sessionConfiguration, beanLocator);
 
 
         this.expiryPrefix = sessionConfiguration.getNamespace() + "expiry:";
@@ -140,34 +151,34 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         );
         this.sessionCommands = redisCommandFactory.getCommands(RedisSessionCommands.class);
 
-        if(sessionConfiguration.isEnableKeyspaceEvents()) {
+        if (sessionConfiguration.isEnableKeyspaceEvents()) {
 
             try {
                 String result = this.sessionCommands.configSet(
                         "notify-keyspace-events", "Egx"
                 );
-                if(!result.equalsIgnoreCase("ok")) {
-                    if(LOG.isWarnEnabled()) {
+                if (!result.equalsIgnoreCase("ok")) {
+                    if (LOG.isWarnEnabled()) {
                         LOG.warn("Failed to enable keyspace events on the Redis server. Manual configuration my be required");
                     }
                 }
             } catch (Exception e) {
-                if(LOG.isWarnEnabled()) {
+                if (LOG.isWarnEnabled()) {
                     LOG.warn("Failed to enable keyspace events on the Redis server. Manual configuration my be required", e);
                 }
             }
         }
-        if(scheduledExecutorService instanceof ScheduledExecutorService) {
+        if (scheduledExecutorService instanceof ScheduledExecutorService) {
 
             long checkDelayMillis = sessionConfiguration.getExpiredSessionCheck().toMillis();
-            ((ScheduledExecutorService)scheduledExecutorService).scheduleAtFixedRate(
-                    ()-> {
+            ((ScheduledExecutorService) scheduledExecutorService).scheduleAtFixedRate(
+                    () -> {
                         long oneMinuteFromNow = Instant.now().plus(1, ChronoUnit.MINUTES).toEpochMilli();
                         long oneMinuteAgo = Instant.now().minus(1, ChronoUnit.MINUTES).toEpochMilli();
                         sessionCommands.zrangebyscore(
                                 activeSessionsSet, Range.create(Long.valueOf(oneMinuteAgo).doubleValue(), Long.valueOf(oneMinuteFromNow).doubleValue())
                         ).thenAccept((aboutToExpire) -> {
-                            if(aboutToExpire != null) {
+                            if (aboutToExpire != null) {
                                 for (byte[] bytes : aboutToExpire) {
                                     byte[] expiryKey = getExpiryKey(new String(bytes, charset));
                                     sessionCommands.get(expiryKey);
@@ -179,21 +190,24 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                     checkDelayMillis,
                     TimeUnit.MILLISECONDS
             );
-        }
-        else {
+        } else {
             throw new ConfigurationException("Configured scheduled executor service is not an instanceof ScheduledExecutorService");
         }
     }
 
+    /**
+     * Getter.
+     * @return ObjectSerializer
+     */
     public ObjectSerializer getValueSerializer() {
         return valueSerializer;
     }
 
     @Override
     public void message(String channel, String message) {
-        if(channel.equals(sessionConfiguration.getSessionCreatedTopic())) {
+        if (channel.equals(sessionConfiguration.getSessionCreatedTopic())) {
             findSessionInternal(message, false).whenComplete((optional, throwable) -> {
-                if(throwable == null && optional.isPresent()) {
+                if (throwable == null && optional.isPresent()) {
                     RedisSession session = optional.get();
                     eventPublisher.publishEvent(new SessionCreatedEvent(session));
                 }
@@ -203,19 +217,19 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
 
     @Override
     public void message(String pattern, String channel, String message) {
-        if(message.startsWith(expiryPrefix)) {
+        if (message.startsWith(expiryPrefix)) {
             boolean expired = pattern.endsWith(":expired");
-            if(pattern.endsWith(":del") || expired) {
+            if (pattern.endsWith(":del") || expired) {
                 String id = message.substring(expiryPrefix.length());
                 sessionCommands.zrem(activeSessionsSet, id.getBytes(charset)).whenComplete((aVoid, throwable) -> {
-                    if(throwable != null) {
-                        if(LOG.isErrorEnabled()) {
-                            LOG.error("Error removing session ["+id+"] from active sessions: " + throwable.getMessage(), throwable);
+                    if (throwable != null) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error removing session [" + id + "] from active sessions: " + throwable.getMessage(), throwable);
                         }
                     }
                 });
                 findSessionInternal(id, true).whenComplete((optional, throwable) -> {
-                    if(throwable == null && optional.isPresent()) {
+                    if (throwable == null && optional.isPresent()) {
                         RedisSession session = optional.get();
                         eventPublisher.publishEvent(expired ? new SessionExpiredEvent(session) : new SessionDeletedEvent(session));
                     }
@@ -223,7 +237,6 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             }
         }
     }
-
 
     @Override
     public RedisSession newSession() {
@@ -317,34 +330,32 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                 future.completeExceptionally(throwable);
             } else {
                 try {
-                    if(session.isNew()) {
+                    if (session.isNew()) {
                         session.clearModifications();
 
-
                         sessionCommands.publish(sessionCreatedTopic, sessionIdBytes).whenComplete((aLong, throwable12) -> {
-                            if(throwable12 != null) {
-                                if(LOG.isErrorEnabled()){
+                            if (throwable12 != null) {
+                                if (LOG.isErrorEnabled()) {
                                     LOG.error("Error publishing session creation event: " + throwable12.getMessage(), throwable12);
                                 }
                             }
                         });
-                    }
-                    else {
+                    } else {
                         session.clearModifications();
                     }
-                } catch(Throwable e) {
-                    if(LOG.isErrorEnabled()){
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
                         LOG.error("Error publishing session creation event: " + e.getMessage(), e);
                     }
                 } finally {
                     long fiveMinutesAfterExpires = expirySeconds
-                            + TimeUnit.MINUTES.toSeconds(5);
+                            + TimeUnit.MINUTES.toSeconds(EXPIRATION_SECONDS);
                     byte[] expiryKey = getExpiryKey(session);
                     double expireTimeScore = Long.valueOf(Instant.now().plus(expirySeconds, ChronoUnit.SECONDS).toEpochMilli()).doubleValue();
 
                     CompletableFuture<Boolean> expireOp = sessionCommands.expire(sessionKey, fiveMinutesAfterExpires);
                     CompletableFuture<Void> saveExpiryOp = sessionCommands.saveExpiry(expiryKey, String.valueOf(expirySeconds).getBytes());
-                    CompletableFuture<Long> saveActiveSessionOp = sessionCommands.zadd(activeSessionsSet,expireTimeScore , sessionIdBytes);
+                    CompletableFuture<Long> saveActiveSessionOp = sessionCommands.zadd(activeSessionsSet, expireTimeScore, sessionIdBytes);
                     CompletableFuture.allOf(expireOp, saveExpiryOp, saveActiveSessionOp).whenComplete((aBoolean, throwable1) -> {
                                 if (throwable1 != null) {
                                     future.completeExceptionally(throwable1);
@@ -401,14 +412,13 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         return (sessionConfiguration.getNamespace() + "sessions:" + id).getBytes();
     }
 
-
     private StatefulConnection findRedisConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
         Optional<String> serverName = sessionConfiguration.getServerName();
-        return RedisConnectionUtil.findRedisConnection(beanLocator, serverName,"No Redis server configured to store sessions");
+        return RedisConnectionUtil.findRedisConnection(beanLocator, serverName, "No Redis server configured to store sessions");
     }
 
     @SuppressWarnings("unchecked")
-    private StatefulRedisPubSubConnection<String,String> findRedisPubSubConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
+    private StatefulRedisPubSubConnection<String, String> findRedisPubSubConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
         Optional<String> serverName = sessionConfiguration.getServerName();
         return (StatefulRedisPubSubConnection<String, String>)
                 serverName.map(name -> beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name))
@@ -426,249 +436,14 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                         ));
     }
 
-    class RedisSession extends InMemorySession implements Session {
-        static final String ATTR_CREATION_TIME = "Creation-Time";
-        static final String ATTR_LAST_ACCESSED = "Last-Accessed";
-        static final String ATTR_MAX_INACTIVE_INTERVAL = "Max-Inactive-Interval";
-        static final String ATTR_PREFIX = "attr:";
-
-        private final Set<Modification> modifications = new HashSet<>();
-
-        final Set<String> removedKeys = new HashSet<>(2);
-        final Set<String> modifiedKeys = new HashSet<>(2);
-        private final ObjectSerializer valueSerializer;
-
-        /**
-         * Construct a new Redis session not yet persisted
-         *
-         * @param id The id of the session
-         * @param valueSerializer The value serializer
-         * @param maxInactiveInterval The initial max inactive interval
-         */
-        RedisSession(
-                String id,
-                ObjectSerializer valueSerializer,
-                Duration maxInactiveInterval) {
-            super(id, Instant.now(), maxInactiveInterval);
-            this.valueSerializer = valueSerializer;
-            this.modifications.add(Modification.CREATED);
-        }
-
-
-        /**
-         * Construct a new Redis session from existing redis data
-         *
-         * @param id The id of the session
-         * @param data The session data
-         */
-        RedisSession(
-                String id,
-                ObjectSerializer valueSerializer,
-                Map<String, byte[]> data) {
-            super(id, readCreationTime(data), readMaxInactive(data));
-            this.valueSerializer = valueSerializer;
-            this.lastAccessTime = readLastAccessTimed(data);
-
-            for (String name: data.keySet()) {
-                if(name.startsWith(ATTR_PREFIX)) {
-                    String attrName = name.substring(ATTR_PREFIX.length());
-                    attributeMap.put(attrName, data.get(name));
-                }
-            }
-        }
-
-
-        @Override
-        public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-            Optional<T> result = super.get(name, conversionContext);
-            if(!result.isPresent() && attributeMap.containsKey(name)) {
-                Object val = attributeMap.get(name);
-                if(val instanceof byte[]) {
-                    Optional<T> deserialized = valueSerializer.deserialize((byte[]) val, conversionContext.getArgument().getType());
-                    deserialized.ifPresent(t -> attributeMap.put(name, t));
-                    return deserialized;
-                }
-            }
-            return result;
-        }
-
-        @Override
-        public Session setLastAccessedTime(Instant instant) {
-            if(instant != null) {
-                if(!isNew()) {
-                    this.modifications.add(Modification.ADDITION);
-                }
-                if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
-                    byte[] lastAccessedTimeBytes = String.valueOf(instant.toEpochMilli()).getBytes();
-                    writeBehind(ATTR_LAST_ACCESSED, lastAccessedTimeBytes);
-                }
-            }
-            return super.setLastAccessedTime(instant);
-        }
-
-        @Override
-        public Session setMaxInactiveInterval(Duration duration) {
-            if(duration != null) {
-
-                if(!isNew()) {
-                    this.modifications.add(Modification.ADDITION);
-                }
-                if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
-                    byte[] intervalBytes = String.valueOf(getMaxInactiveInterval().getSeconds()).getBytes();
-                    writeBehind(ATTR_MAX_INACTIVE_INTERVAL, intervalBytes);
-                }
-            }
-            return super.setMaxInactiveInterval(duration);
-        }
-
-        @Override
-        public MutableConvertibleValues<Object> put(CharSequence key, Object value) {
-            if(value == null) {
-                return remove(key);
-            }
-            else {
-                if(key != null && !isNew()) {
-                    this.modifications.add(Modification.ADDITION);
-                    String attr = key.toString();
-                    this.modifiedKeys.add(attr);
-                    if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
-                        byte[] bytes = value instanceof byte[] ? (byte[]) value : valueSerializer.serialize(value).orElse(null);
-                        if(bytes != null) {
-                            writeBehind(ATTR_PREFIX + attr, bytes);
-                        }
-                    }
-                }
-                return super.put(key, value);
-            }
-        }
-
-        @Override
-        public MutableConvertibleValues<Object> remove(CharSequence key) {
-            if(key != null && !isNew()) {
-                this.modifications.add(Modification.REMOVAL);
-                String attr = key.toString();
-                this.removedKeys.add(attr);
-                if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
-                    sessionCommands.deleteAttributes(getSessionKey(getId()), getAttributeKey(attr))
-                            .exceptionally(attributeErrorHandler(attr));
-                }
-            }
-            this.modifications.add(Modification.REMOVAL);
-            return super.remove(key);
-        }
-
-        private byte[] getAttributeKey(String attr) {
-            return (ATTR_PREFIX + attr).getBytes(charset);
-        }
-
-        @Override
-        public MutableConvertibleValues<Object> clear() {
-            if(!isNew()) {
-
-                this.modifications.add(Modification.CLEARED);
-                Set<String> names = names();
-                this.removedKeys.addAll(names);
-                if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
-                    byte[][] attributes = names.stream().map(this::getAttributeKey).toArray(byte[][]::new);
-                    sessionCommands.deleteAttributes(getSessionKey(getId()), attributes)
-                            .exceptionally(throwable -> {
-                                if(LOG.isErrorEnabled()) {
-                                    LOG.error("Error writing behind session attributes: " + throwable.getMessage(), throwable);
-                                }
-                                return null;
-                            });
-                }
-            }
-            return super.clear();
-        }
-
-        @Override
-        public boolean isNew() {
-            return modifications.contains(Modification.CREATED);
-        }
-
-        /**
-         * @return Produces a modification delta with the changes necessary to save the session
-         */
-        Map<byte[], byte[]> delta(Charset charset) {
-            if(modifications.isEmpty()) {
-                return Collections.emptyMap();
-            }
-            else {
-                Map<byte[], byte[]> delta = new LinkedHashMap<>();
-                if(isNew()) {
-                    byte[] creationTimeBytes = String.valueOf(getCreationTime().toEpochMilli()).getBytes();
-                    delta.put(ATTR_CREATION_TIME.getBytes(charset), creationTimeBytes);
-                    Instant lastAccessedTime = getLastAccessedTime();
-                    byte[] lastAccessedTimeBytes = String.valueOf(lastAccessedTime.toEpochMilli()).getBytes();
-
-                    delta.put(ATTR_LAST_ACCESSED.getBytes(charset), lastAccessedTimeBytes);
-                    delta.put(ATTR_MAX_INACTIVE_INTERVAL.getBytes(charset), String.valueOf( getMaxInactiveInterval().getSeconds()).getBytes());
-                    for (CharSequence key : attributeMap.keySet()) {
-                        convertAttribute(key, delta, charset);
-                    }
-                }
-                else {
-                    delta.put(ATTR_LAST_ACCESSED.getBytes(charset), String.valueOf(getLastAccessedTime().toEpochMilli()).getBytes());
-                    delta.put(ATTR_MAX_INACTIVE_INTERVAL.getBytes(charset), String.valueOf( getMaxInactiveInterval().getSeconds()).getBytes());
-                    for (CharSequence modifiedKey : modifiedKeys) {
-                        convertAttribute(modifiedKey, delta, charset);
-                    }
-                }
-
-                return delta;
-            }
-        }
-
-        void clearModifications() {
-            modifications.clear();
-            removedKeys.clear();
-            modifiedKeys.clear();
-        }
-
-        private Function<Throwable, Void> attributeErrorHandler(String attr) {
-            return throwable -> {
-                if(LOG.isErrorEnabled()) {
-                    LOG.error("Error writing behind session attribute ["+attr+"]: " + throwable.getMessage(), throwable);
-                }
-                return null;
-            };
-        }
-
-        private void writeBehind(String attr, byte[] lastAccessedTimeBytes) {
-            sessionCommands.setAttribute(getSessionKey(getId()), attr.getBytes(charset), lastAccessedTimeBytes)
-                    .exceptionally(attributeErrorHandler(attr));
-        }
-
-
-        private void convertAttribute(CharSequence key, Map<byte[], byte[]> delta, Charset charset) {
-            Object rawValue = attributeMap.get(key);
-            byte[] attributeKey = getAttributeKey(key.toString());
-            if(rawValue instanceof byte[]) {
-                delta.put(attributeKey, (byte[]) rawValue);
-            }
-            else if(rawValue != null) {
-                Optional<byte[]> serialized = valueSerializer.serialize(rawValue);
-                serialized.ifPresent(bytes -> delta.put(attributeKey, bytes));
-            }
-        }
-
-    }
-
-    enum Modification {
-        CREATED,
-        CLEARED,
-        ADDITION,
-        REMOVAL
-    }
-
     private static Instant readLastAccessTimed(Map<String, byte[]> data) {
         return readInstant(data, ATTR_LAST_ACCESSED);
     }
+
     private static Duration readMaxInactive(Map<String, byte[]> data) {
-        if(data != null) {
+        if (data != null) {
             byte[] value = data.get(ATTR_MAX_INACTIVE_INTERVAL);
-            if(value != null) {
+            if (value != null) {
                 try {
                     Long seconds = Long.valueOf(new String(value));
                     return Duration.ofSeconds(seconds);
@@ -685,9 +460,9 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
     }
 
     private static Instant readInstant(Map<String, byte[]> data, String attr) {
-        if(data != null) {
+        if (data != null) {
             byte[] value = data.get(attr);
-            if(value != null) {
+            if (value != null) {
                 try {
                     Long millis = Long.valueOf(new String(value));
                     return Instant.ofEpochMilli(millis);
@@ -697,5 +472,244 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             }
         }
         return Instant.now();
+    }
+
+    /**
+     * Description states on how the session is modified.
+     */
+    enum Modification {
+        CREATED,
+        CLEARED,
+        ADDITION,
+        REMOVAL
+    }
+
+    /**
+     * A new redis session that is in memory and not yet persisted.
+     */
+    class RedisSession extends InMemorySession implements Session {
+        static final String ATTR_CREATION_TIME = "Creation-Time";
+        static final String ATTR_LAST_ACCESSED = "Last-Accessed";
+        static final String ATTR_MAX_INACTIVE_INTERVAL = "Max-Inactive-Interval";
+        static final String ATTR_PREFIX = "attr:";
+        final Set<String> removedKeys = new HashSet<>(2);
+        final Set<String> modifiedKeys = new HashSet<>(2);
+        private final Set<Modification> modifications = new HashSet<>();
+        private final ObjectSerializer valueSerializer;
+
+        /**
+         * Construct a new Redis session not yet persisted.
+         *
+         * @param id The id of the session
+         * @param valueSerializer The value serializer
+         * @param maxInactiveInterval The initial max inactive interval
+         */
+        RedisSession(
+                String id,
+                ObjectSerializer valueSerializer,
+                Duration maxInactiveInterval) {
+            super(id, Instant.now(), maxInactiveInterval);
+            this.valueSerializer = valueSerializer;
+            this.modifications.add(Modification.CREATED);
+        }
+
+
+        /**
+         * Construct a new Redis session from existing redis data.
+         *
+         * @param id The id of the session
+         * @param valueSerializer valueSerializer
+         * @param data The session data
+         */
+        RedisSession(
+                String id,
+                ObjectSerializer valueSerializer,
+                Map<String, byte[]> data) {
+            super(id, readCreationTime(data), readMaxInactive(data));
+            this.valueSerializer = valueSerializer;
+            this.lastAccessTime = readLastAccessTimed(data);
+
+            for (String name: data.keySet()) {
+                if (name.startsWith(ATTR_PREFIX)) {
+                    String attrName = name.substring(ATTR_PREFIX.length());
+                    attributeMap.put(attrName, data.get(name));
+                }
+            }
+        }
+
+        @Override
+        public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+            Optional<T> result = super.get(name, conversionContext);
+            if (!result.isPresent() && attributeMap.containsKey(name)) {
+                Object val = attributeMap.get(name);
+                if (val instanceof byte[]) {
+                    Optional<T> deserialized = valueSerializer.deserialize((byte[]) val, conversionContext.getArgument().getType());
+                    deserialized.ifPresent(t -> attributeMap.put(name, t));
+                    return deserialized;
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public Session setLastAccessedTime(Instant instant) {
+            if (instant != null) {
+                if (!isNew()) {
+                    this.modifications.add(Modification.ADDITION);
+                }
+                if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+                    byte[] lastAccessedTimeBytes = String.valueOf(instant.toEpochMilli()).getBytes();
+                    writeBehind(ATTR_LAST_ACCESSED, lastAccessedTimeBytes);
+                }
+            }
+            return super.setLastAccessedTime(instant);
+        }
+
+        @Override
+        public Session setMaxInactiveInterval(Duration duration) {
+            if (duration != null) {
+
+                if (!isNew()) {
+                    this.modifications.add(Modification.ADDITION);
+                }
+                if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+                    byte[] intervalBytes = String.valueOf(getMaxInactiveInterval().getSeconds()).getBytes();
+                    writeBehind(ATTR_MAX_INACTIVE_INTERVAL, intervalBytes);
+                }
+            }
+            return super.setMaxInactiveInterval(duration);
+        }
+
+        @Override
+        public MutableConvertibleValues<Object> put(CharSequence key, Object value) {
+            if (value == null) {
+                return remove(key);
+            } else {
+                if (key != null && !isNew()) {
+                    this.modifications.add(Modification.ADDITION);
+                    String attr = key.toString();
+                    this.modifiedKeys.add(attr);
+                    if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+                        byte[] bytes = value instanceof byte[] ? (byte[]) value : valueSerializer.serialize(value).orElse(null);
+                        if (bytes != null) {
+                            writeBehind(ATTR_PREFIX + attr, bytes);
+                        }
+                    }
+                }
+                return super.put(key, value);
+            }
+        }
+
+        @Override
+        public MutableConvertibleValues<Object> remove(CharSequence key) {
+            if (key != null && !isNew()) {
+                this.modifications.add(Modification.REMOVAL);
+                String attr = key.toString();
+                this.removedKeys.add(attr);
+                if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+                    sessionCommands.deleteAttributes(getSessionKey(getId()), getAttributeKey(attr))
+                            .exceptionally(attributeErrorHandler(attr));
+                }
+            }
+            this.modifications.add(Modification.REMOVAL);
+            return super.remove(key);
+        }
+
+        private byte[] getAttributeKey(String attr) {
+            return (ATTR_PREFIX + attr).getBytes(charset);
+        }
+
+        @Override
+        public MutableConvertibleValues<Object> clear() {
+            if (!isNew()) {
+
+                this.modifications.add(Modification.CLEARED);
+                Set<String> names = names();
+                this.removedKeys.addAll(names);
+                if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+                    byte[][] attributes = names.stream().map(this::getAttributeKey).toArray(byte[][]::new);
+                    sessionCommands.deleteAttributes(getSessionKey(getId()), attributes)
+                            .exceptionally(throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error writing behind session attributes: " + throwable.getMessage(), throwable);
+                                }
+                                return null;
+                            });
+                }
+            }
+            return super.clear();
+        }
+
+        @Override
+        public boolean isNew() {
+            return modifications.contains(Modification.CREATED);
+        }
+
+        /**
+         * @param charset The charset to evaluate
+         * @return Produces a modification delta with the changes necessary to save the session
+         */
+        Map<byte[], byte[]> delta(Charset charset) {
+            if (modifications.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                Map<byte[], byte[]> delta = new LinkedHashMap<>();
+                if (isNew()) {
+                    byte[] creationTimeBytes = String.valueOf(getCreationTime().toEpochMilli()).getBytes();
+                    delta.put(ATTR_CREATION_TIME.getBytes(charset), creationTimeBytes);
+                    Instant lastAccessedTime = getLastAccessedTime();
+                    byte[] lastAccessedTimeBytes = String.valueOf(lastAccessedTime.toEpochMilli()).getBytes();
+
+                    delta.put(ATTR_LAST_ACCESSED.getBytes(charset), lastAccessedTimeBytes);
+                    delta.put(ATTR_MAX_INACTIVE_INTERVAL.getBytes(charset), String.valueOf(getMaxInactiveInterval().getSeconds()).getBytes());
+                    for (CharSequence key : attributeMap.keySet()) {
+                        convertAttribute(key, delta, charset);
+                    }
+                } else {
+                    delta.put(ATTR_LAST_ACCESSED.getBytes(charset), String.valueOf(getLastAccessedTime().toEpochMilli()).getBytes());
+                    delta.put(ATTR_MAX_INACTIVE_INTERVAL.getBytes(charset), String.valueOf(getMaxInactiveInterval().getSeconds()).getBytes());
+                    for (CharSequence modifiedKey : modifiedKeys) {
+                        convertAttribute(modifiedKey, delta, charset);
+                    }
+                }
+
+                return delta;
+            }
+        }
+
+        /**
+         * Clear member attributes.
+         */
+        void clearModifications() {
+            modifications.clear();
+            removedKeys.clear();
+            modifiedKeys.clear();
+        }
+
+        private Function<Throwable, Void> attributeErrorHandler(String attr) {
+            return throwable -> {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error writing behind session attribute [" + attr + "]: " + throwable.getMessage(), throwable);
+                }
+                return null;
+            };
+        }
+
+        private void writeBehind(String attr, byte[] lastAccessedTimeBytes) {
+            sessionCommands.setAttribute(getSessionKey(getId()), attr.getBytes(charset), lastAccessedTimeBytes)
+                    .exceptionally(attributeErrorHandler(attr));
+        }
+
+        private void convertAttribute(CharSequence key, Map<byte[], byte[]> delta, Charset charset) {
+            Object rawValue = attributeMap.get(key);
+            byte[] attributeKey = getAttributeKey(key.toString());
+            if (rawValue instanceof byte[]) {
+                delta.put(attributeKey, (byte[]) rawValue);
+            } else if (rawValue != null) {
+                Optional<byte[]> serialized = valueSerializer.serialize(rawValue);
+                serialized.ifPresent(bytes -> delta.put(attributeKey, bytes));
+            }
+        }
+
     }
 }

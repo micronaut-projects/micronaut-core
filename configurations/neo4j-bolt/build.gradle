@@ -1,12 +1,12 @@
 dependencies {
-    compile 'org.neo4j.driver:neo4j-java-driver:1.5.1'
+    compile dependencyVersion("neo4j.bolt")
     compile project(":runtime")
     compile project(":validation")
 
     compileOnly project(":inject-java")
     compileOnly project(":management")
-    compileOnly "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    compileOnly dependencyVersion("neo4j")
 
-    testCompile "org.neo4j.test:neo4j-harness:$neo4jVersion"
+    testCompile dependencyVersion("neo4j")
     testCompile project(":management")
 }

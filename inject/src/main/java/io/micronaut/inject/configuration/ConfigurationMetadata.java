@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
@@ -21,23 +22,33 @@ import java.io.IOException;
 import java.io.Writer;
 
 /**
- * Metadata about a configuration group
+ * Metadata about a configuration group.
  *
  * @author Graeme Rocher
  */
-public class ConfigurationMetadata implements Writable{
+public class ConfigurationMetadata implements Writable {
+
     String type;
     String name;
     String description;
 
+    /**
+     * @return The type
+     */
     public String getType() {
         return type;
     }
 
+    /**
+     * @return The name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * @return The description
+     */
     public String getDescription() {
         return description;
     }
@@ -48,11 +59,10 @@ public class ConfigurationMetadata implements Writable{
         ConfigurationMetadataBuilder.writeAttribute(out, "name", name);
         out.write(',');
         ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
-        if(description != null) {
+        if (description != null) {
             out.write(',');
             ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
         }
         out.write('}');
     }
-
 }

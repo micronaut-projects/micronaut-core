@@ -1,0 +1,93 @@
+Micronaut features dedicated support for automatically configuring the https://neo4j.com/docs/developer-manual/current/drivers/[Neo4j Bolt Driver] for the popular https://neo4j.com/[Neo4j] Graph Database.
+
+== Configuring Neoj4 Bolt
+
+To configure the Neo4j Bolt driver you should first add the `neo4j-bolt` module to your classpath:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:neo4j-bolt"
+----
+
+You should then configure the URI of the Neo4j server you wish to communicate with in `application.yml`:
+
+.Configuring `neo4j.uri`
+[source,yaml]
+----
+neo4j:
+    uri: bolt://localhost
+----
+
+TIP: The `neo4j.uri` setting should be in the format as described in the https://neo4j.com/docs/developer-manual/current/drivers/client-applications/#driver-connection-uris[Connection URIs] section of the Neo4j documentation
+
+
+Once you have the above configuration in place you can inject an instance of the `org.neo4j.driver.v1.Driver` bean, which features both a synchronous blocking API and a non-blocking API based on `CompletableFuture`.
+
+=== Customizing Neo4j Configuration
+
+The configuration can be further customized with all the options available using the api:configuration.neo4j.bolt.Neo4jBoltConfiguration[] class.
+
+The `Neo4jBoltConfiguration` also exposes all the options for the `org.neo4j.driver.v1.Config.ConfigBuilder` class.
+
+Below represents an example configuration:
+
+.Customizing the Bolt Configuration
+[source,yaml]
+----
+neo4j:
+    uri: bolt://localhost
+    maxConnectionPoolSize: 50
+    connectionAcquisitionTimeout: 30s
+----
+
+TIP: You can also create a api:context.event.BeanCreatedEventListener[] bean and listen for the creation of the api:configuration.neo4j.bolt.Neo4jBoltConfiguration[] to further programmatically customize configuration
+
+== Embedding Neo4j for Testing
+
+You can embed Neo4j for testing by including a dependency on the Neo4j test harness:
+
+.build.gradle
+[source,groovy]
+----
+testRuntime "org.neo4j.test:neo4j-harness:3.3.3"
+----
+
+If the Neo4j server is not already running on the configured port an embedded version will be started.
+
+You can configure the options for the embedded Neo4j server using the `neo4j.embedded` settings exposed by api:configuration.neo4j.bolt.Neo4jBoltConfiguration[].
+
+One useful option is `ephemeral` which ensures the data is cleaned up between test runs. For example in `application-test.yml`:
+
+.Using ephemeral
+[source,yaml]
+----
+neo4j:
+    embedded:
+        ephemeral: true
+----
+
+
+== Neo4j Health Checks
+
+When the `neo4j-bolt` module is activated a api:configuration.neo4j.bolt.health.Neo4jHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Neo4j connection.
+
+See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+
+== Using GORM for Neo4j
+
+For Groovy users and users familiar with Grails, special support has been added to Micronaut for using http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j].
+
+To add support for GORM for Neo4j, first configure the Neo4j connection as per instructions earlier in the guide, then add the following dependency to your application:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:neo4j-gorm"
+----
+
+The following should be noted regarding using GORM for Neo4j in Micronaut:
+
+* Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
+* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present. You can also add the `@Transactional` annotation to the class.
+* By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.

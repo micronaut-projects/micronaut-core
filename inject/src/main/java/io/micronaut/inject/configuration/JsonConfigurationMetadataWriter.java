@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,64 +13,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.GeneratedFile;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * A {@link ConfigurationMetadataWriter} that writes out metadata in the format defined by spring-configuration-metadata.json
+ * A {@link ConfigurationMetadataWriter} that writes out metadata in the format defined by
+ * spring-configuration-metadata.json.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWriter {
+
     @Override
     public void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        Optional<File> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName());
-        if(opt.isPresent()) {
-            File file = opt.get();
+        Optional<GeneratedFile> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName());
+        if (opt.isPresent()) {
+            GeneratedFile file = opt.get();
             List<ConfigurationMetadata> configurations = metadataBuilder.getConfigurations();
             List<PropertyMetadata> properties = metadataBuilder.getProperties();
-            try(FileWriter writer = new FileWriter(file)) {
+            try (Writer writer = file.openWriter()) {
                 writer.write('{');
                 boolean hasGroups = !configurations.isEmpty();
                 boolean hasProps = !properties.isEmpty();
-                if(hasGroups) {
+                if (hasGroups) {
                     writeMetadata("groups", configurations, writer);
-                    if(hasProps) {
+                    if (hasProps) {
                         writer.write(',');
                     }
                 }
-                if(hasProps) {
+                if (hasProps) {
                     writeMetadata("properties", properties, writer);
                 }
                 writer.write('}');
             }
         }
-
     }
 
+    /**
+     * @return The file name
+     */
     protected String getFileName() {
         return "configuration-metadata.json";
     }
 
-    private void writeMetadata(String attr, List<? extends Writable> configurations, FileWriter writer) throws IOException {
+    private void writeMetadata(String attr, List<? extends Writable> configurations, Writer writer) throws IOException {
         writer.write('"');
         writer.write(attr);
         writer.write("\":[");
         Iterator<? extends Writable> i = configurations.iterator();
-        while(i.hasNext()) {
+        while (i.hasNext()) {
             Writable metadata = i.next();
             metadata.writeTo(writer);
-            if(i.hasNext()) {
+            if (i.hasNext()) {
                 writer.write(',');
             }
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,50 +13,59 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http;
 
-
 /**
- * An enum containing the valid HTTP methods. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
+ * An enum containing the valid HTTP methods. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public enum HttpMethod implements CharSequence {
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2.
      */
     OPTIONS,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3.
      */
     GET,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.4
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.4.
      */
     HEAD,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5.
      */
     POST,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.6
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.6.
      */
     PUT,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.7
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.7.
      */
     DELETE,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.8
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.8.
      */
     TRACE,
+
     /**
-     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.9
+     * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.9.
      */
     CONNECT,
+
     /**
-     * See https://tools.ietf.org/html/rfc5789
+     * See https://tools.ietf.org/html/rfc5789.
      */
     PATCH;
 
@@ -76,7 +85,7 @@ public enum HttpMethod implements CharSequence {
     }
 
     /**
-     * Whether the given method requires a request body
+     * Whether the given method requires a request body.
      *
      * @param method The {@link HttpMethod}
      * @return True if it does
@@ -86,14 +95,14 @@ public enum HttpMethod implements CharSequence {
     }
 
     /**
-     * Whether the given method allows a request body
+     * Whether the given method allows a request body.
      *
      * @param method The {@link HttpMethod}
      * @return True if it does
      */
     public static boolean permitsRequestBody(HttpMethod method) {
         return requiresRequestBody(method)
-                || method.equals(OPTIONS)
-                || method.equals(DELETE);
+            || method.equals(OPTIONS)
+            || method.equals(DELETE);
     }
 }

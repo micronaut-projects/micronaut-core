@@ -2,13 +2,13 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
     compile project(":inject")
-    compile "javax.validation:validation-api:$validationVersion"
-    compileOnly "org.grails:grails-datastore-core:$gormVersion"
+    compile dependencyVersion("validation")
+    compileOnly dependencyVersion("gorm")
 
-    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
     testCompile project(":inject-java")
     testCompile project(":http-server-netty")
-    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
+    testCompile project(":http-client")
+    testCompile dependencyModuleVersion("groovy", "groovy-json")
     testRuntime project(":configurations:hibernate-validator")
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -1,18 +1,19 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
@@ -24,12 +25,17 @@ import io.micronaut.http.uri.UriMatchInfo;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Default implementation of the {@link RouteMatch} interface for matches to URIs
+ * Default implementation of the {@link RouteMatch} interface for matches to URIs.
  *
+ * @param <T>
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -41,6 +47,12 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
     private final Charset defaultCharset;
 
+    /**
+     * @param matchInfo The URI match info
+     * @param uriRoute The URI route
+     * @param defaultCharset The default charset
+     * @param conversionService The conversion service
+     */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          DefaultRouteBuilder.DefaultUriRoute uriRoute,
                          Charset defaultCharset, ConversionService<?> conversionService
@@ -109,20 +121,25 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     @Override
     public Map<String, Object> getVariables() {
         Map<String, Object> variables = matchInfo.getVariables();
-        Map<String,Object> decoded = new LinkedHashMap<>(variables.size());
+        Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
         for (Map.Entry<String, Object> entry : variables.entrySet()) {
             String k = entry.getKey();
             Object v = entry.getValue();
-            if(v instanceof CharSequence) {
+            if (v instanceof CharSequence) {
                 try {
                     v = URLDecoder.decode(v.toString(), defaultCharset.toString());
                 } catch (UnsupportedEncodingException e) {
                     // ignore
                 }
             }
-            decoded.put(k,v);
+            decoded.put(k, v);
         }
         return decoded;
+    }
+
+    @Override
+    public UriRoute getRoute() {
+        return (UriRoute) abstractRoute;
     }
 
     @Override
@@ -132,6 +149,6 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
 
     @Override
     public String toString() {
-        return httpMethod + " - " +  matchInfo.getUri();
+        return httpMethod + " - " + matchInfo.getUri();
     }
 }

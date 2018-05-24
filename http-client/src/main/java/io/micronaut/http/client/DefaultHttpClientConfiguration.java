@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.client;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -22,7 +23,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import javax.inject.Inject;
 
 /**
- * The default configuration if no explicit configuration is specified for an HTTP client
+ * The default configuration if no explicit configuration is specified for an HTTP client.
  *
  * @author graemerocher
  * @since 1.0
@@ -30,14 +31,21 @@ import javax.inject.Inject;
 @ConfigurationProperties(DefaultHttpClientConfiguration.PREFIX)
 @Primary
 public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
+
     /**
-     * Prefix for HTTP Client settings
+     * Prefix for HTTP Client settings.
      */
     public static final String PREFIX = "micronaut.http.client";
 
+    /**
+     * Default constructor.
+     */
     public DefaultHttpClientConfiguration() {
     }
 
+    /**
+     * @param applicationConfiguration The application configuration
+     */
     @Inject
     public DefaultHttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);

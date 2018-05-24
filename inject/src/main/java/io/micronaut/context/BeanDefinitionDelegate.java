@@ -1,55 +1,73 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.naming.NameResolver;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.Named;
-import io.micronaut.inject.*;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.DelegatingBeanDefinition;
+import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * A delegate bean definition
+ * A delegate bean definition.
  *
+ * @param <T> The bean type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver<String> {
+
+    static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
+
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
 
-    public static final String PRIMARY_ATTRIBUTE = "io.micronaut.core.Primary";
-
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
-        if(!(definition instanceof BeanFactory)) {
+        if (!(definition instanceof BeanFactory)) {
             throw new IllegalArgumentException("Delegate can only be used for bean factories");
         }
         this.definition = definition;
@@ -60,6 +78,9 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return definition.isAbstract();
     }
 
+    /**
+     * @return The bean definition type
+     */
     BeanDefinition<T> getDelegate() {
         return definition;
     }
@@ -81,7 +102,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isIterable() {
-        return get(EachProperty.class.getName(), Class.class) != null ||  definition.isIterable();
+        return get(EachProperty.class.getName(), Class.class) != null || definition.isIterable();
     }
 
     @Override
@@ -163,23 +184,22 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         resolutionContext.putAll(attributes);
         try {
-            if(this.definition instanceof ParametrizedBeanFactory) {
+            if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
                 Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
                 Object named = attributes.get(Named.class.getName());
-                if(named != null) {
+                if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>();
                     for (Argument argument : requiredArguments) {
                         Class argumentType = argument.getType();
                         Optional result = ConversionService.SHARED.convert(named, argumentType);
                         String argumentName = argument.getName();
-                        if(result.isPresent()) {
+                        if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
-                        }
-                        else {
+                        } else {
                             // attempt bean lookup to full argument
                             Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
-                            if(bean.isPresent()) {
+                            if (bean.isPresent()) {
                                 fulfilled.put(argumentName, bean.get());
                             }
                         }
@@ -187,7 +207,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
                     return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
                 }
             }
-            return ((BeanFactory<T>)this.definition).build(resolutionContext, context, definition);
+            return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
         } finally {
             for (String key : attributes.keySet()) {
                 resolutionContext.remove(key);
@@ -195,14 +215,17 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         }
     }
 
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         BeanDefinitionDelegate<?> that = (BeanDefinitionDelegate<?>) o;
         return Objects.equals(definition, that.definition) &&
-                Objects.equals(resolveName().orElse(null), that.resolveName().orElse(null));
+            Objects.equals(resolveName().orElse(null), that.resolveName().orElse(null));
     }
 
     @Override
@@ -210,23 +233,9 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return Objects.hash(definition, resolveName().orElse(null));
     }
 
-
-
-    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
-        if(definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
-            if(definition instanceof ValidatedBeanDefinition) {
-                return new LifeCycleValidatingDelegate<>(definition);
-            }
-            else {
-                return new LifeCycleDelegate<>(definition);
-            }
-        }
-        else if(definition instanceof ValidatedBeanDefinition) {
-            return new ValidatingDelegate<>(definition);
-        }
-        return new BeanDefinitionDelegate<>(definition);
-    }
-
+    /**
+     * @return The bean definition type
+     */
     public BeanDefinition<T> getTarget() {
         return definition;
     }
@@ -236,6 +245,12 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return get(Named.class.getName(), String.class);
     }
 
+    /**
+     * Adds a new attribute.
+     *
+     * @param name  The name
+     * @param value The value
+     */
     public void put(String name, Object value) {
         this.attributes.put(name, value);
     }
@@ -277,12 +292,12 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
-        return getTarget().getDefaultValue(annotation, member,requiredType);
+        return getTarget().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
     public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        return getTarget().getDefaultValue(annotation, member,requiredType);
+        return getTarget().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
@@ -303,56 +318,99 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
         Object value = attributes.get(name);
-        if(value != null && conversionContext.getArgument().getType().isInstance(value)) {
+        if (value != null && conversionContext.getArgument().getType().isInstance(value)) {
             return Optional.of((T) value);
         }
         return Optional.empty();
     }
 
+    @Override
+    public String toString() {
+        return definition.toString();
+    }
+
+    /**
+     * @param definition The bean definition type
+     * @param <T>        The type
+     * @return The new bean definition
+     */
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
+        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
+            if (definition instanceof ValidatedBeanDefinition) {
+                return new LifeCycleValidatingDelegate<>(definition);
+            } else {
+                return new LifeCycleDelegate<>(definition);
+            }
+        } else if (definition instanceof ValidatedBeanDefinition) {
+            return new ValidatingDelegate<>(definition);
+        }
+        return new BeanDefinitionDelegate<>(definition);
+    }
+
+    /**
+     * @param <T> The bean definition type
+     */
     interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
         @Override
         default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
-            if(definition instanceof InitializingBeanDefinition) {
+            if (definition instanceof InitializingBeanDefinition) {
                 return ((InitializingBeanDefinition<T>) definition).initialize(resolutionContext, context, bean);
             }
             return bean;
         }
     }
 
-    interface ProxyDisosableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
+    /**
+     * @param <T> The bean definition type
+     */
+    interface ProxyDisposableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
         @Override
         default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
-            if(definition instanceof DisposableBeanDefinition) {
+            if (definition instanceof DisposableBeanDefinition) {
                 return ((DisposableBeanDefinition<T>) definition).dispose(resolutionContext, context, bean);
             }
             return bean;
         }
     }
 
+    /**
+     * @param <T> The bean definition type
+     */
     interface ProxyValidatingBeanDefinitino<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
         @Override
         default T validate(BeanResolutionContext resolutionContext, T instance) {
             BeanDefinition<T> definition = getTarget();
-            if(definition instanceof ValidatedBeanDefinition) {
+            if (definition instanceof ValidatedBeanDefinition) {
                 return ((ValidatedBeanDefinition<T>) definition).validate(resolutionContext, instance);
             }
             return instance;
         }
     }
 
-    private static class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisosableBeanDefinition<T> {
+    /**
+     * @param <T> The bean definition type
+     */
+    private static class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
         private LifeCycleDelegate(BeanDefinition<T> definition) {
             super(definition);
         }
     }
-    private static class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
+
+    /**
+     * @param <T> The bean definition type
+     */
+    private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
         private ValidatingDelegate(BeanDefinition<T> definition) {
             super(definition);
         }
     }
-    private static class LifeCycleValidatingDelegate<T> extends LifeCycleDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
+
+    /**
+     * @param <T> The bean definition type
+     */
+    private static final class LifeCycleValidatingDelegate<T> extends LifeCycleDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
         private LifeCycleValidatingDelegate(BeanDefinition<T> definition) {
             super(definition);
         }

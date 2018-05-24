@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.value.OptionalValuesMap;
@@ -26,11 +25,19 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Extended version of {@link OptionalValuesMap} that resolved place holders
+ * Extended version of {@link OptionalValuesMap} that resolved place holders.
+ *
+ * @param <V> A generic value
  * @author graemerocher
  * @since 1.0
  */
 class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
+
+    /**
+     * @param type        The type
+     * @param values      A map of values
+     * @param environment The environment
+     */
     EnvironmentOptionalValuesMap(Class<?> type, Map<CharSequence, ?> values, Environment environment) {
         super(type, resolveValues(environment, values));
     }
@@ -40,19 +47,17 @@ class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
         PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         return values.entrySet().stream().map((Function<Map.Entry<CharSequence, ?>, Map.Entry<CharSequence, ?>>) entry -> {
             Object value = entry.getValue();
-            if(value instanceof CharSequence) {
+            if (value instanceof CharSequence) {
                 value = placeholderResolver.resolveRequiredPlaceholders(value.toString());
-                ((Map.Entry)entry).setValue(value);
-            }
-            else if(value instanceof String[]) {
+                ((Map.Entry) entry).setValue(value);
+            } else if (value instanceof String[]) {
                 String[] a = (String[]) value;
                 for (int i = 0; i < a.length; i++) {
                     a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
                 }
-                ((Map.Entry)entry).setValue(a);
+                ((Map.Entry) entry).setValue(a);
             }
             return entry;
         }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
-
 }

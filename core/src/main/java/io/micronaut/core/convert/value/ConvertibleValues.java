@@ -1,21 +1,21 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.core.convert.value;
 
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -23,13 +23,22 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
- * An interface for classes that represent a map-like structure of values that can be converted
+ * An interface for classes that represent a map-like structure of values that can be converted.
  *
+ * @param <V> The generic value
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -64,7 +73,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Whether the given key is contained within these values
+     * Whether the given key is contained within these values.
      *
      * @param name The key name
      * @return True if it is
@@ -76,7 +85,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     /**
      * Performs the given action for each value. Note that in the case
      * where multiple values exist for the same header then the consumer will be invoked
-     * multiple times for the same key
+     * multiple times for the same key.
      *
      * @param action The action to be performed for each entry
      * @throws NullPointerException if the specified action is null
@@ -93,7 +102,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Return this {@link ConvertibleValues} as a map for the given key type and value type. The map represents a copy of the data held by this instance
+     * Return this {@link ConvertibleValues} as a map for the given key type and value type. The map represents a copy of the data held by this instance.
      *
      * @return The values
      */
@@ -105,15 +114,17 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         }
         return newMap;
     }
+
     /**
-     * Return this {@link ConvertibleValues} as a map for the given key type and value type
-     * @param keyType The key type
+     * Return this {@link ConvertibleValues} as a map for the given key type and value type.
+     *
+     * @param keyType   The key type
      * @param valueType The value type
-     * @param <KT>
-     * @param <VT>
+     * @param <KT>      The key type
+     * @param <VT>      The value type
      * @return The values
      */
-    default <KT,VT> Map<KT, VT> asMap(Class<KT> keyType, Class<VT> valueType) {
+    default <KT, VT> Map<KT, VT> asMap(Class<KT> keyType, Class<VT> valueType) {
         Map<KT, VT> newMap = new LinkedHashMap<>();
         for (Map.Entry<String, V> entry : this) {
             String key = entry.getKey();
@@ -125,10 +136,11 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         }
         return newMap;
     }
+
     /**
-     * Returns a submap for all the keys with the given prefix
+     * Returns a submap for all the keys with the given prefix.
      *
-     * @param prefix The prefix
+     * @param prefix    The prefix
      * @param valueType The value type
      * @return The submap
      */
@@ -138,9 +150,9 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Returns a submap for all the keys with the given prefix
+     * Returns a submap for all the keys with the given prefix.
      *
-     * @param prefix The prefix
+     * @param prefix    The prefix
      * @param valueType The value type
      * @return The submap
      */
@@ -150,9 +162,9 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Returns a submap for all the keys with the given prefix
+     * Returns a submap for all the keys with the given prefix.
      *
-     * @param prefix The prefix
+     * @param prefix    The prefix
      * @param valueType The value type
      * @return The submap
      */
@@ -161,8 +173,8 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         // special handling for maps for resolving sub keys
         String finalPrefix = prefix + '.';
         return names().stream()
-                .filter(name-> name.startsWith(finalPrefix))
-                .collect(Collectors.toMap((name)->name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
+            .filter(name -> name.startsWith(finalPrefix))
+            .collect(Collectors.toMap((name) -> name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
     }
 
     @SuppressWarnings("NullableProblems")
@@ -177,7 +189,9 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
 
             @Override
             public Map.Entry<String, V> next() {
-                if(!hasNext()) throw new NoSuchElementException();
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
 
                 String name = names.next();
                 return new Map.Entry<String, V>() {
@@ -201,23 +215,23 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Creates a new {@link ConvertibleValues} for the values
+     * Creates a new {@link ConvertibleValues} for the values.
      *
      * @param values A map of values
-     * @param <T> The target generic type
+     * @param <T>    The target generic type
      * @return The values
      */
-    static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values ) {
-        if(values == null) {
+    static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values) {
+        if (values == null) {
             return ConvertibleValuesMap.empty();
-        }
-        else {
-            return new ConvertibleValuesMap<>( values);
+        } else {
+            return new ConvertibleValuesMap<>(values);
         }
     }
 
     /**
-     * An empty {@link ConvertibleValues}
+     * An empty {@link ConvertibleValues}.
+     *
      * @param <V> The generic type
      * @return The empty {@link ConvertibleValues}
      */

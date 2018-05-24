@@ -1,20 +1,22 @@
 /*
- * Copyright 2017 original authors
- * 
+ * Copyright 2017-2018 original authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
+
 package io.micronaut.http;
 
+import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -24,17 +26,16 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Common interface for HTTP messages
+ * Common interface for HTTP messages.
  *
  * @param <B> The body type
- *
+ * @author Graeme Rocher
  * @see HttpRequest
  * @see HttpResponse
- *
- * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpMessage<B>  {
+public interface HttpMessage<B> extends MutableAttributeHolder {
+
     /**
      * @return The {@link HttpHeaders} object
      */
@@ -42,11 +43,12 @@ public interface HttpMessage<B>  {
 
     /**
      * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
-     *
+     * <p>
      * <p>Attributes are designed for internal data sharing and hence are isolated from headers and parameters which are client supplied</p>
      *
      * @return The attributes of the message
      */
+    @Override
     MutableConvertibleValues<Object> getAttributes();
 
     /**
@@ -54,10 +56,16 @@ public interface HttpMessage<B>  {
      */
     Optional<B> getBody();
 
+    @Override
+    default HttpMessage<B> setAttribute(CharSequence name, Object value) {
+        return (HttpMessage<B>) MutableAttributeHolder.super.setAttribute(name, value);
+    }
+
     /**
-     * Return the body as the given type
+     * Return the body as the given type.
+     *
      * @param type The type of the body
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
     default <T> Optional<T> getBody(Argument<T> type) {
@@ -65,9 +73,10 @@ public interface HttpMessage<B>  {
     }
 
     /**
-     * Return the body as the given type
+     * Return the body as the given type.
+     *
      * @param type The type of the body
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
     default <T> Optional<T> getBody(Class<T> type) {
@@ -79,7 +88,7 @@ public interface HttpMessage<B>  {
      */
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
-                .map(Locale::new);
+            .map(Locale::new);
     }
 
     /**
@@ -87,18 +96,17 @@ public interface HttpMessage<B>  {
      */
     default long getContentLength() {
         return getHeaders()
-                .contentLength()
-                .orElse(-1L);
+            .contentLength()
+            .orElse(-1L);
     }
 
     /**
-     * The request or response content type
+     * The request or response content type.
+     *
      * @return The content type
      */
     default Optional<MediaType> getContentType() {
         return getHeaders()
-                .contentType();
+            .contentType();
     }
-
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.web.router;
 
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
@@ -32,7 +29,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A route match designed to return an existing object
+ * A route match designed to return an existing object.
  *
  * @author James Kleeh
  * @since 1.0
@@ -41,8 +38,16 @@ public class BasicObjectRouteMatch implements RouteMatch<Object> {
 
     private final Object object;
 
+    /**
+     * @param object An object
+     */
     public BasicObjectRouteMatch(Object object) {
         this.object = object;
+    }
+
+    @Override
+    public Class<?> getDeclaringType() {
+        return object.getClass();
     }
 
     @Override

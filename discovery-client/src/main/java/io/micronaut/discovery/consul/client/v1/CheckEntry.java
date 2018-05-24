@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Locale;
@@ -37,6 +37,9 @@ public class CheckEntry implements Check {
     private String name;
     private String status;
 
+    /**
+     * @param id The id
+     */
     @JsonCreator
     protected CheckEntry(@JsonProperty("CheckID") String id) {
         this.id = id;
@@ -45,6 +48,13 @@ public class CheckEntry implements Check {
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * @param name The name of the check
+     */
+    protected void setName(String name) {
+        this.name = name;
     }
 
     @Override
@@ -58,29 +68,32 @@ public class CheckEntry implements Check {
     }
 
     /**
+     * @param notes The human readable notes
+     */
+    protected void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    /**
      * @return The status
      */
     public String getStatus() {
         return status;
     }
 
+    /**
+     * @param status The status
+     */
+    protected void setStatus(String status) {
+        this.status = status;
+    }
+
     @Override
     public Status status() {
-        if(StringUtils.isNotEmpty(status)) {
+        if (StringUtils.isNotEmpty(status)) {
             return Status.valueOf(status.toUpperCase(Locale.ENGLISH));
         }
         return Status.PASSING;
     }
-
-    void setNotes(String notes) {
-        this.notes = notes;
-    }
-
-    void setName(String name) {
-        this.name = name;
-    }
-
-    void setStatus(String status) {
-        this.status = status;
-    }
 }
+

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.registration;
 
-import io.micronaut.context.event.ApplicationEventListener;
-import io.reactivex.Flowable;
-import io.reactivex.Observable;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
@@ -26,18 +24,13 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatEvent;
-import io.micronaut.http.HttpStatus;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
- * A base class for classes that automatically register the server with discovery services
+ * A base class for classes that automatically register the server with discovery services.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,22 +42,25 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
 
     private final RegistrationConfiguration registrationConfiguration;
 
+    /**
+     * Initialize given configurations.
+     *
+     * @param registrationConfiguration Common configurations for registration
+     */
     protected AutoRegistration(RegistrationConfiguration registrationConfiguration) {
         this.registrationConfiguration = registrationConfiguration;
     }
 
     @Override
     public void onApplicationEvent(AbstractServiceInstanceEvent event) {
-        if(registrationConfiguration.isEnabled()) {
-            if(event instanceof ServiceStartedEvent) {
+        if (registrationConfiguration.isEnabled()) {
+            if (event instanceof ServiceStartedEvent) {
                 register(event.getSource());
-            }
-            else if(event instanceof ServiceShutdownEvent) {
-                if(registrationConfiguration.isDeregister()) {
+            } else if (event instanceof ServiceShutdownEvent) {
+                if (registrationConfiguration.isDeregister()) {
                     deregister(event.getSource());
                 }
-            }
-            else if(event instanceof HeartbeatEvent) {
+            } else if (event instanceof HeartbeatEvent) {
                 HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
                 pulsate(event.getSource(), heartbeatEvent.getStatus());
             }
@@ -72,37 +68,46 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
     }
 
     /**
-     * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server
+     * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server.
      *
      * @param instance The instance
-     * @param status The {@link HealthStatus}
+     * @param status   The {@link HealthStatus}
      */
     protected abstract void pulsate(ServiceInstance instance, HealthStatus status);
 
     /**
-     * Deregister the {@link ServiceInstance} from service discovery services
+     * Deregister the {@link ServiceInstance} from service discovery services.
      *
      * @param instance The {@link ServiceInstance}
      */
     protected abstract void deregister(ServiceInstance instance);
 
     /**
-     * Register the {@link ServiceInstance} with discovery services
+     * Register the {@link ServiceInstance} with discovery services.
      *
      * @param instance The {@link ServiceInstance}
      */
     protected abstract void register(ServiceInstance instance);
 
+    /**
+     * Validate the given application name.
+     *
+     * @param name The application name
+     */
     protected void validateApplicationName(String name) {
         String typeDescription = "Application name";
         validateName(name, typeDescription);
     }
 
+    /**
+     * Validate the given application name.
+     *
+     * @param name The application name
+     * @param typeDescription The detailed information about name
+     */
     protected void validateName(String name, String typeDescription) {
         if (!APPLICATION_NAME_PATTERN.matcher(name).matches()) {
             throw new DiscoveryException(typeDescription + " [" + name + "] must start with a letter, end with a letter or digit and contain only letters, digits or hyphens. Example: foo-bar");
         }
     }
-
-
 }

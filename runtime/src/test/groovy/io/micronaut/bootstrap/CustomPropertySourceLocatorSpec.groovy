@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,13 @@
  */
 package io.micronaut.bootstrap
 
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.context.env.PropertySourceLocator
-import io.micronaut.core.io.ResourceLoader
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.env.Environment
-import io.micronaut.context.env.PropertySource
-import io.micronaut.context.env.PropertySourceLocator
 import io.micronaut.core.io.ResourceLoader
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
-
-import javax.inject.Singleton
 import java.util.stream.Stream
 
 /**

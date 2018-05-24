@@ -1,0 +1,109 @@
+In distributed systems and Microservice environments, failure is something you have to plan for and it is pretty common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
+
+With this in mind Micronaut comes with a api:retry.annotation.Retryable[] annotation out of the box that is integrated into the container.
+
+== Simple Retry
+
+The simplest form of retry is just to add the `@Retryable` annotation to any type or method. The default behaviour of `@Retryable` is to retry 3 times with a delay of 1 second between each retry.
+
+For example:
+
+.Simply Retry Example
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=simple, indent=0]
+    ...
+}
+----
+
+With the above example if the `listBooks()` method throws an exception it will be retried until the maximum number of attempts is reached.
+
+The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, thus allowing exponential retry support.
+
+Note also that the `@Retryable` annotation can be applied on interfaces and the behaviour will be inherited through annotation metadata. The implication of this is that `@Retryable` can be used in combination with <<introductionAdvice, Introduction Advice>> such as the HTTP api:http.client.Client[] annotation.
+
+To customize retry behaviour you can set the `attempts` and `delay` members, For example to configure 5 attempts with a 2 second delay:
+
+.Setting Retry Attempts
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=attempts, indent=0]
+    ...
+}
+----
+
+Notice how both `attempts` and `delay` are defined as strings. This is to support configurability through annotation metadata. For example you can allow the retry policy to be configured using property placeholder resolution:
+
+.Setting Retry via Configuration
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=config, indent=0]
+    ...
+}
+----
+
+With the above in place if `book.retry.attempts` is specified in configuration it wil be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
+
+== Reactive Retry
+
+`@Retryable` advice can also be applied to methods that return reactive types, such as an RxJava `Flowable`. For example:
+
+
+.Applying Retry Policy to Reactive Types
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=reactive, indent=0]
+    ...
+}
+----
+
+In this case `@Retryable` advice will apply the retry policy to the reactive type.
+
+== Circuit Breaker
+
+In a Microservice environment retry is useful, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.
+
+The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker] pattern is designed to resolve this issue by essentially allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing any additional retry attempts.
+
+The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member that indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
+
+.Applying CircuitBreaker Advice
+[source,java]
+----
+include::{testsuite}/aop/retry/BookService.java[tags=circuit, indent=0]
+    ...
+}
+----
+
+The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
+
+== Bean Creation Retry
+
+As mentioned previously, `@Retryable` advice is integrated right at the container level. This is useful as it is common problem in Microservices and environments like Docker where there may be a delay in services becoming available.
+
+The following snippet is taken from the Neo4j driver support and demonstrates how bean creation can be wrapped in retry support:
+
+[source,java]
+----
+@Factory // <1>
+public class Neo4jDriverFactory {
+    ...
+    @Retryable(ServiceUnavailableException.class) // <2>
+    @Bean(preDestroy = "close")
+    public Driver buildDriver() {
+        ...
+    }
+}
+----
+
+<1> A factory bean is created that defines methods that create beans
+<2> The `@Retryable` annotation is used to catch `ServiceUnavailableException` and retry creating the driver before failing startup.
+
+
+== Retry Events
+
+You can register api:retry.event.RetryEventListener[] instances as beans in order to listen for api:retry.event.RetryEvent[] events that are published every time an operation is retried.
+
+In addition, you can register event listeners for api:retry.event.CircuitOpenEvent[], when a circuit breaker circuit is opened, or api:retry.event.CircuitClosedEvent[] for when a circuit is closed.
+
+

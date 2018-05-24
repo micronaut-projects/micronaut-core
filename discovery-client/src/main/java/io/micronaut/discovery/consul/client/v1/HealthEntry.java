@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
@@ -23,13 +24,14 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Models a Consul Health Entry. See https://www.consul.io/api/health.html
+ * Models a Consul Health Entry. See https://www.consul.io/api/health.html.
  *
  * @author graemerocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class HealthEntry {
+
     private NodeEntry node;
     private ServiceEntry service;
     @SuppressWarnings("unchecked")
@@ -56,18 +58,25 @@ public class HealthEntry {
         return checks;
     }
 
+    /**
+     * @param checks The list of checks
+     */
     @JsonDeserialize(contentAs = CheckEntry.class)
     void setChecks(List<Check> checks) {
         this.checks = checks;
     }
 
-    void setNode(NodeEntry node) {
+    /**
+     * @param node The node
+     */
+    protected void setNode(NodeEntry node) {
         this.node = node;
     }
 
-    void setService(ServiceEntry service) {
+    /**
+     * @param service The service
+     */
+    protected void setService(ServiceEntry service) {
         this.service = service;
     }
-
-
 }

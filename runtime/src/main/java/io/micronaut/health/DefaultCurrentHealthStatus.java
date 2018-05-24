@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 original authors
+ * Copyright 2017-2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.health;
 
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The default health status stores the values in memory
+ * The default health status stores the values in memory.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
 class DefaultCurrentHealthStatus implements CurrentHealthStatus {
+
     private final AtomicReference<HealthStatus> current = new AtomicReference<>(HealthStatus.UP);
 
     @Override
@@ -35,7 +37,7 @@ class DefaultCurrentHealthStatus implements CurrentHealthStatus {
 
     @Override
     public HealthStatus update(HealthStatus newStatus) {
-        if(newStatus != null) {
+        if (newStatus != null) {
             return current.getAndSet(newStatus);
         }
         return current.get();
