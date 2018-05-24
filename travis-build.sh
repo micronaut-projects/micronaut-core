@@ -70,16 +70,24 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
     fi
 fi
 
-./gradlew aggregateReports
 
-cd gh-pages
-mkdir -p reports
-cp -r ../build/reports/. ./reports/
+if [[ $EXIT_STATUS -ne 0 ]]; then
 
-git add reports/*
-git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
-  git push origin HEAD || true
-}
-cd ..
-rm -rf gh-pages
+  ./gradlew aggregateReports
+
+  cd gh-pages
+
+  mkdir -p reports
+
+  cp -r ../build/reports/. ./reports/
+
+  git add reports/*
+
+  git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
+    git push origin HEAD || true
+  }
+  cd ..
+  rm -rf gh-pages
+  
+fi
 exit $EXIT_STATUS
