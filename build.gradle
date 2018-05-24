@@ -76,6 +76,11 @@ ext {
                 group:'io.micrometer',
                 name:'micrometer-graphite'
             ],
+            'micrometer.statsd': [
+                    version: micrometerVersion,
+                    group:'io.micrometer',
+                    name:'micrometer-statsd'
+            ],
             mongodb:[
                 version: mongoVersion,
                 group:'org.mongodb',

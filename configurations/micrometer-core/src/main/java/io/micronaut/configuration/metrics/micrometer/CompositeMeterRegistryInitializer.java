@@ -19,14 +19,14 @@ public class CompositeMeterRegistryInitializer implements BeanCreatedEventListen
 
     @Override
     public CompositeMeterRegistry onCreated(BeanCreatedEvent<CompositeMeterRegistry> event) {
-        System.out.println("-- CompositeMeterRegistryInitializer.onCreated");
-
         CompositeMeterRegistry compositeMeterRegistry = event.getBean();
-
         BeanContext ctx = event.getSource();
         Collection<Class> meterRegistryTypes = findMeterRegistryTypes(ctx);
-
-        meterRegistryTypes.forEach(it -> compositeMeterRegistry.add((MeterRegistry) ctx.findBean(it).get()));
+        meterRegistryTypes.forEach(it -> {
+            if (ctx.findBean(it).isPresent()) {
+                compositeMeterRegistry.add((MeterRegistry) ctx.findBean(it).get());
+            }
+        });
 
         return compositeMeterRegistry;
     }
@@ -37,10 +37,10 @@ public class CompositeMeterRegistryInitializer implements BeanCreatedEventListen
      * @param ctx The Bean Context
      * @return Collection of MeterRegistry classes
      */
-    protected Collection<Class> findMeterRegistryTypes(BeanContext ctx) {
+    private Collection<Class> findMeterRegistryTypes(BeanContext ctx) {
         return ctx.getAllBeanDefinitions().stream()
-            .map(BeanDefinition::getBeanType)
-            .filter(it -> MeterRegistry.class.isAssignableFrom(it) && it != CompositeMeterRegistry.class)
-            .collect(Collectors.toList());
+                .map(BeanDefinition::getBeanType)
+                .filter(it -> MeterRegistry.class.isAssignableFrom(it) && it != CompositeMeterRegistry.class)
+                .collect(Collectors.toList());
     }
 }

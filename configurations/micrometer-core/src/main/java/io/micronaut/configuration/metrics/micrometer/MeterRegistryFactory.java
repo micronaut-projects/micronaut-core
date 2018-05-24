@@ -18,7 +18,6 @@ package io.micronaut.configuration.metrics.micrometer;
 
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -33,35 +32,34 @@ import javax.inject.Singleton;
 public class MeterRegistryFactory {
     public static final String CFG_ROOT = "micronaut.metrics.";
     public static final String METRICS_ENABLED = CFG_ROOT + "enabled";
-    public static final String COMPOSITE_METER_REGISTRY_ENABLED = CFG_ROOT + "composite-meter-registry.enabled";
-    public static final String SIMPLE_METER_REGISTRY_ENABLED = CFG_ROOT + "simple-meter-registry.enabled";
 
     /**
-     * @param ctx - the ApplicationContext.
-     * @return A SimpleMeterFactory.
+     * Create a SimpleMeterRegistry bean if metrics are enabled, true by default.
+     * <p>
+     * Micrometer packs with a SimpleMeterRegistry that holds the latest value of each meter
+     * in memory and doesn't export the data anywhere. If you don’t yet have a preferred monitoring
+     * system, you can get started playing with metrics by using the simple registry.
+     *
+     * @return A SimpleMeterRegistry.
      */
     @Bean
     @Primary
     @Singleton
     @Requires(property = METRICS_ENABLED, value = "true", defaultValue = "true")
-    @Requires(property = SIMPLE_METER_REGISTRY_ENABLED, value = "true", defaultValue = "true")
-    SimpleMeterRegistry simpleMeterRegistry(ApplicationContext ctx) {
+    SimpleMeterRegistry simpleMeterRegistry() {
         return new SimpleMeterRegistry();
     }
 
     /**
-     * Create a CompositeMeterFactory bean if CompositeMeterRegistry is on the classpath, metrics are not disabled, and the
-     * composite-meter-registry is not disabled.
+     * Create a CompositeMeterRegistry bean if metrics are enabled, true by default.
      *
-     * @param ctx - the ApplicationContext.
-     * @return A CompositeMeterFactory
+     * @return A CompositeMeterRegistry
      */
     @Bean
     @Primary
     @Singleton
     @Requires(property = METRICS_ENABLED, value = "true", defaultValue = "true")
-    @Requires(property = COMPOSITE_METER_REGISTRY_ENABLED, value = "true", defaultValue = "true")
-    CompositeMeterRegistry compositeMeterRegistry(ApplicationContext ctx) {
+    CompositeMeterRegistry compositeMeterRegistry() {
         return new CompositeMeterRegistry();
     }
 }
