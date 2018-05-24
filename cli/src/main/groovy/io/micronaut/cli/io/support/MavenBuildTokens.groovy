@@ -19,6 +19,7 @@ import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.graph.Exclusion
 
 /**
  * @author James Kleeh
@@ -92,6 +93,16 @@ class MavenBuildTokens {
                     version(artifact.version)
                 }
                 scope(dep.scope)
+                if (dep.exclusions != null && !dep.exclusions.empty) {
+                    exclusions {
+                        dep.exclusions.each { Exclusion e ->
+                            exclusion {
+                                groupId(e.groupId)
+                                artifactId(e.artifactId)
+                            }
+                        }
+                    }
+                }
             }
         }
 

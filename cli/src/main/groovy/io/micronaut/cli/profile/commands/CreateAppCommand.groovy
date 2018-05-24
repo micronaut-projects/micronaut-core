@@ -417,7 +417,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
-        console.addStatus("Service created at ${targetDir.absolutePath}")
+        console.addStatus("Application created at ${targetDir.absolutePath}")
     }
 
     protected boolean validateProfile(Profile profileInstance, String profileName) {

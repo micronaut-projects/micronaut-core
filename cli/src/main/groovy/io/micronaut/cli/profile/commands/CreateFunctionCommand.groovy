@@ -51,10 +51,7 @@ class CreateFunctionCommand extends CreateAppCommand {
 
     @Override
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
-        if (command.profileName.startsWith("function")) {
-            console.addStatus("Function created at ${Paths.get(targetDir.path).toAbsolutePath().normalize()}")
-
-        }
+        console.addStatus("Function created at ${Paths.get(targetDir.path).toAbsolutePath().normalize()}")
     }
 
     @Override
