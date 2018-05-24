@@ -25,6 +25,9 @@ import java.util.Optional;
 /**
  * A spring FactoryBean for adding Micronaut beans to a
  * Spring application context.
+ *
+ * @author jeffbrown
+ * @since 1.0
  */
 class MicronautSpringBeanFactory implements FactoryBean {
 

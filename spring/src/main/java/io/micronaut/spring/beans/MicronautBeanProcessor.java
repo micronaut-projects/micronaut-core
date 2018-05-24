@@ -33,6 +33,9 @@ import java.lang.annotation.Annotation;
  * Adds Micronaut beans to a Spring application context.  This processor will
  * find all of the singleton Micronaut beans marked with a specified stereotype
  * annotation and add them as singleton beans to the Spring application context.
+ *
+ * @author jeffbrown
+ * @since 1.0
  */
 public class MicronautBeanProcessor implements BeanFactoryPostProcessor, DisposableBean {
 
