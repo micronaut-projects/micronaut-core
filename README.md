@@ -1,5 +1,7 @@
 # Micronaut 
 
+[![Build Status](https://travis-ci.org/micronaut-projects/micronaut-core.svg?branch=master)](https://travis-ci.org/micronaut-projects/micronaut-core)
+
 Micronaut is a modern, JVM-based, full stack microservices framework designed for building modular, easily testable microservice applications.
 
 Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
