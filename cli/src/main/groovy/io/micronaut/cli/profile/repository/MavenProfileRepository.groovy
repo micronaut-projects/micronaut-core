@@ -50,7 +50,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         else {
             DEFAULT_REPO = new RepositoryConfiguration(
                     "jcenter",
-                    new URI("http://jcenter.bintray.com"), true
+                    new URI("https://jcenter.bintray.com"), true
             )
         }
     }
