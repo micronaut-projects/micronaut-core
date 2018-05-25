@@ -24,7 +24,8 @@ ioc:
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
-  annotationMetadata: Bean Annotation Metadata  
+  annotationMetadata: Bean Annotation Metadata
+  springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
   title: Application Configuration
