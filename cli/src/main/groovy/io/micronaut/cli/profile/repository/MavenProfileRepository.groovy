@@ -49,8 +49,8 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         }
         else {
             DEFAULT_REPO = new RepositoryConfiguration(
-                    "micronautCentral",
-                    new URI("https://repo.micronaut.io/"), true
+                    "jcenter",
+                    new URI("http://jcenter.bintray.com"), true
             )
         }
     }
