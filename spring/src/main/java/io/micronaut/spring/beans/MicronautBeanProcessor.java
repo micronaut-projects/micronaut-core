@@ -19,6 +19,9 @@ package io.micronaut.spring.beans;
 import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.env.DefaultEnvironment;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.DisposableBean;
@@ -26,8 +29,12 @@ import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.EnvironmentAware;
+import org.springframework.core.env.Environment;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * Adds Micronaut beans to a Spring application context.  This processor will
@@ -37,13 +44,14 @@ import java.lang.annotation.Annotation;
  * @author jeffbrown
  * @since 1.0
  */
-public class MicronautBeanProcessor implements BeanFactoryPostProcessor, DisposableBean {
+public class MicronautBeanProcessor implements BeanFactoryPostProcessor, DisposableBean, EnvironmentAware {
 
-    public static final String MICRONAUT_BEAN_TYPE_PROPERTY_NAME = "micronautBeanType";
-    public static final String MICRONAUT_CONTEXT_PROPERTY_NAME = "micronautContext";
+    private static final String MICRONAUT_BEAN_TYPE_PROPERTY_NAME = "micronautBeanType";
+    private static final String MICRONAUT_CONTEXT_PROPERTY_NAME = "micronautContext";
 
     protected DefaultBeanContext micronautContext;
-    final protected Class<? extends Annotation> micronautBeanStereotype;
+    protected final Class<? extends Annotation> micronautBeanStereotype;
+    private Environment environment;
 
     /**
      *
@@ -51,19 +59,54 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
      *                   Micronaut beans which should be added to the
      *                   Spring application context.
      */
-    public MicronautBeanProcessor(Class stereotype) {
+    public MicronautBeanProcessor(Class<? extends Annotation> stereotype) {
         this.micronautBeanStereotype = stereotype;
     }
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-        micronautContext = new DefaultApplicationContext();
+        if (environment != null) {
+            micronautContext = new DefaultApplicationContext(environment.getActiveProfiles()) {
+                @Override
+                public io.micronaut.context.env.Environment getEnvironment() {
+                    return new DefaultEnvironment(environment.getActiveProfiles()) {
+                        @Override
+                        public io.micronaut.context.env.Environment start() {
+                            return this;
+                        }
+
+                        @Override
+                        public io.micronaut.context.env.Environment stop() {
+                            return this;
+                        }
+
+                        @Override
+                        public boolean containsProperty(@Nullable String name) {
+                            return environment.containsProperty(name);
+                        }
+
+                        @Override
+                        public boolean containsProperties(@Nullable String name) {
+                            return environment.containsProperty(name);
+                        }
+
+                        @Override
+                        public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
+                            return Optional.ofNullable(environment.getProperty(name, conversionContext.getArgument().getType()));
+                        }
+                    };
+                }
+            };
+        } else {
+            micronautContext = new DefaultApplicationContext();
+        }
         micronautContext.start();
+
 
         Qualifier<Object> micronautBeanQualifier = Qualifiers.byStereotype(micronautBeanStereotype);
         micronautContext.getBeanDefinitions(micronautBeanQualifier)
                 .stream()
-                .filter(beanDefinition -> beanDefinition.isSingleton())
+                .filter(BeanDefinition::isSingleton)
                 .forEach(definition -> {
                     final BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
                             .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
@@ -78,6 +121,11 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
         if (micronautContext != null) {
             micronautContext.close();
         }
+    }
+
+    @Override
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
     }
 }
 
