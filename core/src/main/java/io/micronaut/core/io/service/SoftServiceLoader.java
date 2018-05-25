@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
+public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
 
     private final Class<S> serviceType;

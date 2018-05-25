@@ -178,6 +178,7 @@ public interface RouteBuilder {
      * @return The route
      */
     StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class... parameterTypes);
+
     /**
      * Register a route to handle the error.
      *
