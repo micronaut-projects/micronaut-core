@@ -1,7 +1,6 @@
 dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
-    testCompile project(":configurations:hibernate-gorm")
     testCompile project(":configurations:hibernate-validator")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
