@@ -20,13 +20,16 @@ import io.micronaut.core.util.Toggleable;
 
 /**
  * Encapsulates the configuration of {@link OauthController}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface OauthControllerConfiguration extends Toggleable {
 
     /**
-     * @return e.g. /oauth/access_token
+     * The path the controller can be accessed at.
+     *
+     * @return The path e.g. /oauth/access_token
      */
     String getPath();
 }

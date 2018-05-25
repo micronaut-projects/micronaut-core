@@ -84,8 +84,6 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         this.acceptedMediaTypes = abstractRoute.getConsumes();
     }
 
-
-
     private String resolveInputName(Argument requiredArgument) {
         Optional<Annotation> ann = requiredArgument.findAnnotationWithStereoType(Bindable.class);
         return ann.map(annotation -> {

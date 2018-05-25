@@ -17,7 +17,6 @@
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
-import brave.Tracer;
 import brave.http.HttpServerHandler;
 import brave.http.HttpTracing;
 import brave.propagation.TraceContext;
@@ -28,7 +27,6 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 /**

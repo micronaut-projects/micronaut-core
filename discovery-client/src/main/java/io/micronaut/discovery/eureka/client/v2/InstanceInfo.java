@@ -102,6 +102,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      * @param metadata             The metadata
      * @param asgName              The asg name
      */
+    @SuppressWarnings("ParameterNumber")
     @JsonCreator
     InstanceInfo(
         @JsonProperty("instanceId") String instanceId,

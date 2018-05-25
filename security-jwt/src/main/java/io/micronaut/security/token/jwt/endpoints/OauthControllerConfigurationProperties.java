@@ -20,16 +20,18 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
+ * Configures the provided OAuth controller.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 @ConfigurationProperties(OauthControllerConfigurationProperties.PREFIX)
 public class OauthControllerConfigurationProperties implements OauthControllerConfiguration {
+
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.oauth";
 
-    private boolean enabled = false;
-    private String path = "/oauth/access_token";
+    protected boolean enabled = false;
+    protected String path = "/oauth/access_token";
 
     /**
      * @return true if you want to enable the {@link OauthController}
@@ -42,23 +44,5 @@ public class OauthControllerConfigurationProperties implements OauthControllerCo
     @Override
     public String getPath() {
         return this.path;
-    }
-
-    /**
-     * Sets whether OAuth is enabled
-     *
-     * @param enabled Sets whether OAuth is enabled
-     */
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    /**
-     * Sets the path to the oauth controller
-     *
-     * @param path The path to the oauth controller
-     */
-    public void setPath(String path) {
-        this.path = path;
     }
 }
