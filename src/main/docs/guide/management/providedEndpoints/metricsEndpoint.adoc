@@ -76,7 +76,7 @@ The following are the currently supported libraries for reporting metrics.
 
 === Statsd
 
-You can include the statsd reporter via `io.micronaut.configuration:micrometer-statsd:[VERSION]`
+You can include the statsd reporter via `io.micronaut.configuration:micrometer-statsd:${micronaut.version}`
 
 .Maven
 [source,xml]
