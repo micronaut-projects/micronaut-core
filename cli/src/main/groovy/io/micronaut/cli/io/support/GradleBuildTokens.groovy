@@ -17,6 +17,7 @@ package io.micronaut.cli.io.support
 
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.profile.repository.MavenProfileRepository
 import org.eclipse.aether.graph.Dependency
 
 /**
@@ -34,7 +35,9 @@ class GradleBuildTokens {
             repo.startsWith('http') ? "${' ' * spaces}maven { url \"${repo}\" }" : "${' ' * spaces}${repo}"
         }
 
-        def repositories = profile.repositories.collect(repositoryUrl.curry(4)).unique().join(ln)
+        String defaultRepo = MavenProfileRepository.DEFAULT_REPO.uri.toString()
+
+        def repositories = (profile.repositories + defaultRepo).collect(repositoryUrl.curry(4)).unique().join(ln)
 
         List<Dependency> profileDependencies = profile.dependencies
         def dependencies = profileDependencies.findAll() { Dependency dep ->

@@ -351,9 +351,9 @@ class MicronautCli {
 
                 def mainCommandLine = context.getCommandLine()
                 if (mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
-                    console.setStacktrace(true);
+                    console.setStacktrace(true)
                 } else {
-                    console.setStacktrace(false);
+                    console.setStacktrace(false)
                 }
 
                 if (mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {
