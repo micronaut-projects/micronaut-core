@@ -1,0 +1,151 @@
+The metrics endpoint returns information about the "metrics" of the application.
+
+To execute the metrics endpoint, send a GET request to /metrics.  This will return a list of the metrics registered with the `MeterRegistry` bean.
+
+== Configuration
+
+Currently the metrics endpoint will only be enabled if you include the `micrometer-core` or one of the reporters (which transitively include the core library) such as `micrometer-statsd` or `micrometer-graphite`.  You will also need to have the global metrics flag enabled.
+
+[source,yaml]
+----
+micronaut:
+    metrics:
+        enabled: true
+----
+
+To configure the metrics endpoint, supply configuration through `endpoints.metrics`.
+
+.Metrics Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    metrics:
+        enabled: Boolean
+        sensitive: Boolean
+        id: String
+----
+
+== Custom Metrics
+
+To add metrics to your application you can inject the MeterRegistry bean to your class and use the provided methods to access counters, timers, etc.
+
+See the Micrometer.io docs at https://micrometer.io/docs for more information.
+
+.Custom Metrics Example
+[source,java]
+----
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.validation.Validated;
+import io.reactivex.Single;
+
+import javax.annotation.Nullable;
+import javax.validation.constraints.NotBlank;
+
+@Controller("/")
+@Validated
+public class IndexController {
+
+    private MeterRegistry meterRegistry;
+
+    public IndexController(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
+
+    @Get("/hello/{name}")
+    public Single hello(@NotBlank String name) {
+        meterRegistry
+                .counter("web.access", "controller", "index", "action", "hello")
+                .increment();
+        return Single.just("Hello " + name);
+    }
+
+}
+----
+
+== Provided Metrics
+
+WIP
+
+== Metrics Reporters
+
+The following are the currently supported libraries for reporting metrics.
+
+=== Statsd
+
+You can include the statsd reporter via `io.micronaut.configuration:micrometer-statsd:[VERSION]`
+
+.Maven
+[source,xml]
+----
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-statsd</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure the following properties for the statsd reporter under `micronaut.metrics.statsd`
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|flavor |The type of metric to use (datadog, etsy or telegraf). Default: `datadog`
+|step |Ho frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|host |The host to communicate to statsd on. Default: `localhost`
+|port |The port to communicate to statsd on. Default: `8125`
+|=======
+
+.Example Statsd Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    statsd:
+      enabled: true
+      flavor: datadog
+      step: PT1M
+      host: localhost
+      port: 8125
+----
+
+=== Graphite
+
+You can include the graphite reporter via `io.micronaut.configuration:micrometer-graphite:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-graphite</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure the following properties for the graphite reporter under `micronaut.metrics.graphite`
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |Ho frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|host |The host to communicate to graphite on. Default: `localhost`
+|port |The port to communicate to graphite on. Default: `2004`
+|=======
+
+.Example Graphite Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    graphite:
+      enabled: true
+      step: PT1M
+      host: localhost
+      port: 2004
+----

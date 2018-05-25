@@ -7,7 +7,6 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.reactivex.Single;
 
@@ -40,14 +39,9 @@ public class MetricsEndpoint {
     static final boolean DEFAULT_SENSITIVE = false;
 
     /**
-     * Constant for health.
+     * Constant for metrics.
      */
     static final String NAME = "metrics";
-
-    /**
-     * Prefix for health endpoint.
-     */
-    public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     private final MeterRegistry meterRegistry;
 
@@ -205,6 +199,7 @@ public class MetricsEndpoint {
 
         /**
          * Object to hold metric names.
+         *
          * @param names list of names
          */
         ListNamesResponse(Set<String> names) {
@@ -213,6 +208,7 @@ public class MetricsEndpoint {
 
         /**
          * Get the names.
+         *
          * @return set of names
          */
         public Set<String> getNames() {
