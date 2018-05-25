@@ -65,7 +65,7 @@ task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
 }
 
 task cliZip(type: Zip, dependsOn: ['fatJar']) {
-    archiveName = 'mn.zip'
+    archiveName = "micronaut-${project.version}.zip"
     from('build/bin') {
         into('bin')
     }

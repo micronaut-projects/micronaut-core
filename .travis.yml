@@ -34,3 +34,12 @@ after_deploy:
 cache:
   directories:
   - "$HOME/.gradle"
+deploy:
+  provider: releases
+  api_key:
+    secure: WHH8c5d6dGOmU4T5EUu1uWlmUqtbe5h6o9DNXRQYQe1v8+ep/igYoB0zxCtL0o7wtrN/l1T1+evHEYMpeylYAlyDxmH1sFgMn+ZQNbELcHOzhdErdOlp97/ZRGOW58haWWp3md+UjM9Z4jZBw2/1coxJUYioLBB5WZuzYxsq8hGVyZYqFObY8pKlc4ncTKsfRFeUgKOtIB5EWda8vXSkd9ocxVvxxtyN9UVPeQQ+mi5d/6pQPI0zRii9DUQ77lncV3LVS5vtr+1M2OGSK4FdQuWt6eToPTJCK9NfB3CZOwlgEucpfLy8pcJLtxZp4gIzAW2/5WtG6u52TbdUvgNAcDtU0o98z6zs7vUuS/ef7L7QKnm6VzbYbwYDSUePDxlXtdTAYj+7AaMgAyEofDhm/Yi7aLsVXDcNeXb5naB17Fe6GFPW2dg6tCVcpYwOJRwH0TQRdd7ZMLwZoSIUT1v2zWTjyLjCSmvrvQIBgJOue8bSES2JFKIbGUQqOj/VrJIF2AbH0wdn9cALEy21qeRuB1lqTKBpb2lLjeHfxhWAXkKXHiGCNbXbo3eC6HDMoe6Fd17ehxWr3cPx5I0RTZQrkQD+mX/xiYM3FAxPIhyrdAibTjhqSgCN5hccHLLFVB0K8arKmhAmW6HkuSKZx1KWKyIhMKwF2UqEKJbSVYqr2qU=
+  file: cli/build/distributions/micronaut-${TRAVIS_TAG:1}.zip
+  on:
+    repo: micronaut-projects/micronaut-core
+    tags: true
+    all_branches: true
