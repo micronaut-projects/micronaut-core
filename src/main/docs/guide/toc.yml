@@ -1,6 +1,7 @@
 introduction: Introduction
 quickStart:
   title: Quick Start
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
