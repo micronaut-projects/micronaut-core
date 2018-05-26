@@ -43,7 +43,7 @@ Note for more complex configurations you can structure ann:context.annotation.Co
 
 For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.
 
-=== Configuration Builder
+== Configuration Builder
 
 Many existing frameworks and tools already use builder-style classes to construct configuration.
 

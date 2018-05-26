@@ -1,7 +1,7 @@
 The api:runtime.context.scope.Refreshable[] scope is a custom scope that allows a bean’s state to be refreshed via:
 
 - `/refresh` endpoint.
-- Publication of a `RefreshEvent`.
+- Publication of a api:runtime.context.scope.refresh.RefreshEvent[].
 
 The following example, illustrates the `@Refreshable` scope behavior.
 
@@ -15,7 +15,7 @@ include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=weatherService, indent=0
 
 If you invoke the `latestForecast()` twice, you will see identical responses such as `"Scattered Clouds 01/Feb/18 10:29.199"`.
 
-When the `/refresh` endpoint is invoked or a api:runtime.context.scope.RefreshEvent[] is published then the instance is invalidated and a new instance is created the next time the object is requested. For example:
+When the `/refresh` endpoint is invoked or a api:runtime.context.scope.refresh.RefreshEvent[] is published then the instance is invalidated and a new instance is created the next time the object is requested. For example:
 
 [source,groovy]
 ----
