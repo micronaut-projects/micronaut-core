@@ -55,7 +55,7 @@ NOTE: Since Micronaut is compile time, generally the advice should be packaged i
 
 == Customizing Proxy Generation
 
-The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
+The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is to generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the `NotNullExample` class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to `super`.
 
 This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviour and the `@Around` annotation supports various attributes that allow you to alter this behaviour including:
 
