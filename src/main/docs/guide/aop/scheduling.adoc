@@ -38,7 +38,7 @@ To schedule a https://en.wikipedia.org/wiki/Cron[Cron] task use the `cron` membe
 include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=cron, indent=0]
 ----
 
-The above example will run the task every Tuesday morning at 10:15AM.
+The above example will run the task every Monday morning at 10:15AM.
 
 == Programmatically Scheduling Tasks
 
