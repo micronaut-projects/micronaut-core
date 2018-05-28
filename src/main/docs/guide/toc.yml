@@ -74,6 +74,7 @@ httpServer:
   sse: Server Sent Events
   filters: HTTP Filters
   sessions: HTTP Sessions
+  serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
