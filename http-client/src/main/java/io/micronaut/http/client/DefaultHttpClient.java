@@ -185,7 +185,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
      * @param configuration              The {@link HttpClientConfiguration} object
      * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL buidler
+     * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
@@ -231,7 +231,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     /**
      * @param url                   The URL
      * @param configuration         The {@link HttpClientConfiguration} object
-     * @param nettyClientSslBuilder The SSL buidler
+     * @param nettyClientSslBuilder The SSL builder
      * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param filters               The filters to use
      */
@@ -258,7 +258,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      * @param url The URL
      */
     public DefaultHttpClient(@Parameter URL url) {
-        this(LoadBalancer.fixed(url));
+        this(url, new DefaultHttpClientConfiguration());
     }
 
     /**
@@ -266,7 +266,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      * @param configuration The {@link HttpClientConfiguration} object
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
-        this(LoadBalancer.fixed(url), configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class), new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+        this(
+                LoadBalancer.fixed(url), configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                createSslBuilder(url), createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT
+        );
     }
 
     /**
@@ -742,8 +746,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected ChannelFuture doConnect(URI uri, @Nullable SslContext sslCtx) {
         String host = uri.getHost();
-        int port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
 
+        int port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
         return doConnect(host, port, sslCtx);
     }
 
@@ -1273,6 +1277,16 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             new JsonMediaTypeCodec(objectMapper, applicationConfiguration), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration)
         );
     }
+
+    private static NettyClientSslBuilder createSslBuilder(URL url) {
+        boolean isHTTPS = "https".equalsIgnoreCase(url.getProtocol());
+        SslConfiguration sslConfiguration = new SslConfiguration();
+        if (isHTTPS) {
+            sslConfiguration.setEnabled(true);
+        }
+        return new NettyClientSslBuilder(sslConfiguration, new ResourceResolver());
+    }
+
 
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
