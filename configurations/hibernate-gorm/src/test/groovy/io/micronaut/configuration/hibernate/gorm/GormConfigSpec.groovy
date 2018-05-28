@@ -27,6 +27,7 @@ import io.micronaut.context.env.PropertySource
 import org.springframework.transaction.PlatformTransactionManager
 import spock.lang.Specification
 
+import javax.annotation.PostConstruct
 import javax.inject.Singleton
 import javax.sql.DataSource
 
@@ -79,6 +80,7 @@ class GormConfigSpec extends Specification {
         then:
         bookService.dbCreate == 'create-drop'
         bookService.list().size() == 0
+        bookService.initCalled
 
         cleanup:
         applicationContext.stop()
@@ -140,6 +142,13 @@ abstract class BookService {
 
     @Value('${data-source.db-create}')
     String dbCreate
+
+    boolean initCalled = false
+
+    @PostConstruct
+    void init() {
+        initCalled = true
+    }
 
     abstract List<Book> list()
 }

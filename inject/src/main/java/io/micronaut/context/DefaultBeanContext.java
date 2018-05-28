@@ -521,7 +521,11 @@ public class DefaultBeanContext implements BeanContext {
         Collection<BeanDefinition> candidates = findBeanCandidatesForInstance(instance);
         if (candidates.size() == 1) {
             BeanDefinition<T> beanDefinition = candidates.stream().findFirst().get();
-            beanDefinition.inject(new DefaultBeanResolutionContext(this, beanDefinition), this, instance);
+            doInject(
+                    new DefaultBeanResolutionContext(this, beanDefinition),
+                    instance,
+                    beanDefinition
+            );
 
         } else if (!candidates.isEmpty()) {
             throw new BeanContextException("Multiple possible bean candidates found for injection: " + candidates);
