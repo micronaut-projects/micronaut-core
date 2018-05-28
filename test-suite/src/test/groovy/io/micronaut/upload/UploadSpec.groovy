@@ -24,11 +24,13 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
+import spock.lang.IgnoreIf
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@IgnoreIf({System.getenv("TRAVIS")})
 class UploadSpec extends AbstractMicronautSpec {
 
     @Override
