@@ -50,6 +50,15 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * Whether SSL is enabled
+     *
+     * @param enabled True if SSL is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
      * @return The default SSL port
      */
     public int getPort() {
