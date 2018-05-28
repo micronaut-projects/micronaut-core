@@ -28,8 +28,6 @@ The following snippet presents an example of using the annotations:
 .Using Trace Annotations
 [source,java]
 ----
-import io.micronaut.tracing.annotation.*;
-
 @Singleton
 class HelloService {
 
@@ -39,18 +37,18 @@ class HelloService {
     }
 
     @ContinueSpan // <3>
-    public String greet(@SpanTag("greeting.message") String greeting) { // <4>
+    public String greet(@SpanTag("hello.greeting") String greet) {
         return greeting;
     }
 }
 ----
 
-<1> The ann:tracing.annotation.NewSpan[] annotation is used to create a new span called `hello-world`
-<2> The ann:tracing.annotation.SpanTag[] annotations adds a tag called `person.name` with the name of the person
-<3> The ann:tracing.annotation.ContinueSpan[] annotation is used to continue an existing span
-<4> The ann:tracing.annotation.SpanTag[] annotation is used again to add the greeting as a tag called `greeting.message`
 
-== Tracing Instrumentation
+<1> The ann:tracing.annotation.NewSpan[] annotation is used to start a new span
+<2> You can use ann:tracing.annotation.SpanTag[] to include arguments of methods as tags for the span
+<3> The ann:tracing.annotation.ContinueSpan[] annotation can be used to continue as existing span and incorporate additional tags using `@SpanTag`
+
+=== Tracing Instrumentation
 
 In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
 

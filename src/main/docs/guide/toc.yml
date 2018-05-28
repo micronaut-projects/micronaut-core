@@ -1,6 +1,7 @@
 introduction: Introduction
 quickStart:
   title: Quick Start
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
@@ -23,7 +24,8 @@ ioc:
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
-  annotationMetadata: Bean Annotation Metadata  
+  annotationMetadata: Bean Annotation Metadata
+  springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
   title: Application Configuration
@@ -64,7 +66,7 @@ httpServer:
     reactiveResponses: Reactive Responses
     jsonBinding: JSON Binding with Jackson
   staticResources: Serving Static Resources
-  contentNegotiation: Content Negotiation
+#  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data
   uploads: File Uploads

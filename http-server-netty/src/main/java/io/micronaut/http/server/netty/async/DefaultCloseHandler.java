@@ -77,6 +77,8 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
             }
         } else if (!request.getHeaders().isKeepAlive() || statusCode >= HttpStatus.MULTIPLE_CHOICES.getCode()) {
             future.channel().close();
+        } else {
+            context.read();
         }
     }
 }

@@ -60,13 +60,14 @@ publishing {
     repositories {
         maven {
             credentials {
-                def u = System.getenv("ARTIFACTORY_USERNAME") ?: project.hasProperty("artifactoryPublishUsername") ? project.artifactoryPublishUsername : ''
-                def p = System.getenv("ARTIFACTORY_PASSWORD") ?: project.hasProperty("artifactoryPublishPassword") ? project.artifactoryPublishPassword : ''
-                username = u
-                password = p
+                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
+                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+
+                username = ossUser
+                password = ossPass
             }
             if(isBuildSnapshot) {
-                url  "https://repo.micronaut.io/artifactory/libs-snapshots-local"
+                url  "https://oss.sonatype.org/content/repositories/snapshots"
             }
             else {
                 url "https://repo.micronaut.io/artifactory/libs-releases-local"
@@ -168,10 +169,10 @@ bintray {
     publications = ['maven']
     publish = true
     pkg {
-        repo = 'micronaut-core'
-        userOrg = 'micronaut-projects'
+        repo = 'core-releases-local'
+        userOrg = 'micronaut'
         name = project.name
-        desc = "${project.title} - ${project.projectDesc}".toString()
+        desc = "${project.title} - ${project.projectDesc} - ${project.name} module".toString()
         websiteUrl = projectUrl
         issueTrackerUrl = "https://github.com/$githubSlug/issues"
         vcsUrl = "https://github.com/$githubSlug"

@@ -18,7 +18,6 @@ package io.micronaut.docs.aop.around;
 // tag::imports[]
 import io.micronaut.context.annotation.Type;
 import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.Type;
 import java.lang.annotation.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 // end::imports[]

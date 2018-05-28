@@ -68,7 +68,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * The server {@link LogLevel} to enable
+     * The server {@link LogLevel} to enable.
+     *
      * @return The server {@link LogLevel} to enable
      */
     public Optional<LogLevel> getLogLevel() {

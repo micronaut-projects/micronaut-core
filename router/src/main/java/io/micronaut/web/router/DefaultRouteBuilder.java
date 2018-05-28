@@ -673,7 +673,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 return 0;
             }
             Class<?> thatType = o.originatingType();
-            Class<?> thisType= this.originatingType();
+            Class<?> thisType = this.originatingType();
 
             if (thisType == thatType && this.status().equals(o.status())) {
                 return 0;

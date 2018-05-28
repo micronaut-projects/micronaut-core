@@ -1,6 +1,6 @@
 Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
 
-Unlike the aforementioned frameworks, however, Micronaut uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is as efficient as possible with minimal impact on startup time.
+Micronaut, however, will produce a reflection free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
 
 An example of a configuration class can be seen below:
 
@@ -39,11 +39,17 @@ include::{testsdir}/config/properties/VehicleSpec.groovy[tags=start, indent=0]
 
 The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
 
+Note for more complex configurations you can structure ann:context.annotation.ConfigurationProperties[] beans through inheritance.
+
+For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.
+
 == Configuration Builder
+
+Many existing frameworks and tools already use builder-style classes to construct configuration.
 
 To support the ability for a builder style class to be populated with configuration values, the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[@ConfigurationBuilder] annotation can be used. link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.html[ConfigurationBuilder] can be added to a field or method in a class annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties].
 
-One or more method prefixes can be specified in the annotation to support builder methods like "withXxx" or "setXxx". If the builder methods have no prefix, assign an empty string to the parameter.
+Since there is no consistent way to define builders in the Java world, one or more method prefixes can be specified in the annotation to support builder methods like `withXxx` or `setXxx`. If the builder methods have no prefix, assign an empty string to the parameter.
 
 A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 

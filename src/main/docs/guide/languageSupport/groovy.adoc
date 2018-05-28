@@ -23,7 +23,7 @@ The most common module you will need is `inject-groovy`, which enables DI and AO
 
 == Groovy Support in the CLI
 
-The <<cli, Command Line Interface>> for Micronaut also includes special support for Micronaut. To create Groovy application use the `groovy` feature. For example:
+The <<cli, Command Line Interface>> for Micronaut also includes special support for Groovy. To create Groovy application use the `groovy` feature. For example:
 
 [source,bash]
 .Create a Micronaut Groovy application
