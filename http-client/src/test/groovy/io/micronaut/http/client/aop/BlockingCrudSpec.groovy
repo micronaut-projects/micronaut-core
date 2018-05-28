@@ -48,6 +48,17 @@ class BlockingCrudSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
+    void "test configured client"() {
+        given:
+        ApplicationContext anotherContext = ApplicationContext.run(
+                'book.service.uri':"${embeddedServer.URL}/blocking"
+        )
+        ConfiguredBookClient bookClient = anotherContext.getBean(ConfiguredBookClient)
+
+        expect:
+        bookClient.list().size() == 0
+    }
+
     void "test CRUD operations on generated client that returns blocking responses"() {
         given:
         BookClient client = context.getBean(BookClient)
@@ -145,6 +156,10 @@ class BlockingCrudSpec extends Specification {
 
     @Client('/blocking/books')
     static interface BookClient extends BookApi {
+    }
+
+    @Client('${book.service.uri}/books')
+    static interface ConfiguredBookClient extends BookApi {
     }
 
     @Controller("/blocking/books")
