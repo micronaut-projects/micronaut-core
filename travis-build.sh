@@ -11,11 +11,11 @@ git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-
 
 ./gradlew --stop
 ./gradlew testClasses || EXIT_STATUS=$?
-# ./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
+./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
 
-# if [[ $EXIT_STATUS -eq 0 ]]; then
-#     ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
-# fi
+if [[ $EXIT_STATUS -eq 0 ]]; then
+    ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
+fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
     echo "Publishing archives for branch $TRAVIS_BRANCH"
