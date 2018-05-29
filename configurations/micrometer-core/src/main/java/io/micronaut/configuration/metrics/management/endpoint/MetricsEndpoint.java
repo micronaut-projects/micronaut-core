@@ -5,7 +5,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
+import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
 import io.reactivex.Single;
@@ -18,19 +20,21 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.METRICS_ENABLED;
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
 
 /**
  * Provides a metrics endpoint to visualize metrics.
+ *
+ * @author Christian Oestreich
+ * @since 1.0
  */
 @Endpoint(value = MetricsEndpoint.NAME, defaultSensitive = MetricsEndpoint.DEFAULT_SENSITIVE)
 @Requires(beans = MeterRegistry.class)
-@Requires(property = METRICS_ENABLED, value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
 public class MetricsEndpoint {
 
     /**
@@ -44,14 +48,19 @@ public class MetricsEndpoint {
     static final String NAME = "metrics";
 
     private final MeterRegistry meterRegistry;
+    private final MeterRegistryConfigurer meterRegistryConfigurer;
 
     /**
-     * Constructor for metrics endpoint.
+     * Constructor for metrics endpoint.  The meterRegistryConfigurer is required here so that
+     * the publisher is available when the endpoint runs.
      *
-     * @param meterRegistry Meter Registry
+     * @param meterRegistry           Meter Registry
+     * @param meterRegistryConfigurer Meter Registry Configurer
      */
-    public MetricsEndpoint(MeterRegistry meterRegistry) {
+    public MetricsEndpoint(MeterRegistry meterRegistry,
+                           MeterRegistryConfigurer meterRegistryConfigurer) {
         this.meterRegistry = meterRegistry;
+        this.meterRegistryConfigurer = meterRegistryConfigurer;
     }
 
     /**
@@ -73,34 +82,39 @@ public class MetricsEndpoint {
      * After calling the /metrics endpoint, you can pass the name in
      * like /metrics/foo.bar and the details for the metrics and tags
      * will be returned.
+     * <p>
+     * Will return a 404 if the metric is not found.
      *
+     * @param name the name of the meter to get the details for.
      * @return Optional with metric response
      */
     @Read
-    Single<Optional<MetricResponse>> getMetric(String name) {
+    Single<HttpResponse<MetricResponse>> getMetric(String name) {
         List<Tag> tags = Collections.emptyList();
         List<Meter> meters = new ArrayList<>();
-        collectMeters(meters, this.meterRegistry, name, tags);
+        collectMeters(meters, this.meterRegistry, name, tags, new HashSet<>());
         if (meters.isEmpty()) {
-            //Perhaps return something else here?
-            return Single.just(Optional.empty());
+            return Single.just(HttpResponse.notFound());
         }
         Map<Statistic, Double> samples = getSamples(meters);
         Map<String, Set<String>> availableTags = getAvailableTags(meters);
         tags.forEach((t) -> availableTags.remove(t.getKey()));
-        return Single.just(Optional.of(
-                new MetricResponse(name,
+        return Single.just(
+                HttpResponse.ok(new MetricResponse(name,
                         asList(samples, Sample::new),
                         asList(availableTags, AvailableTag::new))));
     }
 
     private void collectMeters(List<Meter> meters, MeterRegistry registry, String name,
-                               Iterable<Tag> tags) {
+                               Iterable<Tag> tags, Set<String> meterNames) {
         if (registry instanceof CompositeMeterRegistry) {
             ((CompositeMeterRegistry) registry).getRegistries()
-                    .forEach((member) -> collectMeters(meters, member, name, tags));
+                    .forEach((member) -> collectMeters(meters, member, name, tags, meterNames));
         } else {
-            meters.addAll(registry.find(name).tags(tags).meters());
+            if (!meterNames.contains(name)) {
+                meters.addAll(registry.find(name).tags(tags).meters());
+                meterNames.add(name);
+            }
         }
     }
 

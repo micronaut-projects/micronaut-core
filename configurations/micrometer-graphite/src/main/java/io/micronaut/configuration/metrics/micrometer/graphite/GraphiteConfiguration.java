@@ -7,7 +7,7 @@ import io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory;
  */
 interface GraphiteConfiguration {
 
-    String GRAPHITE_CONFIG = MeterRegistryFactory.CFG_ROOT + "export.graphite";
+    String GRAPHITE_CONFIG = MeterRegistryFactory.MICRONAUT_METRICS + "export.graphite";
     String GRAPHITE_ENABLED = GRAPHITE_CONFIG + ".enabled";
     String GRAPHITE_HOST = GRAPHITE_CONFIG + ".host";
     String GRAPHITE_STEP = GRAPHITE_CONFIG + ".step";

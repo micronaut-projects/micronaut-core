@@ -11,7 +11,7 @@ import spock.lang.Unroll
 
 import java.time.Duration
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.METRICS_ENABLED
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 import static io.micronaut.configuration.metrics.micrometer.statsd.StatsdConfiguration.STATSD_ENABLED
 import static io.micronaut.configuration.metrics.micrometer.statsd.StatsdConfiguration.STATSD_FLAVOR
 import static io.micronaut.configuration.metrics.micrometer.statsd.StatsdConfiguration.STATSD_HOST
@@ -57,11 +57,11 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         context.findBean(StatsdMeterRegistry).isPresent() == result
 
         where:
-        cfg             | setting | result
-        METRICS_ENABLED | false   | false
-        METRICS_ENABLED | true    | true
-        STATSD_ENABLED  | true    | true
-        STATSD_ENABLED  | false   | false
+        cfg                       | setting | result
+        MICRONAUT_METRICS_ENABLED | false   | false
+        MICRONAUT_METRICS_ENABLED | true    | true
+        STATSD_ENABLED            | true    | true
+        STATSD_ENABLED            | false   | false
     }
 
     void "verify StatsdMeterRegistry bean exists datadog flavor"() {

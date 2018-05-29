@@ -10,7 +10,7 @@ import spock.lang.Unroll
 
 import java.time.Duration
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.METRICS_ENABLED
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 import static io.micronaut.configuration.metrics.micrometer.graphite.GraphiteConfiguration.GRAPHITE_ENABLED
 import static io.micronaut.configuration.metrics.micrometer.graphite.GraphiteConfiguration.GRAPHITE_HOST
 import static io.micronaut.configuration.metrics.micrometer.graphite.GraphiteConfiguration.GRAPHITE_PORT
@@ -55,11 +55,11 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         context.findBean(GraphiteMeterRegistry).isPresent() == result
 
         where:
-        cfg              | setting | result
-        METRICS_ENABLED  | false   | false
-        METRICS_ENABLED  | true    | true
-        GRAPHITE_ENABLED | true    | true
-        GRAPHITE_ENABLED | false   | false
+        cfg                       | setting | result
+        MICRONAUT_METRICS_ENABLED | false   | false
+        MICRONAUT_METRICS_ENABLED | true    | true
+        GRAPHITE_ENABLED          | true    | true
+        GRAPHITE_ENABLED          | false   | false
     }
 
     void "verify GraphiteMeterRegistry bean exists with default config"() {
