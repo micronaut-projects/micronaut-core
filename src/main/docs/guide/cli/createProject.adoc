@@ -136,7 +136,7 @@ TIP: Currently AWS Lambda is the only supported cloud provider for Micronaut fun
 |`-lang groovy`
 
 |`test`
-|Language to use for the function (one of `java`, `groovy`, `kotlin` - default is `java`)
+|Test framework to use for the function (one of `junit`, `spock` - default is `junit`)
 |`-test spock`
 
 |`build`
