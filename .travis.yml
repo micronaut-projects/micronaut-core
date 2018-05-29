@@ -31,8 +31,8 @@ install: "/bin/true"
 script:
 - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./travis-build-pr.sh; fi
 - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./travis-build.sh; fi
-after_deploy:
-- "./gradlew sdkMajorRelease"
+#after_deploy:
+#- "./gradlew sdkMajorRelease"
 cache:
   directories:
   - "$HOME/.gradle"
