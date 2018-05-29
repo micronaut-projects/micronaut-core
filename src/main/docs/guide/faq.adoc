@@ -1,0 +1,38 @@
+The following section covers frequently asked questions and common problems folks stumble upon when using Micronaut.
+
+
+==== Does Micronaut modify my byte code?
+
+No. Your classes are your classes. Micronaut does not transform classes or modify the Java byte code you write. Micronaut at compile will produce an additional set of classes that sit next to your original untouched classes.
+
+==== Does Micronaut support Scala?
+
+Micronaut supports any JVM language that supports the Annotation Processor API. Scala currently does not support this API. However, Groovy also doesn't support this API and special support has been built that processes the Groovy AST. It may be technically possible to support Scala future if a similar module to `inject-groovy` is built, but as of this writing Scala is not supported.
+
+
+==== Can Micronaut be used for purposes other than Microservices?
+
+Yes. Micronaut is very modular and you can choose to use just the Dependency Injection and AOP implementation if you want simply by including only the `inject-java` (or `inject-groovy` for Groovy) dependency in your application.
+
+In fact Micronaut's support for <<serverlessFunctions, Serverless Computing>> uses this exact approach.
+
+
+==== What are the advantages of Micronaut's Dependency Injection and AOP implementation?
+
+Micronaut processes your classes at compile time and produces all metadata at compile time. This eliminates the need for reflection, cached reflective metadata and the requirement to analyze your classes at runtime all of which leads to slower startup performance and greater memory consumption.
+
+In addition, Micronaut will build AOP proxies at compile time that are completely reflection free, which improves performances, reduces stack trace sizes and reduces memory consumption.
+
+==== I am using Micronaut but Dependency Injection is not working
+
+The most common reason that Dependency Injection fails to work is when you either don't have the appropriate annotation processor configured or your IDE is incorrectly configured. See the section on <<languageSupport, Language Support>> for how to get setup in your language.
+
+==== Why does Micronaut have its own Consul and Eureka client implementations?
+
+The majority of Consul and Eureka clients that exist are blocking and include a mountain of external dependencies that inflate your JAR files.
+
+Micronaut's api:discovery.DiscoveryClient[] uses Micronaut's native HTTP client thus greatly reducing the need for external dependencies and providing a reactive API onto both discovery servers.
+
+==== I am using Groovy and a NoSuchMethodError occurs loading my beans
+
+Groovy by default imports the `groovy.lang` package which includes a class called `@Singleton` that is an AST transformation that makes your class a singleton (adding a private constructor and static retrieval method). This annotation is easily confused with the `javax.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you are using the correct annotation in your Groovy classes.
