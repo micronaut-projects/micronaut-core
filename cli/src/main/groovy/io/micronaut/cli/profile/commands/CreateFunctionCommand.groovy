@@ -108,7 +108,7 @@ class CreateFunctionCommand extends CreateAppCommand {
         if (commandLineFeatures) features.addAll(commandLineFeatures)
 
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
-        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         final String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
         final CreateServiceCommandObject cmd = new CreateServiceCommandObject(

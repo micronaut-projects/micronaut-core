@@ -396,7 +396,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             }
         }
 
-        boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
         List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
