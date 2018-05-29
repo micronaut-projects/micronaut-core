@@ -15,9 +15,9 @@
  */
 
 /**
- * Health aggregation.
+ * Metrics aggregation.
  *
- * @author Graeme Rocher
+ * @author Christian Oestreich
  * @since 1.0
  */
 package io.micronaut.configuration.metrics.aggregator;
