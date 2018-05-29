@@ -68,7 +68,107 @@ public class IndexController {
 
 == Provided Metrics
 
-WIP
+The following metrics currently have binders and are enabled by default.  The settings listed below can disable the specific metric binders if you do not with to collect or report the specific metrics.
+
+=== Jvm Metrics
+
+The JVM metrics bindings will provide several jvm metrics.
+
+*Control Property*: `micronaut.metrics.binders.jvm.enabled`
+
+.Metrics provided
+|=======
+|*Name* 
+| jvm.buffer.count 
+| jvm.buffer.memory.used
+| jvm.buffer.total.capacity
+| jvm.classes.loaded
+| jvm.classes.unloaded
+| jvm.gc.live.data.size
+| jvm.gc.max.data.size
+| jvm.gc.memory.allocated
+| jvm.gc.memory.promoted
+| jvm.memory.committed
+| jvm.memory.max
+| jvm.memory.used
+| jvm.threads.daemon
+| jvm.threads.live
+| jvm.threads.peak
+|=======
+
+=== Web Metrics
+
+There is a default web filter provided for web metrics.  All routes, status codes, methods and exceptions will be timed and counted.
+
+*Control Property*: `micronaut.metrics.binders.web.enabled`
+
+.Filter Path
+If enabled, be default the path `/**` will be intercepted.  If you wish to change which paths are run through the filter set the following property.
+
+*Control Property*: `micronaut.metrics.http.path`
+
+.Metrics provided
+|=======
+|*Name*
+| http.server.requests
+|=======
+
+=== System Metrics
+
+There are multiple metrics that can be separately toggled.
+
+==== Uptime Metrics
+
+The uptime metrics bindings will provide system uptime metrics.
+
+*Control Property*: `micronaut.metrics.binders.uptime.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| process.uptime
+| process.start.time
+|=======
+
+==== Processor Metrics
+
+The processor metrics bindings will provide system processor metrics.
+
+*Control Property*: `micronaut.metrics.binders.processor.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| system.load.average.1m
+| system.cpu.usage
+| system.cpu.count
+| process.cpu.usage
+|=======
+
+==== File Descriptor Metrics
+
+The file descriptor metrics bindings will provide system file descriptor metrics.
+
+*Control Property*: `micronaut.metrics.binders.files.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| process.files.open
+| process.files.max
+|=======
+
+=== Logback Metrics
+
+The logging metrics bindings will provide logging metrics if using Logback.
+
+*Control Property*: `micronaut.metrics.binders.logback.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| logback.events
+|=======
 
 == Metrics Reporters
 

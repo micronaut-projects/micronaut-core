@@ -8,7 +8,7 @@ import io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory;
  */
 public interface StatsdConfiguration {
 
-    String STATSD_CONFIG = MeterRegistryFactory.CFG_ROOT + "export.statsd";
+    String STATSD_CONFIG = MeterRegistryFactory.MICRONAUT_METRICS + "export.statsd";
     String STATSD_ENABLED = STATSD_CONFIG + ".enabled";
     String STATSD_FLAVOR = STATSD_CONFIG + ".flavor";
     String STATSD_PORT = STATSD_CONFIG + ".port";

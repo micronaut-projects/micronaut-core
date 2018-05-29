@@ -12,7 +12,11 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 
 /**
- * Initializes a CompositeMeterRegistry.
+ * Initializes a CompositeMeterRegistry.  This type of registry is required to compose any sub type
+ * of registries that are created, like statsd, graphite, etc.
+ *
+ * @author Christian Oestreich
+ * @since 1.0
  */
 @Singleton
 public class CompositeMeterRegistryInitializer implements BeanCreatedEventListener<CompositeMeterRegistry> {

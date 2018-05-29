@@ -153,6 +153,7 @@ management:
     beansEndpoint: The Beans Endpoint
     infoEndpoint: The Info Endpoint
     healthEndpoint: The Health Endpoint
+    metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     stopEndpoint: The Server Stop Endpoint

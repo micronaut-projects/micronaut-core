@@ -16,22 +16,31 @@
 
 package io.micronaut.configuration.metrics.micrometer;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
+import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
+import io.micronaut.configuration.metrics.aggregator.MicrometerMeterRegistryConfigurer;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
+import java.util.Collection;
 
 /**
  * Factory for all supported MetricRegistry beans.
+ *
+ * @author Christian Oestreich
+ * @since 1.0
  */
 @Factory
 public class MeterRegistryFactory {
-    public static final String CFG_ROOT = "micronaut.metrics.";
-    public static final String METRICS_ENABLED = CFG_ROOT + "enabled";
+    public static final String MICRONAUT_METRICS = "micronaut.metrics.";
+    public static final String MICRONAUT_METRICS_ENABLED = MICRONAUT_METRICS + "enabled";
 
     /**
      * Create a SimpleMeterRegistry bean if metrics are enabled, true by default.
@@ -43,9 +52,8 @@ public class MeterRegistryFactory {
      * @return A SimpleMeterRegistry.
      */
     @Bean
-    @Primary
     @Singleton
-    @Requires(property = METRICS_ENABLED, value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     SimpleMeterRegistry simpleMeterRegistry() {
         return new SimpleMeterRegistry();
     }
@@ -58,8 +66,28 @@ public class MeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Requires(property = METRICS_ENABLED, value = "true", defaultValue = "true")
-    CompositeMeterRegistry compositeMeterRegistry() {
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+    CompositeMeterRegistry meterRegistry() {
         return new CompositeMeterRegistry();
+    }
+
+    /**
+     * Creates a MeterRegistryConfigurer bean if the metrics are endabled, true by default.
+     * <p>
+     * This bean adds the filters and binders to the metric registry.
+     *
+     * @param meterRegistry the meter registry
+     * @param binders       list of binder beans
+     * @param filters       list of filter beans
+     * @return meterRegistryConfigurer bean
+     */
+    @Bean
+    @Primary
+    @Singleton
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+    MeterRegistryConfigurer meterRegistryConfigurer(MeterRegistry meterRegistry,
+                                                    Collection<MeterBinder> binders,
+                                                    Collection<MeterFilter> filters) {
+        return new MicrometerMeterRegistryConfigurer(meterRegistry, binders, filters);
     }
 }
