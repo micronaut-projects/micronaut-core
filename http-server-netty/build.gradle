@@ -11,4 +11,5 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
     testCompile dependencyVersion("rxjava2")
+    testCompile dependencyVersion("reactor")
 }
