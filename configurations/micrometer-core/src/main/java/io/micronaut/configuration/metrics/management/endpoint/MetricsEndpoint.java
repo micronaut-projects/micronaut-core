@@ -65,15 +65,42 @@ public class MetricsEndpoint {
 
     /**
      * Read operation to list metric names.  To get the details
-     * the method getMetric below will be invoked.
+     * the method getMetricDetails(name) should be invoked.
      *
-     * @return list of metric names
+     * @return single of http response with list of metric names
      */
     @Read
-    Single<ListNamesResponse> listNames() {
+    Single<HttpResponse<ListNamesResponse>> listNames() {
+        return Single.just(getListNamesResponse());
+    }
+
+    /**
+     * Method to read individual metric data.
+     * <p>
+     * After calling the /metrics endpoint, you can pass the name in
+     * like /metrics/foo.bar and the details for the metrics and tags
+     * will be returned.
+     * <p>
+     * Will return a 404 if the metric is not found.
+     *
+     * @param name the name of the metric to get the details for
+     * @return single with metric details response
+     */
+    @Read
+    Single<HttpResponse<MetricDetailsResponse>> getMetricDetails(String name) {
+        return Single.just(getMetricDetailsResponse(name));
+    }
+
+    /**
+     * Read operation to list metric names.  To get the details
+     * the method getMetric will be invoked after this one.
+     *
+     * @return http response with list of metric names
+     */
+    private HttpResponse<ListNamesResponse> getListNamesResponse() {
         Set<String> names = new LinkedHashSet<>();
         collectNames(names, this.meterRegistry);
-        return Single.just(new ListNamesResponse(names));
+        return HttpResponse.ok(new ListNamesResponse(names));
     }
 
     /**
@@ -86,23 +113,21 @@ public class MetricsEndpoint {
      * Will return a 404 if the metric is not found.
      *
      * @param name the name of the meter to get the details for.
-     * @return Optional with metric response
+     * @return single with metric details response
      */
-    @Read
-    Single<HttpResponse<MetricResponse>> getMetric(String name) {
+    private HttpResponse<MetricDetailsResponse> getMetricDetailsResponse(String name) {
         List<Tag> tags = Collections.emptyList();
         List<Meter> meters = new ArrayList<>();
         collectMeters(meters, this.meterRegistry, name, tags, new HashSet<>());
         if (meters.isEmpty()) {
-            return Single.just(HttpResponse.notFound());
+            return HttpResponse.notFound();
         }
         Map<Statistic, Double> samples = getSamples(meters);
         Map<String, Set<String>> availableTags = getAvailableTags(meters);
         tags.forEach((t) -> availableTags.remove(t.getKey()));
-        return Single.just(
-                HttpResponse.ok(new MetricResponse(name,
-                        asList(samples, Sample::new),
-                        asList(availableTags, AvailableTag::new))));
+        return HttpResponse.ok(new MetricDetailsResponse(name,
+                asList(samples, Sample::new),
+                asList(availableTags, AvailableTag::new)));
     }
 
     private void collectMeters(List<Meter> meters, MeterRegistry registry, String name,
@@ -233,7 +258,7 @@ public class MetricsEndpoint {
     /**
      * Response payload for a metric name selector.
      */
-    public static final class MetricResponse {
+    public static final class MetricDetailsResponse {
 
         private final String name;
 
@@ -248,8 +273,8 @@ public class MetricsEndpoint {
          * @param measurements  numerical values
          * @param availableTags tags
          */
-        MetricResponse(String name, List<Sample> measurements,
-                       List<AvailableTag> availableTags) {
+        MetricDetailsResponse(String name, List<Sample> measurements,
+                              List<AvailableTag> availableTags) {
             this.name = name;
             this.measurements = measurements;
             this.availableTags = availableTags;
