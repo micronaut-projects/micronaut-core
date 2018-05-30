@@ -28,6 +28,7 @@ import io.micronaut.cli.profile.commands.DefaultMultiStepCommand
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.util.CliSettings
 import io.micronaut.cli.util.CosineSimilarity
+import io.micronaut.cli.util.VersionInfo
 import jline.console.completer.ArgumentCompleter
 import jline.console.completer.Completer
 import org.eclipse.aether.artifact.DefaultArtifact
@@ -68,9 +69,9 @@ abstract class AbstractProfile implements Profile {
     protected String parentTargetFolder
     protected final ClassLoader classLoader
     protected ExclusionDependencySelector exclusionDependencySelector = new ExclusionDependencySelector()
-    protected String description = "";
-    protected String instructions = "";
-    protected String version = CliSettings.package.implementationVersion
+    protected String description = ""
+    protected String instructions = ""
+    protected String version = VersionInfo.getVersion(CliSettings)
 
     AbstractProfile(Resource profileDir) {
         this(profileDir, AbstractProfile.getClassLoader())

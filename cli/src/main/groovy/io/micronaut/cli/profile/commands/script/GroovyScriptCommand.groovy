@@ -36,6 +36,7 @@ import io.micronaut.cli.profile.commands.io.ServerInteraction
 import io.micronaut.cli.profile.commands.templates.TemplateRenderer
 import io.micronaut.cli.profile.commands.templates.TemplateRendererImpl
 import io.micronaut.cli.util.NameUtils
+import io.micronaut.cli.util.VersionInfo
 
 /**
  * A base class for Groovy scripts that implement commands
@@ -77,7 +78,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
     /**
      * The version of Micronaut being used
      */
-    String micronautVersion = getClass().getPackage()?.getImplementationVersion()
+    String micronautVersion = VersionInfo.getVersion(getClass())
 
     /**
      * Provides a description for the command
