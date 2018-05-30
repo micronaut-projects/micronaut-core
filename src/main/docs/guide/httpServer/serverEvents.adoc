@@ -1,0 +1,38 @@
+The HTTP server will emit a number of <<events, Bean Events>>, defined in the pkg:io.micronaut.runtime.server.event[] package, that you can write listeners for. The following table summarizes those events:
+
+.Server Events
+|===
+|Event|Description
+
+|api:runtime.server.event.ServerStartupEvent[]
+|Emitted when the server completes startup
+
+|api:runtime.server.event.ServerShutdownEvent[]
+|Emitted when the server shuts down
+
+|api:discovery.event.ServiceStartedEvent[]
+|Emitted after all api:runtime.server.event.ServerStartupEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
+
+|api:discovery.event.ServiceShutdownEvent[]
+|Emitted after all api:runtime.server.event.ServerShutdownEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
+
+|===
+
+WARNING: If you do significant work within a listener for a api:runtime.server.event.ServerStartupEvent[] this will slow down you startup time.
+
+The following example defines a api:context.event.ApplicationEventListener[] that listens for api:runtime.server.event.ServerStartupEvent[]:
+
+.Listening for Server Startup Events
+[source,java]
+----
+import io.micronaut.context.event.ApplicationEventListener;
+...
+@Singleton
+public class StartupListener implements ApplicationEventListener<ServerStartupEvent> {
+    @Override
+    public void onApplicationEvent(ServerStartupEvent event) {
+        // logic here
+        ...
+    }
+}
+----

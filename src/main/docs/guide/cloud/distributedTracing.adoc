@@ -48,7 +48,7 @@ class HelloService {
 <2> You can use ann:tracing.annotation.SpanTag[] to include arguments of methods as tags for the span
 <3> The ann:tracing.annotation.ContinueSpan[] annotation can be used to continue as existing span and incorporate additional tags using `@SpanTag`
 
-==== Tracing Instrumentation
+=== Tracing Instrumentation
 
 In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
 

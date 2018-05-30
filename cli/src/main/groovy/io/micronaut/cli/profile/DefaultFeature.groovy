@@ -23,6 +23,7 @@ import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.io.support.Resource
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.graph.Exclusion
 import org.yaml.snakeyaml.Yaml
 
 /**
@@ -54,18 +55,29 @@ class DefaultFeature implements Feature {
         def dependencyMap = configuration.get("dependencies")
         dependentFeatures.addAll((List) configuration.get("dependentFeatures", Collections.emptyList()))
 
-        if (dependencyMap instanceof Map) {
-            for (entry in ((Map) dependencyMap)) {
-                def scope = entry.key
-                def value = entry.value
-                if (value instanceof List) {
-                    for (dep in ((List) value)) {
-                        String coords = dep.toString()
-                        if (coords.count(':') == 1) {
-                            coords = "$coords:BOM"
-                        }
-                        dependencies.add new Dependency(new DefaultArtifact(coords), scope.toString())
+        if (dependencyMap instanceof List) {
+
+            for (entry in ((List) dependencyMap)) {
+                if (entry instanceof Map) {
+                    def scope = (String)entry.scope
+                    String coords = (String)entry.coords
+
+                    if (coords.count(':') == 1) {
+                        coords = "$coords:BOM"
                     }
+                    Dependency dependency = new Dependency(new DefaultArtifact(coords), scope.toString())
+                    if (entry.containsKey('excludes')) {
+                        List<Exclusion> dependencyExclusions = new ArrayList<>()
+                        List excludes = (List)entry.excludes
+
+                        for (ex in excludes) {
+                            if (ex instanceof Map) {
+                                dependencyExclusions.add(new Exclusion((String)ex.group, (String)ex.module, (String)ex.classifier, (String)ex.extension))
+                            }
+                        }
+                        dependency = dependency.setExclusions(dependencyExclusions)
+                    }
+                    dependencies.add(dependency)
                 }
             }
         }

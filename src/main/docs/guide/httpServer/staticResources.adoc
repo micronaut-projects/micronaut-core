@@ -7,7 +7,7 @@ The following configuration options are available through link:{api}/io/micronau
 |paths |List<String> |A list of paths either starting with `classpath:` or `file:`. You can serve files from anywhere on disk or the classpath. For example to serve static resources from `src/main/resources/public`, you would use `classpath:public` as the path.
 |=======
 
-Here is what an example YML configuration might look like:
+Here is what an example YAML configuration might look like (note that the `router` declaration must be at the top-level of the file and not nested under any other items):
 
 [source,yaml]
 ----

@@ -19,6 +19,7 @@ package io.micronaut.http.client;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -53,7 +54,7 @@ public interface LoadBalancer {
      * @return The {@link LoadBalancer}
      */
     static LoadBalancer fixed(URL url) {
-        return discriminator -> Publishers.just(ServiceInstance.of("Unknown", url));
+        return new FixedLoadBalancer(url);
     }
 
     /**

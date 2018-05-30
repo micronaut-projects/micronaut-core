@@ -46,7 +46,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     /**
      * @param ssl              The SSL configuration
-     * @param resourceResolver The resouce resolver
+     * @param resourceResolver The resource resolver
      */
     public NettyClientSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);

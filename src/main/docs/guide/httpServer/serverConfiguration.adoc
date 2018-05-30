@@ -1,6 +1,6 @@
-The HTTP server features a number of configuration options you may wish to tweak. Defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
+The HTTP server features a number of configuration options you may wish to tweak. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
-The following example shows how tweak configuration options for the server via `application.yml`:
+The following example shows how to tweak configuration options for the server via `application.yml`:
 
 .Configuring HTTP server settings
 [source,yaml]

@@ -40,7 +40,6 @@ public class DefaultMongoClientFactory {
      * @return mongoClient
      */
     @Bean(preDestroy = "close")
-    @Refreshable(MongoSettings.PREFIX)
     @Primary
     MongoClient mongoClient(DefaultMongoConfiguration configuration) {
         return new MongoClient(configuration.buildURI());

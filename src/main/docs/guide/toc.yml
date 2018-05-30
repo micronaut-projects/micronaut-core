@@ -1,6 +1,7 @@
 introduction: Introduction
 quickStart:
   title: Quick Start
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
@@ -23,7 +24,8 @@ ioc:
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
-  annotationMetadata: Bean Annotation Metadata  
+  annotationMetadata: Bean Annotation Metadata
+  springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
   title: Application Configuration
@@ -72,6 +74,7 @@ httpServer:
   sse: Server Sent Events
   filters: HTTP Filters
   sessions: HTTP Sessions
+  serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
@@ -196,4 +199,4 @@ cli:
   profiles: Profiles
   features: Features
   commands: Commands
-
+faq: Frequently Asked Questions (FAQ)

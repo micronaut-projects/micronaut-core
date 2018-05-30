@@ -18,8 +18,6 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 
-import java.util.EventObject;
-
 /**
  * A BeanContextEvent is an event fired from the {@link BeanContext} instance.
  *

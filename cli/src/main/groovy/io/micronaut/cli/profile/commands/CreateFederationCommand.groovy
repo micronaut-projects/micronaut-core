@@ -119,7 +119,6 @@ class CreateFederationCommand extends CreateAppCommand {
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
         if (command.profileName == "federation") {
             console.addStatus("Federation created at ${Paths.get(targetDir.path).toAbsolutePath().normalize()}")
-
         }
     }
 
