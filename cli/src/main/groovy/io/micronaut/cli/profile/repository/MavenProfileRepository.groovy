@@ -144,7 +144,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         if (!resolved) {
             List<Map> profiles = []
             resolutionContext.managedDependencies.each { Dependency dep ->
-                if (dep.artifact.groupId == "io.micronaut.cli.profiles") {
+                if (dep.artifact.groupId == "io.micronaut.profiles") {
                     profiles.add([group: dep.artifact.groupId, module: dep.artifact.artifactId])
                 }
             }
