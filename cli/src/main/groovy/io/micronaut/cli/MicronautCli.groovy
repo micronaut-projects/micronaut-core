@@ -206,7 +206,6 @@ class MicronautCli {
         if (mainCommandLine.hasOption(CommandLine.VERSION_ARGUMENT) || mainCommandLine.hasOption('v')) {
             def console = MicronautConsole.instance
             console.addStatus("Micronaut Version: ${MicronautCli.getPackage().implementationVersion}")
-            console.addStatus("Groovy Version: ${GroovySystem.version}")
             console.addStatus("JVM Version: ${System.getProperty('java.version')}")
             exit(0)
         }
@@ -351,9 +350,9 @@ class MicronautCli {
 
                 def mainCommandLine = context.getCommandLine()
                 if (mainCommandLine.hasOption(CommandLine.STACKTRACE_ARGUMENT)) {
-                    console.setStacktrace(true);
+                    console.setStacktrace(true)
                 } else {
-                    console.setStacktrace(false);
+                    console.setStacktrace(false)
                 }
 
                 if (mainCommandLine.hasOption(CommandLine.VERBOSE_ARGUMENT)) {

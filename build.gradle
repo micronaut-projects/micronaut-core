@@ -9,12 +9,15 @@ buildscript {
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
+        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
     }
 }
 
 plugins {
     id 'com.github.hierynomus.license' version '0.14.0' apply false
 }
+
+apply plugin: "io.sdkman.vendors"
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
@@ -245,6 +248,8 @@ subprojects { subproject ->
     }
 
     tasks.withType(Test) {
+        jvmArgs '-Duser.country=US'
+        jvmArgs '-Duser.language=en'
         testLogging {
             showStandardStreams = !System.getenv("TRAVIS")
             exceptionFormat = 'full'
@@ -372,4 +377,15 @@ task aggregateReports {
         File f = new File("${rootProject.buildDir}/reports/index.html")
         f.text = html
     }
+}
+
+
+sdkman {
+    api = "https://vendors.sdkman.io"
+    consumerKey = System.getenv("GVM_SDKVENDOR_KEY") ?: project.hasProperty("gvmSdkvendorKey") ? project.gvmSdkvendorKey : ''
+    consumerToken = System.getenv("GVM_SDKVENDOR_TOKEN") ?: project.hasProperty("gvmSdkvendorToken") ? project.gvmSdkvendorToken : ''
+    candidate = "micronaut"
+    version = project.version
+    url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
+    hashtag = "#micronaut"
 }

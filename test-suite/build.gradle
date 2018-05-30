@@ -1,7 +1,6 @@
 dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
-    testCompile project(":configurations:hibernate-gorm")
     testCompile project(":configurations:hibernate-validator")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
@@ -15,4 +14,11 @@ dependencies {
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
+}
+tasks.withType(Test) {
+    maxParallelForks = 1
+    forkEvery = 5
+    testLogging {
+        showStandardStreams = true
+    }
 }

@@ -32,7 +32,7 @@ Provided Features:
 * hibernate-gorm - Adds support for GORM persistence framework
 * java - Adds support for Java in the application
 * kotlin - Adds support for Kotlin in the application
-* spek - Adds support for the Spek testing framewokr
+* spek - Adds support for the Spek testing framework
 * redis-lettuce - Configures the Lettuce driver for Redis
 * jdbc-hikari - Configures SQL DataSource instances using Hikari Connection Pool
 * jdbc-tomcat - Configures SQL DataSource instances using Tomcat Connection Pool

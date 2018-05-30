@@ -21,5 +21,3 @@
  * @since 1.0
  */
 package io.micronaut.configuration.neo4j.bolt.condition;
-
-import io.micronaut.context.annotation.Configuration;

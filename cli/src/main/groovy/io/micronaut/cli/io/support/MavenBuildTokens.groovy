@@ -18,7 +18,9 @@ package io.micronaut.cli.io.support
 import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.profile.repository.MavenProfileRepository
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.graph.Exclusion
 
 /**
  * @author James Kleeh
@@ -44,7 +46,9 @@ class MavenBuildTokens {
 
         def repositoriesWriter = new StringWriter()
         MarkupBuilder repositoriesXml = new MarkupBuilder(repositoriesWriter)
-        profile.repositories.each { String repo ->
+        String defaultRepo = MavenProfileRepository.DEFAULT_REPO.uri.toString()
+
+        (profile.repositories + defaultRepo).each { String repo ->
             if (repo.startsWith('http')) {
                 repositoriesXml.repository {
                     id(repo.replaceAll("^http(|s)://(.*?)/.*", '$2'))
@@ -92,6 +96,16 @@ class MavenBuildTokens {
                     version(artifact.version)
                 }
                 scope(dep.scope)
+                if (dep.exclusions != null && !dep.exclusions.empty) {
+                    exclusions {
+                        dep.exclusions.each { Exclusion e ->
+                            exclusion {
+                                groupId(e.groupId)
+                                artifactId(e.artifactId)
+                            }
+                        }
+                    }
+                }
             }
         }
 

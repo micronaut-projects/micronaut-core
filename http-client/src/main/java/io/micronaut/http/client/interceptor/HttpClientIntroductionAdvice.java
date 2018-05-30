@@ -57,6 +57,7 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
@@ -457,7 +458,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 contextPath = path;
             } else if (ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
+            } else if (loadBalancer instanceof FixedLoadBalancer) {
+                FixedLoadBalancer flb = (FixedLoadBalancer) loadBalancer;
+                String p = flb.getUrl().getPath();
+                if (!StringUtils.isEmpty(p)) {
+                    contextPath = p;
+                }
             }
+
             HttpClientConfiguration configuration;
             Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
                 HttpClientConfiguration.class,

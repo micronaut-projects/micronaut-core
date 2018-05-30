@@ -151,14 +151,11 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
             if (LOG.isErrorEnabled()) {
                 LOG.error("Google compute metadataUrl value is invalid!: " + configuration.getMetadataUrl(), me);
             }
-
-        }
-        catch (FileNotFoundException fnfe) {
+        } catch (FileNotFoundException fnfe) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No metadata found at: " + configuration.getMetadataUrl() + "?recursive=true", fnfe);
             }
-        }
-        catch (IOException ioe) {
+        } catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
             }
