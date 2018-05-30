@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.boot.DependencyVersions
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
@@ -40,7 +41,8 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     public static final RepositoryConfiguration DEFAULT_REPO
 
     static {
-        def version = MicronautCli.getPackage().getImplementationVersion()
+        def version = VersionInfo.getVersion(MicronautCli)
+
         if(version == null || version.endsWith("-SNAPSHOT")) {
             DEFAULT_REPO = new RepositoryConfiguration(
                     "micronautSnapshots",

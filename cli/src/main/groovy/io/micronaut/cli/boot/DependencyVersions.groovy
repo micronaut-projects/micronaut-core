@@ -21,6 +21,7 @@ import groovy.grape.GrapeEngine
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.slurpersupport.GPathResult
+import io.micronaut.cli.util.VersionInfo
 import org.springframework.boot.cli.compiler.dependencies.Dependency
 import org.springframework.boot.cli.compiler.dependencies.DependencyManagement
 
@@ -46,7 +47,7 @@ class DependencyVersions implements DependencyManagement {
     }
 
     DependencyVersions(GrapeEngine grape) {
-        this(grape, [group: "io.micronaut", module: "bom", version: DependencyVersions.package.implementationVersion, type: "pom"])
+        this(grape, [group: "io.micronaut", module: "bom", version: VersionInfo.getVersion(DependencyVersions), type: "pom"])
     }
 
     DependencyVersions(GrapeEngine grape, Map<String, String> bomCoords) {
