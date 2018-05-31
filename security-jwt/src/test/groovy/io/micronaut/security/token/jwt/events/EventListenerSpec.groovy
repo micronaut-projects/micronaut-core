@@ -39,8 +39,10 @@ import javax.inject.Singleton
 
 class EventListenerSpec extends Specification {
 
+    static final String specName = "io.micronaut.security.token.jwt.events.EventListenerSpec"
+
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'eventlistener',
+            'spec.name': specName,
             'endpoints.beans.enabled': true,
             'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
@@ -64,7 +66,7 @@ class EventListenerSpec extends Specification {
                 old(embeddedServer.applicationContext.getBean(AccessTokenGeneratedEventListener).events.size()) + 1
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = specName)
     @Singleton
     static class RefreshTokenGeneratedEventListener implements ApplicationEventListener<RefreshTokenGeneratedEvent> {
         List<RefreshTokenGeneratedEvent> events = []
@@ -74,7 +76,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = specName)
     @Singleton
     static class AccessTokenGeneratedEventListener implements ApplicationEventListener<AccessTokenGeneratedEvent> {
         List<AccessTokenGeneratedEvent> events = []
@@ -84,7 +86,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = specName)
     @Singleton
     static class CustomAuthenticationProvider implements AuthenticationProvider {
 
