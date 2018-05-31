@@ -291,7 +291,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             Files.walkFileTree(projectDir.absoluteFile.toPath(), new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes mainAtts)
-                    throws IOException {
+                        throws IOException {
                     if (path.fileName.toString() == fileName) {
                         files.add(path.toFile())
                     }
@@ -419,19 +419,19 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         List<String> features = [langFeature]
         List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        if(commandLineFeatures) features.addAll(commandLineFeatures)
+        if (commandLineFeatures) features.addAll(commandLineFeatures)
 
         String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-            appName: appName,
-            baseDir: executionContext.baseDir,
-            profileName: profileName,
-            micronautVersion: VersionInfo.getVersion(MicronautCli),
-            features: features,
-            inplace: inPlace,
-            build: build,
-            console: executionContext.console
+                appName: appName,
+                baseDir: executionContext.baseDir,
+                profileName: profileName,
+                micronautVersion: VersionInfo.getVersion(MicronautCli),
+                features: features,
+                inplace: inPlace,
+                build: build,
+                console: executionContext.console
         )
 
         return this.handle(cmd)
@@ -487,22 +487,22 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             tokens = new MavenBuildTokens().getTokens(profile, features)
         }
 
-        if(tokens) {
+        if (tokens) {
             List<String> requestedFeatureNames = features.findAll { it.requested }*.name
             List<String> allFeatureNames = features*.name
             String testFramework = null
             String sourceLanguage = null
 
-            if(requestedFeatureNames) {
+            if (requestedFeatureNames) {
                 testFramework = evaulateTestFramework(requestedFeatureNames)
                 sourceLanguage = evaulateSourceLanguage(requestedFeatureNames)
             }
 
-            if(!testFramework) {
+            if (!testFramework) {
                 testFramework = evaulateTestFramework(allFeatureNames)
             }
 
-            if(!sourceLanguage) {
+            if (!sourceLanguage) {
                 sourceLanguage = evaulateSourceLanguage(allFeatureNames)
             }
 
@@ -513,8 +513,12 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
                 replacefilter {
-                    if (k) {replacetoken("@${k}@".toString()) }
-                    if (v) { replacevalue(v) }
+                    if (k) {
+                        replacetoken("@${k}@".toString())
+                    }
+                    if (v) {
+                        replacevalue(v)
+                    }
                 }
             }
             variables.each { k, v ->
@@ -528,11 +532,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
     protected String evaulateTestFramework(List<String> features) {
         String testFramework = null
-        if(features.contains("spock"))
+        if (features.contains("spock"))
             testFramework = "spock"
-        else if(features.contains("junit"))
+        else if (features.contains("junit"))
             testFramework = "junit"
-        else if(features.contains("spek"))
+        else if (features.contains("spek"))
             testFramework = "spek"
 
         testFramework
@@ -540,11 +544,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
     protected String evaulateSourceLanguage(List<String> features) {
         String sourceLanguage = null
-        if(features.contains("groovy"))
+        if (features.contains("groovy"))
             sourceLanguage = "groovy"
-        else if(features.contains("kotlin"))
+        else if (features.contains("kotlin"))
             sourceLanguage = "kotlin"
-        else if(features.contains("java"))
+        else if (features.contains("java"))
             sourceLanguage = "java"
 
         sourceLanguage
@@ -559,7 +563,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     protected String resolveLang(CommandLine commandLine) {
-        if(!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
+        if (!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
         lang
     }
 
@@ -592,7 +596,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         features.addAll(profile.requiredFeatures)
 
-        if(profile.oneOfFeatures.size() > 0) {
+        if (profile.oneOfFeatures.size() > 0) {
             Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures.contains(it) }
 
             if (!oneOfFeatures) {
@@ -604,9 +608,19 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             features.addAll(features[i].getDependentFeatures(profile))
         }
 
-        if(validRequestedFeatureNames) {
+        if (profile.oneOfFeatures.size() > 0) {
+            Iterable<Feature> includedOneOfFeatures = features.findAll { Feature f -> profile.oneOfFeatures.contains(f) }
+
+            if (includedOneOfFeatures.size() > 1) {
+                List<String> names = includedOneOfFeatures*.name
+                StringBuilder warning = new StringBuilder("Features ${names.join(", ")} should not be used together!")
+                MicronautConsole.getInstance().warn(warning.toString())
+            }
+        }
+
+        if (validRequestedFeatureNames) {
             features = features.collect { feature ->
-                if(validRequestedFeatureNames.contains(feature.name)) {
+                if (validRequestedFeatureNames.contains(feature.name)) {
                     feature.setRequested(true)
                 }
 
