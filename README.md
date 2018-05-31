@@ -44,7 +44,7 @@ export MICRONAUT_HOME=/path/to/checkout
 export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
 ```
 
-You will also need to checkout the [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles/) and run `./gradlew publishToMavenLocal` there to.
+You will also need to checkout the [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles/) and run `./gradlew publishToMavenLocal` there too.
 
 You should then be able to `mn create-app hello-world`.
 
