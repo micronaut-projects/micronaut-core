@@ -19,11 +19,7 @@ package io.micronaut.context;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.*;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.context.event.ShutdownEvent;
-import io.micronaut.context.event.StartupEvent;
+import io.micronaut.context.event.*;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
@@ -107,6 +103,7 @@ import java.util.stream.Stream;
 public class DefaultBeanContext implements BeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
+    private static final Logger EVENT_LOGGER  = LoggerFactory.getLogger(ApplicationEventPublisher.class);
     private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
@@ -853,16 +850,22 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public void publishEvent(Object event) {
         if (event != null) {
+            if (EVENT_LOGGER.isDebugEnabled()) {
+                EVENT_LOGGER.debug("Publishing event: {}", event);
+            }
             streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
                 .forEach(listener -> {
                         if (listener.supports(event)) {
                             try {
+                                if (EVENT_LOGGER.isDebugEnabled()) {
+                                    EVENT_LOGGER.debug("Invoking event listener [{}] for event: {}", event);
+                                }
                                 listener.onApplicationEvent(event);
                             } catch (ClassCastException ex) {
                                 String msg = ex.getMessage();
                                 if (msg == null || msg.startsWith(event.getClass().getName())) {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Incompatible listener for event: " + listener, ex);
+                                    if (EVENT_LOGGER.isDebugEnabled()) {
+                                        EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
                                     }
                                 } else {
                                     throw ex;
