@@ -38,13 +38,11 @@ import io.micronaut.security.handlers.LoginHandler
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
 
-@IgnoreIf({System.getenv("TRAVIS")}) // TODO no idea why it fails on travis
 class EventListenerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
