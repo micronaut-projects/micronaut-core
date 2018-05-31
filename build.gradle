@@ -74,6 +74,11 @@ ext {
                 group:'io.micrometer',
                 name:'micrometer-core'
             ],
+            'micrometer.atlas': [
+                    version: micrometerVersion,
+                    group:'io.micrometer',
+                    name:'micrometer-atlas'
+            ],
             'micrometer.graphite': [
                 version: micrometerVersion,
                 group:'io.micrometer',
