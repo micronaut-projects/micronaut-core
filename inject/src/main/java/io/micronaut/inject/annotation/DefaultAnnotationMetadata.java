@@ -569,20 +569,42 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         String annotationName,
         String member,
         Object value) {
+
+        return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
+    }
+
+    /**
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
+     * mutating the existing.</p>
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param annotationMetadata The metadata
+     * @param annotationName     The annotation name
+     * @param members            The key/value set of members and values
+     * @return The metadata
+     */
+    @Internal
+    public static AnnotationMetadata mutateMember(
+            AnnotationMetadata annotationMetadata,
+            String annotationName,
+            Map<CharSequence, Object> members) {
         if (StringUtils.isEmpty(annotationName)) {
             throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
         }
-        if (StringUtils.isEmpty(member)) {
-            throw new IllegalArgumentException("Argument [member] cannot be blank");
-        }
-        if (value == null) {
-            throw new IllegalArgumentException("Argument [value] cannot be null");
+        if (!members.isEmpty()) {
+            for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
+                if (StringUtils.isEmpty(entry.getKey())) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a blank key");
+                }
+                if (entry.getValue() == null) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a null value. Key [" + entry.getKey() + "]");
+                }
+            }
         }
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             return new DefaultAnnotationMetadata() {{
-                addDeclaredAnnotation(annotationName, Collections.singletonMap(
-                    member, value
-                ));
+                addDeclaredAnnotation(annotationName, members);
             }};
         } else {
             DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
@@ -594,9 +616,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 throw new IllegalStateException("Couldn't clone annotation metadata");
             }
             defaultMetadata
-                .addDeclaredAnnotation(annotationName, Collections.singletonMap(
-                    member, value
-                ));
+                    .addDeclaredAnnotation(annotationName, members);
 
             return defaultMetadata;
         }
