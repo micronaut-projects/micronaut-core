@@ -23,6 +23,8 @@ dependencies {
         dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
 
+    compile "com.amazon.alexa:ask-sdk:2.2.1"
+
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")

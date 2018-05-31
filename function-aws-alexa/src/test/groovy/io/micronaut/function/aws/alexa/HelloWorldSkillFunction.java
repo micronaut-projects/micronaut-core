@@ -3,10 +3,12 @@ package io.micronaut.function.aws.alexa;
 import com.amazon.ask.Skill;
 import com.amazon.ask.Skills;
 import hello.world.lambda.java.helloworld.handlers.*;
+import io.micronaut.function.FunctionBean;
 
-public class HelloWorldSkillFunction extends AlexaSkillHandler {
+@FunctionBean("hello-world")
+public class HelloWorldSkillFunction extends AlexFunction {
     @Override
-    public Skill getSkill() {
+    protected Skill getSkill() {
        return Skills.standard()
                 .addRequestHandlers(
                         new CancelandStopIntentHandler(),
@@ -18,3 +20,5 @@ public class HelloWorldSkillFunction extends AlexaSkillHandler {
                 .build();
     }
 }
+
+

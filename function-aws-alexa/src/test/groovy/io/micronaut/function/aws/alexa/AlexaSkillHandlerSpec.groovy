@@ -9,7 +9,9 @@ import hello.world.lambda.java.helloworld.handlers.HelloWorldIntentHandler
 import hello.world.lambda.java.helloworld.handlers.HelpIntentHandler
 import hello.world.lambda.java.helloworld.handlers.LaunchRequestHandler
 import hello.world.lambda.java.helloworld.handlers.SessionEndedRequestHandler
-import io.micronaut.function.aws.alexa.AlexaSkillHandler
+import io.micronaut.context.env.Environment
+import io.micronaut.function.aws.MicronautRequestStreamHandler
+
 import spock.lang.Specification
 
 import java.util.function.Function
@@ -20,7 +22,12 @@ public class AlexaSkillHandlerSpec extends Specification {
     void "test micronaut alexa stream handler with simulated input"() {
         given:
 
-        AlexaSkillHandler requestHandler = new HelloWorldSkillFunction()
+        MicronautRequestStreamHandler requestHandler = new MicronautRequestStreamHandler(){
+            @Override
+            protected String resolveFunctionName(Environment env) {
+                "hello-world"
+            }
+        }
 
 
         when:
@@ -44,22 +51,28 @@ public class AlexaSkillHandlerSpec extends Specification {
 
     void "test micronaut alexa stream handler with simulated input - invalid skill id"() {
         given:
-
-        AlexaSkillHandler requestHandler = new HelloWorldSkillFunction() {
-
+        MicronautRequestStreamHandler requestHandler = new MicronautRequestStreamHandler(){
             @Override
-            public Skill getSkill() {
-                return Skills.standard()
-                        .addRequestHandlers(
-                        new CancelandStopIntentHandler(),
-                        new HelloWorldIntentHandler(),
-                        new HelpIntentHandler(),
-                        new LaunchRequestHandler(),
-                        new SessionEndedRequestHandler())
-                        .withSkillId("abc123")
-                        .build();
+            protected String resolveFunctionName(Environment env) {
+                "hello-world"
             }
         }
+//
+//        AlexaSkillHandler requestHandler = new HelloWorldSkillFunction() {
+//
+//            @Override
+//            public Skill getSkill() {
+//                return Skills.standard()
+//                        .addRequestHandlers(
+//                        new CancelandStopIntentHandler(),
+//                        new HelloWorldIntentHandler(),
+//                        new HelpIntentHandler(),
+//                        new LaunchRequestHandler(),
+//                        new SessionEndedRequestHandler())
+//                        .withSkillId("abc123")
+//                        .build();
+//            }
+//        }
 
 
         when:

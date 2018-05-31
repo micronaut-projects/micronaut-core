@@ -54,6 +54,7 @@ import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
@@ -1267,6 +1268,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
+
+
+
         ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
