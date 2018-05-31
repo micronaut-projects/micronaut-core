@@ -142,10 +142,12 @@ class WebFunctionSpec extends Specification {
 
     @FunctionBean("supplier/string")
     static class StringSupplier implements Supplier<String> {
-
+        String getValue() {
+            return "value"
+        }
         @Override
         String get() {
-            return "value"
+            return getValue()
         }
     }
 

@@ -75,7 +75,7 @@ fi
 if [[ $EXIT_STATUS -ne 0 ]]; then
 
   ./gradlew aggregateReports
-  
+
   git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
 
   cd gh-pages
