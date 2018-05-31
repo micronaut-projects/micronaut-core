@@ -79,7 +79,7 @@ class CreateFederationCommand extends CreateAppCommand {
             return false
         }
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
-        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         final String micronautVersion = VersionInfo.getVersion(MicronautCli)
         final String profileName = evaluateProfileName(commandLine)
 
