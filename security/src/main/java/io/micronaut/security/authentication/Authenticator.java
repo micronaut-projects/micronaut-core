@@ -25,6 +25,7 @@ import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * An Authenticator operates on several {@link AuthenticationProvider} instances returning the first
@@ -55,6 +56,7 @@ public class Authenticator {
         if (this.authenticationProviders == null) {
             return Flowable.empty();
         }
+        System.out.println(authenticationProviders.stream().map(AuthenticationProvider::getClass).map(Class::getName).collect(Collectors.joining()));
         Iterator<AuthenticationProvider> providerIterator = authenticationProviders.iterator();
         if (providerIterator.hasNext()) {
             Flowable<AuthenticationProvider> providerFlowable = Flowable.just(providerIterator.next());
