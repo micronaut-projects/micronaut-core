@@ -372,5 +372,5 @@ sdkman {
     candidate = "micronaut"
     version = project.version
     url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
-    hashtag = "#micronaut"
+    hashtag = "#micronautfw"
 }

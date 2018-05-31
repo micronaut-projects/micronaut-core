@@ -43,6 +43,7 @@ import io.micronaut.cli.profile.commands.CommandRegistry
 import io.micronaut.cli.profile.repository.MavenProfileRepository
 import io.micronaut.cli.profile.repository.RepositoryConfiguration
 import io.micronaut.cli.util.CliSettings
+import io.micronaut.cli.util.VersionInfo
 import jline.UnixTerminal
 import jline.console.UserInterruptException
 import jline.console.completer.ArgumentCompleter
@@ -205,7 +206,7 @@ class MicronautCli {
 
         if (mainCommandLine.hasOption(CommandLine.VERSION_ARGUMENT) || mainCommandLine.hasOption('v')) {
             def console = MicronautConsole.instance
-            console.addStatus("Micronaut Version: ${MicronautCli.getPackage().implementationVersion}")
+            console.addStatus("Micronaut Version: ${VersionInfo.getVersion(MicronautCli)}")
             console.addStatus("JVM Version: ${System.getProperty('java.version')}")
             exit(0)
         }

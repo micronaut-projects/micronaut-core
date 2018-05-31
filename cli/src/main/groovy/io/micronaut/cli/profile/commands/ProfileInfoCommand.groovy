@@ -100,9 +100,11 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
             String name = lastOption.get(0)
             profileNames = profileNames.findAll { String pn ->
                 pn.startsWith(name)
-            }.collect { it.substring(name.size()) }
+            }.collect {
+                "${it.substring(name.size())} ".toString()
+            }
         }
-        candidates.addAll profileNames.join(' ')
+        candidates.addAll profileNames
         return cursor
     }
 
