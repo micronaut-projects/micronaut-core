@@ -40,6 +40,7 @@ import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
 
@@ -62,8 +63,9 @@ class EventListenerSpec extends Specification {
 
         then:
         thrown(HttpClientResponseException)
-        embeddedServer.applicationContext.getBean(LoginFailedEventListener).events.size() ==
-                old(embeddedServer.applicationContext.getBean(LoginFailedEventListener).events.size()) + 1
+        new PollingConditions().eventually {
+            embeddedServer.applicationContext.getBean(LoginFailedEventListener).events.size() == 1
+        }
     }
 
     def "successful login publishes LoginSuccessfulEvent"() {
@@ -72,8 +74,9 @@ class EventListenerSpec extends Specification {
         client.toBlocking().exchange(request)
 
         then:
-        embeddedServer.applicationContext.getBean(LoginSuccessfulEventListener).events.size() ==
-                old(embeddedServer.applicationContext.getBean(LoginSuccessfulEventListener).events.size()) + 1
+        new PollingConditions().eventually {
+            embeddedServer.applicationContext.getBean(LoginSuccessfulEventListener).events.size() == 1
+        }
     }
 
     def "accessing a secured endpoints, validates Basic auth token and triggers TokenValidatedEvent"() {
@@ -82,8 +85,9 @@ class EventListenerSpec extends Specification {
         client.toBlocking().exchange(request)
 
         then:
-        embeddedServer.applicationContext.getBean(TokenValidatedEventListener).events.size() ==
-                old(embeddedServer.applicationContext.getBean(TokenValidatedEventListener).events.size()) + 1
+        new PollingConditions().eventually {
+            embeddedServer.applicationContext.getBean(TokenValidatedEventListener).events.size() == 1
+        }
     }
 
     def "invoking logout triggers LogoutEvent"() {
@@ -93,9 +97,10 @@ class EventListenerSpec extends Specification {
 
         then:
         thrown(HttpClientResponseException)
-        embeddedServer.applicationContext.getBean(LogoutEventListener).events.size() ==
-                old(embeddedServer.applicationContext.getBean(LogoutEventListener).events.size()) + 1
-        (embeddedServer.applicationContext.getBean(LogoutEventListener).events*.getSource() as List<Authentication>).find { it.name == 'user'}
+        new PollingConditions().eventually {
+            embeddedServer.applicationContext.getBean(LogoutEventListener).events.size() == 1
+            (embeddedServer.applicationContext.getBean(LogoutEventListener).events*.getSource() as List<Authentication>).any { it.name == 'user'}
+        }
     }
 
     @Requires(property = "spec.name", value = "eventlistener")
