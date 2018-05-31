@@ -30,7 +30,6 @@ import javax.inject.Singleton
  */
 class HeartbeatTaskSpec extends Specification {
 
-    @IgnoreIf({System.getenv('TRAVIS')})
     void "test that by default a heartbeat is sent"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
