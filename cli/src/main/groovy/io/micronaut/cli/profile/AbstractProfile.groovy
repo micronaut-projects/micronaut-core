@@ -66,6 +66,8 @@ abstract class AbstractProfile implements Profile {
     protected List<Feature> features = []
     protected Set<String> defaultFeaturesNames = []
     protected Set<String> requiredFeatureNames = []
+    protected Set<String> oneOfFeatureNames = []
+    protected String defaultOneOfFeatureName = null
     protected String parentTargetFolder
     protected final ClassLoader classLoader
     protected ExclusionDependencySelector exclusionDependencySelector = new ExclusionDependencySelector()
@@ -154,6 +156,8 @@ abstract class AbstractProfile implements Profile {
             def featureList = (List) featureMap.get("provided") ?: Collections.emptyList()
             def defaultFeatures = (List) featureMap.get("defaults") ?: Collections.emptyList()
             def requiredFeatures = (List) featureMap.get("required") ?: Collections.emptyList()
+            def oneOfFeatures = (List) featureMap.get("oneOf") ?: Collections.emptyList()
+            def defaultOneOfFeatures = featureMap.get("defaultOneOf") ?: null
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
@@ -164,6 +168,8 @@ abstract class AbstractProfile implements Profile {
 
             defaultFeaturesNames.addAll(defaultFeatures)
             requiredFeatureNames.addAll(requiredFeatures)
+            oneOfFeatureNames.addAll(oneOfFeatures)
+            defaultOneOfFeatureName = defaultOneOfFeatures
         }
 
 
@@ -249,6 +255,17 @@ abstract class AbstractProfile implements Profile {
     Iterable<Feature> getDefaultFeatures() {
         getFeatures().findAll() { Feature f -> defaultFeaturesNames.contains(f.name) }
     }
+
+    @Override
+    Iterable<Feature> getOneOfFeatures() {
+        getFeatures().findAll() { Feature f -> oneOfFeatureNames.contains(f.name) }
+    }
+
+    @Override
+    Feature getDefaultOneOfFeature() {
+        getFeatures().find() { Feature f -> f.name == defaultOneOfFeatureName } as Feature
+    }
+
 
     @Override
     Iterable<Feature> getRequiredFeatures() {

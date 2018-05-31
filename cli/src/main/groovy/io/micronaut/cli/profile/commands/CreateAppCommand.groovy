@@ -536,11 +536,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
         Set<Feature> features = []
-        List<String> validFeatureNames
+        List<String> validRequestedFeatureNames
 
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
-            validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
+            validRequestedFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -554,7 +554,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
                 MicronautConsole.getInstance().warn(warning.toString())
             }
 
-            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }
+            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validRequestedFeatureNames.contains(f.name) }
 // as List<Feature>
             features.addAll(validFeatures)
         } else {
@@ -563,13 +563,21 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         features.addAll(profile.requiredFeatures)
 
+        if(profile.oneOfFeatures.size() > 0) {
+            Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures.contains(it) }
+
+            if (!oneOfFeatures) {
+                features.add(profile.defaultOneOfFeature)
+            }
+        }
+
         for (int i = 0; i < features.size(); i++) {
             features.addAll(features[i].getDependentFeatures(profile))
         }
 
-        if(validFeatureNames) {
+        if(validRequestedFeatureNames) {
             features = features.collect { feature ->
-                if(validFeatureNames.contains(feature.name)) {
+                if(validRequestedFeatureNames.contains(feature.name)) {
                     feature.setRequested(true)
                 }
 
