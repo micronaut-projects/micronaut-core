@@ -47,7 +47,7 @@ import javax.inject.Singleton
 class EventListenerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'eventlistener',
+            'spec.name': "io.micronaut.security.events.EventListenerSpec",
             'endpoints.beans.enabled': true,
             'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
@@ -103,7 +103,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class LoginSuccessfulEventListener implements ApplicationEventListener<LoginSuccessfulEvent> {
         List<LoginSuccessfulEvent> events = []
@@ -113,7 +113,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class LogoutEventListener implements ApplicationEventListener<LogoutEvent> {
         List<LogoutEvent> events = []
@@ -124,17 +124,17 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class LoginFailedEventListener implements ApplicationEventListener<LoginFailedEvent> {
-        List<LoginFailedEvent> events = []
+        volatile List<LoginFailedEvent> events = []
         @Override
         void onApplicationEvent(LoginFailedEvent event) {
             events.add(event)
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class TokenValidatedEventListener implements ApplicationEventListener<TokenValidatedEvent> {
         List<TokenValidatedEvent> events = []
@@ -144,7 +144,7 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class LogoutFailedEventListener implements ApplicationEventListener<LogoutEvent> {
         List<LogoutEvent> events = []
@@ -154,20 +154,24 @@ class EventListenerSpec extends Specification {
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class CustomAuthenticationProvider implements AuthenticationProvider {
 
         @Override
         Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
+            System.out.println(authenticationRequest.identity)
+            System.out.println(authenticationRequest.secret)
             if ( authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password' ) {
+                System.out.println("returning a new user details")
                 return Flowable.just(new UserDetails('user', []))
             }
+            System.out.println("returning authentication failed")
             return Flowable.just(new AuthenticationFailed())
         }
     }
 
-    @Requires(property = "spec.name", value = "eventlistener")
+    @Requires(property = "spec.name", value = "io.micronaut.security.events.EventListenerSpec")
     @Singleton
     static class CustomLoginHandler implements LoginHandler {
 
