@@ -30,6 +30,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
       ./gradlew --stop
       ./gradlew --no-daemon docs || EXIT_STATUS=$?
+
       git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
 
       cd gh-pages
@@ -74,6 +75,8 @@ fi
 if [[ $EXIT_STATUS -ne 0 ]]; then
 
   ./gradlew aggregateReports
+  
+  git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
 
   cd gh-pages
 

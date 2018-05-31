@@ -25,6 +25,8 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.annotation.Scheduled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,7 +64,8 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     /**
      * Publish the heartbeat event with current health status.
      */
-    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
+    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}",
+               initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
     public void pulsate() {
         ServiceInstance instance = eventReference.get();
         if (instance != null) {

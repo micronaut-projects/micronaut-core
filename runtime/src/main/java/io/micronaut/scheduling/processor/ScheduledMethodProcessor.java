@@ -26,6 +26,8 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
@@ -45,6 +47,8 @@ import java.util.concurrent.ScheduledFuture;
  */
 @Singleton
 public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TaskScheduler.class);
 
     private final BeanContext beanContext;
     private final ConversionService<?> conversionService;
@@ -94,12 +98,19 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
             String cronExpr = scheduledAnnotation.cron();
             if (StringUtils.isNotEmpty(cronExpr)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
+                }
                 taskScheduler.schedule(cronExpr, task);
             } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
                     new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
                 );
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Scheduling fixed rate task [{}] for method: {}", duration, method);
+                }
 
                 ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
                 scheduledTasks.add(scheduledFuture);
@@ -110,6 +121,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     Duration duration = converted.orElseThrow(() ->
                         new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
                     );
+
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
+                    }
 
                     ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
                     scheduledTasks.add(scheduledFuture);
