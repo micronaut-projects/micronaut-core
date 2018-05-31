@@ -30,7 +30,6 @@ import spock.lang.IgnoreIf
  * @author Graeme Rocher
  * @since 1.0
  */
-@IgnoreIf({System.getenv("TRAVIS")})
 class UploadSpec extends AbstractMicronautSpec {
 
     @Override
