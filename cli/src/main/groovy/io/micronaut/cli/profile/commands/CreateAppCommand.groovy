@@ -57,10 +57,13 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     public static final String NAME = "create-app"
     public static final String PROFILE_FLAG = "profile"
     public static final String FEATURES_FLAG = "features"
+    public static final String LANG_FLAG = "lang"
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
     public static final String INPLACE_FLAG = "inplace"
     public static final String BUILD_FLAG = "build"
 
+    protected static final List<String> LANG_OPTIONS = ["java", "groovy", "kotlin"]
+    protected static final String LANG_DEFAULT = "java"
     protected static final List<String> BUILD_OPTIONS = ["gradle", "maven"]
     protected static final String APPLICATION_YML = "application.yml"
     protected static final String BUILD_GRADLE = "build.gradle"
@@ -70,10 +73,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     Map<String, String> variables = [:]
     String appname
     String groupname
+    String lang
     String defaultpackagename
     File targetDirectory
 
-    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME]")
+    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME]-lang [LANG]")
 
     CreateAppCommand() {
         populateDescription()
@@ -84,6 +88,9 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         if (flags.contains(BUILD_FLAG)) {
             description.flag(name: BUILD_FLAG, description: "Which build tool to configure. Possible values: ${BUILD_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
+        if (flags.contains(LANG_FLAG)) {
+            description.flag(name: LANG_FLAG, description: "Which language to use. Possible values: ${LANG_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
+        }
         if (flags.contains(PROFILE_FLAG)) {
             description.flag(name: PROFILE_FLAG, description: "The profile to use", required: false)
         }
@@ -93,7 +100,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     protected List<String> getFlags() {
-        [INPLACE_FLAG, BUILD_FLAG, PROFILE_FLAG, FEATURES_FLAG]
+        [INPLACE_FLAG, BUILD_FLAG, LANG_FLAG, PROFILE_FLAG, FEATURES_FLAG]
     }
 
     protected void populateDescription() {
@@ -159,6 +166,15 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
                 } else if (!BUILD_OPTIONS.contains(val)) {
                     def valStr = val.toString()
                     candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
+                }
+                return cursor
+            } else if (lastOption.key == LANG_FLAG) {
+                def val = lastOption.value
+                if (val == true) {
+                    candidates.addAll(LANG_OPTIONS.collect { "$it ".toString() })
+                } else if (!LANG_OPTIONS.contains(val)) {
+                    def valStr = val.toString()
+                    candidates.addAll(LANG_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
                 }
                 return cursor
             }
@@ -383,6 +399,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         CommandLine commandLine = executionContext.commandLine
 
         String profileName = evaluateProfileName(commandLine)
+        String langFeature = evaluateLangFeature(commandLine, profileName)
 
         List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
@@ -400,7 +417,10 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
-        List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        List<String> features = [langFeature]
+        List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        if(commandLineFeatures) features.addAll(commandLineFeatures)
+
         String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
@@ -532,6 +552,15 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
     protected String evaluateProfileName(CommandLine mainCommandLine) {
         mainCommandLine.optionValue(PROFILE_FLAG)?.toString() ?: getDefaultProfile()
+    }
+
+    protected String evaluateLangFeature(CommandLine commandLine, String profile) {
+        "application-${resolveLang(commandLine)}"
+    }
+
+    protected String resolveLang(CommandLine commandLine) {
+        if(!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
+        lang
     }
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
