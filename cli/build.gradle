@@ -66,14 +66,16 @@ task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
 
 task cliZip(type: Zip, dependsOn: ['fatJar']) {
     archiveName = "micronaut-${project.version}.zip"
-    from('build/bin') {
-        into('bin')
+    into("micronaut-${project.version}") {
+        from('build/bin') {
+            into('bin')
+        }
+        from('../media') {
+            into('media')
+        }
+        from fatJar.outputs.files
+        from('../LICENSE')
     }
-    from('../media') {
-        into('media')
-    }
-    from fatJar.outputs.files
-    from('../LICENSE')
 }
 
 publishing {

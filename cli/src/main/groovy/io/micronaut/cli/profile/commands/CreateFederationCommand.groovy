@@ -26,6 +26,7 @@ import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.util.VersionInfo
 
 import java.nio.file.Paths
 
@@ -79,7 +80,7 @@ class CreateFederationCommand extends CreateAppCommand {
         }
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
         final boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
-        final String micronautVersion = MicronautCli.getPackage().getImplementationVersion()
+        final String micronautVersion = VersionInfo.getVersion(MicronautCli)
         final String profileName = evaluateProfileName(commandLine)
 
         final File serviceDir = inPlace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)

@@ -36,6 +36,7 @@ import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.util.NameUtils
+import io.micronaut.cli.util.VersionInfo
 
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -406,7 +407,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             appName: appName,
             baseDir: executionContext.baseDir,
             profileName: profileName,
-            micronautVersion: MicronautCli.getPackage().getImplementationVersion(),
+            micronautVersion: VersionInfo.getVersion(MicronautCli),
             features: features,
             inplace: inPlace,
             build: build,

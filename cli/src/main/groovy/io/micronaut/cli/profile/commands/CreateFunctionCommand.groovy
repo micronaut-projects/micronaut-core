@@ -21,6 +21,7 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.ExecutionContext
+import io.micronaut.cli.util.VersionInfo
 
 import java.nio.file.Paths
 
@@ -115,7 +116,7 @@ class CreateFunctionCommand extends CreateAppCommand {
                 appName: appName,
                 baseDir: executionContext.baseDir,
                 profileName: functionProfile,
-                micronautVersion: MicronautCli.getPackage().getImplementationVersion(),
+                micronautVersion: VersionInfo.getVersion(MicronautCli),
                 features: features,
                 inplace: inPlace,
                 build: build,

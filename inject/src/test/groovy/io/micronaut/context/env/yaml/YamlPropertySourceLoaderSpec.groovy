@@ -29,16 +29,17 @@ class YamlPropertySourceLoaderSpec extends Specification {
 
     void "test load yaml properties source"() {
         given:
-        def mock = Mock(SoftServiceLoader)
         def serviceDefinition = Mock(ServiceDefinition)
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()
-        mock.iterator() >> [serviceDefinition].iterator()
 
         Environment env = new DefaultEnvironment(["test"] as String[]) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
-                return mock
+                GroovyClassLoader gcl = new GroovyClassLoader()
+                gcl.addClass(YamlPropertySourceLoader)
+                gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
             }
 
             @Override
