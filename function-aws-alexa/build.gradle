@@ -5,4 +5,5 @@ dependencies {
     compile "com.amazon.alexa:ask-sdk:2.2.1"
 
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
 }
