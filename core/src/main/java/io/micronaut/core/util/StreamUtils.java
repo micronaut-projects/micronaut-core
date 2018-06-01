@@ -196,32 +196,4 @@ public class StreamUtils {
     public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
         return toImmutableCollection(ArrayList::new);
     }
-
-    /**
-     * Creates a stream for the given list that operates in reverse order.
-     * Does not modify the original collection.
-     *
-     * @param list The list to stream
-     * @param <T> The type of stream to return
-     * @return A new stream
-     */
-    public static <T> Stream<T> reversed(List<T> list) {
-        Spliterator<T> spliterator = ((Iterable<T>) () ->
-            new Iterator<T>() {
-                int current = list.size() - 1;
-
-                public boolean hasNext() {
-                    return current > -1;
-                }
-
-                public T next() {
-                    return list.get(current--);
-                }
-
-                public void remove() { // Not implemented
-                    throw new UnsupportedOperationException();
-                }
-            }).spliterator();
-        return StreamSupport.stream(spliterator, false);
-    }
 }
