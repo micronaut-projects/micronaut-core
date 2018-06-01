@@ -134,6 +134,7 @@ class EventListenerSpec extends Specification {
         volatile List<LoginFailedEvent> events = []
         @Override
         void onApplicationEvent(LoginFailedEvent event) {
+            println "received login failed event"
             events.add(event)
         }
     }
@@ -144,6 +145,7 @@ class EventListenerSpec extends Specification {
         List<TokenValidatedEvent> events = []
         @Override
         void onApplicationEvent(TokenValidatedEvent event) {
+            println "received token validated event"
             events.add(event)
         }
     }
@@ -154,6 +156,7 @@ class EventListenerSpec extends Specification {
         List<LogoutEvent> events = []
         @Override
         void onApplicationEvent(LogoutEvent event) {
+            println "received logout event"
             events.add(event)
         }
     }
