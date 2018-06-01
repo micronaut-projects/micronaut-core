@@ -208,8 +208,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                         }
                     }
                     if (exceptionType == null) {
-                        List<Class> argumentTypes = Arrays.asList(method.getArgumentTypes());
-                        exceptionType = StreamUtils.reversed(argumentTypes)
+                        exceptionType = Arrays.stream(method.getArgumentTypes())
                                 .filter(Throwable.class::isAssignableFrom)
                                 .findFirst()
                                 .orElse(Throwable.class);
