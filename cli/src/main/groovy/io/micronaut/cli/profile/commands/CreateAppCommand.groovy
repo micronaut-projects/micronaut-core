@@ -814,7 +814,6 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
     }
 
-
     static class CreateServiceCommandObject {
         String appName
         File baseDir

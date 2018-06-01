@@ -306,10 +306,6 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
-
-    tasks.withType(Test) {
-        ignoreFailures = true
-    }
 }
 
 task aggregateReports {
