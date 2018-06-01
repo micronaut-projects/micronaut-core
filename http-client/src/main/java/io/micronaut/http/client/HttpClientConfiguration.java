@@ -17,6 +17,8 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 
@@ -39,11 +41,6 @@ import java.util.concurrent.ThreadFactory;
  * @since 1.0
  */
 public abstract class HttpClientConfiguration {
-
-    /**
-     * Constant for localhost.
-     */
-    public static final String LOCALHOST = "localhost";
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
 
@@ -74,6 +71,8 @@ public abstract class HttpClientConfiguration {
 
     private boolean followRedirects = true;
 
+    private SslConfiguration sslConfiguration = new ClientSslConfiguration();
+
     /**
      * Default constructor.
      */
@@ -87,6 +86,22 @@ public abstract class HttpClientConfiguration {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
+    }
+
+    /**
+     * @return The {@link SslConfiguration} for the client
+     */
+    public SslConfiguration getSslConfiguration() {
+        return sslConfiguration;
+    }
+
+    /**
+     * Sets the SSL configuration for the client.
+     *
+     * @param sslConfiguration The SSL configuration
+     */
+    public void setSslConfiguration(SslConfiguration sslConfiguration) {
+        this.sslConfiguration = sslConfiguration;
     }
 
     /**
@@ -293,6 +308,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @return The proxy password to use.
      */
+    @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
         return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));
