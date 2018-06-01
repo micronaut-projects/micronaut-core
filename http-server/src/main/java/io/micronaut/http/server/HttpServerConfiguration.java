@@ -47,11 +47,6 @@ public class HttpServerConfiguration {
 
     public static final String PREFIX = "micronaut.server";
 
-    /**
-     * Constant for localhost.
-     */
-    public static final String LOCALHOST = "localhost";
-
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
     protected Optional<Integer> readTimeout;
