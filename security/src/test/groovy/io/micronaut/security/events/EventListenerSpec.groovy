@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -63,7 +64,8 @@ class EventListenerSpec extends Specification {
         client.toBlocking().exchange(request)
 
         then:
-        thrown(HttpClientResponseException)
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
         new PollingConditions().eventually {
             embeddedServer.applicationContext.getBean(LoginFailedEventListener).events.size() == 1
         }
