@@ -18,6 +18,7 @@ package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import groovy.transform.ToString
+import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.console.parsing.ScriptNameResolver
 import io.micronaut.cli.interactive.completers.StringsCompleter
@@ -66,8 +67,7 @@ abstract class AbstractProfile implements Profile {
     protected List<Feature> features = []
     protected Set<String> defaultFeaturesNames = []
     protected Set<String> requiredFeatureNames = []
-    protected Set<String> oneOfFeatureNames = []
-    protected String defaultOneOfFeatureName = null
+    protected List<Map> oneOfFeatureMaps = []
     protected String parentTargetFolder
     protected final ClassLoader classLoader
     protected ExclusionDependencySelector exclusionDependencySelector = new ExclusionDependencySelector()
@@ -156,8 +156,7 @@ abstract class AbstractProfile implements Profile {
             def featureList = (List) featureMap.get("provided") ?: Collections.emptyList()
             def defaultFeatures = (List) featureMap.get("defaults") ?: Collections.emptyList()
             def requiredFeatures = (List) featureMap.get("required") ?: Collections.emptyList()
-            def oneOfFeatures = (List) featureMap.get("oneOf") ?: Collections.emptyList()
-            def defaultOneOfFeatures = featureMap.get("defaultOneOf") ?: null
+            def oneOfFeaturesMap = (List) featureMap.get("oneOf") ?: Collections.emptyList()
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
@@ -166,10 +165,18 @@ abstract class AbstractProfile implements Profile {
                 }
             }
 
+            for (entry in (List) oneOfFeaturesMap) {
+                if (entry instanceof Map) {
+                    String feature = (String) entry.feature
+                    Integer priority = (Integer) entry.priority
+
+                    oneOfFeatureMaps.add([name: feature, priority: priority])
+
+                }
+            }
+
             defaultFeaturesNames.addAll(defaultFeatures)
             requiredFeatureNames.addAll(requiredFeatures)
-            oneOfFeatureNames.addAll(oneOfFeatures)
-            defaultOneOfFeatureName = defaultOneOfFeatures
         }
 
 
@@ -181,8 +188,8 @@ abstract class AbstractProfile implements Profile {
 
             for (entry in ((List) dependencyMap)) {
                 if (entry instanceof Map) {
-                    def scope = (String)entry.scope
-                    String coords = (String)entry.coords
+                    def scope = (String) entry.scope
+                    String coords = (String) entry.coords
 
                     if ("excludes".equals(scope)) {
                         def artifact = new DefaultArtifact(coords)
@@ -194,11 +201,11 @@ abstract class AbstractProfile implements Profile {
                         Dependency dependency = new Dependency(new DefaultArtifact(coords), scope.toString())
                         if (entry.containsKey('excludes')) {
                             List<Exclusion> dependencyExclusions = new ArrayList<>()
-                            List excludes = (List)entry.excludes
+                            List excludes = (List) entry.excludes
 
                             for (ex in excludes) {
                                 if (ex instanceof Map) {
-                                    dependencyExclusions.add(new Exclusion((String)ex.group, (String)ex.module, (String)ex.classifier, (String)ex.extension))
+                                    dependencyExclusions.add(new Exclusion((String) ex.group, (String) ex.module, (String) ex.classifier, (String) ex.extension))
                                 }
                             }
                             dependency = dependency.setExclusions(dependencyExclusions)
@@ -257,15 +264,17 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
-    Iterable<Feature> getOneOfFeatures() {
-        getFeatures().findAll() { Feature f -> oneOfFeatureNames.contains(f.name) }
+    @CompileStatic(TypeCheckingMode.SKIP)
+    Iterable<OneOfFeature> getOneOfFeatures() {
+        getFeatures().findAll() { Feature f ->
+            oneOfFeatureMaps.collect() { it.name }.contains(f.name)
+        }
+        .collect() { Feature f ->
+            new OneOfFeature(
+                    feature: (Feature) f,
+                    priority: (Integer) oneOfFeatureMaps.find { it.name == f.name }.priority)
+        }
     }
-
-    @Override
-    Feature getDefaultOneOfFeature() {
-        getFeatures().find() { Feature f -> f.name == defaultOneOfFeatureName } as Feature
-    }
-
 
     @Override
     Iterable<Feature> getRequiredFeatures() {
@@ -409,8 +418,8 @@ abstract class AbstractProfile implements Profile {
                 if (description.completer) {
                     if (description.flags) {
                         completers << new ArgumentCompleter(commandNameCompleter,
-                                                            description.completer,
-                                                            new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
+                                description.completer,
+                                new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
                     } else {
                         completers << new ArgumentCompleter(commandNameCompleter, description.completer)
                     }
