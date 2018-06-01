@@ -18,20 +18,17 @@ package io.micronaut.discovery.kubernetes;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.reactivex.Flowable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A {@link DiscoveryClient} implementation for Kubernetes. Kubernetes uses environment variables so no API calls is
@@ -43,46 +40,83 @@ import java.util.Map;
 @Singleton
 @Requires(env = Environment.KUBERNETES)
 public class KubernetesDiscoveryClient implements DiscoveryClient {
+    private static final Logger LOG = LoggerFactory.getLogger(KubernetesDiscoveryClient.class);
 
-    private static final String HOST_SUFFIX = "_SERVICE_HOST";
-    private static final String PORT_SUFFIX = "_SERVICE_PORT";
-    private static final String HTTPS_PORT_SUFFIX = "_SERVICE_PORT_HTTPS";
+    private static final String SERVICE_SUFFIX = "_SERVICE";
+    private static final String HOST_SUFFIX = SERVICE_SUFFIX + "_HOST";
+    // When k8s exposes a port to the outside world the environment variable is suffixes with _PUBLISHED_SERVICE_HOST
+    private static final String PUBLISHED_SUFFIX = "_PUBLISHED";
+    // When k8s exposes a port to the outside world the environment variable is suffixes with _RANDOM_PORTS_SERVICE_HOST
+    private static final String RANDOM_PORTS_SUFFIX = "_RANDOM_PORTS";
+    private static final String[] SUFFIXES = new String[] {  PUBLISHED_SUFFIX + HOST_SUFFIX, RANDOM_PORTS_SUFFIX + HOST_SUFFIX, HOST_SUFFIX};
+
+    private static final String PORT_SUFFIX = SERVICE_SUFFIX + "_PORT";
+    private static final String HTTPS_PORT_SUFFIX = SERVICE_SUFFIX + "_PORT_HTTPS";
+
+    private final Map<String, ServiceInstance> serviceIds;
+    /**
+     * Default constructor.
+     */
+    public KubernetesDiscoveryClient() {
+        Map<String, String> env = resolveEnvironment();
+        Map<String, ServiceInstance> serviceInstanceMap = new HashMap<>();
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            String key = entry.getKey();
+            for (String suffix : SUFFIXES) {
+                if (key.endsWith(suffix)) {
+                    String serviceId = key.substring(0, key.length() - HOST_SUFFIX.length());
+                    String host = entry.getValue();
+                    String port;
+                    boolean isSecure = false;
+
+                    port = env.get(serviceId + HTTPS_PORT_SUFFIX);
+                    if (StringUtils.isEmpty(port)) {
+                        port = env.get(serviceId + PORT_SUFFIX);
+                    }
+                    else {
+                        isSecure = true;
+                    }
+                    if (port != null) {
+                        if (serviceId.endsWith(PUBLISHED_SUFFIX)) {
+                            serviceId = serviceId.substring(0, serviceId.length() - PUBLISHED_SUFFIX.length());
+                        }
+                        else if (serviceId.endsWith(RANDOM_PORTS_SUFFIX)) {
+                            serviceId = serviceId.substring(0, serviceId.length() - RANDOM_PORTS_SUFFIX.length());
+                        }
+
+                        serviceId = serviceId.toLowerCase(Locale.ENGLISH).replace('_', '-');
+                        serviceInstanceMap.put(
+                                serviceId,
+                                ServiceInstance.builder(
+                                        serviceId,
+                                        URI.create((isSecure ? "https://" : "http://") + host + ":" + port)
+                                ).build()
+                        );
+                    }
+                }
+            }
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Discovered Services from Kubernetes environment:");
+            for (ServiceInstance serviceInstance : serviceInstanceMap.values()) {
+                LOG.debug("* {} - {}", serviceInstance.getId(), serviceInstance.getURI());
+            }
+        }
+        this.serviceIds = serviceInstanceMap;
+    }
 
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
-        serviceId = NameUtils.hyphenate(serviceId);
-        Map<String, String> environment = resolveEnvironment();
-
-        String envName = serviceId.toUpperCase(Locale.ENGLISH).replace('-', '_');
-        String host = environment.get(envName + HOST_SUFFIX);
-        if (StringUtils.isNotEmpty(host)) {
-            String port = environment.get(envName + HTTPS_PORT_SUFFIX);
-            if (StringUtils.isNotEmpty(port)) {
-                return singleService(serviceId, host, port, true);
-            } else {
-                port = environment.get(envName + PORT_SUFFIX);
-                if (StringUtils.isNotEmpty(port)) {
-                    return singleService(serviceId, host, port, false);
-                }
-            }
+        ServiceInstance serviceInstance = serviceIds.get(serviceId);
+        if (serviceInstance != null) {
+            return Flowable.just(Collections.singletonList(serviceInstance));
         }
         return Flowable.just(Collections.emptyList());
     }
 
     @Override
     public Flowable<List<String>> getServiceIds() {
-        List<String> services = new ArrayList<>();
-
-        Map<String, String> environment = resolveEnvironment();
-        for (String envName : environment.keySet()) {
-            if (envName.endsWith(HOST_SUFFIX)) {
-                String serviceId = envName.substring(0, envName.length() - HOST_SUFFIX.length());
-
-                services.add(serviceId.toLowerCase(Locale.ENGLISH).replace('_', '-'));
-            }
-        }
-
-        return Flowable.just(services);
+        return Flowable.just(new ArrayList<>(serviceIds.keySet()));
     }
 
     @Override
@@ -105,14 +139,4 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
         return System.getenv();
     }
 
-    private Flowable<List<ServiceInstance>> singleService(String serviceId, String host, String port, boolean secure) {
-        return Flowable.just(
-            Collections.singletonList(
-                ServiceInstance.builder(
-                    serviceId,
-                    URI.create((secure ? "https://" : "http://") + host + ":" + port)
-                ).build()
-            )
-        );
-    }
 }
