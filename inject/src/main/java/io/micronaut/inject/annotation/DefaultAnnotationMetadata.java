@@ -628,7 +628,11 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      */
     @Internal
     public void flushCache() {
-        annotationMap.clear();
-        declaredAnnotationMap.clear();
+        if (annotationMap != null) {
+            annotationMap.clear();
+        }
+        if (declaredAnnotationMap != null) {
+            declaredAnnotationMap.clear();
+        }
     }
 }
