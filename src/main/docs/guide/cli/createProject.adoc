@@ -106,7 +106,7 @@ To create an app with Kotlin & Spek support, supply the appropriate features via
 
 [source,bash]
 ----
-mn> create-app my-groovy-app -features kotlin, spek
+mn> create-app my-kotlin-app -features kotlin, spek
 ----
 
 This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
