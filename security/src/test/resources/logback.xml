@@ -11,5 +11,6 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-    <!--<logger name="io.micronaut.context.env" level="TRACE"/>-->
+    <logger name="io.micronaut.context.env" level="TRACE"/>
+    <logger name="io.micronaut.scheduling" level="TRACE"/>
 </configuration>
