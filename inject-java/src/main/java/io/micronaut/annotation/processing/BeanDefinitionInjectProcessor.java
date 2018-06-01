@@ -1374,6 +1374,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
                 AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(paramElement);
+                if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
+                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+                }
                 params.addAnnotationMetadata(argName, annotationMetadata);
 
                 switch (kind) {

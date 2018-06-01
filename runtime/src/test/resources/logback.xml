@@ -11,8 +11,4 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-    <!--<logger name="io.micronaut.http" level="TRACE"/>-->
-    <logger name="io.micronaut.scheduling" level="DEBUG"/>
-    <logger name="io.micronaut.context.event" level="DEBUG"/>
-
 </configuration>

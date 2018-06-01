@@ -81,10 +81,12 @@ public class LoginController {
         return authenticationResponseFlowable.map(authenticationResponse -> {
             if (authenticationResponse.isAuthenticated()) {
                 UserDetails userDetails = (UserDetails) authenticationResponse;
+                System.out.println("Publishing login success");
                 eventPublisher.publishEvent(new LoginSuccessfulEvent(userDetails));
                 return loginHandler.loginSuccess(userDetails, request);
             } else {
                 AuthenticationFailed authenticationFailed = (AuthenticationFailed) authenticationResponse;
+                System.out.println("Publishing login failure");
                 eventPublisher.publishEvent(new LoginFailedEvent(authenticationFailed));
                 return loginHandler.loginFailed(authenticationFailed);
             }
