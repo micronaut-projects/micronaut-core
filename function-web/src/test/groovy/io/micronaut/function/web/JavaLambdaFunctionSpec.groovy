@@ -1,5 +1,6 @@
 package io.micronaut.function.web
 
+import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -9,6 +10,7 @@ import spock.lang.Specification
 
 class JavaLambdaFunctionSpec extends Specification {
 
+    @NotYetImplemented
     void "test string supplier"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
