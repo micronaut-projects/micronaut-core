@@ -12,7 +12,7 @@
         <appender-ref ref="STDOUT" />
     </root>
     <!--<logger name="io.micronaut.http" level="TRACE"/>-->
-    <logger name="io.micronaut.scheduling" level="TRACE"/>
-    <logger name="io.micronaut.context.event" level="TRACE"/>
+    <!--<logger name="io.micronaut.scheduling" level="TRACE"/>-->
+    <!--<logger name="io.micronaut.context.event" level="TRACE"/>-->
 
 </configuration>
