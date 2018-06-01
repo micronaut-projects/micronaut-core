@@ -55,11 +55,12 @@ class HeartbeatTaskSpec extends Specification {
         private HeartbeatEvent event
         @Override
         synchronized void onApplicationEvent(HeartbeatEvent event) {
-            println 'Test Heartbeat listener received event'
+            println "Test Heartbeat listener $this received event $event"
             this.event = event
         }
 
         synchronized HeartbeatEvent getEvent() {
+            println "Test Heartbeat listener $this return event $event"
             return event
         }
     }
