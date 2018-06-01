@@ -50,9 +50,16 @@ class MavenBuildTokens {
 
         (profile.repositories + defaultRepo).each { String repo ->
             if (repo.startsWith('http')) {
-                repositoriesXml.repository {
-                    id(repo.replaceAll("^http(|s)://(.*?)/.*", '$2'))
-                    url(repo)
+                try {
+                    URI uri = URI.create(repo)
+                    if (uri != null) {
+                        repositoriesXml.repository {
+                            id(uri.host)
+                            url(repo)
+                        }
+                    }
+                } catch (Exception e) {
+                    //no-op
                 }
             } else if (repo == 'jcenter()') {
                 repositoriesXml.repository {
