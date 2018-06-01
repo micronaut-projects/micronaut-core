@@ -139,6 +139,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     @Internal
     public void configure(BeanContext context) {
         if (context instanceof ApplicationContext) {
+            flushCache();
             ApplicationContext applicationContext = (ApplicationContext) context;
             this.environment = applicationContext.getEnvironment();
         }
