@@ -18,6 +18,7 @@ package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.InheritConstructors
 import groovy.transform.ToString
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.io.support.Resource
@@ -32,6 +33,7 @@ import org.yaml.snakeyaml.Yaml
  * @author Graeme Rocher
  * @since 1.0
  */
+@InheritConstructors
 @EqualsAndHashCode(includes = ['name'])
 @ToString(includes = ['profile', 'name'])
 @CompileStatic

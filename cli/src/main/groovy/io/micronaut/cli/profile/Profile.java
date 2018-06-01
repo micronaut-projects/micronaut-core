@@ -77,14 +77,9 @@ public interface Profile {
     Iterable<Feature> getDefaultFeatures();
 
     /**
-     * @return The defaultOneOf feature for this profile
-     */
-    Feature getDefaultOneOfFeature();
-
-    /**
      * @return The oneOf features for this profile
      */
-    Iterable<Feature> getOneOfFeatures();
+    Iterable<OneOfFeature> getOneOfFeatures();
 
     /**
      * @return The required features for this profile

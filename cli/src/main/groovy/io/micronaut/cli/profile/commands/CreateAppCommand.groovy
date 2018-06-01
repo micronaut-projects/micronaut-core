@@ -32,6 +32,7 @@ import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Feature
+import io.micronaut.cli.profile.OneOfFeature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
@@ -568,6 +569,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
+        println "evaluating..."
         Set<Feature> features = []
         List<String> validRequestedFeatureNames
 
@@ -588,7 +590,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             }
 
             Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validRequestedFeatureNames.contains(f.name) }
-// as List<Feature>
+
             features.addAll(validFeatures)
         } else {
             features.addAll(profile.defaultFeatures)
@@ -597,10 +599,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         features.addAll(profile.requiredFeatures)
 
         if (profile.oneOfFeatures.size() > 0) {
-            Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures.contains(it) }
+            Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures*.feature.contains(it) }
 
             if (!oneOfFeatures) {
-                features.add(profile.defaultOneOfFeature)
+                //TODO:
+                features.add(profile.oneOfFeatures.min { it.priority}.feature )
             }
         }
 
@@ -609,12 +612,13 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
 
         if (profile.oneOfFeatures.size() > 0) {
-            Iterable<Feature> includedOneOfFeatures = features.findAll { Feature f -> profile.oneOfFeatures.contains(f) }
+            Iterable<OneOfFeature> includedOneOfFeatures = profile.oneOfFeatures.findAll { OneOfFeature f -> features.contains { f.feature } }
 
             if (includedOneOfFeatures.size() > 1) {
-                List<String> names = includedOneOfFeatures*.name
-                StringBuilder warning = new StringBuilder("Features ${names.join(", ")} should not be used together!")
-                MicronautConsole.getInstance().warn(warning.toString())
+                //TODO:
+                includedOneOfFeatures.min { it.priority }
+
+
             }
         }
 
