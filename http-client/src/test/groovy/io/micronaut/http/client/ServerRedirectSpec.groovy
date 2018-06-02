@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.Single
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
@@ -46,12 +47,14 @@ class ServerRedirectSpec extends Specification {
     void "test https redirect"() {
 
         given:"An HTTPS URL issues an HTTPS"
+        YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
         def client = HttpClient.create(new URL("https://www.youtube.com"))
         def response= client
                 .toBlocking().retrieve("/")
 
         expect:"The response was returned and doesn't loop"
         response
+        youtubeClient.test().blockingGet()
 
         cleanup:
         client.close()
@@ -157,6 +160,13 @@ class ServerRedirectSpec extends Specification {
             Flowable.just(new Book(title: "The Stand"))
         }
     }
+
+    @Client("https://youtube.com")
+    static interface YoutubeClient {
+        @Get("/")
+        Single<String> test()
+    }
+
 
     static class Book {
         String title

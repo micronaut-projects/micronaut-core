@@ -52,10 +52,16 @@ class HeartbeatTaskSpec extends Specification {
 
     @Singleton
     static class HeartbeatListener implements ApplicationEventListener<HeartbeatEvent> {
-        HeartbeatEvent event
+        private HeartbeatEvent event
         @Override
-        void onApplicationEvent(HeartbeatEvent event) {
+        synchronized void onApplicationEvent(HeartbeatEvent event) {
+            println "Test Heartbeat listener $this received event $event"
             this.event = event
+        }
+
+        synchronized HeartbeatEvent getEvent() {
+            println "Test Heartbeat listener $this return event $event"
+            return event
         }
     }
 }

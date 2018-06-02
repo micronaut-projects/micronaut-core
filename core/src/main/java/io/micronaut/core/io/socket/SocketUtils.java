@@ -31,6 +31,11 @@ import java.util.Random;
  */
 public class SocketUtils {
 
+    /**
+     * Constant for localhost.
+     */
+    public static final String LOCALHOST = "localhost";
+
     private static final int MIN_PORT_RANGE = 1024;
 
     // no unsigned short type in Java so use constant

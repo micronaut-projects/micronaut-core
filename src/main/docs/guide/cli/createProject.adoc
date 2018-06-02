@@ -8,7 +8,7 @@ In addition, there are specialty commands for creating a "federation" of multipl
 |Command|Description|Arguments|Example
 
 |`create-app`
-|Creates a basic Micronaut Java application, using the `service` profile by default.
+|Creates a basic Micronaut application, using the `service` profile by default.
 | `profile`, `features`, `build`, `inplace`
 |`mn create-app my-project -features mongo-reactive,security-jwt  -build maven`
 
@@ -39,10 +39,6 @@ The `create-app` command will generate a basic Micronaut project, with optional 
 .Create-App Flags
 |===
 |Flag|Description|Example
-
-|`lang`
-|Language to use for the application (one of `java`, `groovy`, `kotlin` - default is `java`)
-|`-lang groovy`
 
 |`build`
 |Build tool (one of `gradle`, `maven` - default is `gradle`)
@@ -95,22 +91,22 @@ NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation 
 
 ==== Groovy
 
-To create an app with Groovy & Spock support, supply the appropriate feature via the `lang` flag:
+To create an app with Groovy & Spock support, supply the appropriate features via the `feature` flag:
 
 [source,bash]
 ----
-mn> create-app my-groovy-app -lang groovy
+mn> create-app my-groovy-app -features groovy, spock
 ----
 
 This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
 
 ==== Kotlin
 
-To create an app with Kotlin & Spek support, supply the appropriate feature via the `lang` flag:
+To create an app with Kotlin & Spek support, supply the appropriate features via the `feature` flag:
 
 [source,bash]
 ----
-mn> create-app my-groovy-app -lang kotlin
+mn> create-app my-kotlin-app -features kotlin, spek
 ----
 
 This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.

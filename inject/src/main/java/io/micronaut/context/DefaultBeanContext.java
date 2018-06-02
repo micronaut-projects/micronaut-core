@@ -853,27 +853,33 @@ public class DefaultBeanContext implements BeanContext {
             if (EVENT_LOGGER.isDebugEnabled()) {
                 EVENT_LOGGER.debug("Publishing event: {}", event);
             }
-            streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
-                .forEach(listener -> {
-                        if (listener.supports(event)) {
-                            try {
-                                if (EVENT_LOGGER.isDebugEnabled()) {
-                                    EVENT_LOGGER.debug("Invoking event listener [{}] for event: {}", event);
-                                }
-                                listener.onApplicationEvent(event);
-                            } catch (ClassCastException ex) {
-                                String msg = ex.getMessage();
-                                if (msg == null || msg.startsWith(event.getClass().getName())) {
-                                    if (EVENT_LOGGER.isDebugEnabled()) {
-                                        EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
+            Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
+            if (!eventListeners.isEmpty()) {
+                if (EVENT_LOGGER.isTraceEnabled()) {
+                    EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
+                }
+                eventListeners
+                        .forEach(listener -> {
+                                    if (listener.supports(event)) {
+                                        try {
+                                            if (EVENT_LOGGER.isTraceEnabled()) {
+                                                EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                                            }
+                                            listener.onApplicationEvent(event);
+                                        } catch (ClassCastException ex) {
+                                            String msg = ex.getMessage();
+                                            if (msg == null || msg.startsWith(event.getClass().getName())) {
+                                                if (EVENT_LOGGER.isDebugEnabled()) {
+                                                    EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
+                                                }
+                                            } else {
+                                                throw ex;
+                                            }
+                                        }
                                     }
-                                } else {
-                                    throw ex;
                                 }
-                            }
-                        }
-                    }
-                );
+                        );
+            }
         }
     }
 

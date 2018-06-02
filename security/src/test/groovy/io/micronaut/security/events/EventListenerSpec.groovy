@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -63,7 +64,8 @@ class EventListenerSpec extends Specification {
         client.toBlocking().exchange(request)
 
         then:
-        thrown(HttpClientResponseException)
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
         new PollingConditions().eventually {
             embeddedServer.applicationContext.getBean(LoginFailedEventListener).events.size() == 1
         }
@@ -132,6 +134,7 @@ class EventListenerSpec extends Specification {
         volatile List<LoginFailedEvent> events = []
         @Override
         void onApplicationEvent(LoginFailedEvent event) {
+            println "received login failed event"
             events.add(event)
         }
     }
@@ -142,6 +145,7 @@ class EventListenerSpec extends Specification {
         List<TokenValidatedEvent> events = []
         @Override
         void onApplicationEvent(TokenValidatedEvent event) {
+            println "received token validated event"
             events.add(event)
         }
     }
@@ -152,6 +156,7 @@ class EventListenerSpec extends Specification {
         List<LogoutEvent> events = []
         @Override
         void onApplicationEvent(LogoutEvent event) {
+            println "received logout event"
             events.add(event)
         }
     }

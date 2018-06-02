@@ -28,7 +28,7 @@ package io.micronaut.context.event;
 public interface ApplicationEventPublisher {
 
     /**
-     * Publish the given event.
+     * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
      *
      * @param event The event to publish
      */
