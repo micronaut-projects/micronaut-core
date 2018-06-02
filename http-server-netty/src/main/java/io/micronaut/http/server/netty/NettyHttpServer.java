@@ -36,7 +36,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.ssl.NettyServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -105,7 +105,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private final SslConfiguration sslConfiguration;
+    private final ServerSslConfiguration sslConfiguration;
     private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
     private final Router router;

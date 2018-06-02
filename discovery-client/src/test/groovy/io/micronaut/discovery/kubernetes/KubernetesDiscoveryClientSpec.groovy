@@ -32,17 +32,23 @@ class KubernetesDiscoveryClientSpec extends Specification {
                         "FOO_BAR_SERVICE_HOST":"foobar",
                         "FOO_BAR_SERVICE_PORT":"8080",
                         "FOO_SERVICE_PORT_HTTPS":"8443",
-                        "FOO_SERVICE_HOST":"foo"
+                        "FOO_SERVICE_HOST":"foo",
+                        "FOO_BAZ_PUBLISHED_SERVICE_PORT_HTTPS":"8443",
+                        "FOO_BAZ_PUBLISHED_SERVICE_HOST":"foobaz",
+                        "BAR_RANDOM_PORTS_SERVICE_PORT":"8081",
+                        "BAR_RANDOM_PORTS_SERVICE_HOST":"bar"
                 ]
             }
         }
 
         expect:
-        client.getServiceIds().blockingFirst() == ['foo-bar', 'foo']
+        client.getServiceIds().blockingFirst() as Set == ['foo-bar', 'foo', 'foo-baz', 'bar'] as Set
         client.getInstances('foo-bar').blockingFirst()[0].id == 'foo-bar'
         client.getInstances('foo-bar').blockingFirst()[0].getURI() == URI.create("http://foobar:8080")
         client.getInstances('foo').blockingFirst()[0].id == 'foo'
         client.getInstances('foo').blockingFirst()[0].getURI() == URI.create("https://foo:8443")
+        client.getInstances('foo-baz').blockingFirst()[0].getURI() == URI.create("https://foobaz:8443")
+        client.getInstances('bar').blockingFirst()[0].getURI() == URI.create("http://bar:8081")
 
     }
 }
