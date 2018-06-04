@@ -243,6 +243,8 @@ subprojects { subproject ->
             System.out.print('.')
             System.out.flush()
         }
+        reports.html.enabled = !System.getenv("TRAVIS")
+        reports.junitXml.enabled = !System.getenv("TRAVIS")
     }
 
     configurations {
