@@ -69,25 +69,25 @@ ext {
                     group:'com.google.code.findbugs',
                     name:'jsr305'
             ],
-            'micrometer.core': [
-                version: micrometerVersion,
-                group:'io.micrometer',
-                name:'micrometer-core'
-            ],
-            'micrometer.atlas': [
+            'micrometer.core'    : [
                     version: micrometerVersion,
-                    group:'io.micrometer',
-                    name:'micrometer-atlas'
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-core'
+            ],
+            'micrometer.atlas'   : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-atlas'
             ],
             'micrometer.graphite': [
-                version: micrometerVersion,
-                group:'io.micrometer',
-                name:'micrometer-graphite'
-            ],
-            'micrometer.statsd': [
                     version: micrometerVersion,
-                    group:'io.micrometer',
-                    name:'micrometer-statsd'
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-graphite'
+            ],
+            'micrometer.statsd'  : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-statsd'
             ],
             mongodb:[
                 version: mongoVersion,

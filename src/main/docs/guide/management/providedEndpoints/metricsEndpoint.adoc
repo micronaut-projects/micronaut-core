@@ -9,8 +9,8 @@ Currently the metrics endpoint will only be enabled if you include the `micromet
 [source,yaml]
 ----
 micronaut:
-    metrics:
-        enabled: true
+  metrics:
+    enabled: true
 ----
 
 To configure the metrics endpoint, supply configuration through `endpoints.metrics`.
@@ -19,10 +19,10 @@ To configure the metrics endpoint, supply configuration through `endpoints.metri
 [source,yaml]
 ----
 endpoints:
-    metrics:
-        enabled: Boolean
-        sensitive: Boolean
-        id: String
+  metrics:
+    enabled: Boolean
+    sensitive: Boolean
+    id: String
 ----
 
 == Custom Metrics
@@ -170,31 +170,31 @@ The logging metrics bindings will provide logging metrics if using Logback.
 | logback.events
 |=======
 
-== Metrics Reporters
+== Metrics Registries & Reporters
 
-The following are the currently supported libraries for reporting metrics.
+By default there a metrics endpoint wired up and metrics are provided to it for viewing or retrieving via http.  If you want to register a specific type of reporter you will need to include a typed registry configuration.  The following are the currently supported libraries for reporting metrics.
 
-=== Statsd
+=== Statsd Registry
 
-You can include the statsd reporter via `io.micronaut.configuration:micrometer-statsd:${micronaut.version}`
+You can include the statsd reporter via `io.micronaut.configuration:micrometer-registry-statsd:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
 	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-statsd</artifactId>
+	<artifactId>micrometer-registry-statsd</artifactId>
 	<version>${micronaut.version}</version>
 </dependency>
 ----
 
-You can configure the following properties for the statsd reporter under `micronaut.metrics.statsd`
+You can configure this reporter using `micronaut.metrics.export.statsd`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-statsd/src/main/java/io/micrometer/statsd/StatsdConfig.java[StatdsConfig] for more options
 
 |=======
 |*Name* |*Description*
 |enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
 |flavor |The type of metric to use (datadog, etsy or telegraf). Default: `datadog`
-|step |Ho frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
 |host |The host to communicate to statsd on. Default: `localhost`
 |port |The port to communicate to statsd on. Default: `8125`
 |=======
@@ -205,34 +205,35 @@ You can configure the following properties for the statsd reporter under `micron
 micronaut:
   metrics:
     enabled: true
-    statsd:
-      enabled: true
-      flavor: datadog
-      step: PT1M
-      host: localhost
-      port: 8125
+    export:
+      statsd:
+        enabled: true
+        flavor: datadog
+        step: PT1M
+        host: localhost
+        port: 8125
 ----
 
-=== Graphite
+=== Graphite Registry
 
-You can include the graphite reporter via `io.micronaut.configuration:micrometer-graphite:${micronaut.version}`
+You can include the graphite reporter via `io.micronaut.configuration:micrometer-registry-graphite:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
 	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-graphite</artifactId>
+	<artifactId>micrometer-registry-graphite</artifactId>
 	<version>${micronaut.version}</version>
 </dependency>
 ----
 
-You can configure the following properties for the graphite reporter under `micronaut.metrics.graphite`
+You can configure this reporter using `micronaut.metrics.export.graphite`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-graphite/src/main/java/io/micrometer/graphite/GraphiteConfig.java[GraphiteConfig] for more options
 
 |=======
 |*Name* |*Description*
 |enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
-|step |Ho frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
 |host |The host to communicate to graphite on. Default: `localhost`
 |port |The port to communicate to graphite on. Default: `2004`
 |=======
@@ -243,9 +244,46 @@ You can configure the following properties for the graphite reporter under `micr
 micronaut:
   metrics:
     enabled: true
-    graphite:
-      enabled: true
-      step: PT1M
-      host: localhost
-      port: 2004
+    export:
+      graphite:
+        enabled: true
+        step: PT1M
+        host: localhost
+        port: 2004
+----
+
+=== Atlas Registry
+
+You can include the atlas reporter via `io.micronaut.configuration:micrometer-registry-atlas:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-registry-atlas</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.atlas`.  The most commonly changed configuration properties are listed below, but see https://github.com/Netflix/spectator/blob/master/spectator-reg-atlas/src/main/java/com/netflix/spectator/atlas/AtlasConfig.java[AtlasConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|uri |The uri for the atlas backend. Default: `http://localhost:7101/api/v1/publish`
+|=======
+
+.Example Graphite Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      atlas:
+        enabled: true
+        uri: http://localhost:7101/api/v1/publish
+        step: PT1M
 ----
