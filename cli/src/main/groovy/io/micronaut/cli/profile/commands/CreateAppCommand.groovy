@@ -400,7 +400,6 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         CommandLine commandLine = executionContext.commandLine
 
         String profileName = evaluateProfileName(commandLine)
-        String langFeature = evaluateLangFeature(commandLine, profileName)
 
         List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
@@ -418,7 +417,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
-        List<String> features = [langFeature]
+        List<String> features = [resolveLang(commandLine)]
         List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
         if (commandLineFeatures) features.addAll(commandLineFeatures)
 
@@ -495,16 +494,16 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             String sourceLanguage = null
 
             if (requestedFeatureNames) {
-                testFramework = evaulateTestFramework(requestedFeatureNames)
-                sourceLanguage = evaulateSourceLanguage(requestedFeatureNames)
+                testFramework = evaluateTestFramework(requestedFeatureNames)
+                sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
             }
 
             if (!testFramework) {
-                testFramework = evaulateTestFramework(allFeatureNames)
+                testFramework = evaluateTestFramework(allFeatureNames)
             }
 
             if (!sourceLanguage) {
-                sourceLanguage = evaulateSourceLanguage(allFeatureNames)
+                sourceLanguage = evaluateSourceLanguage(allFeatureNames)
             }
 
             tokens.put("testFramework", testFramework)
@@ -531,7 +530,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
     }
 
-    protected String evaulateTestFramework(List<String> features) {
+    protected String evaluateTestFramework(List<String> features) {
         String testFramework = null
         if (features.contains("spock"))
             testFramework = "spock"
@@ -543,7 +542,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         testFramework
     }
 
-    protected String evaulateSourceLanguage(List<String> features) {
+    protected String evaluateSourceLanguage(List<String> features) {
         String sourceLanguage = null
         if (features.contains("groovy"))
             sourceLanguage = "groovy"
@@ -559,17 +558,13 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         mainCommandLine.optionValue(PROFILE_FLAG)?.toString() ?: getDefaultProfile()
     }
 
-    protected String evaluateLangFeature(CommandLine commandLine, String profile) {
-        "application-${resolveLang(commandLine)}"
-    }
-
     protected String resolveLang(CommandLine commandLine) {
         if (!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
         lang
     }
 
+    @CompileStatic(TypeCheckingMode.SKIP)
     protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
-        println "evaluating..."
         Set<Feature> features = []
         List<String> validRequestedFeatureNames
 
@@ -602,24 +597,25 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures*.feature.contains(it) }
 
             if (!oneOfFeatures) {
-                //TODO:
                 features.add(profile.oneOfFeatures.min { it.priority}.feature )
+            }
+        }
+
+        if (profile.oneOfFeatures.size() > 0) {
+            Iterable<OneOfFeature> includedOneOfFeatures = features.
+                    findAll { Feature f -> profile.oneOfFeatures*.feature.contains(f) }
+                    .collect { Feature f ->
+                profile.oneOfFeatures.find { OneOfFeature oof -> oof.feature.name == f.name }
+            }
+
+            if (includedOneOfFeatures.size() > 1) {
+                OneOfFeature highestPriority = includedOneOfFeatures.min { it.priority }
+                features.removeAll(includedOneOfFeatures.findAll { OneOfFeature oof -> oof.priority > highestPriority.priority }*.feature)
             }
         }
 
         for (int i = 0; i < features.size(); i++) {
             features.addAll(features[i].getDependentFeatures(profile))
-        }
-
-        if (profile.oneOfFeatures.size() > 0) {
-            Iterable<OneOfFeature> includedOneOfFeatures = profile.oneOfFeatures.findAll { OneOfFeature f -> features.contains { f.feature } }
-
-            if (includedOneOfFeatures.size() > 1) {
-                //TODO:
-                includedOneOfFeatures.min { it.priority }
-
-
-            }
         }
 
         if (validRequestedFeatureNames) {
@@ -632,6 +628,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             }.toSet()
         }
 
+        println "final features: ${features*.name.join(',')}"
         features
     }
 
