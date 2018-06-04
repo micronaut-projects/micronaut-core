@@ -71,12 +71,13 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
     fi
 fi
 
-
 if [[ $EXIT_STATUS -ne 0 ]]; then
+
+  ./gradlew -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test
 
   ./gradlew aggregateReports
 
-  git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
+  git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
 
   cd gh-pages
 
@@ -93,4 +94,5 @@ if [[ $EXIT_STATUS -ne 0 ]]; then
   rm -rf gh-pages
   
 fi
+
 exit $EXIT_STATUS
