@@ -306,12 +306,6 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
-
-    if ( System.getProperty('IGNORE_FAILURES') != null && Boolean.valueOf(System.getProperty('IGNORE_FAILURES'))) {
-        tasks.withType(Test) {
-            ignoreFailures = true
-        }
-    }
 }
 
 task aggregateReports {
