@@ -1,6 +1,5 @@
 package io.micronaut.configuration.metrics.micrometer
 
-import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer
@@ -17,12 +16,12 @@ class MeterRegistryFactorySpec extends Specification {
         MeterRegistryFactory factory = new MeterRegistryFactory()
 
         then:
+        factory.compositeMeterRegistry()
         factory.simpleMeterRegistry()
-        factory.meterRegistry()
-        factory.meterRegistryConfigurer(Mock(MeterRegistry), [], [])
+        factory.meterRegistryConfigurer([], [])
     }
 
-    void "verify SimpleMeterRegistry created by default"() {
+    void "verify beans created by default"() {
         when:
         ApplicationContext context = ApplicationContext.run()
 
@@ -41,11 +40,10 @@ class MeterRegistryFactorySpec extends Specification {
         CompositeMeterRegistry compositeRegistry = context.getBean(CompositeMeterRegistry)
 
         then:
-        context.findBean(SimpleMeterRegistry).isPresent()
         context.findBean(CompositeMeterRegistry).isPresent()
+        context.findBean(SimpleMeterRegistry).isPresent()
         compositeRegistry
         compositeRegistry?.registries?.size() == 1
-        compositeRegistry.registries*.class.contains SimpleMeterRegistry
 
         cleanup:
         context.close()
@@ -57,7 +55,7 @@ class MeterRegistryFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run([(cfg): setting])
 
         then:
-        context.findBean(SimpleMeterRegistry).isPresent() == result
+        context.findBean(CompositeMeterRegistry).isPresent() == result
         context.findBean(SimpleMeterRegistry).isPresent() == result
 
         cleanup:
@@ -86,23 +84,4 @@ class MeterRegistryFactorySpec extends Specification {
         MICRONAUT_METRICS_ENABLED | false   | false
         MICRONAUT_METRICS_ENABLED | true    | true
     }
-
-    @Unroll
-    void "verify MeterRegistryConfigurer present == #result for #cfg = #setting"() {
-        when:
-        ApplicationContext context = ApplicationContext.run([(cfg): setting])
-
-        then:
-        context.findBean(MeterRegistryConfigurer).isPresent() == result
-
-        cleanup:
-        context.close()
-
-        where:
-        cfg                       | setting | result
-        MICRONAUT_METRICS_ENABLED | false   | false
-        MICRONAUT_METRICS_ENABLED | true    | true
-
-    }
-
 }

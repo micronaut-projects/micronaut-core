@@ -3,6 +3,7 @@ package io.micronaut.configuration.metrics.micrometer.atlas;
 import com.netflix.spectator.atlas.AtlasConfig;
 import io.micrometer.atlas.AtlasMeterRegistry;
 import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -44,6 +45,7 @@ public class AtlasMeterRegistryFactory {
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     @Requires(property = ATLAS_ENABLED, value = "true", defaultValue = "true")
+    @Requires(beans = CompositeMeterRegistry.class)
     AtlasMeterRegistry atlasMeterRegistry() {
         return new AtlasMeterRegistry(atlasConfig, Clock.SYSTEM);
     }

@@ -4,6 +4,7 @@ import io.micrometer.atlas.AtlasMeterRegistry
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micronaut.configuration.metrics.micrometer.MeterRegistryCreationListener
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import spock.lang.Specification
@@ -42,11 +43,16 @@ class AtlasMeterRegistryFactorySpec extends Specification {
     }
 
     void "verify CompositeMeterRegistry created by default"() {
-        when:
+        given:
         ApplicationContext context = ApplicationContext.run()
-        CompositeMeterRegistry compositeRegistry = context.getBean(CompositeMeterRegistry)
+
+        when:
+        CompositeMeterRegistry compositeRegistry = context.findBean(CompositeMeterRegistry).get()
 
         then:
+        context.getBean(MeterRegistryCreationListener)
+        context.getBean(AtlasMeterRegistry)
+        context.getBean(SimpleMeterRegistry)
         compositeRegistry
         compositeRegistry.registries.size() == 2
         compositeRegistry.registries*.class.containsAll([AtlasMeterRegistry, SimpleMeterRegistry])

@@ -16,6 +16,8 @@
 
 package io.micronaut.configuration.metrics.aggregator;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * <p>Aggregates all registered meter binders into a single stream.</p>
  *
@@ -23,4 +25,6 @@ package io.micronaut.configuration.metrics.aggregator;
  * @since 1.0
  */
 public interface MeterRegistryConfigurer {
+
+    void configure(MeterRegistry meterRegistry);
 }

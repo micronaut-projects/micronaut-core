@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micrometer.statsd.StatsdFlavor
 import io.micrometer.statsd.StatsdMeterRegistry
+import io.micronaut.configuration.metrics.micrometer.MeterRegistryCreationListener
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import spock.lang.Specification
@@ -37,6 +38,9 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         then:
         context.getBeansOfType(MeterRegistry).size() == 3
         context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'SimpleMeterRegistry', 'StatsdMeterRegistry'])
+
+        cleanup:
+        context.stop()
     }
 
     void "verify CompositeMeterRegistry created by default"() {
@@ -46,8 +50,14 @@ class StatsdMeterRegistryFactorySpec extends Specification {
 
         then:
         compositeRegistry
+        context.getBean(MeterRegistryCreationListener)
+        context.getBean(StatsdMeterRegistry)
+        context.getBean(SimpleMeterRegistry)
         compositeRegistry.registries.size() == 2
         compositeRegistry.registries*.class.containsAll([StatsdMeterRegistry, SimpleMeterRegistry])
+
+        cleanup:
+        context.stop()
     }
 
     @Unroll
@@ -78,6 +88,9 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         statsdMeterRegistry.get().statsdConfig.port() == 8125
         statsdMeterRegistry.get().statsdConfig.host() == "localhost"
         statsdMeterRegistry.get().statsdConfig.step() == Duration.ofMinutes(1)
+
+        cleanup:
+        context.stop()
     }
 
     void "verify StatsdMeterRegistry bean exists etsy flavor"() {
@@ -92,6 +105,9 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         statsdMeterRegistry.get().statsdConfig.port() == 8125
         statsdMeterRegistry.get().statsdConfig.host() == "localhost"
         statsdMeterRegistry.get().statsdConfig.step() == Duration.ofMinutes(1)
+
+        cleanup:
+        context.stop()
     }
 
     void "verify StatsdMeterRegistry bean exists telegraf flavor"() {
@@ -106,6 +122,9 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         statsdMeterRegistry.get().statsdConfig.port() == 8125
         statsdMeterRegistry.get().statsdConfig.host() == "localhost"
         statsdMeterRegistry.get().statsdConfig.step() == Duration.ofMinutes(1)
+
+        cleanup:
+        context.stop()
     }
 
     void "verify StatsdMeterRegistry bean exists datadog flavor changed port, host and step"() {
@@ -115,7 +134,7 @@ class StatsdMeterRegistryFactorySpec extends Specification {
                 (STATSD_CONFIG + ".flavor"): StatsdFlavor.DATADOG,
                 (STATSD_CONFIG + ".host")  : "zerocool",
                 (STATSD_CONFIG + ".port")  : 8122,
-                (STATSD_CONFIG + ".step") : "PT2M",
+                (STATSD_CONFIG + ".step")  : "PT2M",
         ])
         Optional<StatsdMeterRegistry> statsdMeterRegistry = context.findBean(StatsdMeterRegistry)
 
@@ -126,5 +145,8 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         statsdMeterRegistry.get().statsdConfig.port() == 8122
         statsdMeterRegistry.get().statsdConfig.host() == "zerocool"
         statsdMeterRegistry.get().statsdConfig.step() == Duration.ofMinutes(2)
+
+        cleanup:
+        context.stop()
     }
 }

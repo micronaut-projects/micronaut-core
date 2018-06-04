@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micrometer.graphite.GraphiteMeterRegistry
+import io.micronaut.configuration.metrics.micrometer.MeterRegistryCreationListener
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import spock.lang.Specification
@@ -45,6 +46,9 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         CompositeMeterRegistry compositeRegistry = context.getBean(CompositeMeterRegistry)
 
         then:
+        context.getBean(MeterRegistryCreationListener)
+        context.getBean(GraphiteMeterRegistry)
+        context.getBean(SimpleMeterRegistry)
         compositeRegistry
         compositeRegistry.registries.size() == 2
         compositeRegistry.registries*.class.containsAll([GraphiteMeterRegistry, SimpleMeterRegistry])

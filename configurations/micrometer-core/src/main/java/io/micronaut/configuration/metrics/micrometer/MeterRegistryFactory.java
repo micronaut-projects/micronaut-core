@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.metrics.micrometer;
 
-import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
@@ -55,6 +54,8 @@ public class MeterRegistryFactory {
     @Bean
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+    @Requires(beans = CompositeMeterRegistry.class)
+    //todo: need a way to only include this when no other meter registry EXCEPT CompositeMeterRegistry exists
     SimpleMeterRegistry simpleMeterRegistry() {
         return new SimpleMeterRegistry();
     }
@@ -68,7 +69,8 @@ public class MeterRegistryFactory {
     @Primary
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-    CompositeMeterRegistry meterRegistry() {
+    @Requires(beans = MeterRegistryConfigurer.class)
+    CompositeMeterRegistry compositeMeterRegistry() {
         return new CompositeMeterRegistry();
     }
 
@@ -77,18 +79,16 @@ public class MeterRegistryFactory {
      * <p>
      * This bean adds the filters and binders to the metric registry.
      *
-     * @param meterRegistry the meter registry
-     * @param binders       list of binder beans
-     * @param filters       list of filter beans
+     * @param binders list of binder beans
+     * @param filters list of filter beans
      * @return meterRegistryConfigurer bean
      */
     @Bean
     @Primary
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-    MeterRegistryConfigurer meterRegistryConfigurer(MeterRegistry meterRegistry,
-                                                    Collection<MeterBinder> binders,
+    MeterRegistryConfigurer meterRegistryConfigurer(Collection<MeterBinder> binders,
                                                     Collection<MeterFilter> filters) {
-        return new MicrometerMeterRegistryConfigurer(meterRegistry, binders, filters);
+        return new MicrometerMeterRegistryConfigurer(binders, filters);
     }
 }
