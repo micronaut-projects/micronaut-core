@@ -7,7 +7,6 @@ git config --global user.email "$GIT_EMAIL"
 git config --global credential.helper "store --file=~/.git-credentials"
 echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 
-
 ./gradlew --stop
 ./gradlew testClasses || EXIT_STATUS=$?
 ./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
@@ -73,7 +72,7 @@ fi
 
 if [[ $EXIT_STATUS -ne 0 ]]; then
 
-  ./gradlew -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test
+  ./gradlew --continue -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test
 
   ./gradlew aggregateReports
 
