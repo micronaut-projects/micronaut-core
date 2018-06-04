@@ -12,26 +12,6 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 if [[ $EXIT_STATUS -eq 0 ]]; then
     ./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
 fi
-if [[ $EXIT_STATUS -ne 0 ]]; then
-
-  ./gradlew aggregateReports --no-daemon
-
-  git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
-
-  cd gh-pages
-
-  mkdir -p reports
-
-  cp -r ../build/reports/. ./reports/
-
-  git add reports/*
-
-  git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
-    git push origin HEAD || true
-  }
-  cd ..
-  rm -rf gh-pages
-fi
 if [[ $EXIT_STATUS -eq 0 ]]; then
     ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
 fi
