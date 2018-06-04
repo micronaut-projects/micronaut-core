@@ -30,7 +30,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       ./gradlew --stop
       ./gradlew --no-daemon docs || EXIT_STATUS=$?
 
-      git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
+      git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-docs.git -b gh-pages gh-pages --single-branch > /dev/null
 
       cd gh-pages
 
@@ -72,9 +72,13 @@ fi
 
 if [[ $EXIT_STATUS -ne 0 ]]; then
 
-  ./gradlew --continue -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test
+  ./gradlew clean --no-daemon
 
-  ./gradlew aggregateReports
+  echo "Running tests with --continue flag"
+
+  ./gradlew --continue -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test --no-daemon || EXIT_STATUS=$?
+
+  ./gradlew aggregateReports --no-daemon
 
   git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
 
