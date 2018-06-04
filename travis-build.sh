@@ -9,8 +9,31 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 
 ./gradlew --stop
 ./gradlew testClasses || EXIT_STATUS=$?
-./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
+if [[ $EXIT_STATUS -eq 0 ]]; then
+    ./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
+fi
+if [[ $EXIT_STATUS -ne 0 ]]; then
 
+  ./gradlew clean --no-daemon
+
+  ./gradlew aggregateReports --no-daemon
+
+  git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
+
+  cd gh-pages
+
+  mkdir -p reports
+
+  cp -r ../build/reports/. ./reports/
+
+  git add reports/*
+
+  git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
+    git push origin HEAD || true
+  }
+  cd ..
+  rm -rf gh-pages
+fi
 if [[ $EXIT_STATUS -eq 0 ]]; then
     ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
 fi
@@ -68,34 +91,6 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       }
       cd ..
     fi
-fi
-
-if [[ $EXIT_STATUS -ne 0 ]]; then
-
-  ./gradlew clean --no-daemon
-
-  echo "Running tests with --continue flag"
-
-  ./gradlew --continue -Dgeb.env=chromeHeadless -DIGNORE_FAILURES=true check -x test-suite:test --no-daemon || EXIT_STATUS=$?
-
-  ./gradlew aggregateReports --no-daemon
-
-  git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
-
-  cd gh-pages
-
-  mkdir -p reports
-
-  cp -r ../build/reports/. ./reports/
-
-  git add reports/*
-
-  git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
-    git push origin HEAD || true
-  }
-  cd ..
-  rm -rf gh-pages
-  
 fi
 
 exit $EXIT_STATUS
