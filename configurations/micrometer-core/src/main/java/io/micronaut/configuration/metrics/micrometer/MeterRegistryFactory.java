@@ -41,6 +41,7 @@ import java.util.Collection;
 public class MeterRegistryFactory {
     public static final String MICRONAUT_METRICS = "micronaut.metrics.";
     public static final String MICRONAUT_METRICS_ENABLED = MICRONAUT_METRICS + "enabled";
+    public static final String MICRONAUT_METRICS_EXPORT = MICRONAUT_METRICS + "export";
 
     /**
      * Create a SimpleMeterRegistry bean if metrics are enabled, true by default.
