@@ -1,6 +1,8 @@
 package io.micronaut.configuration.metrics.management.endpoint
 
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.composite.CompositeMeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
@@ -33,6 +35,8 @@ class MetricsEndpointSpec extends Specification {
         expect:
         context.containsBean(MetricsEndpoint)
         context.containsBean(MeterRegistry)
+        context.containsBean(CompositeMeterRegistry)
+        context.containsBean(SimpleMeterRegistry)
 
         cleanup:
         context.close()

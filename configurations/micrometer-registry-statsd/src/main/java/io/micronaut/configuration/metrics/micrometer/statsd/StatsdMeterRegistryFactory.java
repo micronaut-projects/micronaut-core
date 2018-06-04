@@ -1,6 +1,7 @@
 package io.micronaut.configuration.metrics.micrometer.statsd;
 
 import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.statsd.StatsdConfig;
 import io.micrometer.statsd.StatsdMeterRegistry;
 import io.micronaut.context.annotation.Bean;
@@ -45,6 +46,7 @@ public class StatsdMeterRegistryFactory {
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     @Requires(property = STATSD_ENABLED, value = "true", defaultValue = "true")
+    @Requires(beans = CompositeMeterRegistry.class)
     StatsdMeterRegistry statsdMeterRegistry() {
         return new StatsdMeterRegistry(statsdConfig, Clock.SYSTEM);
     }

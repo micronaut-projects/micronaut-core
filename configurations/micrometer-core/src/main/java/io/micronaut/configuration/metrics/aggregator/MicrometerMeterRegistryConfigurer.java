@@ -31,29 +31,35 @@ import java.util.Collection;
  */
 public class MicrometerMeterRegistryConfigurer implements MeterRegistryConfigurer {
 
+    private final Collection<MeterBinder> binders;
+    private final Collection<MeterFilter> filters;
+
     /**
      * Constructor for the micrometer meter registry configurer.
-     * @param meterRegistry the meter registry bean
+     *
      * @param binders list of binder beans
      * @param filters list of filter beans
      */
     public MicrometerMeterRegistryConfigurer(
-            MeterRegistry meterRegistry,
             Collection<MeterBinder> binders,
             Collection<MeterFilter> filters) {
-        addFilters(meterRegistry, filters);
-        addBinders(meterRegistry, binders);
+        this.binders = binders;
+        this.filters = filters;
+    }
+
+    public void configure(MeterRegistry meterRegistry) {
+        addBinders(meterRegistry);
+        addFilters(meterRegistry);
     }
 
     /**
-     * Add filters to the meter registry. More details available at https://micrometer.io/docs/concepts#_meter_filters
+     * Add filters to the meter regitry. More details available at https://micrometer.io/docs/concepts#_meter_filters
      *
-     * @param registry the meter registry
-     * @param filters  list of the current filters
+     * @param meterRegistry the meter registry to configure
      */
-    private void addFilters(MeterRegistry registry, Collection<MeterFilter> filters) {
+    private void addFilters(MeterRegistry meterRegistry) {
         if (filters != null && !filters.isEmpty()) {
-            filters.forEach(registry.config()::meterFilter);
+            filters.forEach(meterRegistry.config()::meterFilter);
         }
     }
 
@@ -64,12 +70,11 @@ public class MicrometerMeterRegistryConfigurer implements MeterRegistryConfigure
      * {@link io.micronaut.configuration.metrics.binder.logging.LogbackMeterRegistryBinder}
      * {@link io.micronaut.configuration.metrics.binder.system.SystemMeterRegistryBinder}
      *
-     * @param registry the meter registry
-     * @param binders  list of the current binders
+     * @param meterRegistry the meter registry
      */
-    private void addBinders(MeterRegistry registry, final Collection<MeterBinder> binders) {
+    private void addBinders(MeterRegistry meterRegistry) {
         if (binders != null && !binders.isEmpty()) {
-            binders.forEach((binder) -> binder.bindTo(registry));
+            binders.forEach((binder) -> binder.bindTo(meterRegistry));
         }
     }
 }

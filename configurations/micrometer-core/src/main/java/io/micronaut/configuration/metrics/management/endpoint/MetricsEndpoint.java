@@ -5,7 +5,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
-import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.management.endpoint.Endpoint;
@@ -13,6 +12,7 @@ import io.micronaut.management.endpoint.Read;
 import io.reactivex.Single;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,20 +47,15 @@ public class MetricsEndpoint {
      */
     static final String NAME = "metrics";
 
-    private final MeterRegistry meterRegistry;
-    private final MeterRegistryConfigurer meterRegistryConfigurer;
+    private final Collection<MeterRegistry> meterRegistries;
 
     /**
-     * Constructor for metrics endpoint.  The meterRegistryConfigurer is required here so that
-     * the publisher is available when the endpoint runs.
+     * Constructor for metrics endpoint.
      *
-     * @param meterRegistry           Meter Registry
-     * @param meterRegistryConfigurer Meter Registry Configurer
+     * @param meterRegistries Meter Registries
      */
-    public MetricsEndpoint(MeterRegistry meterRegistry,
-                           MeterRegistryConfigurer meterRegistryConfigurer) {
-        this.meterRegistry = meterRegistry;
-        this.meterRegistryConfigurer = meterRegistryConfigurer;
+    public MetricsEndpoint(Collection<MeterRegistry> meterRegistries) {
+        this.meterRegistries = meterRegistries;
     }
 
     /**
@@ -99,7 +94,7 @@ public class MetricsEndpoint {
      */
     private HttpResponse<ListNamesResponse> getListNamesResponse() {
         Set<String> names = new LinkedHashSet<>();
-        collectNames(names, this.meterRegistry);
+        collectNames(names, this.meterRegistries);
         return HttpResponse.ok(new ListNamesResponse(names));
     }
 
@@ -118,7 +113,7 @@ public class MetricsEndpoint {
     private HttpResponse<MetricDetailsResponse> getMetricDetailsResponse(String name) {
         List<Tag> tags = Collections.emptyList();
         List<Meter> meters = new ArrayList<>();
-        collectMeters(meters, this.meterRegistry, name, tags, new HashSet<>());
+        collectMeters(meters, this.meterRegistries, name, tags, new HashSet<>());
         if (meters.isEmpty()) {
             return HttpResponse.notFound();
         }
@@ -130,16 +125,21 @@ public class MetricsEndpoint {
                 asList(availableTags, AvailableTag::new)));
     }
 
-    private void collectMeters(List<Meter> meters, MeterRegistry registry, String name,
+    private void collectMeters(List<Meter> meters, Collection<MeterRegistry> meterRegistries, String name,
                                Iterable<Tag> tags, Set<String> meterNames) {
-        if (registry instanceof CompositeMeterRegistry) {
-            ((CompositeMeterRegistry) registry).getRegistries()
-                    .forEach((member) -> collectMeters(meters, member, name, tags, meterNames));
-        } else {
-            if (!meterNames.contains(name)) {
-                meters.addAll(registry.find(name).tags(tags).meters());
-                meterNames.add(name);
+        meterRegistries.forEach(meterRegistry -> {
+            if (meterRegistry instanceof CompositeMeterRegistry) {
+                ((CompositeMeterRegistry) meterRegistry).getRegistries()
+                        .forEach((member) -> collectMeters(meters, member, name, tags, meterNames));
             }
+        });
+    }
+
+    private void collectMeters(List<Meter> meters, MeterRegistry meterRegistry, String name,
+                               Iterable<Tag> tags, Set<String> meterNames) {
+        if (!meterNames.contains(name)) {
+            meters.addAll(meterRegistry.find(name).tags(tags).meters());
+            meterNames.add(name);
         }
     }
 
@@ -207,16 +207,22 @@ public class MetricsEndpoint {
     /**
      * Collect the names from the registries.
      *
-     * @param names    set of names
-     * @param registry meter registry
+     * @param names           set of names
+     * @param meterRegistries meter registries
      */
-    private void collectNames(Set<String> names, MeterRegistry registry) {
-        if (registry instanceof CompositeMeterRegistry) {
-            ((CompositeMeterRegistry) registry).getRegistries()
-                    .forEach((member) -> collectNames(names, member));
-        } else {
-            registry.getMeters().stream().map(this::getName).forEach(names::add);
-        }
+    private void collectNames(Set<String> names, Collection<MeterRegistry> meterRegistries) {
+        meterRegistries.forEach(meterRegistry -> {
+            if (meterRegistry instanceof CompositeMeterRegistry) {
+                ((CompositeMeterRegistry) meterRegistry).getRegistries()
+                        .forEach((member) -> collectNames(names, member));
+            } else {
+                meterRegistry.getMeters().stream().map(this::getName).forEach(names::add);
+            }
+        });
+    }
+
+    private void collectNames(Set<String> names, MeterRegistry meterRegistry) {
+        meterRegistry.getMeters().stream().map(this::getName).forEach(names::add);
     }
 
     /**

@@ -1,6 +1,7 @@
 package io.micronaut.configuration.metrics.micrometer.graphite;
 
 import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.graphite.GraphiteConfig;
 import io.micrometer.graphite.GraphiteMeterRegistry;
 import io.micronaut.context.annotation.Bean;
@@ -45,6 +46,7 @@ public class GraphiteMeterRegistryFactory {
     @Singleton
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     @Requires(property = GRAPHITE_ENABLED, value = "true", defaultValue = "true")
+    @Requires(beans = CompositeMeterRegistry.class)
     GraphiteMeterRegistry graphiteMeterRegistry() {
         return new GraphiteMeterRegistry(graphiteConfig, Clock.SYSTEM);
     }
