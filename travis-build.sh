@@ -14,8 +14,6 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 fi
 if [[ $EXIT_STATUS -ne 0 ]]; then
 
-  ./gradlew clean --no-daemon
-
   ./gradlew aggregateReports --no-daemon
 
   git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-reports.git -b gh-pages gh-pages --single-branch > /dev/null
