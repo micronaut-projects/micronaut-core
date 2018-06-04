@@ -247,6 +247,13 @@ subprojects { subproject ->
         reports.junitXml.enabled = !System.getenv("TRAVIS")
     }
 
+    tasks.withType(Checkstyle) {
+        reports {
+            xml.enabled = !System.getenv("TRAVIS")
+            html.enabled = !System.getenv("TRAVIS")
+        }
+    }
+
     configurations {
         shadowCompile
         shadowRuntime
