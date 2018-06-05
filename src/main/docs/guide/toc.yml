@@ -64,7 +64,7 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-    jsonBinding: JSON Binding with Jackson
+  jsonBinding: JSON Binding with Jackson
   staticResources: Serving Static Resources
 #  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
@@ -200,3 +200,4 @@ cli:
   commands: Commands
 faq: Frequently Asked Questions (FAQ)
 problems: Common Problems
+breaks: Breaking Changes
