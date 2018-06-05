@@ -37,6 +37,7 @@ import io.reactivex.Single
 import io.reactivex.annotations.NonNull
 import io.reactivex.functions.Function
 import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import java.nio.charset.StandardCharsets
@@ -45,6 +46,7 @@ import java.nio.charset.StandardCharsets
  * @author graemerocher
  * @since 1.0
  */
+@IgnoreIf({System.getenv("TRAVIS")})
 class StreamRequestSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
