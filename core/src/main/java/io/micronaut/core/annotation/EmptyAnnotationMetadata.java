@@ -21,6 +21,7 @@ import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -52,13 +53,23 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
+    public List<String> getAnnotationNamesByStereotype(String stereotype) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Set<String> getAnnotationNames() {
         return Collections.emptySet();
     }
 
     @Override
-    public Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+    public Set<String> getDeclaredAnnotationNames() {
         return Collections.emptySet();
+    }
+
+    @Override
+    public List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+        return Collections.emptyList();
     }
 
     @Override

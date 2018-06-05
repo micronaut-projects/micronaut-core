@@ -20,6 +20,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -38,6 +39,16 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
+    default Set<String> getAnnotationNames() {
+        return getAnnotationMetadata().getAnnotationNames();
+    }
+
+    @Override
+    default Set<String> getDeclaredAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredAnnotationNames();
+    }
+
+    @Override
     default boolean hasAnnotation(String annotation) {
         return getAnnotationMetadata().hasAnnotation(annotation);
     }
@@ -53,12 +64,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default Set<String> getAnnotationNamesByStereotype(String stereotype) {
+    default List<String> getAnnotationNamesByStereotype(String stereotype) {
         return getAnnotationMetadata().getAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    default Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+    default List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
         return getAnnotationMetadata().getDeclaredAnnotationNamesTypeByStereotype(stereotype);
     }
 

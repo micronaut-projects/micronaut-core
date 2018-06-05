@@ -700,9 +700,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         AnnotationMetadata annotationMetadata;
                         boolean isAnnotationReference = false;
+                        // if the method is annotated we build metadata for the method
                         if (annotationUtils.isAnnotated(method)) {
                             annotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod, method);
                         } else {
+                            // otherwise we setup a reference to the parent metadata (essentially the annotations declared on the bean factory method)
                             isAnnotationReference = true;
                             annotationMetadata = new AnnotationMetadataReference(
                                 beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -813,6 +815,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     boolean isAnnotationReference = methodAnnotationMetadata instanceof AnnotationMetadataReference;
 
+                    AnnotationMetadata aroundMethodMetadata;
+
+                    if (!isAnnotationReference && executableMethodWriter != null) {
+                        aroundMethodMetadata = new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata);
+                    } else {
+                        aroundMethodMetadata = methodAnnotationMetadata;
+                    }
+
                     aopProxyWriter.visitAroundMethod(
                         typeRef,
                         resolvedReturnType,
@@ -821,7 +831,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         method.getSimpleName().toString(),
                         params.getParameters(),
                         params.getParameterMetadata(),
-                        params.getGenericTypes(), !isAnnotationReference && executableMethodWriter != null ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata) : methodAnnotationMetadata);
+                        params.getGenericTypes(),
+                        aroundMethodMetadata);
                 }
             }
         }

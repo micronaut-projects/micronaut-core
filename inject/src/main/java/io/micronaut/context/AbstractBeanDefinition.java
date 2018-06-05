@@ -40,6 +40,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -63,6 +64,7 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
@@ -73,22 +75,12 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
-import java.io.Closeable;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -110,7 +102,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, Closeable {
+public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinition.class);
 
     @SuppressWarnings("WeakerAccess")
@@ -132,6 +124,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
+    private AnnotationMetadata beanAnnotationMetadata;
+    private Environment environment;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type (factory bean).
@@ -152,9 +146,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
-        this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
+        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
+        this.singleton = beanAnnotationMetadata.hasDeclaredStereotype(Singleton.class);
+        this.isProvided = beanAnnotationMetadata.hasDeclaredStereotype(Provided.class);
         this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
         this.declaringType = declaringType;
@@ -180,43 +174,52 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         this.addRequiredComponents(arguments);
     }
 
+
     /**
      * Constructs a bean for the given type.
      *
      * @param type               The type
-     * @param annotationMetadata The annotation metadata
+     * @param constructorAnnotationMetadata The annotation metadata for the constructor
      * @param requiresReflection Whether reflection is required
      * @param arguments          The constructor arguments used to build the bean
      */
     @Internal
     @SuppressWarnings({"unchecked", "WeakerAccess"})
     protected AbstractBeanDefinition(Class<T> type,
-                                     AnnotationMetadata annotationMetadata,
+                                     AnnotationMetadata constructorAnnotationMetadata,
                                      boolean requiresReflection,
                                      Argument... arguments) {
 
-        AnnotationMetadata beanMetadata = getAnnotationMetadata();
+        AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
-        this.isProvided = beanMetadata.hasDeclaredStereotype(Provided.class);
-        this.singleton = beanMetadata.hasDeclaredStereotype(Singleton.class);
+        this.isProvided = beanAnnotationMetadata.hasDeclaredStereotype(Provided.class);
+        this.singleton = beanAnnotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
         if (requiresReflection) {
             this.constructor = new ReflectionConstructorInjectionPoint<>(
                 this,
                 type,
-                annotationMetadata,
+                constructorAnnotationMetadata,
                 arguments);
         } else {
             this.constructor = new DefaultConstructorInjectionPoint<>(
                 this,
                 type,
-                annotationMetadata,
+                constructorAnnotationMetadata,
                 arguments
             );
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (this.beanAnnotationMetadata == null) {
+            this.beanAnnotationMetadata = initializeAnnotationMetadata();
+        }
+        return this.beanAnnotationMetadata;
     }
 
     @Override
@@ -369,26 +372,29 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * {@link io.micronaut.context.env.Environment} this method configures the annotation metadata such that
      * environment aware values are returned.
      *
-     * @param context The bean context
+     * @param environment The environment
      */
-    protected void configure(BeanContext context) {
-        AnnotationMetadata am = getAnnotationMetadata();
-        if (am instanceof DefaultAnnotationMetadata) {
-            ((DefaultAnnotationMetadata) am).configure(context);
-        }
-        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
-            AnnotationMetadata annotationMetadata = methodInjectionPoint.getAnnotationMetadata();
-            if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-                ((DefaultAnnotationMetadata) annotationMetadata).configure(context);
+    @Internal
+    @Override
+    public final void configure(Environment environment) {
+        if (environment != null) {
+            this.environment = environment;
+            if (constructor instanceof EnvironmentConfigurable) {
+                ((EnvironmentConfigurable) constructor).configure(environment);
             }
-        }
 
-        executableMethodMap.values().parallelStream().forEach(method -> {
-            AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
-            if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-                ((DefaultAnnotationMetadata) annotationMetadata).configure(context);
+            for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+                if (methodInjectionPoint instanceof EnvironmentConfigurable) {
+                    ((EnvironmentConfigurable) methodInjectionPoint).configure(environment);
+                }
             }
-        });
+
+            for (ExecutableMethod<T, ?> executableMethod : executableMethodMap.values()) {
+                if (executableMethod instanceof EnvironmentConfigurable) {
+                    ((EnvironmentConfigurable) executableMethod).configure(environment);
+                }
+            }
+        }
     }
 
     /**
@@ -1377,6 +1383,26 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         );
     }
 
+    /**
+     * Resolves the annotation metadata for this bean. Subclasses
+     *
+     * @return The {@link AnnotationMetadata}
+     */
+    protected AnnotationMetadata resolveAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    private AnnotationMetadata initializeAnnotationMetadata() {
+        AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            // we make a copy of the result of annotation metadata which is normally a reference
+            // to the class metadata
+            return new BeanAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        } else {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+    }
+
     private AbstractBeanDefinition addInjectionPointInternal(
         Class declaringType,
         String method,
@@ -1690,18 +1716,26 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
-    @Override
-    public void close() throws IOException {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            ((DefaultAnnotationMetadata) annotationMetadata).flushCache();
+
+    /**
+     * Internal environment aware annotation metadata delegate.
+     */
+    private final class BeanAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+        BeanAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+            super(targetMetadata);
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return environment;
         }
     }
 
     /**
      * Class used as a method key.
      */
-    private class MethodKey {
+    private final class MethodKey {
         final String name;
         final Class[] argumentTypes;
 

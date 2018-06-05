@@ -2198,8 +2198,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public Set<String> getAnnotationNamesByStereotype(String stereotype) {
-            return Collections.emptySet();
+        public List<String> getAnnotationNamesByStereotype(String stereotype) {
+            return Collections.emptyList();
         }
 
         @Override
