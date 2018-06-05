@@ -761,7 +761,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected ChannelFuture doConnect(String host, int port, @Nullable SslContext sslCtx) {
         Bootstrap localBootstrap = this.bootstrap.clone();
-        localBootstrap.handler(new HttpClientInitializer(sslCtx, false));
+        localBootstrap.handler(new HttpClientInitializer(sslCtx, host,port, false));
         return doConnect(localBootstrap, host, port);
     }
 
@@ -1326,16 +1326,22 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected class HttpClientInitializer extends ChannelInitializer<Channel> {
 
-        SslContext sslContext;
-        boolean stream;
+        final SslContext sslContext;
+        final boolean stream;
+        final String host;
+        final int port;
 
         /**
          * @param sslContext The ssl context
+         * @param host The host
+         * @param port The port
          * @param stream     Whether is stream
          */
-        protected HttpClientInitializer(SslContext sslContext, boolean stream) {
+        protected HttpClientInitializer(SslContext sslContext,String host, int port, boolean stream) {
             this.sslContext = sslContext;
             this.stream = stream;
+            this.host = host;
+            this.port = port;
         }
 
         /**
@@ -1344,8 +1350,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         protected void initChannel(Channel ch) {
             ChannelPipeline p = ch.pipeline();
             if (sslContext != null) {
-                SSLEngine engine = sslContext.newEngine(ch.alloc());
-                p.addFirst("ssl-handler", new SslHandler(engine));
+                SslHandler sslHandler = sslContext.newHandler(
+                        ch.alloc(),
+                        host,
+                        port
+                );
+                p.addFirst("ssl-handler", sslHandler);
             }
 
             Optional<SocketAddress> proxy = configuration.getProxyAddress();
