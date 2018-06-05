@@ -24,7 +24,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyHttpResponse;
-import io.micronaut.http.server.netty.async.DefaultCloseHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -32,7 +31,6 @@ import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderValues;
 
 import javax.inject.Singleton;
 import java.io.File;
@@ -89,8 +87,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                 FullHttpResponse nettyResponse = notModified();
-                context.writeAndFlush(nettyResponse)
-                    .addListener(new DefaultCloseHandler(context, request, response.code()));
+                context.writeAndFlush(nettyResponse);
                 return;
             }
         }
@@ -99,13 +96,10 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
         }
         setDateAndCacheHeaders(response, lastModified);
-        if (request.getHeaders().isKeepAlive()) {
-            response.header(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-        }
 
         type.process(response);
-
         type.write(request, response, context);
+        context.read();
     }
 
     @Override
