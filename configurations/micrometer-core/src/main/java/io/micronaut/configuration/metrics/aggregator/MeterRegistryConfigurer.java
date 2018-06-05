@@ -19,12 +19,18 @@ package io.micronaut.configuration.metrics.aggregator;
 import io.micrometer.core.instrument.MeterRegistry;
 
 /**
- * <p>Aggregates all registered meter binders into a single stream.</p>
+ * Class that will configure meter registries.  This is done on bean added event so that
+ * composite registry can be skipped and non-composite registries can be added to composite.
  *
  * @author Christian Oestreich
  * @since 1.0
  */
 public interface MeterRegistryConfigurer {
 
+    /**
+     * Method to configure a meter registry with binders, filters, etc.
+     *
+     * @param meterRegistry Meter Registry
+     */
     void configure(MeterRegistry meterRegistry);
 }
