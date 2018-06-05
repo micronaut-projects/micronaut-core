@@ -39,7 +39,7 @@ class WebFunctionSpec extends Specification {
 
     void "test the function registry"() {
         given:
-        LocalFunctionRegistry registry = ApplicationContext.run(LocalFunctionRegistry)
+        LocalFunctionRegistry registry = ApplicationContext.run().getBean(LocalFunctionRegistry)
 
         expect:
         registry.findConsumer("consumer/string").isPresent()
