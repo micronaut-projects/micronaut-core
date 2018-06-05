@@ -51,6 +51,7 @@ public class ClientSslConfiguration extends SslConfiguration {
             DefaultSslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
         this.enabled = true;
+        this.buildSelfSigned = true;
     }
 
     /**
