@@ -1,0 +1,16 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compileOnly "io.dropwizard.metrics:metrics-core:$dropwizardVersion"
+    compileOnly "io.micrometer:micrometer-registry-graphite:$micrometerVersion"
+
+    compile "javax.validation:validation-api:$validationVersion"
+    compile "io.micrometer:micrometer-core:$micrometerVersion"
+
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+
+    // The following are optional at runtime, but needed to be on the test classpath
+    testCompile "io.dropwizard.metrics:metrics-core:$dropwizardVersion"
+    testCompile "io.micrometer:micrometer-registry-graphite:$micrometerVersion"
+}

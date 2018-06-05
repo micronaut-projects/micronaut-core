@@ -36,6 +36,11 @@ ext {
 ext {
 
     dependencyVersions = [
+            dropwizard: [
+                    version:dropwizardVersion,
+                    group:'io.dropwizard.metrics',
+                    name: 'metrics-core'
+            ],
             groovy: [
                     version:groovyVersion,
                     group:'org.codehaus.groovy',
@@ -68,6 +73,16 @@ ext {
                 version:jsr305Version,
                 group:'com.google.code.findbugs',
                 name:'jsr305'
+            ],
+            'micrometer.core': [
+                    version: micrometerVersion,
+                    group:'io.micrometer',
+                    name:'micrometer-core'
+            ],
+            'micrometer.graphite': [
+                    version: micrometerVersion,
+                    group:'io.micrometer',
+                    name:'micrometer-graphite'
             ],
             mongodb:[
                 version: mongoVersion,
