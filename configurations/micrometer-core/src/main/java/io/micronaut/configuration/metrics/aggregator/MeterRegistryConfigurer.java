@@ -23,14 +23,23 @@ import io.micrometer.core.instrument.MeterRegistry;
  * composite registry can be skipped and non-composite registries can be added to composite.
  *
  * @author Christian Oestreich
+ * @param <T> an instance of a meter registry that will be configured
  * @since 1.0
  */
-public interface MeterRegistryConfigurer {
+public interface MeterRegistryConfigurer<T extends MeterRegistry> {
 
     /**
      * Method to configure a meter registry with binders, filters, etc.
      *
      * @param meterRegistry Meter Registry
      */
-    void configure(MeterRegistry meterRegistry);
+    void configure(T meterRegistry);
+
+    /**
+     * Method to determine if this configurer supports the meter registry type.
+     *
+     * @param meterRegistry a meter registry
+     * @return boolean whether is supported
+     */
+    boolean supports(T meterRegistry);
 }
