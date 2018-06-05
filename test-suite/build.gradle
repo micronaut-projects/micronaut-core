@@ -18,7 +18,4 @@ dependencies {
 tasks.withType(Test) {
     maxParallelForks = 1
     forkEvery = 5
-    testLogging {
-        showStandardStreams = true
-    }
 }
