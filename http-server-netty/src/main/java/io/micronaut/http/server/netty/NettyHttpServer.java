@@ -80,6 +80,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -258,18 +259,36 @@ public class NettyHttpServer implements EmbeddedServer {
             LOG.debug("Binding server to port: {}", serverPort);
         }
         try {
-            if (host.isPresent()) {
-                serverBootstrap.bind(host.get(), serverPort).sync();
-            } else {
-                serverBootstrap.bind(serverPort).sync();
+            boolean success = false;
+            int attemptCount = 0;
+            while (!success && attemptCount < 3) {
+                attemptCount = attempts.getAndIncrement();
+                if (host.isPresent()) {
+                    success = serverBootstrap.bind(host.get(), serverPort).await(2, TimeUnit.SECONDS);
+                } else {
+                    success = serverBootstrap.bind(serverPort).await(2, TimeUnit.SECONDS);
+                }
+
+                if (!success && isRandomPort) {
+                    // try another port
+                    serverPort = SocketUtils.findAvailableTcpPort();
+                }
             }
 
-            applicationContext.publishEvent(new ServerStartupEvent(this));
-            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-            applicationName.ifPresent(id -> {
-                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-            });
+            if (success) {
+                applicationContext.publishEvent(new ServerStartupEvent(this));
+                Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+                applicationName.ifPresent(id -> {
+                    this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+                    applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+                });
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Unable to bind Micronaut server to available port");
+                }
+                stop();
+            }
+
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 if (e instanceof BindException) {
