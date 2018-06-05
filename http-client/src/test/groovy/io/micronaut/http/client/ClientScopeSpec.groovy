@@ -51,8 +51,12 @@ class ClientScopeSpec extends Specification {
         given:
         MyService myService = context.getBean(MyService)
 
+        MyJavaService myJavaService = context.getBean(MyJavaService)
+
         expect:
         myService.get() == 'success'
+        myJavaService.client == myService.client
+        myJavaService.rxHttpClient == myService.rxHttpClient
     }
 
 

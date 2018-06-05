@@ -23,12 +23,12 @@ The most common module you will need is `inject-groovy`, which enables DI and AO
 
 == Groovy Support in the CLI
 
-The <<cli, Command Line Interface>> for Micronaut also includes special support for Groovy. To create Groovy application use the `groovy` feature. For example:
+The <<cli, Command Line Interface>> for Micronaut includes special support for Groovy. To create a Groovy application use the `groovy` lang option. For example:
 
 [source,bash]
 .Create a Micronaut Groovy application
 ----
-$ mn create-app hello-world --features groovy
+$ mn create-app hello-world -lang groovy
 ----
 
 The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.

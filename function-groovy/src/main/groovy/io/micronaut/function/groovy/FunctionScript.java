@@ -57,7 +57,7 @@ public abstract class FunctionScript extends FunctionInitializer implements Prop
     }
 
     @Override
-    public String getName() {
+    public final String getName() {
         return NameUtils.hyphenate(getClass().getSimpleName());
     }
 

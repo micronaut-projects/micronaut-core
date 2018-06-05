@@ -161,7 +161,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>          The type
      * @return The running bean
      */
-    static <T> T run(Class<T> type, String... environments) {
+    static <T extends ApplicationContextLifeCyle> T run(Class<T> type, String... environments) {
         return run(type, Collections.emptyMap(), environments);
     }
 
@@ -177,7 +177,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>          The type
      * @return The running bean
      */
-    static <T> T run(Class<T> type, Map<String, Object> properties, String... environments) {
+    static <T extends ApplicationContextLifeCyle> T run(Class<T> type, Map<String, Object> properties, String... environments) {
         PropertySource propertySource = PropertySource.of(PropertySource.CONTEXT, properties, SystemPropertiesPropertySource.POSITION + 100);
         return run(type, propertySource, environments);
     }
@@ -194,16 +194,15 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>            The type
      * @return The running {@link BeanContext}
      */
-    static <T> T run(Class<T> type, PropertySource propertySource, String... environments) {
+    static <T extends ApplicationContextLifeCyle> T run(Class<T> type, PropertySource propertySource, String... environments) {
         T bean = build(environments)
             .mainClass(type)
             .propertySources(propertySource)
             .start()
             .getBean(type);
-        if (bean instanceof LifeCycle) {
-            LifeCycle lifeCycle = (LifeCycle) bean;
-            if (!lifeCycle.isRunning()) {
-                lifeCycle.start();
+        if (bean != null) {
+            if (!bean.isRunning()) {
+                bean.start();
             }
         }
 

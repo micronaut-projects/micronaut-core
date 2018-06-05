@@ -513,7 +513,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void finalizeAnnotationMetadata() {
         if (annotationMetadata != null) {
-            GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
+            GeneratorAdapter annotationMetadataMethod = startProtectedMethod(
+                    classWriter,
+                    "resolveAnnotationMetadata",
+                    AnnotationMetadata.class.getName()
+            );
             annotationMetadataMethod.loadThis();
             annotationMetadataMethod.getStatic(getTypeReference(beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
             annotationMetadataMethod.returnValue();

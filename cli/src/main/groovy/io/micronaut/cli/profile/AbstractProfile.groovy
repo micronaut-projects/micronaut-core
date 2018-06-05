@@ -18,6 +18,7 @@ package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import groovy.transform.ToString
+import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.console.parsing.ScriptNameResolver
 import io.micronaut.cli.interactive.completers.StringsCompleter
@@ -28,6 +29,7 @@ import io.micronaut.cli.profile.commands.DefaultMultiStepCommand
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.util.CliSettings
 import io.micronaut.cli.util.CosineSimilarity
+import io.micronaut.cli.util.VersionInfo
 import jline.console.completer.ArgumentCompleter
 import jline.console.completer.Completer
 import org.eclipse.aether.artifact.DefaultArtifact
@@ -65,12 +67,13 @@ abstract class AbstractProfile implements Profile {
     protected List<Feature> features = []
     protected Set<String> defaultFeaturesNames = []
     protected Set<String> requiredFeatureNames = []
+    protected List<Map> oneOfFeatureMaps = []
     protected String parentTargetFolder
     protected final ClassLoader classLoader
     protected ExclusionDependencySelector exclusionDependencySelector = new ExclusionDependencySelector()
-    protected String description = "";
-    protected String instructions = "";
-    protected String version = CliSettings.package.implementationVersion
+    protected String description = ""
+    protected String instructions = ""
+    protected String version = VersionInfo.getVersion(CliSettings)
 
     AbstractProfile(Resource profileDir) {
         this(profileDir, AbstractProfile.getClassLoader())
@@ -153,11 +156,22 @@ abstract class AbstractProfile implements Profile {
             def featureList = (List) featureMap.get("provided") ?: Collections.emptyList()
             def defaultFeatures = (List) featureMap.get("defaults") ?: Collections.emptyList()
             def requiredFeatures = (List) featureMap.get("required") ?: Collections.emptyList()
+            def oneOfFeaturesMap = (List) featureMap.get("oneOf") ?: Collections.emptyList()
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
                     def f = new DefaultFeature(this, fn.toString(), profileDir.createRelative("features/$fn/"))
                     features.add f
+                }
+            }
+
+            for (entry in (List) oneOfFeaturesMap) {
+                if (entry instanceof Map) {
+                    String feature = (String) entry.feature
+                    Integer priority = (Integer) entry.priority
+
+                    oneOfFeatureMaps.add([name: feature, priority: priority])
+
                 }
             }
 
@@ -174,8 +188,8 @@ abstract class AbstractProfile implements Profile {
 
             for (entry in ((List) dependencyMap)) {
                 if (entry instanceof Map) {
-                    def scope = (String)entry.scope
-                    String coords = (String)entry.coords
+                    def scope = (String) entry.scope
+                    String coords = (String) entry.coords
 
                     if ("excludes".equals(scope)) {
                         def artifact = new DefaultArtifact(coords)
@@ -187,11 +201,11 @@ abstract class AbstractProfile implements Profile {
                         Dependency dependency = new Dependency(new DefaultArtifact(coords), scope.toString())
                         if (entry.containsKey('excludes')) {
                             List<Exclusion> dependencyExclusions = new ArrayList<>()
-                            List excludes = (List)entry.excludes
+                            List excludes = (List) entry.excludes
 
                             for (ex in excludes) {
                                 if (ex instanceof Map) {
-                                    dependencyExclusions.add(new Exclusion((String)ex.group, (String)ex.module, (String)ex.classifier, (String)ex.extension))
+                                    dependencyExclusions.add(new Exclusion((String) ex.group, (String) ex.module, (String) ex.classifier, (String) ex.extension))
                                 }
                             }
                             dependency = dependency.setExclusions(dependencyExclusions)
@@ -247,6 +261,21 @@ abstract class AbstractProfile implements Profile {
     @Override
     Iterable<Feature> getDefaultFeatures() {
         getFeatures().findAll() { Feature f -> defaultFeaturesNames.contains(f.name) }
+    }
+
+    @Override
+    @CompileStatic(TypeCheckingMode.SKIP)
+    Iterable<OneOfFeature> getOneOfFeatures() {
+        List<Feature> features = getFeatures().toList()
+        List<OneOfFeature> oneOfFeatures = []
+        for (Map<String, Object> map: oneOfFeatureMaps) {
+            Feature f = features.find { it.name == map.name }
+            if (f) {
+                oneOfFeatures.add(new OneOfFeature(feature: f, priority: (Integer) map.priority))
+            }
+        }
+        //descending
+        oneOfFeatures.sort { a, b -> a.priority <=> b.priority}
     }
 
     @Override
@@ -391,8 +420,8 @@ abstract class AbstractProfile implements Profile {
                 if (description.completer) {
                     if (description.flags) {
                         completers << new ArgumentCompleter(commandNameCompleter,
-                                                            description.completer,
-                                                            new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
+                                description.completer,
+                                new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
                     } else {
                         completers << new ArgumentCompleter(commandNameCompleter, description.completer)
                     }

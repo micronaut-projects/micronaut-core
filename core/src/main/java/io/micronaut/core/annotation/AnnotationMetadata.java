@@ -23,11 +23,7 @@ import io.micronaut.core.value.OptionalValues;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -104,7 +100,22 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    Set<String> getAnnotationNamesByStereotype(String stereotype);
+    List<String> getAnnotationNamesByStereotype(String stereotype);
+
+    /**
+     * All the annotation names this metadata declares.
+     *
+     * @return All the annotation names this metadata declares
+     */
+    Set<String> getAnnotationNames();
+
+
+    /**
+     * All the declared annotation names this metadata declares.
+     *
+     * @return All the declared annotation names this metadata declares
+     */
+    Set<String> getDeclaredAnnotationNames();
 
     /**
      * Resolve all of the annotations names for the given stereotype that are declared annotations.
@@ -112,7 +123,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param stereotype The stereotype
      * @return The declared annotations
      */
-    Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
+    List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
 
     /**
      * Get all of the values for the given annotation.
@@ -279,7 +290,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default Set<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
+    default List<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
         return getAnnotationNamesByStereotype(stereotype.getName());
     }
 
@@ -290,12 +301,12 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return A set of annotation names
      */
     @SuppressWarnings("unchecked")
-    default Set<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
-        Set<String> names = getAnnotationNamesByStereotype(stereotype.getName());
+    default List<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
+        List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
         return names.stream().map(name -> ClassUtils.forName(name, AnnotationMetadata.class.getClassLoader()))
             .filter(Optional::isPresent)
             .map(opt -> (Class<? extends Annotation>) opt.get())
-            .collect(Collectors.toSet());
+            .collect(Collectors.toList());
     }
 
     /**
