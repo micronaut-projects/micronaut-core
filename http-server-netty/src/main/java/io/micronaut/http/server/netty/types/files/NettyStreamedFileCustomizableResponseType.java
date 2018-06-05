@@ -85,10 +85,8 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
             // Write the request data
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
+            context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(getInputStream())));
 
-            ChannelFuture flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(getInputStream())));
-
-            flushFuture.addListener(new DefaultCloseHandler(context, request, response.code()));
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }

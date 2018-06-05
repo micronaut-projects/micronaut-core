@@ -209,12 +209,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
             subscription.cancel();
         } else {
             this.subscription = subscription;
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    provideSubscription();
-                }
-            });
+            executor.execute(this::provideSubscription);
         }
     }
 
