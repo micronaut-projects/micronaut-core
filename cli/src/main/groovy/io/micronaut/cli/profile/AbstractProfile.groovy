@@ -266,14 +266,16 @@ abstract class AbstractProfile implements Profile {
     @Override
     @CompileStatic(TypeCheckingMode.SKIP)
     Iterable<OneOfFeature> getOneOfFeatures() {
-        getFeatures().findAll() { Feature f ->
-            oneOfFeatureMaps.collect() { it.name }.contains(f.name)
+        List<Feature> features = getFeatures().toList()
+        List<OneOfFeature> oneOfFeatures = []
+        for (Map<String, Object> map: oneOfFeatureMaps) {
+            Feature f = features.find { it.name == map.name }
+            if (f) {
+                oneOfFeatures.add(new OneOfFeature(feature: f, priority: (Integer) map.priority))
+            }
         }
-        .collect() { Feature f ->
-            new OneOfFeature(
-                    feature: (Feature) f,
-                    priority: (Integer) oneOfFeatureMaps.find { it.name == f.name }.priority)
-        }
+        //descending
+        oneOfFeatures.sort { a, b -> a.priority <=> b.priority}
     }
 
     @Override

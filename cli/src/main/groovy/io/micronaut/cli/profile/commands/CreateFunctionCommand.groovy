@@ -105,7 +105,8 @@ class CreateFunctionCommand extends CreateAppCommand {
         checkInvalidSelections(executionContext, langFeature, testFeature)
 
         final List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        List<String> features = [langFeature, testFeature]
+        Set<String> features = new HashSet<>()
+        features.addAll(langFeature, testFeature)
         if (commandLineFeatures) features.addAll(commandLineFeatures)
 
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
