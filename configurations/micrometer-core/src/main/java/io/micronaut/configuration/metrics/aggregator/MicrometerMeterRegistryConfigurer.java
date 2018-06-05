@@ -47,9 +47,17 @@ public class MicrometerMeterRegistryConfigurer implements MeterRegistryConfigure
         this.filters = filters;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * It is Important that filters are the first thing added so that subsequent operations are
+     * appropriately filtered.
+     *
+     * @param meterRegistry Meter registry to bind metrics to.
+     */
     public void configure(MeterRegistry meterRegistry) {
-        addBinders(meterRegistry);
         addFilters(meterRegistry);
+        addBinders(meterRegistry);
     }
 
     /**

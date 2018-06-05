@@ -11,20 +11,31 @@ import java.util.Properties;
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_EXPORT;
 
 /**
- * {@inheritDoc}
+ * {@inheritDoc}.
  *
- * @see AtlasConfig
  * @author Christian Oestreich
+ * @see AtlasConfig
  */
 @ConfigurationProperties(MICRONAUT_METRICS_EXPORT)
 class AtlasConfigurationProperties implements AtlasConfig {
     private final Properties config;
 
+    /**
+     * Constructor for wiring a config which will use environment specific or create new.
+     *
+     * @param environment Environment
+     */
     public AtlasConfigurationProperties(Environment environment) {
         Optional<Properties> config = environment.getProperty(MICRONAUT_METRICS_EXPORT, Properties.class);
         this.config = config.orElseGet(Properties::new);
     }
 
+    /**
+     * Method to get config param.  Will hyphenate the properties.
+     *
+     * @param k key
+     * @return String value of property
+     */
     @Override
     public String get(String k) {
         return config.getProperty(NameUtils.hyphenate(k));

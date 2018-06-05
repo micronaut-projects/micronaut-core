@@ -2,30 +2,24 @@ package io.micronaut.configuration.metrics.management.endpoint
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
+import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import javax.inject.Singleton
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
 class MetricsEndpointSpec extends Specification {
-
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test the beans are available"() {
         given:

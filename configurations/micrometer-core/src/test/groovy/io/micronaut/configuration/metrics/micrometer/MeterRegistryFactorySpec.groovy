@@ -1,11 +1,18 @@
 package io.micronaut.configuration.metrics.micrometer
 
+import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
+import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer
+import io.micronaut.configuration.metrics.aggregator.MicrometerMeterRegistryConfigurer
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import javax.inject.Singleton
 
 import static MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
