@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/DefaultLocalFunctionRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/FunctionBean.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/LocalFunctionRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/AbstractExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/AbstractFunctionExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/DefaultFunctionExitHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/FunctionApplication.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/FunctionExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/FunctionExitHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/FunctionInitializer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/StreamFunctionExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/executor/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function/src/main/java/io/micronaut/function/package-info.java">
+</file>
+</checkstyle>

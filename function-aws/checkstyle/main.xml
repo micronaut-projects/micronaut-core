@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-aws/src/main/java/io/micronaut/function/aws/MicronautRequestHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-aws/src/main/java/io/micronaut/function/aws/MicronautRequestStreamHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-aws/src/main/java/io/micronaut/function/aws/bind/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-aws/src/main/java/io/micronaut/function/aws/package-info.java">
+</file>
+</checkstyle>

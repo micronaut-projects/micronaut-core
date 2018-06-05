@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - Class io.micronaut.discovery.consul.MockConfigurationDiscoverySpec</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>Class io.micronaut.discovery.consul.MockConfigurationDiscoverySpec</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/io.micronaut.discovery.consul.html">io.micronaut.discovery.consul</a> &gt; MockConfigurationDiscoverySpec</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">2</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">0.263s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success" id="successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="tabs">
+<ul class="tabLinks">
+<li>
+<a href="#tab0">Tests</a>
+</li>
+<li>
+<a href="#tab1">Standard output</a>
+</li>
+</ul>
+<div id="tab0" class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="success">test disable application configuration from Consul</td>
+<td>0.051s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">test read application configuration from Consul</td>
+<td>0.212s</td>
+<td class="success">passed</td>
+</tr>
+</table>
+</div>
+<div id="tab1" class="tab">
+<h2>Standard output</h2>
+<span class="code">
+<pre>00:18:56.054 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.055 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.110 [Test worker] DEBUG i.m.h.server.netty.NettyHttpServer - Binding server to port: 60889
+00:18:56.116 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.117 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.169 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value
+00:18:56.170 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.170 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.170 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.170 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.170 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.170 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.171 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.171 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.171 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - test
+00:18:56.171 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.172 [nioEventLoopGroup-37-2] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value
+00:18:56.172 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value
+00:18:56.173 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.186 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.187 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.194 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.194 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.194 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.194 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.194 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.195 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.195 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 6
+00:18:56.195 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.196 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.196 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - foobar
+00:18:56.196 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.197 [nioEventLoopGroup-37-3] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.199 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.200 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.203 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.203 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.203 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.204 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.206 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.206 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 5
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - other
+00:18:56.206 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.209 [nioEventLoopGroup-37-4] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.209 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.209 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.214 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.215 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fmust.override1
+00:18:56.215 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - test
+00:18:56.216 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.219 [nioEventLoopGroup-37-5] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fmust.override1
+00:18:56.219 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fmust.override1
+00:18:56.219 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fmust.override1 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fmust.override1
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.222 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.224 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.224 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 10
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - overridden
+00:18:56.224 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.224 [nioEventLoopGroup-37-2] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.224 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.224 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.226 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.228 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override2
+00:18:56.228 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - test
+00:18:56.228 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.229 [nioEventLoopGroup-37-3] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override2
+00:18:56.229 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override2
+00:18:56.229 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override2 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override2
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.230 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.232 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Ctest%2Fmust.override2
+00:18:56.232 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 10
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - overridden
+00:18:56.232 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.233 [nioEventLoopGroup-37-4] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Ctest%2Fmust.override2
+00:18:56.233 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Ctest%2Fmust.override2
+00:18:56.233 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Ctest%2Fmust.override2 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Ctest%2Fmust.override2
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.235 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.238 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.239 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.285 [nioEventLoopGroup-39-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.286 [nioEventLoopGroup-39-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.286 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: application/json
+00:18:56.286 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Accept: application/json
+00:18:56.286 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.286 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.287 [nioEventLoopGroup-37-5] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.287 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route GET - /v1/kv/%2Fconfig%2Fapplication
+00:18:56.287 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route GET - /v1/kv/%2Fconfig%2Fapplication to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.296 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - content-type: application/json
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 273
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.297 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.298 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - [{&quot;Key&quot;:&quot;config/application,test/some.consul.value&quot;,&quot;Value&quot;:&quot;Zm9vYmFy&quot;},{&quot;Key&quot;:&quot;config/application/some.consul.value&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;},{&quot;Key&quot;:&quot;config/application/must.override1&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;},{&quot;Key&quot;:&quot;config/application,other/some.consul.value&quot;,&quot;Value&quot;:&quot;b3RoZXI=&quot;}]
+00:18:56.298 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.312 [nioEventLoopGroup-39-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.312 [nioEventLoopGroup-39-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.312 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: application/json
+00:18:56.313 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Accept: application/json
+00:18:56.313 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.313 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.314 [nioEventLoopGroup-37-2] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.314 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route GET - /v1/kv/%2Fconfig%2Ftest-app
+00:18:56.314 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route GET - /v1/kv/%2Fconfig%2Ftest-app to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - content-type: application/json
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 202
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - [{&quot;Key&quot;:&quot;config/test-app,test/must.override2&quot;,&quot;Value&quot;:&quot;b3ZlcnJpZGRlbg==&quot;},{&quot;Key&quot;:&quot;config/test-app/must.override1&quot;,&quot;Value&quot;:&quot;b3ZlcnJpZGRlbg==&quot;},{&quot;Key&quot;:&quot;config/test-app/must.override2&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;}]
+00:18:56.317 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.322 [Test worker] INFO  i.m.d.c.c.DistributedPropertySourceLocator - Resolved 4 configuration sources from client: compositeConfigurationClient(consul)
+00:18:56.340 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.340 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 7
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - changed
+00:18:56.340 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.341 [nioEventLoopGroup-37-3] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.341 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.341 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Ftest-app%2Fmust.override1
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.343 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.346 [nioEventLoopGroup-39-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.346 [nioEventLoopGroup-39-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.346 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: application/json
+00:18:56.346 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Accept: application/json
+00:18:56.346 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.346 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.347 [nioEventLoopGroup-37-4] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.347 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route GET - /v1/kv/%2Fconfig%2Fapplication
+00:18:56.347 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route GET - /v1/kv/%2Fconfig%2Fapplication to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: GET /v1/kv/%2Fconfig%2Fapplication?recurse=true
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - content-type: application/json
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 273
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - [{&quot;Key&quot;:&quot;config/application,test/some.consul.value&quot;,&quot;Value&quot;:&quot;Zm9vYmFy&quot;},{&quot;Key&quot;:&quot;config/application/some.consul.value&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;},{&quot;Key&quot;:&quot;config/application/must.override1&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;},{&quot;Key&quot;:&quot;config/application,other/some.consul.value&quot;,&quot;Value&quot;:&quot;b3RoZXI=&quot;}]
+00:18:56.349 [nioEventLoopGroup-39-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.351 [nioEventLoopGroup-39-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.351 [nioEventLoopGroup-39-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.351 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: application/json
+00:18:56.351 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Accept: application/json
+00:18:56.351 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.351 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.353 [nioEventLoopGroup-37-5] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.354 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route GET - /v1/kv/%2Fconfig%2Ftest-app
+00:18:56.354 [nioEventLoopGroup-37-5] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route GET - /v1/kv/%2Fconfig%2Ftest-app to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: GET /v1/kv/%2Fconfig%2Ftest-app?recurse=true
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - content-type: application/json
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 266
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - [{&quot;Key&quot;:&quot;config/test-app,test/must.override2&quot;,&quot;Value&quot;:&quot;b3ZlcnJpZGRlbg==&quot;},{&quot;Key&quot;:&quot;config/test-app/must.override1&quot;,&quot;Value&quot;:&quot;b3ZlcnJpZGRlbg==&quot;},{&quot;Key&quot;:&quot;config/test-app/must.override2&quot;,&quot;Value&quot;:&quot;dGVzdA==&quot;},{&quot;Key&quot;:&quot;config/test-app/must.override1&quot;,&quot;Value&quot;:&quot;Y2hhbmdlZA==&quot;}]
+00:18:56.358 [nioEventLoopGroup-39-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.359 [Test worker] INFO  i.m.d.c.c.DistributedPropertySourceLocator - Resolved 4 configuration sources from client: compositeConfigurationClient(consul)
+00:18:56.369 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value2
+00:18:56.369 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.369 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.369 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - test
+00:18:56.370 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.370 [nioEventLoopGroup-37-2] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value2
+00:18:56.370 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value2
+00:18:56.371 [nioEventLoopGroup-37-2] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value2 to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.372 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Fsome.consul.value2
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.373 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.374 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.374 [nioEventLoopGroup-38-4] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 6
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - foobar
+00:18:56.375 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.375 [nioEventLoopGroup-37-3] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.375 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.376 [nioEventLoopGroup-37-3] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Ctest%2Fsome.consul.value
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.377 [nioEventLoopGroup-38-4] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.379 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Sending HTTP Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.379 [nioEventLoopGroup-38-2] DEBUG i.m.http.client.DefaultHttpClient - Chosen Server: localhost(60889)
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Content-Type: text/plain
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Accept: text/plain
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - host: localhost
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 5
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - other
+00:18:56.379 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.380 [nioEventLoopGroup-37-4] DEBUG i.m.h.server.netty.NettyHttpServer - Server localhost:60889 Received Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.380 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matching route PUT - /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.380 [nioEventLoopGroup-37-4] DEBUG i.m.h.s.netty.RoutingInBoundHandler - Matched route PUT - /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value to controller class io.micronaut.discovery.consul.MockConsulServer
+00:18:56.381 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - HTTP Client Response Received for Request: PUT /v1/kv/%2Fconfig%2Fapplication%2Cother%2Fsome.consul.value
+00:18:56.381 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Status Code: 200 OK
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-type: text/plain
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - content-length: 4
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - connection: close
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - Body
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - true
+00:18:56.382 [nioEventLoopGroup-38-2] TRACE i.m.http.client.DefaultHttpClient - ----
+00:18:56.386 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:18:56.387 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+</pre>
+</span>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="http://www.gradle.org">Gradle 4.6</a> at Jun 5, 2018 12:19:07 AM</p>
+</div>
+</div>
+</body>
+</html>

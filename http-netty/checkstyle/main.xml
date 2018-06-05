@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/AbstractNettyHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/NettyHttpHeaders.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/NettyHttpParameters.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/NettyHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/buffer/NettyByteBuffer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/buffer/NettyByteBufferFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/buffer/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/channel/NettyThreadFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/channel/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/content/HttpContentUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/content/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/cookies/NettyCookie.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/cookies/NettyCookieFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/cookies/NettyCookies.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/cookies/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/reactive/CancelledSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/reactive/HandlerPublisher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/reactive/HandlerSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/reactive/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DefaultStreamedHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DefaultStreamedHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DefaultWebSocketHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DelegateHttpMessage.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DelegateHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DelegateHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DelegateStreamedHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/DelegateStreamedHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/EmptyHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/EmptyHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/HttpStreamsClientHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/HttpStreamsHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/HttpStreamsServerHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/StreamedHttpMessage.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/StreamedHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/StreamedHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/WebSocketHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-netty/src/main/java/io/micronaut/http/netty/stream/package-info.java">
+</file>
+</checkstyle>

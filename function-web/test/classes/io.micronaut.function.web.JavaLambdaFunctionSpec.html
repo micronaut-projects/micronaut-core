@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - Class io.micronaut.function.web.JavaLambdaFunctionSpec</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>Class io.micronaut.function.web.JavaLambdaFunctionSpec</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/io.micronaut.function.web.html">io.micronaut.function.web</a> &gt; JavaLambdaFunctionSpec</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">3.521s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success" id="successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="tabs">
+<ul class="tabLinks">
+<li>
+<a href="#tab0">Tests</a>
+</li>
+<li>
+<a href="#tab1">Standard output</a>
+</li>
+</ul>
+<div id="tab0" class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="success">test string supplier</td>
+<td>3.521s</td>
+<td class="success">passed</td>
+</tr>
+</table>
+</div>
+<div id="tab1" class="tab">
+<h2>Standard output</h2>
+<span class="code">
+<pre>00:19:30.028 [Test worker] INFO io.micronaut.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:19:30.041 [Test worker] INFO io.micronaut.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:19:30.059 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.jackson.env.JsonPropertySourceLoader@1958ce2a
+00:19:30.061 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.jackson.env.EnvJsonPropertySourceLoader@34f7794c
+00:19:30.061 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.context.env.yaml.YamlPropertySourceLoader@6b01c866
+00:19:30.067 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.context.env.PropertiesPropertySourceLoader@517de935
+00:19:30.076 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: env
+00:19:30.079 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: system
+00:19:30.080 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.080 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.081 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.084 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for instance: io.micronaut.context.DefaultApplicationContext$BootstrapEnvironment@7bbf6ffa
+00:19:30.088 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - No bean candidates found for instance: io.micronaut.context.DefaultApplicationContext$BootstrapEnvironment@7bbf6ffa
+00:19:30.093 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Starting BeanContext
+00:19:30.543 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.reactor.converters.$PublisherToMonoConverterDefinition] will not be loaded due to failing conditions:
+00:19:30.543 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Mono] is not present
+00:19:30.546 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.reactor.converters.$PublisherToFluxConverterDefinition] will not be loaded due to failing conditions:
+00:19:30.546 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Flux] is not present
+00:19:30.632 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.rxjava1.converters.$RxJava1ConverterRegistrarDefinition] will not be loaded due to failing conditions:
+00:19:30.632 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [hu.akarnokd.rxjava.interop.RxJavaInterop] is not present
+00:19:30.688 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.client.reactor.$ReactorReactiveClientResultTransformerDefinition] will not be loaded due to failing conditions:
+00:19:30.688 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Mono] is not present
+00:19:30.694 [Test worker] DEBUG io.micronaut.context.condition.Condition - Configuration: io.micronaut.http.server.cors will not be loaded due to failing conditions:
+00:19:30.694 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.cors.enabled] not present
+00:19:30.695 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.server.cors.CorsOriginConverter] will not be loaded because the configuration [Optional[Configuration: io.micronaut.http.server.cors]] is not enabled
+00:19:30.699 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.server.cors.CorsFilter] will not be loaded because the configuration [Optional[Configuration: io.micronaut.http.server.cors]] is not enabled
+00:19:30.708 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Loaded active configurations: io.micronaut.jackson
+00:19:30.708 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - BeanContext Started.
+00:19:30.709 [Test worker] DEBUG io.micronaut.context.event.ApplicationEventPublisher - Publishing event: io.micronaut.context.event.StartupEvent[source=io.micronaut.context.DefaultApplicationContext$BootstrapApplicationContext@103bf4db]
+00:19:30.710 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;StartupEvent&gt; io.micronaut.context.event.ApplicationEventListener 
+00:19:30.711 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.context.event.ApplicationEventListener
+00:19:30.745 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.health.HeartbeatTask] will not be loaded due to failing conditions:
+00:19:30.749 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.application.name] not present
+00:19:30.752 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope, Definition: io.micronaut.http.client.scope.ClientScope] for type: interface io.micronaut.context.event.ApplicationEventListener
+00:19:30.753 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope, Definition: io.micronaut.http.client.scope.ClientScope]
+00:19:30.753 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;StartupEvent&gt; 
+00:19:30.756 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;StartupEvent&gt; 
+00:19:30.757 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.context.env.BootstrapPropertySourceLocator
+00:19:30.758 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: interface io.micronaut.context.env.BootstrapPropertySourceLocator
+00:19:30.760 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.jackson.env.JsonPropertySourceLoader@15783eda
+00:19:30.760 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.jackson.env.EnvJsonPropertySourceLoader@31fec28d
+00:19:30.761 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.context.env.yaml.YamlPropertySourceLoader@6a56f839
+00:19:30.762 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Reading property sources from loader: io.micronaut.context.env.PropertiesPropertySourceLoader@2191647a
+00:19:30.762 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: env
+00:19:30.763 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: env
+00:19:30.765 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: env
+00:19:30.766 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: system
+00:19:30.766 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: system
+00:19:30.767 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: system
+00:19:30.767 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.768 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.768 [Test worker] DEBUG io.micronaut.context.env.DefaultEnvironment - Processing property source: context
+00:19:30.768 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for instance: io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c
+00:19:30.768 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - No bean candidates found for instance: io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c
+00:19:30.769 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for instance: io.micronaut.context.ExecutableMethodProcessorListener@60999df8
+00:19:30.771 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for instance: io.micronaut.context.ExecutableMethodProcessorListener@60999df8
+00:19:30.771 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Starting BeanContext
+00:19:30.774 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.reactor.converters.$PublisherToMonoConverterDefinition] will not be loaded due to failing conditions:
+00:19:30.774 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Mono] is not present
+00:19:30.774 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.reactor.converters.$PublisherToFluxConverterDefinition] will not be loaded due to failing conditions:
+00:19:30.774 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Flux] is not present
+00:19:30.775 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.reactive.rxjava1.converters.$RxJava1ConverterRegistrarDefinition] will not be loaded due to failing conditions:
+00:19:30.775 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [hu.akarnokd.rxjava.interop.RxJavaInterop] is not present
+00:19:30.777 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.client.reactor.$ReactorReactiveClientResultTransformerDefinition] will not be loaded due to failing conditions:
+00:19:30.777 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Class [reactor.core.publisher.Mono] is not present
+00:19:30.778 [Test worker] DEBUG io.micronaut.context.condition.Condition - Configuration: io.micronaut.http.server.cors will not be loaded due to failing conditions:
+00:19:30.778 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.cors.enabled] not present
+00:19:30.778 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.server.cors.CorsOriginConverter] will not be loaded because the configuration [Optional[Configuration: io.micronaut.http.server.cors]] is not enabled
+00:19:30.778 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [io.micronaut.http.server.cors.CorsFilter] will not be loaded because the configuration [Optional[Configuration: io.micronaut.http.server.cors]] is not enabled
+00:19:30.779 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.core.convert.TypeConverter
+00:19:30.779 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.convert.TypeConverter
+00:19:30.787 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.bind.MapToObjectConverter, Definition: io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter, Definition: io.micronaut.http.server.netty.converters.HttpDataToStringConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToStringConverter, Definition: io.micronaut.jackson.convert.ObjectToJsonNodeConverter, Definition: io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter, Definition: io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter, Definition: io.micronaut.http.server.netty.converters.FileUploadToObjectConverter, Definition: io.micronaut.jackson.convert.ArrayNodeToArrayConverter, Definition: io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToArrayConverter, Definition: io.micronaut.http.server.netty.converters.AttributeConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToObjectConverter, Definition: io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter, Definition: io.micronaut.jackson.convert.ArrayNodeToIterableConverter, Definition: io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter, Definition: io.micronaut.http.client.converters.ClientResponseConverter, Definition: io.micronaut.jackson.convert.JsonNodeToObjectConverter] for type: interface io.micronaut.core.convert.TypeConverter
+00:19:30.787 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.bind.MapToObjectConverter, Definition: io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter, Definition: io.micronaut.http.server.netty.converters.HttpDataToStringConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToStringConverter, Definition: io.micronaut.jackson.convert.ObjectToJsonNodeConverter, Definition: io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter, Definition: io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter, Definition: io.micronaut.http.server.netty.converters.FileUploadToObjectConverter, Definition: io.micronaut.jackson.convert.ArrayNodeToArrayConverter, Definition: io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToArrayConverter, Definition: io.micronaut.http.server.netty.converters.AttributeConverter, Definition: io.micronaut.http.server.netty.converters.ByteBufToObjectConverter, Definition: io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter, Definition: io.micronaut.jackson.convert.ArrayNodeToIterableConverter, Definition: io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter, Definition: io.micronaut.http.client.converters.ClientResponseConverter, Definition: io.micronaut.jackson.convert.JsonNodeToObjectConverter]
+00:19:30.797 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.bind.BeanPropertyBinder
+00:19:30.799 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.bind.JacksonBeanPropertyBinder] for type: interface io.micronaut.core.bind.BeanPropertyBinder
+00:19:30.799 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.bind.JacksonBeanPropertyBinder]
+00:19:30.800 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.jackson.bind.JacksonBeanPropertyBinder] for type: io.micronaut.core.bind.BeanPropertyBinder 
+00:19:30.804 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.ObjectMapper
+00:19:30.813 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.ObjectMapperFactory] for type: class com.fasterxml.jackson.databind.ObjectMapper
+00:19:30.814 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.ObjectMapperFactory]
+00:19:30.814 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.jackson.ObjectMapperFactory] for type: com.fasterxml.jackson.databind.ObjectMapper 
+00:19:30.814 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.jackson.ObjectMapperFactory
+00:19:30.817 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.ObjectMapperFactory] for type: class io.micronaut.jackson.ObjectMapperFactory
+00:19:30.818 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.ObjectMapperFactory]
+00:19:30.818 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.jackson.ObjectMapperFactory] for type: io.micronaut.jackson.ObjectMapperFactory 
+00:19:30.821 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: com.fasterxml.jackson.databind.Module
+00:19:30.821 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.Module
+00:19:30.822 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.serialize.ResourceModule] for type: class com.fasterxml.jackson.databind.Module
+00:19:30.822 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.serialize.ResourceModule]
+00:19:30.826 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ResourceModule&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.826 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.context.event.BeanCreatedEventListener
+00:19:30.827 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@2eb15e3] for type: interface io.micronaut.context.event.BeanCreatedEventListener
+00:19:30.827 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@2eb15e3]
+00:19:30.827 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceModule&gt; 
+00:19:30.827 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceModule&gt; 
+00:19:30.828 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.serialize.ResourceModule@6d3e6501] from definition [Definition: io.micronaut.jackson.serialize.ResourceModule] with qualifier [null]
+00:19:30.831 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.Module]: io.micronaut.jackson.serialize.ResourceModule@6d3e6501 
+00:19:30.831 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 1 beans for type [com.fasterxml.jackson.databind.Module]: [io.micronaut.jackson.serialize.ResourceModule@6d3e6501] 
+00:19:30.831 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: com.fasterxml.jackson.databind.JsonSerializer
+00:19:30.831 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.JsonSerializer
+00:19:30.834 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.serialize.ConvertibleValuesSerializer, Definition: io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer, Definition: io.micronaut.jackson.serialize.OptionalValuesSerializer] for type: class com.fasterxml.jackson.databind.JsonSerializer
+00:19:30.835 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.serialize.ConvertibleValuesSerializer, Definition: io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer, Definition: io.micronaut.jackson.serialize.OptionalValuesSerializer]
+00:19:30.835 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ConvertibleValuesSerializer&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.835 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ConvertibleValuesSerializer&gt; 
+00:19:30.835 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ConvertibleValuesSerializer&gt; 
+00:19:30.836 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.serialize.ConvertibleValuesSerializer@3ab1b083] from definition [Definition: io.micronaut.jackson.serialize.ConvertibleValuesSerializer] with qualifier [null]
+00:19:30.836 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.JsonSerializer]: io.micronaut.jackson.serialize.ConvertibleValuesSerializer@3ab1b083 
+00:19:30.836 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ConvertibleMultiValuesSerializer&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.836 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ConvertibleMultiValuesSerializer&gt; 
+00:19:30.836 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ConvertibleMultiValuesSerializer&gt; 
+00:19:30.837 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer@2ce3d1aa] from definition [Definition: io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer] with qualifier [null]
+00:19:30.837 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.JsonSerializer]: io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer@2ce3d1aa 
+00:19:30.837 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;OptionalValuesSerializer&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.837 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;OptionalValuesSerializer&gt; 
+00:19:30.837 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;OptionalValuesSerializer&gt; 
+00:19:30.838 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.serialize.OptionalValuesSerializer@74f79687] from definition [Definition: io.micronaut.jackson.serialize.OptionalValuesSerializer] with qualifier [null]
+00:19:30.838 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.JsonSerializer]: io.micronaut.jackson.serialize.OptionalValuesSerializer@74f79687 
+00:19:30.838 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 3 beans for type [com.fasterxml.jackson.databind.JsonSerializer]: [io.micronaut.jackson.serialize.OptionalValuesSerializer@74f79687, io.micronaut.jackson.serialize.ConvertibleValuesSerializer@3ab1b083, io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer@2ce3d1aa] 
+00:19:30.838 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: com.fasterxml.jackson.databind.JsonDeserializer
+00:19:30.838 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.JsonDeserializer
+00:19:30.839 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class com.fasterxml.jackson.databind.JsonDeserializer
+00:19:30.839 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: com.fasterxml.jackson.databind.ser.BeanSerializerModifier
+00:19:30.839 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.ser.BeanSerializerModifier
+00:19:30.840 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.serialize.ResourceSerializerModifier] for type: class com.fasterxml.jackson.databind.ser.BeanSerializerModifier
+00:19:30.841 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.serialize.ResourceSerializerModifier]
+00:19:30.846 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ResourceSerializerModifier&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.847 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceSerializerModifier&gt; 
+00:19:30.847 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceSerializerModifier&gt; 
+00:19:30.847 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.serialize.ResourceSerializerModifier@55bb1938] from definition [Definition: io.micronaut.jackson.serialize.ResourceSerializerModifier] with qualifier [null]
+00:19:30.847 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.ser.BeanSerializerModifier]: io.micronaut.jackson.serialize.ResourceSerializerModifier@55bb1938 
+00:19:30.848 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 1 beans for type [com.fasterxml.jackson.databind.ser.BeanSerializerModifier]: [io.micronaut.jackson.serialize.ResourceSerializerModifier@55bb1938] 
+00:19:30.848 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: com.fasterxml.jackson.databind.deser.BeanDeserializerModifier
+00:19:30.848 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.databind.deser.BeanDeserializerModifier
+00:19:30.849 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class com.fasterxml.jackson.databind.deser.BeanDeserializerModifier
+00:19:30.849 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ObjectMapperFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.849 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectMapperFactory&gt; 
+00:19:30.850 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectMapperFactory&gt; 
+00:19:30.850 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.ObjectMapperFactory@4f167a26] from definition [Definition: io.micronaut.jackson.ObjectMapperFactory] with qualifier [null]
+00:19:30.851 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.jackson.ObjectMapperFactory]: io.micronaut.jackson.ObjectMapperFactory@4f167a26 
+00:19:30.851 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.jackson.JacksonConfiguration
+00:19:30.858 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.jackson.JacksonConfiguration] for type: class io.micronaut.jackson.JacksonConfiguration
+00:19:30.858 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.jackson.JacksonConfiguration]
+00:19:30.859 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.jackson.JacksonConfiguration] for type: io.micronaut.jackson.JacksonConfiguration 
+00:19:30.863 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;JacksonConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:30.863 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JacksonConfiguration&gt; 
+00:19:30.864 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JacksonConfiguration&gt; 
+00:19:30.864 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.JacksonConfiguration@7ea03814] from definition [Definition: io.micronaut.jackson.JacksonConfiguration] with qualifier [null]
+00:19:30.864 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.jackson.JacksonConfiguration]: io.micronaut.jackson.JacksonConfiguration@7ea03814 
+00:19:30.865 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class com.fasterxml.jackson.core.JsonFactory
+00:19:30.866 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class com.fasterxml.jackson.core.JsonFactory
+00:19:31.015 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ObjectMapper&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.016 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectMapper&gt; 
+00:19:31.017 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectMapper&gt; 
+00:19:31.017 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] from definition [Definition: io.micronaut.jackson.ObjectMapperFactory] with qualifier [null]
+00:19:31.017 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [com.fasterxml.jackson.databind.ObjectMapper]: com.fasterxml.jackson.databind.ObjectMapper@7844af5a 
+00:19:31.018 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.jackson.JacksonConfiguration@7ea03814] for type [class io.micronaut.jackson.JacksonConfiguration] and qualifier [null]
+00:19:31.018 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;JacksonBeanPropertyBinder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.019 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JacksonBeanPropertyBinder&gt; 
+00:19:31.019 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JacksonBeanPropertyBinder&gt; 
+00:19:31.019 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.bind.JacksonBeanPropertyBinder@191c314f] from definition [Definition: io.micronaut.jackson.bind.JacksonBeanPropertyBinder] with qualifier [null]
+00:19:31.020 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.bind.BeanPropertyBinder]: io.micronaut.jackson.bind.JacksonBeanPropertyBinder@191c314f 
+00:19:31.021 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;MapToObjectConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.021 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MapToObjectConverter&gt; 
+00:19:31.022 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MapToObjectConverter&gt; 
+00:19:31.022 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.bind.MapToObjectConverter@5a286d33] from definition [Definition: io.micronaut.jackson.bind.MapToObjectConverter] with qualifier [null]
+00:19:31.022 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.bind.MapToObjectConverter@5a286d33 
+00:19:31.023 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.convert.ConversionService
+00:19:31.024 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@b70830a] for type: interface io.micronaut.core.convert.ConversionService
+00:19:31.024 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@b70830a]
+00:19:31.024 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Searching for @Primary for type [io.micronaut.core.convert.ConversionService] from candidates: [] 
+00:19:31.026 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.ConversionService]: io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c 
+00:19:31.027 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyPartDataToObjectConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.027 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyPartDataToObjectConverter&gt; 
+00:19:31.028 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyPartDataToObjectConverter&gt; 
+00:19:31.028 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter@7a881bb] from definition [Definition: io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter] with qualifier [null]
+00:19:31.028 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter@7a881bb 
+00:19:31.029 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.029 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;HttpDataToStringConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.030 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpDataToStringConverter&gt; 
+00:19:31.030 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpDataToStringConverter&gt; 
+00:19:31.031 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.HttpDataToStringConverter@5bc938e8] from definition [Definition: io.micronaut.http.server.netty.converters.HttpDataToStringConverter] with qualifier [null]
+00:19:31.031 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.HttpDataToStringConverter@5bc938e8 
+00:19:31.031 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ByteBufToStringConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.032 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToStringConverter&gt; 
+00:19:31.032 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToStringConverter&gt; 
+00:19:31.033 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.ByteBufToStringConverter@1eb5001] from definition [Definition: io.micronaut.http.server.netty.converters.ByteBufToStringConverter] with qualifier [null]
+00:19:31.033 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.ByteBufToStringConverter@1eb5001 
+00:19:31.033 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.034 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ObjectToJsonNodeConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.034 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectToJsonNodeConverter&gt; 
+00:19:31.035 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectToJsonNodeConverter&gt; 
+00:19:31.035 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.convert.ObjectToJsonNodeConverter@5c427fb7] from definition [Definition: io.micronaut.jackson.convert.ObjectToJsonNodeConverter] with qualifier [null]
+00:19:31.035 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.convert.ObjectToJsonNodeConverter@5c427fb7 
+00:19:31.036 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.036 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ObjectNodeToConvertibleValuesConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.036 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectNodeToConvertibleValuesConverter&gt; 
+00:19:31.037 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObjectNodeToConvertibleValuesConverter&gt; 
+00:19:31.037 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter@28f55508] from definition [Definition: io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter] with qualifier [null]
+00:19:31.037 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter@28f55508 
+00:19:31.038 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;FileUploadToCompletedFileUploadConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.038 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileUploadToCompletedFileUploadConverter&gt; 
+00:19:31.039 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileUploadToCompletedFileUploadConverter&gt; 
+00:19:31.039 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter@59628338] from definition [Definition: io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter] with qualifier [null]
+00:19:31.039 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter@59628338 
+00:19:31.041 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.041 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.codec.MediaTypeCodecRegistry
+00:19:31.045 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Bean [class io.micronaut.function.web.AnnotatedFunctionRouteBuilder] replaces existing bean of type [class io.micronaut.function.DefaultLocalFunctionRegistry]
+00:19:31.047 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder, Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] for type: interface io.micronaut.http.codec.MediaTypeCodecRegistry
+00:19:31.047 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder, Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory]
+00:19:31.047 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Searching for @Primary for type [io.micronaut.http.codec.MediaTypeCodecRegistry] from candidates: [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder, Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] 
+00:19:31.047 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] for type: io.micronaut.http.codec.MediaTypeCodecRegistry 
+00:19:31.048 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory
+00:19:31.049 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] for type: class io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory
+00:19:31.049 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory]
+00:19:31.049 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] for type: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory 
+00:19:31.050 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;MediaTypeCodecRegistryFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.050 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MediaTypeCodecRegistryFactory&gt; 
+00:19:31.051 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MediaTypeCodecRegistryFactory&gt; 
+00:19:31.051 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory@28b2bfc5] from definition [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] with qualifier [null]
+00:19:31.051 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory]: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory@28b2bfc5 
+00:19:31.052 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.http.codec.MediaTypeCodec
+00:19:31.053 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.codec.MediaTypeCodec
+00:19:31.055 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.codec.TextStreamCodec, Definition: io.micronaut.jackson.codec.JsonMediaTypeCodec, Definition: io.micronaut.runtime.http.codec.TextPlainCodec, Definition: io.micronaut.jackson.codec.JsonStreamMediaTypeCodec] for type: interface io.micronaut.http.codec.MediaTypeCodec
+00:19:31.056 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.codec.TextStreamCodec, Definition: io.micronaut.jackson.codec.JsonMediaTypeCodec, Definition: io.micronaut.runtime.http.codec.TextPlainCodec, Definition: io.micronaut.jackson.codec.JsonStreamMediaTypeCodec]
+00:19:31.057 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.server.HttpServerConfiguration
+00:19:31.063 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.HttpServerConfiguration, Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration] for type: class io.micronaut.http.server.HttpServerConfiguration
+00:19:31.063 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.HttpServerConfiguration, Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration]
+00:19:31.063 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Searching for @Primary for type [io.micronaut.http.server.HttpServerConfiguration] from candidates: [Definition: io.micronaut.http.server.HttpServerConfiguration, Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration] 
+00:19:31.064 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.HttpServerConfiguration] for type: io.micronaut.http.server.HttpServerConfiguration 
+00:19:31.065 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.runtime.ApplicationConfiguration
+00:19:31.066 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.runtime.ApplicationConfiguration] for type: class io.micronaut.runtime.ApplicationConfiguration
+00:19:31.066 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.runtime.ApplicationConfiguration]
+00:19:31.067 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.runtime.ApplicationConfiguration] for type: io.micronaut.runtime.ApplicationConfiguration 
+00:19:31.070 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ApplicationConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.070 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ApplicationConfiguration&gt; 
+00:19:31.070 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ApplicationConfiguration&gt; 
+00:19:31.071 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.runtime.ApplicationConfiguration@131fbcd8] from definition [Definition: io.micronaut.runtime.ApplicationConfiguration] with qualifier [null]
+00:19:31.071 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.runtime.ApplicationConfiguration]: io.micronaut.runtime.ApplicationConfiguration@131fbcd8 
+00:19:31.074 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;HttpServerConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.074 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpServerConfiguration&gt; 
+00:19:31.075 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpServerConfiguration&gt; 
+00:19:31.075 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.HttpServerConfiguration@309b9281] from definition [Definition: io.micronaut.http.server.HttpServerConfiguration] with qualifier [null]
+00:19:31.076 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.HttpServerConfiguration]: io.micronaut.http.server.HttpServerConfiguration@309b9281 
+00:19:31.076 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.io.buffer.ByteBufferFactory
+00:19:31.077 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.netty.buffer.NettyByteBufferFactory] for type: interface io.micronaut.core.io.buffer.ByteBufferFactory
+00:19:31.078 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.netty.buffer.NettyByteBufferFactory]
+00:19:31.078 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.netty.buffer.NettyByteBufferFactory] for type: io.micronaut.core.io.buffer.ByteBufferFactory 
+00:19:31.089 [Test worker] DEBUG io.netty.util.internal.logging.InternalLoggerFactory - Using SLF4J as the default logging framework
+00:19:31.092 [Test worker] DEBUG io.netty.util.internal.InternalThreadLocalMap - -Dio.netty.threadLocalMap.stringBuilder.initialSize: 1024
+00:19:31.092 [Test worker] DEBUG io.netty.util.internal.InternalThreadLocalMap - -Dio.netty.threadLocalMap.stringBuilder.maxSize: 4096
+00:19:31.115 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - -Dio.netty.noUnsafe: false
+00:19:31.116 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - Java version: 8
+00:19:31.118 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - sun.misc.Unsafe.theUnsafe: available
+00:19:31.119 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - sun.misc.Unsafe.copyMemory: available
+00:19:31.120 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - java.nio.Buffer.address: available
+00:19:31.120 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - direct buffer constructor: available
+00:19:31.121 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - java.nio.Bits.unaligned: available, true
+00:19:31.122 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - jdk.internal.misc.Unsafe.allocateUninitializedArray(int): unavailable prior to Java9
+00:19:31.122 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 - java.nio.DirectByteBuffer.&lt;init&gt;(long, int): available
+00:19:31.122 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - sun.misc.Unsafe: available
+00:19:31.123 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - -Dio.netty.tmpdir: /tmp (java.io.tmpdir)
+00:19:31.123 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - -Dio.netty.bitMode: 64 (sun.arch.data.model)
+00:19:31.124 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - -Dio.netty.noPreferDirect: false
+00:19:31.125 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - -Dio.netty.maxDirectMemory: 1743257600 bytes
+00:19:31.125 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - -Dio.netty.uninitializedArrayAllocationThreshold: -1
+00:19:31.126 [Test worker] DEBUG io.netty.util.internal.CleanerJava6 - java.nio.ByteBuffer.cleaner(): available
+00:19:31.142 [Test worker] DEBUG io.netty.util.ResourceLeakDetector - -Dio.netty.leakDetection.level: simple
+00:19:31.142 [Test worker] DEBUG io.netty.util.ResourceLeakDetector - -Dio.netty.leakDetection.targetRecords: 4
+00:19:31.147 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.numHeapArenas: 4
+00:19:31.147 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.numDirectArenas: 4
+00:19:31.147 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.pageSize: 8192
+00:19:31.148 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.maxOrder: 11
+00:19:31.148 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.chunkSize: 16777216
+00:19:31.148 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.tinyCacheSize: 512
+00:19:31.148 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.smallCacheSize: 256
+00:19:31.148 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.normalCacheSize: 64
+00:19:31.149 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.maxCachedBufferCapacity: 32768
+00:19:31.149 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.cacheTrimInterval: 8192
+00:19:31.149 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator - -Dio.netty.allocator.useCacheForAllThreads: true
+00:19:31.165 [Test worker] DEBUG io.netty.buffer.ByteBufUtil - -Dio.netty.allocator.type: pooled
+00:19:31.165 [Test worker] DEBUG io.netty.buffer.ByteBufUtil - -Dio.netty.threadLocalDirectBufferSize: 65536
+00:19:31.166 [Test worker] DEBUG io.netty.buffer.ByteBufUtil - -Dio.netty.maxThreadLocalCharBufferSize: 16384
+00:19:31.168 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyByteBufferFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.169 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyByteBufferFactory&gt; 
+00:19:31.169 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyByteBufferFactory&gt; 
+00:19:31.169 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.netty.buffer.NettyByteBufferFactory@17b5621a] from definition [Definition: io.micronaut.http.netty.buffer.NettyByteBufferFactory] with qualifier [null]
+00:19:31.170 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.io.buffer.ByteBufferFactory]: io.micronaut.http.netty.buffer.NettyByteBufferFactory@17b5621a 
+00:19:31.171 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;TextStreamCodec&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.172 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TextStreamCodec&gt; 
+00:19:31.172 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TextStreamCodec&gt; 
+00:19:31.173 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.codec.TextStreamCodec@71d8e203] from definition [Definition: io.micronaut.http.server.codec.TextStreamCodec] with qualifier [null]
+00:19:31.173 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.codec.MediaTypeCodec]: io.micronaut.http.server.codec.TextStreamCodec@71d8e203 
+00:19:31.174 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.174 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.runtime.ApplicationConfiguration@131fbcd8] for type [class io.micronaut.runtime.ApplicationConfiguration] and qualifier [null]
+00:19:31.175 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;JsonMediaTypeCodec&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.175 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonMediaTypeCodec&gt; 
+00:19:31.175 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonMediaTypeCodec&gt; 
+00:19:31.176 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.codec.JsonMediaTypeCodec@8c96bc3] from definition [Definition: io.micronaut.jackson.codec.JsonMediaTypeCodec] with qualifier [null]
+00:19:31.176 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.codec.MediaTypeCodec]: io.micronaut.jackson.codec.JsonMediaTypeCodec@8c96bc3 
+00:19:31.178 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;TextPlainCodec&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.179 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TextPlainCodec&gt; 
+00:19:31.179 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TextPlainCodec&gt; 
+00:19:31.180 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.runtime.http.codec.TextPlainCodec@6667fd89] from definition [Definition: io.micronaut.runtime.http.codec.TextPlainCodec] with qualifier [null]
+00:19:31.180 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.codec.MediaTypeCodec]: io.micronaut.runtime.http.codec.TextPlainCodec@6667fd89 
+00:19:31.181 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.181 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.runtime.ApplicationConfiguration@131fbcd8] for type [class io.micronaut.runtime.ApplicationConfiguration] and qualifier [null]
+00:19:31.181 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;JsonStreamMediaTypeCodec&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.182 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonStreamMediaTypeCodec&gt; 
+00:19:31.182 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonStreamMediaTypeCodec&gt; 
+00:19:31.182 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.codec.JsonStreamMediaTypeCodec@7dca8f19] from definition [Definition: io.micronaut.jackson.codec.JsonStreamMediaTypeCodec] with qualifier [null]
+00:19:31.183 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.codec.MediaTypeCodec]: io.micronaut.jackson.codec.JsonStreamMediaTypeCodec@7dca8f19 
+00:19:31.183 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 4 beans for type [io.micronaut.http.codec.MediaTypeCodec]: [io.micronaut.jackson.codec.JsonStreamMediaTypeCodec@7dca8f19, io.micronaut.jackson.codec.JsonMediaTypeCodec@8c96bc3, io.micronaut.http.server.codec.TextStreamCodec@71d8e203, io.micronaut.runtime.http.codec.TextPlainCodec@6667fd89] 
+00:19:31.190 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;MediaTypeCodecRegistry&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.191 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MediaTypeCodecRegistry&gt; 
+00:19:31.191 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;MediaTypeCodecRegistry&gt; 
+00:19:31.191 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@130af059] from definition [Definition: io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory] with qualifier [null]
+00:19:31.191 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.codec.MediaTypeCodecRegistry]: io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@130af059 
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;FileUploadToObjectConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileUploadToObjectConverter&gt; 
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileUploadToObjectConverter&gt; 
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.FileUploadToObjectConverter@35b3971e] from definition [Definition: io.micronaut.http.server.netty.converters.FileUploadToObjectConverter] with qualifier [null]
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.FileUploadToObjectConverter@35b3971e 
+00:19:31.192 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.193 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ArrayNodeToArrayConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.193 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ArrayNodeToArrayConverter&gt; 
+00:19:31.193 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ArrayNodeToArrayConverter&gt; 
+00:19:31.193 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.convert.ArrayNodeToArrayConverter@45237f4e] from definition [Definition: io.micronaut.jackson.convert.ArrayNodeToArrayConverter] with qualifier [null]
+00:19:31.198 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.convert.ArrayNodeToArrayConverter@45237f4e 
+00:19:31.198 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyChannelOptionConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.199 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyChannelOptionConverter&gt; 
+00:19:31.199 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyChannelOptionConverter&gt; 
+00:19:31.199 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter@5c11cdca] from definition [Definition: io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter] with qualifier [null]
+00:19:31.200 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter@5c11cdca 
+00:19:31.200 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ByteBufToArrayConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.201 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToArrayConverter&gt; 
+00:19:31.201 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToArrayConverter&gt; 
+00:19:31.201 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.ByteBufToArrayConverter@7d7edcbb] from definition [Definition: io.micronaut.http.server.netty.converters.ByteBufToArrayConverter] with qualifier [null]
+00:19:31.202 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.ByteBufToArrayConverter@7d7edcbb 
+00:19:31.202 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.204 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;AttributeConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.204 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AttributeConverter&gt; 
+00:19:31.214 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AttributeConverter&gt; 
+00:19:31.214 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.AttributeConverter@47f0effa] from definition [Definition: io.micronaut.http.server.netty.converters.AttributeConverter] with qualifier [null]
+00:19:31.214 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.AttributeConverter@47f0effa 
+00:19:31.215 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.215 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ByteBufToObjectConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.216 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToObjectConverter&gt; 
+00:19:31.216 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ByteBufToObjectConverter&gt; 
+00:19:31.216 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.ByteBufToObjectConverter@2706461a] from definition [Definition: io.micronaut.http.server.netty.converters.ByteBufToObjectConverter] with qualifier [null]
+00:19:31.217 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.ByteBufToObjectConverter@2706461a 
+00:19:31.217 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.217 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyPartDataToArrayConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.218 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyPartDataToArrayConverter&gt; 
+00:19:31.218 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyPartDataToArrayConverter&gt; 
+00:19:31.219 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter@1a11f3dd] from definition [Definition: io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter] with qualifier [null]
+00:19:31.219 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter@1a11f3dd 
+00:19:31.220 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.220 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.220 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ArrayNodeToIterableConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.220 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ArrayNodeToIterableConverter&gt; 
+00:19:31.221 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ArrayNodeToIterableConverter&gt; 
+00:19:31.221 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.convert.ArrayNodeToIterableConverter@15df53df] from definition [Definition: io.micronaut.jackson.convert.ArrayNodeToIterableConverter] with qualifier [null]
+00:19:31.221 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.convert.ArrayNodeToIterableConverter@15df53df 
+00:19:31.222 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.222 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;HttpDataToByteArrayConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.223 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpDataToByteArrayConverter&gt; 
+00:19:31.223 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HttpDataToByteArrayConverter&gt; 
+00:19:31.223 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter@28f11e8c] from definition [Definition: io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter] with qualifier [null]
+00:19:31.224 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter@28f11e8c 
+00:19:31.224 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.224 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ClientResponseConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.225 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClientResponseConverter&gt; 
+00:19:31.225 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClientResponseConverter&gt; 
+00:19:31.226 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.client.converters.ClientResponseConverter@20de1d57] from definition [Definition: io.micronaut.http.client.converters.ClientResponseConverter] with qualifier [null]
+00:19:31.226 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.http.client.converters.ClientResponseConverter@20de1d57 
+00:19:31.226 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [com.fasterxml.jackson.databind.ObjectMapper@7844af5a] for type [class com.fasterxml.jackson.databind.ObjectMapper] and qualifier [null]
+00:19:31.227 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;JsonNodeToObjectConverter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.227 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonNodeToObjectConverter&gt; 
+00:19:31.227 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;JsonNodeToObjectConverter&gt; 
+00:19:31.228 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.jackson.convert.JsonNodeToObjectConverter@611edbdb] from definition [Definition: io.micronaut.jackson.convert.JsonNodeToObjectConverter] with qualifier [null]
+00:19:31.228 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverter]: io.micronaut.jackson.convert.JsonNodeToObjectConverter@611edbdb 
+00:19:31.231 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 18 beans for type [io.micronaut.core.convert.TypeConverter]: [io.micronaut.jackson.convert.ArrayNodeToIterableConverter@15df53df, io.micronaut.http.server.netty.converters.HttpDataToStringConverter@5bc938e8, io.micronaut.http.server.netty.converters.ByteBufToArrayConverter@7d7edcbb, io.micronaut.jackson.convert.JsonNodeToObjectConverter@611edbdb, io.micronaut.http.client.converters.ClientResponseConverter@20de1d57, io.micronaut.http.server.netty.converters.ByteBufToStringConverter@1eb5001, io.micronaut.http.server.netty.converters.AttributeConverter@47f0effa, io.micronaut.http.server.netty.converters.NettyPartDataToArrayConverter@1a11f3dd, io.micronaut.http.server.netty.converters.FileUploadToObjectConverter@35b3971e, io.micronaut.jackson.convert.ArrayNodeToArrayConverter@45237f4e, io.micronaut.http.server.netty.converters.NettyPartDataToObjectConverter@7a881bb, io.micronaut.jackson.convert.ObjectToJsonNodeConverter@5c427fb7, io.micronaut.http.server.netty.converters.FileUploadToCompletedFileUploadConverter@59628338, io.micronaut.jackson.bind.MapToObjectConverter@5a286d33, io.micronaut.http.server.netty.configuration.NettyChannelOptionConverter@5c11cdca, io.micronaut.http.server.netty.converters.ByteBufToObjectConverter@2706461a, io.micronaut.jackson.convert.ObjectNodeToConvertibleValuesConverter@28f55508, io.micronaut.http.server.netty.converters.HttpDataToByteArrayConverter@28f11e8c] 
+00:19:31.258 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.core.convert.TypeConverterRegistrar
+00:19:31.259 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.convert.TypeConverterRegistrar
+00:19:31.263 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.client.converters.LoadBalancerConverters, Definition: io.micronaut.runtime.converters.time.TimeConverterRegistrar, Definition: io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar] for type: interface io.micronaut.core.convert.TypeConverterRegistrar
+00:19:31.263 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.client.converters.LoadBalancerConverters, Definition: io.micronaut.runtime.converters.time.TimeConverterRegistrar, Definition: io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar]
+00:19:31.264 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;LoadBalancerConverters&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.264 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;LoadBalancerConverters&gt; 
+00:19:31.265 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;LoadBalancerConverters&gt; 
+00:19:31.265 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.client.converters.LoadBalancerConverters@25395bab] from definition [Definition: io.micronaut.http.client.converters.LoadBalancerConverters] with qualifier [null]
+00:19:31.265 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverterRegistrar]: io.micronaut.http.client.converters.LoadBalancerConverters@25395bab 
+00:19:31.266 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;TimeConverterRegistrar&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.267 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TimeConverterRegistrar&gt; 
+00:19:31.267 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;TimeConverterRegistrar&gt; 
+00:19:31.267 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.runtime.converters.time.TimeConverterRegistrar@35c08ed1] from definition [Definition: io.micronaut.runtime.converters.time.TimeConverterRegistrar] with qualifier [null]
+00:19:31.268 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverterRegistrar]: io.micronaut.runtime.converters.time.TimeConverterRegistrar@35c08ed1 
+00:19:31.268 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;RxJavaConverterRegistrar&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.268 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;RxJavaConverterRegistrar&gt; 
+00:19:31.269 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;RxJavaConverterRegistrar&gt; 
+00:19:31.269 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar@410547a1] from definition [Definition: io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar] with qualifier [null]
+00:19:31.269 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.convert.TypeConverterRegistrar]: io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar@410547a1 
+00:19:31.270 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 3 beans for type [io.micronaut.core.convert.TypeConverterRegistrar]: [io.micronaut.runtime.converters.time.TimeConverterRegistrar@35c08ed1, io.micronaut.http.client.converters.LoadBalancerConverters@25395bab, io.micronaut.reactive.rxjava2.converters.RxJavaConverterRegistrar@410547a1] 
+00:19:31.327 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.health.HeartbeatTask] will not be loaded due to failing conditions:
+00:19:31.328 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.application.name] not present
+00:19:31.328 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Loaded active configurations: io.micronaut.jackson
+00:19:31.328 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - BeanContext Started.
+00:19:31.329 [Test worker] DEBUG io.micronaut.context.event.ApplicationEventPublisher - Publishing event: io.micronaut.context.event.StartupEvent[source=io.micronaut.context.DefaultApplicationContext@7ea51c35]
+00:19:31.329 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;StartupEvent&gt; io.micronaut.context.event.ApplicationEventListener 
+00:19:31.330 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.context.event.ApplicationEventListener
+00:19:31.334 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.health.HeartbeatTask] will not be loaded due to failing conditions:
+00:19:31.334 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.application.name] not present
+00:19:31.335 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope, Definition: io.micronaut.http.client.scope.ClientScope] for type: interface io.micronaut.context.event.ApplicationEventListener
+00:19:31.335 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope, Definition: io.micronaut.http.client.scope.ClientScope]
+00:19:31.336 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;StartupEvent&gt; 
+00:19:31.336 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;StartupEvent&gt; 
+00:19:31.337 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.runtime.server.EmbeddedServer
+00:19:31.339 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.NettyHttpServer] for type: interface io.micronaut.runtime.server.EmbeddedServer
+00:19:31.339 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.NettyHttpServer]
+00:19:31.340 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.netty.NettyHttpServer] for type: io.micronaut.runtime.server.EmbeddedServer 
+00:19:31.342 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
+00:19:31.344 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration] for type: class io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
+00:19:31.344 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration]
+00:19:31.344 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration] for type: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration 
+00:19:31.345 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.runtime.ApplicationConfiguration@131fbcd8] for type [class io.micronaut.runtime.ApplicationConfiguration] and qualifier [null]
+00:19:31.348 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyHttpServerConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.348 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyHttpServerConfiguration&gt; 
+00:19:31.348 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyHttpServerConfiguration&gt; 
+00:19:31.349 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration@24a64364] from definition [Definition: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration] with qualifier [null]
+00:19:31.349 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration]: io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration@24a64364 
+00:19:31.349 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.web.router.Router
+00:19:31.351 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.web.router.DefaultRouter] for type: interface io.micronaut.web.router.Router
+00:19:31.351 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.web.router.DefaultRouter]
+00:19:31.351 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.web.router.DefaultRouter] for type: io.micronaut.web.router.Router 
+00:19:31.352 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.web.router.RouteBuilder
+00:19:31.352 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.web.router.RouteBuilder
+00:19:31.354 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Bean [class io.micronaut.function.web.AnnotatedFunctionRouteBuilder] replaces existing bean of type [class io.micronaut.function.DefaultLocalFunctionRegistry]
+00:19:31.355 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder, Definition: io.micronaut.web.router.AnnotatedFilterRouteBuilder, Definition: io.micronaut.web.router.AnnotatedMethodRouteBuilder] for type: interface io.micronaut.web.router.RouteBuilder
+00:19:31.355 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder, Definition: io.micronaut.web.router.AnnotatedFilterRouteBuilder, Definition: io.micronaut.web.router.AnnotatedMethodRouteBuilder]
+00:19:31.360 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.web.router.RouteBuilder$UriNamingStrategy
+00:19:31.362 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.web.router.naming.HyphenatedUriNamingStrategy] for type: interface io.micronaut.web.router.RouteBuilder$UriNamingStrategy
+00:19:31.362 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.web.router.naming.HyphenatedUriNamingStrategy]
+00:19:31.362 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.web.router.naming.HyphenatedUriNamingStrategy] for type: io.micronaut.web.router.RouteBuilder$UriNamingStrategy 
+00:19:31.363 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;HyphenatedUriNamingStrategy&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.363 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HyphenatedUriNamingStrategy&gt; 
+00:19:31.364 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;HyphenatedUriNamingStrategy&gt; 
+00:19:31.364 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@adb38df] from definition [Definition: io.micronaut.web.router.naming.HyphenatedUriNamingStrategy] with qualifier [null]
+00:19:31.364 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.RouteBuilder$UriNamingStrategy]: io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@adb38df 
+00:19:31.364 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.365 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@130af059] for type [interface io.micronaut.http.codec.MediaTypeCodecRegistry] and qualifier [null]
+00:19:31.365 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;AnnotatedFunctionRouteBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.366 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AnnotatedFunctionRouteBuilder&gt; 
+00:19:31.366 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 1 beans for type [&lt;AnnotatedFunctionRouteBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener]: [io.micronaut.context.ExecutableMethodProcessorListener@60999df8] 
+00:19:31.368 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for qualifier: io.micronaut.inject.qualifiers.AnnotationStereotypeQualifier@22860a00
+00:19:31.380 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.function.web.WebFunctionSpec$PojoConsumer
+00:19:31.381 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.WebFunctionSpec$PojoConsumer] for type: class io.micronaut.function.web.WebFunctionSpec$PojoConsumer
+00:19:31.381 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.WebFunctionSpec$PojoConsumer]
+00:19:31.393 [Test worker] DEBUG io.micronaut.web.router.DefaultRouteBuilder - Created Route to Function: POST /consumer/pojo -&gt; PojoConsumer#void accept(Book book) (application/json )
+00:19:31.396 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.function.web.WebFunctionSpec$PojoSupplier
+00:19:31.397 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.WebFunctionSpec$PojoSupplier] for type: class io.micronaut.function.web.WebFunctionSpec$PojoSupplier
+00:19:31.398 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.WebFunctionSpec$PojoSupplier]
+00:19:31.398 [Test worker] DEBUG io.micronaut.web.router.DefaultRouteBuilder - Created Route to Function: GET /supplier/pojo -&gt; PojoSupplier#Book get() (application/json )
+00:19:31.399 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.function.web.WebFunctionSpec$StringConsumer
+00:19:31.400 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.WebFunctionSpec$StringConsumer] for type: class io.micronaut.function.web.WebFunctionSpec$StringConsumer
+00:19:31.400 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.WebFunctionSpec$StringConsumer]
+00:19:31.400 [Test worker] DEBUG io.micronaut.web.router.DefaultRouteBuilder - Created Route to Function: POST /consumer/string -&gt; StringConsumer#void accept(String title) (application/json )
+00:19:31.402 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.function.web.WebFunctionSpec$StringSupplier
+00:19:31.403 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.function.web.WebFunctionSpec$StringSupplier] for type: class io.micronaut.function.web.WebFunctionSpec$StringSupplier
+00:19:31.403 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.function.web.WebFunctionSpec$StringSupplier]
+00:19:31.404 [Test worker] DEBUG io.micronaut.web.router.DefaultRouteBuilder - Created Route to Function: GET /supplier/string -&gt; StringSupplier#String get() (application/json )
+00:19:31.405 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.function.web.AnnotatedFunctionRouteBuilder@7f0c87fa] from definition [Definition: io.micronaut.function.web.AnnotatedFunctionRouteBuilder] with qualifier [null]
+00:19:31.405 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.RouteBuilder]: io.micronaut.function.web.AnnotatedFunctionRouteBuilder@7f0c87fa 
+00:19:31.406 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@adb38df] for type [interface io.micronaut.web.router.RouteBuilder$UriNamingStrategy] and qualifier [null]
+00:19:31.406 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.407 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.context.event.BeanInitializedEventListener
+00:19:31.407 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.context.event.BeanInitializedEventListener
+00:19:31.407 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: interface io.micronaut.context.event.BeanInitializedEventListener
+00:19:31.408 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for qualifier: io.micronaut.inject.qualifiers.AnnotationStereotypeQualifier@4f35362a
+00:19:31.409 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;AnnotatedFilterRouteBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.410 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AnnotatedFilterRouteBuilder&gt; 
+00:19:31.410 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AnnotatedFilterRouteBuilder&gt; 
+00:19:31.410 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.AnnotatedFilterRouteBuilder@1aaff97e] from definition [Definition: io.micronaut.web.router.AnnotatedFilterRouteBuilder] with qualifier [null]
+00:19:31.410 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.RouteBuilder]: io.micronaut.web.router.AnnotatedFilterRouteBuilder@1aaff97e 
+00:19:31.411 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@adb38df] for type [interface io.micronaut.web.router.RouteBuilder$UriNamingStrategy] and qualifier [null]
+00:19:31.412 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.418 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;AnnotatedMethodRouteBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.419 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;AnnotatedMethodRouteBuilder&gt; 
+00:19:31.419 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 1 beans for type [&lt;AnnotatedMethodRouteBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener]: [io.micronaut.context.ExecutableMethodProcessorListener@60999df8] 
+00:19:31.420 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for qualifier: io.micronaut.inject.qualifiers.AnnotationStereotypeQualifier@3dcc24f4
+00:19:31.420 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.AnnotatedMethodRouteBuilder@52fe07af] from definition [Definition: io.micronaut.web.router.AnnotatedMethodRouteBuilder] with qualifier [null]
+00:19:31.421 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.RouteBuilder]: io.micronaut.web.router.AnnotatedMethodRouteBuilder@52fe07af 
+00:19:31.421 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 3 beans for type [io.micronaut.web.router.RouteBuilder]: [io.micronaut.web.router.AnnotatedFilterRouteBuilder@1aaff97e, io.micronaut.web.router.AnnotatedMethodRouteBuilder@52fe07af, io.micronaut.function.web.AnnotatedFunctionRouteBuilder@7f0c87fa] 
+00:19:31.422 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultRouter&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.423 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultRouter&gt; 
+00:19:31.423 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultRouter&gt; 
+00:19:31.423 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.DefaultRouter@2abcf253] from definition [Definition: io.micronaut.web.router.DefaultRouter] with qualifier [null]
+00:19:31.423 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.Router]: io.micronaut.web.router.DefaultRouter@2abcf253 
+00:19:31.424 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.server.binding.RequestBinderRegistry
+00:19:31.425 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.binding.DefaultRequestBinderRegistry] for type: interface io.micronaut.http.server.binding.RequestBinderRegistry
+00:19:31.425 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.binding.DefaultRequestBinderRegistry]
+00:19:31.425 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.binding.DefaultRequestBinderRegistry] for type: io.micronaut.http.server.binding.RequestBinderRegistry 
+00:19:31.426 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.426 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.http.server.binding.binders.RequestArgumentBinder
+00:19:31.427 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.server.binding.binders.RequestArgumentBinder
+00:19:31.430 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.binders.SingleBodyBinder, Definition: io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder, Definition: io.micronaut.http.server.netty.binders.PublisherBodyBinder, Definition: io.micronaut.http.server.netty.binders.ObservableBodyBinder] for type: interface io.micronaut.http.server.binding.binders.RequestArgumentBinder
+00:19:31.430 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.binders.SingleBodyBinder, Definition: io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder, Definition: io.micronaut.http.server.netty.binders.PublisherBodyBinder, Definition: io.micronaut.http.server.netty.binders.ObservableBodyBinder]
+00:19:31.431 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.432 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.server.HttpServerConfiguration@309b9281] for type [class io.micronaut.http.server.HttpServerConfiguration] and qualifier [null]
+00:19:31.432 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;SingleBodyBinder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.433 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;SingleBodyBinder&gt; 
+00:19:31.433 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;SingleBodyBinder&gt; 
+00:19:31.433 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.binders.SingleBodyBinder@6ba172ec] from definition [Definition: io.micronaut.http.server.netty.binders.SingleBodyBinder] with qualifier [null]
+00:19:31.434 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.binding.binders.RequestArgumentBinder]: io.micronaut.http.server.netty.binders.SingleBodyBinder@6ba172ec 
+00:19:31.434 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.server.HttpServerConfiguration@309b9281] for type [class io.micronaut.http.server.HttpServerConfiguration] and qualifier [null]
+00:19:31.434 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.435 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;CompletableFutureBodyBinder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.435 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;CompletableFutureBodyBinder&gt; 
+00:19:31.435 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;CompletableFutureBodyBinder&gt; 
+00:19:31.436 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder@3c284363] from definition [Definition: io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder] with qualifier [null]
+00:19:31.436 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.binding.binders.RequestArgumentBinder]: io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder@3c284363 
+00:19:31.436 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.437 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.server.HttpServerConfiguration@309b9281] for type [class io.micronaut.http.server.HttpServerConfiguration] and qualifier [null]
+00:19:31.437 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;PublisherBodyBinder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.437 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;PublisherBodyBinder&gt; 
+00:19:31.438 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;PublisherBodyBinder&gt; 
+00:19:31.438 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.binders.PublisherBodyBinder@64d25095] from definition [Definition: io.micronaut.http.server.netty.binders.PublisherBodyBinder] with qualifier [null]
+00:19:31.438 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.binding.binders.RequestArgumentBinder]: io.micronaut.http.server.netty.binders.PublisherBodyBinder@64d25095 
+00:19:31.439 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c] for type [interface io.micronaut.core.convert.ConversionService] and qualifier [null]
+00:19:31.439 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.server.HttpServerConfiguration@309b9281] for type [class io.micronaut.http.server.HttpServerConfiguration] and qualifier [null]
+00:19:31.439 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ObservableBodyBinder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.439 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObservableBodyBinder&gt; 
+00:19:31.440 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ObservableBodyBinder&gt; 
+00:19:31.440 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.binders.ObservableBodyBinder@3700ca01] from definition [Definition: io.micronaut.http.server.netty.binders.ObservableBodyBinder] with qualifier [null]
+00:19:31.440 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.binding.binders.RequestArgumentBinder]: io.micronaut.http.server.netty.binders.ObservableBodyBinder@3700ca01 
+00:19:31.441 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 4 beans for type [io.micronaut.http.server.binding.binders.RequestArgumentBinder]: [io.micronaut.http.server.netty.binders.ObservableBodyBinder@3700ca01, io.micronaut.http.server.netty.binders.PublisherBodyBinder@64d25095, io.micronaut.http.server.netty.binders.CompletableFutureBodyBinder@3c284363, io.micronaut.http.server.netty.binders.SingleBodyBinder@6ba172ec] 
+00:19:31.449 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultRequestBinderRegistry&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.450 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultRequestBinderRegistry&gt; 
+00:19:31.450 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultRequestBinderRegistry&gt; 
+00:19:31.450 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.binding.DefaultRequestBinderRegistry@25cda344] from definition [Definition: io.micronaut.http.server.binding.DefaultRequestBinderRegistry] with qualifier [null]
+00:19:31.451 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.binding.RequestBinderRegistry]: io.micronaut.http.server.binding.DefaultRequestBinderRegistry@25cda344 
+00:19:31.451 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@130af059] for type [interface io.micronaut.http.codec.MediaTypeCodecRegistry] and qualifier [null]
+00:19:31.451 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry
+00:19:31.452 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry] for type: interface io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry
+00:19:31.453 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry]
+00:19:31.453 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry] for type: io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry 
+00:19:31.453 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
+00:19:31.454 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
+00:19:31.455 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandler] for type: interface io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
+00:19:31.455 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandler]
+00:19:31.457 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
+00:19:31.459 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration] for type: class io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
+00:19:31.459 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration]
+00:19:31.459 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration] for type: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration 
+00:19:31.459 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;FileTypeHandlerConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.460 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileTypeHandlerConfiguration&gt; 
+00:19:31.460 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileTypeHandlerConfiguration&gt; 
+00:19:31.460 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration@622d1fce] from definition [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration] with qualifier [null]
+00:19:31.461 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration]: io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration@622d1fce 
+00:19:31.461 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;FileTypeHandler&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.461 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileTypeHandler&gt; 
+00:19:31.461 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileTypeHandler&gt; 
+00:19:31.462 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.types.files.FileTypeHandler@33154e4e] from definition [Definition: io.micronaut.http.server.netty.types.files.FileTypeHandler] with qualifier [null]
+00:19:31.462 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler]: io.micronaut.http.server.netty.types.files.FileTypeHandler@33154e4e 
+00:19:31.466 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 1 beans for type [io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler]: [io.micronaut.http.server.netty.types.files.FileTypeHandler@33154e4e] 
+00:19:31.467 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultCustomizableResponseTypeHandlerRegistry&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.467 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultCustomizableResponseTypeHandlerRegistry&gt; 
+00:19:31.468 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultCustomizableResponseTypeHandlerRegistry&gt; 
+00:19:31.468 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry@57499851] from definition [Definition: io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry] with qualifier [null]
+00:19:31.468 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry]: io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry@57499851 
+00:19:31.469 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.web.router.resource.StaticResourceResolver
+00:19:31.470 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.web.router.resource.StaticResourceResolver] for type: class io.micronaut.web.router.resource.StaticResourceResolver
+00:19:31.470 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.web.router.resource.StaticResourceResolver]
+00:19:31.470 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.web.router.resource.StaticResourceResolver] for type: io.micronaut.web.router.resource.StaticResourceResolver 
+00:19:31.471 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.web.router.resource.StaticResourceConfiguration
+00:19:31.472 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.web.router.resource.StaticResourceConfiguration] for type: class io.micronaut.web.router.resource.StaticResourceConfiguration
+00:19:31.473 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.web.router.resource.StaticResourceConfiguration]
+00:19:31.473 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.web.router.resource.StaticResourceConfiguration] for type: io.micronaut.web.router.resource.StaticResourceConfiguration 
+00:19:31.474 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.core.io.ResourceResolver
+00:19:31.475 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.resource.ResourceLoaderFactory] for type: class io.micronaut.core.io.ResourceResolver
+00:19:31.475 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.resource.ResourceLoaderFactory]
+00:19:31.475 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.resource.ResourceLoaderFactory] for type: io.micronaut.core.io.ResourceResolver 
+00:19:31.476 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.resource.ResourceLoaderFactory
+00:19:31.477 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.resource.ResourceLoaderFactory] for type: class io.micronaut.http.resource.ResourceLoaderFactory
+00:19:31.477 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.resource.ResourceLoaderFactory]
+00:19:31.477 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.resource.ResourceLoaderFactory] for type: io.micronaut.http.resource.ResourceLoaderFactory 
+00:19:31.478 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ResourceLoaderFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.479 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceLoaderFactory&gt; 
+00:19:31.479 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceLoaderFactory&gt; 
+00:19:31.479 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.resource.ResourceLoaderFactory@3c3f57f8] from definition [Definition: io.micronaut.http.resource.ResourceLoaderFactory] with qualifier [null]
+00:19:31.480 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.resource.ResourceLoaderFactory]: io.micronaut.http.resource.ResourceLoaderFactory@3c3f57f8 
+00:19:31.480 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.core.io.ResourceLoader
+00:19:31.480 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.core.io.ResourceLoader
+00:19:31.482 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@b70830a, Definition: io.micronaut.http.resource.ResourceLoaderFactory, Definition: io.micronaut.http.resource.ResourceLoaderFactory] for type: interface io.micronaut.core.io.ResourceLoader
+00:19:31.483 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [io.micronaut.context.DefaultBeanContext$NoInjectionBeanDefinition@b70830a, Definition: io.micronaut.http.resource.ResourceLoaderFactory, Definition: io.micronaut.http.resource.ResourceLoaderFactory]
+00:19:31.483 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.resource.ResourceLoaderFactory@3c3f57f8] for type [class io.micronaut.http.resource.ResourceLoaderFactory] and qualifier [null]
+00:19:31.484 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ClassPathResourceLoader&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.484 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClassPathResourceLoader&gt; 
+00:19:31.484 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClassPathResourceLoader&gt; 
+00:19:31.485 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.core.io.scan.DefaultClassPathResourceLoader@5fde88f2] from definition [Definition: io.micronaut.http.resource.ResourceLoaderFactory] with qualifier [null]
+00:19:31.485 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.io.ResourceLoader]: io.micronaut.core.io.scan.DefaultClassPathResourceLoader@5fde88f2 
+00:19:31.485 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.resource.ResourceLoaderFactory@3c3f57f8] for type [class io.micronaut.http.resource.ResourceLoaderFactory] and qualifier [null]
+00:19:31.487 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;FileSystemResourceLoader&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.487 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileSystemResourceLoader&gt; 
+00:19:31.487 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;FileSystemResourceLoader&gt; 
+00:19:31.488 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.core.io.file.DefaultFileSystemResourceLoader@70849e09] from definition [Definition: io.micronaut.http.resource.ResourceLoaderFactory] with qualifier [null]
+00:19:31.488 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.io.ResourceLoader]: io.micronaut.core.io.file.DefaultFileSystemResourceLoader@70849e09 
+00:19:31.489 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found 3 beans for type [io.micronaut.core.io.ResourceLoader]: [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@754b007c, io.micronaut.core.io.scan.DefaultClassPathResourceLoader@5fde88f2, io.micronaut.core.io.file.DefaultFileSystemResourceLoader@70849e09] 
+00:19:31.489 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ResourceResolver&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.490 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceResolver&gt; 
+00:19:31.490 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ResourceResolver&gt; 
+00:19:31.490 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.core.io.ResourceResolver@24fdc664] from definition [Definition: io.micronaut.http.resource.ResourceLoaderFactory] with qualifier [null]
+00:19:31.490 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.core.io.ResourceResolver]: io.micronaut.core.io.ResourceResolver@24fdc664 
+00:19:31.491 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;StaticResourceConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.491 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;StaticResourceConfiguration&gt; 
+00:19:31.491 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;StaticResourceConfiguration&gt; 
+00:19:31.492 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.resource.StaticResourceConfiguration@1901af30] from definition [Definition: io.micronaut.web.router.resource.StaticResourceConfiguration] with qualifier [null]
+00:19:31.492 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.resource.StaticResourceConfiguration]: io.micronaut.web.router.resource.StaticResourceConfiguration@1901af30 
+00:19:31.493 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;StaticResourceResolver&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.494 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;StaticResourceResolver&gt; 
+00:19:31.494 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;StaticResourceResolver&gt; 
+00:19:31.495 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.web.router.resource.StaticResourceResolver@587a8909] from definition [Definition: io.micronaut.web.router.resource.StaticResourceResolver] with qualifier [null]
+00:19:31.495 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.web.router.resource.StaticResourceResolver]: io.micronaut.web.router.resource.StaticResourceResolver@587a8909 
+00:19:31.497 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface java.util.concurrent.ExecutorService
+00:19:31.499 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.ExecutorFactory] for type: interface java.util.concurrent.ExecutorService
+00:19:31.499 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.scheduling.executor.ExecutorConfiguration
+00:19:31.503 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig, Definition: io.micronaut.scheduling.executor.UserExecutorConfiguration, Definition: io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig] for type: interface io.micronaut.scheduling.executor.ExecutorConfiguration
+00:19:31.507 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig, Definition: io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig]
+00:19:31.536 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.ExecutorFactory, Definition: io.micronaut.scheduling.executor.ExecutorFactory]
+00:19:31.537 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [java.util.concurrent.ExecutorService] for qualifier: @Named('io') 
+00:19:31.548 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.ExecutorFactory] for type: @Named('io') java.util.concurrent.ExecutorService 
+00:19:31.549 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.scheduling.executor.ExecutorFactory
+00:19:31.550 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.ExecutorFactory] for type: class io.micronaut.scheduling.executor.ExecutorFactory
+00:19:31.551 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.ExecutorFactory]
+00:19:31.551 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.ExecutorFactory] for type: io.micronaut.scheduling.executor.ExecutorFactory 
+00:19:31.552 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface java.util.concurrent.ThreadFactory
+00:19:31.553 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.netty.channel.NettyThreadFactory, Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] for type: interface java.util.concurrent.ThreadFactory
+00:19:31.554 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.netty.channel.NettyThreadFactory, Definition: io.micronaut.scheduling.executor.DefaultThreadFactory]
+00:19:31.554 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Searching for @Primary for type [java.util.concurrent.ThreadFactory] from candidates: [Definition: io.micronaut.http.netty.channel.NettyThreadFactory, Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] 
+00:19:31.561 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] for type: java.util.concurrent.ThreadFactory 
+00:19:31.562 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.scheduling.executor.DefaultThreadFactory
+00:19:31.563 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] for type: class io.micronaut.scheduling.executor.DefaultThreadFactory
+00:19:31.563 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory]
+00:19:31.563 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] for type: io.micronaut.scheduling.executor.DefaultThreadFactory 
+00:19:31.564 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultThreadFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.564 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultThreadFactory&gt; 
+00:19:31.565 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultThreadFactory&gt; 
+00:19:31.565 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.scheduling.executor.DefaultThreadFactory@4eee31bd] from definition [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] with qualifier [null]
+00:19:31.565 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.scheduling.executor.DefaultThreadFactory]: io.micronaut.scheduling.executor.DefaultThreadFactory@4eee31bd 
+00:19:31.566 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ThreadFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.566 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ThreadFactory&gt; 
+00:19:31.566 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ThreadFactory&gt; 
+00:19:31.567 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [java.util.concurrent.Executors$DefaultThreadFactory@7f2afd85] from definition [Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] with qualifier [null]
+00:19:31.567 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [java.util.concurrent.ThreadFactory]: java.util.concurrent.Executors$DefaultThreadFactory@7f2afd85 
+00:19:31.567 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ExecutorFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.568 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorFactory&gt; 
+00:19:31.568 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorFactory&gt; 
+00:19:31.568 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.scheduling.executor.ExecutorFactory@4bafcf0c] from definition [Definition: io.micronaut.scheduling.executor.ExecutorFactory] with qualifier [null]
+00:19:31.568 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.scheduling.executor.ExecutorFactory]: io.micronaut.scheduling.executor.ExecutorFactory@4bafcf0c 
+00:19:31.569 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.scheduling.executor.ExecutorConfiguration
+00:19:31.570 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig, Definition: io.micronaut.scheduling.executor.UserExecutorConfiguration, Definition: io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig] for type: interface io.micronaut.scheduling.executor.ExecutorConfiguration
+00:19:31.571 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig, Definition: io.micronaut.scheduling.executor.ScheduledExecutorServiceConfig]
+00:19:31.571 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.scheduling.executor.ExecutorConfiguration] for qualifier: @Named('io') 
+00:19:31.573 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig] for type: @Named('io') io.micronaut.scheduling.executor.ExecutorConfiguration 
+00:19:31.580 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.scheduling.executor.IOExecutorServiceConfig
+00:19:31.581 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig] for type: class io.micronaut.scheduling.executor.IOExecutorServiceConfig
+00:19:31.582 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig]
+00:19:31.582 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig] for type: io.micronaut.scheduling.executor.IOExecutorServiceConfig 
+00:19:31.582 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;IOExecutorServiceConfig&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.583 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;IOExecutorServiceConfig&gt; 
+00:19:31.583 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;IOExecutorServiceConfig&gt; 
+00:19:31.583 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.scheduling.executor.IOExecutorServiceConfig@559fd124] from definition [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig] with qualifier [null]
+00:19:31.584 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.scheduling.executor.IOExecutorServiceConfig]: io.micronaut.scheduling.executor.IOExecutorServiceConfig@559fd124 
+00:19:31.584 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ExecutorConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.585 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorConfiguration&gt; 
+00:19:31.585 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorConfiguration&gt; 
+00:19:31.585 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.scheduling.executor.UserExecutorConfiguration@3a63dc0e] from definition [Definition: io.micronaut.scheduling.executor.IOExecutorServiceConfig] with qualifier [@Named('io')]
+00:19:31.585 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [@Named('io') io.micronaut.scheduling.executor.ExecutorConfiguration]: io.micronaut.scheduling.executor.UserExecutorConfiguration@3a63dc0e 
+00:19:31.587 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ExecutorService&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.590 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorService&gt; 
+00:19:31.590 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ExecutorService&gt; 
+00:19:31.590 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [java.util.concurrent.ThreadPoolExecutor@7af3dc32[Running, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0]] from definition [Definition: io.micronaut.scheduling.executor.ExecutorFactory] with qualifier [@Named('io')]
+00:19:31.593 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [@Named('io') java.util.concurrent.ExecutorService]: java.util.concurrent.ThreadPoolExecutor@7af3dc32[Running, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0] 
+00:19:31.594 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface java.util.concurrent.ThreadFactory
+00:19:31.595 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.netty.channel.NettyThreadFactory, Definition: io.micronaut.scheduling.executor.DefaultThreadFactory] for type: interface java.util.concurrent.ThreadFactory
+00:19:31.595 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.netty.channel.NettyThreadFactory, Definition: io.micronaut.scheduling.executor.DefaultThreadFactory]
+00:19:31.595 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [java.util.concurrent.ThreadFactory] for qualifier: @Named('netty') 
+00:19:31.596 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.netty.channel.NettyThreadFactory] for type: @Named('netty') java.util.concurrent.ThreadFactory 
+00:19:31.596 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.netty.channel.NettyThreadFactory
+00:19:31.597 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.netty.channel.NettyThreadFactory] for type: class io.micronaut.http.netty.channel.NettyThreadFactory
+00:19:31.597 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.netty.channel.NettyThreadFactory]
+00:19:31.597 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.netty.channel.NettyThreadFactory] for type: io.micronaut.http.netty.channel.NettyThreadFactory 
+00:19:31.598 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyThreadFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.598 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyThreadFactory&gt; 
+00:19:31.598 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyThreadFactory&gt; 
+00:19:31.606 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.netty.channel.NettyThreadFactory@1e90149c] from definition [Definition: io.micronaut.http.netty.channel.NettyThreadFactory] with qualifier [null]
+00:19:31.606 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.netty.channel.NettyThreadFactory]: io.micronaut.http.netty.channel.NettyThreadFactory@1e90149c 
+00:19:31.609 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ThreadFactory&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.610 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ThreadFactory&gt; 
+00:19:31.610 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ThreadFactory&gt; 
+00:19:31.611 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.netty.util.concurrent.DefaultThreadFactory@54fb8325] from definition [Definition: io.micronaut.http.netty.channel.NettyThreadFactory] with qualifier [@Named('netty')]
+00:19:31.611 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [@Named('netty') java.util.concurrent.ThreadFactory]: io.netty.util.concurrent.DefaultThreadFactory@54fb8325 
+00:19:31.611 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.scheduling.executor.ExecutorSelector
+00:19:31.613 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.scheduling.executor.DefaultExecutorSelector] for type: interface io.micronaut.scheduling.executor.ExecutorSelector
+00:19:31.613 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.scheduling.executor.DefaultExecutorSelector]
+00:19:31.613 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.scheduling.executor.DefaultExecutorSelector] for type: io.micronaut.scheduling.executor.ExecutorSelector 
+00:19:31.614 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [java.util.concurrent.ThreadPoolExecutor@7af3dc32[Running, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0]] for type [interface java.util.concurrent.ExecutorService] and qualifier [@Named('io')]
+00:19:31.614 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultExecutorSelector&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.614 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultExecutorSelector&gt; 
+00:19:31.614 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultExecutorSelector&gt; 
+00:19:31.615 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.scheduling.executor.DefaultExecutorSelector@34b7042b] from definition [Definition: io.micronaut.scheduling.executor.DefaultExecutorSelector] with qualifier [null]
+00:19:31.615 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.scheduling.executor.ExecutorSelector]: io.micronaut.scheduling.executor.DefaultExecutorSelector@34b7042b 
+00:19:31.615 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.server.netty.ssl.NettyServerSslBuilder
+00:19:31.616 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder] for type: class io.micronaut.http.server.netty.ssl.NettyServerSslBuilder
+00:19:31.620 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder]
+00:19:31.620 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder] for type: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder 
+00:19:31.622 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ServerSslConfiguration
+00:19:31.624 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.ServerSslConfiguration] for type: class io.micronaut.http.ssl.ServerSslConfiguration
+00:19:31.624 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.ServerSslConfiguration]
+00:19:31.625 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.ServerSslConfiguration] for type: io.micronaut.http.ssl.ServerSslConfiguration 
+00:19:31.625 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.DefaultSslConfiguration
+00:19:31.627 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.DefaultSslConfiguration] for type: class io.micronaut.http.ssl.DefaultSslConfiguration
+00:19:31.633 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.DefaultSslConfiguration]
+00:19:31.634 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.DefaultSslConfiguration] for type: io.micronaut.http.ssl.DefaultSslConfiguration 
+00:19:31.636 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultSslConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.637 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultSslConfiguration&gt; 
+00:19:31.637 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultSslConfiguration&gt; 
+00:19:31.637 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.DefaultSslConfiguration@13c555ec] from definition [Definition: io.micronaut.http.ssl.DefaultSslConfiguration] with qualifier [null]
+00:19:31.637 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.DefaultSslConfiguration]: io.micronaut.http.ssl.DefaultSslConfiguration@13c555ec 
+00:19:31.637 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration
+00:19:31.638 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration] for type: class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration
+00:19:31.639 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration]
+00:19:31.639 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration] for type: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration 
+00:19:31.639 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultKeyConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.640 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultKeyConfiguration&gt; 
+00:19:31.640 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultKeyConfiguration&gt; 
+00:19:31.640 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration@47e83ef4] from definition [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration] with qualifier [null]
+00:19:31.640 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration]: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration@47e83ef4 
+00:19:31.641 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.642 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration] for type: class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.643 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration]
+00:19:31.643 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration] for type: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration 
+00:19:31.643 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultKeyStoreConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.646 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultKeyStoreConfiguration&gt; 
+00:19:31.647 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultKeyStoreConfiguration&gt; 
+00:19:31.647 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration@576c1da9] from definition [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration] with qualifier [null]
+00:19:31.648 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration]: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration@576c1da9 
+00:19:31.648 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration
+00:19:31.650 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ClientSslConfiguration$DefaultTrustStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.650 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.http.client.ssl.trust-store] not present
+00:19:31.652 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ServerSslConfiguration$DefaultTrustStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.652 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.ssl.trust-store] not present
+00:19:31.652 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration] for type: class io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration
+00:19:31.652 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration]
+00:19:31.653 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration] for type: io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration 
+00:19:31.653 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultTrustStoreConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.654 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultTrustStoreConfiguration&gt; 
+00:19:31.654 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultTrustStoreConfiguration&gt; 
+00:19:31.654 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration@71738727] from definition [Definition: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration] with qualifier [null]
+00:19:31.655 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration]: io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration@71738727 
+00:19:31.669 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyConfiguration
+00:19:31.670 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyConfiguration] will not be loaded due to failing conditions:
+00:19:31.670 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.ssl.key] not present
+00:19:31.671 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyConfiguration
+00:19:31.672 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.673 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.673 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.ssl.key-store] not present
+00:19:31.673 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.674 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultTrustStoreConfiguration
+00:19:31.674 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ServerSslConfiguration$DefaultTrustStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.674 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.server.ssl.trust-store] not present
+00:19:31.674 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ServerSslConfiguration$DefaultTrustStoreConfiguration
+00:19:31.675 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ServerSslConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.675 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ServerSslConfiguration&gt; 
+00:19:31.675 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ServerSslConfiguration&gt; 
+00:19:31.675 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.ServerSslConfiguration@286bb7de] from definition [Definition: io.micronaut.http.ssl.ServerSslConfiguration] with qualifier [null]
+00:19:31.678 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.ServerSslConfiguration]: io.micronaut.http.ssl.ServerSslConfiguration@286bb7de 
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.core.io.ResourceResolver@24fdc664] for type [class io.micronaut.core.io.ResourceResolver] and qualifier [null]
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyServerSslBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyServerSslBuilder&gt; 
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyServerSslBuilder&gt; 
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.ssl.NettyServerSslBuilder@5a08d3b8] from definition [Definition: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder] with qualifier [null]
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.server.netty.ssl.NettyServerSslBuilder]: io.micronaut.http.server.netty.ssl.NettyServerSslBuilder@5a08d3b8 
+00:19:31.679 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.netty.channel.ChannelOutboundHandler
+00:19:31.680 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.netty.channel.ChannelOutboundHandler
+00:19:31.680 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: interface io.netty.channel.ChannelOutboundHandler
+00:19:31.688 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyHttpServer&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.688 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyHttpServer&gt; 
+00:19:31.688 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyHttpServer&gt; 
+00:19:31.689 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.server.netty.NettyHttpServer@739e9786] from definition [Definition: io.micronaut.http.server.netty.NettyHttpServer] with qualifier [null]
+00:19:31.689 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.runtime.server.EmbeddedServer]: io.micronaut.http.server.netty.NettyHttpServer@739e9786 
+00:19:31.693 [Test worker] DEBUG io.netty.channel.MultithreadEventLoopGroup - -Dio.netty.eventLoopThreads: 4
+00:19:31.715 [Test worker] DEBUG io.netty.channel.nio.NioEventLoop - -Dio.netty.noKeySetOptimization: false
+00:19:31.715 [Test worker] DEBUG io.netty.channel.nio.NioEventLoop - -Dio.netty.selectorAutoRebuildThreshold: 512
+00:19:31.725 [Test worker] DEBUG io.netty.util.internal.PlatformDependent - org.jctools-core.MpscChunkedArrayQueue: available
+00:19:31.745 [Test worker] DEBUG io.micronaut.http.server.netty.NettyHttpServer - Binding server to port: 49483
+00:19:31.757 [Test worker] DEBUG io.netty.channel.DefaultChannelId - -Dio.netty.processId: 6022 (auto-detected)
+00:19:31.760 [Test worker] DEBUG io.netty.util.NetUtil - -Djava.net.preferIPv4Stack: false
+00:19:31.760 [Test worker] DEBUG io.netty.util.NetUtil - -Djava.net.preferIPv6Addresses: false
+00:19:31.762 [Test worker] DEBUG io.netty.util.NetUtil - Loopback interface: lo (lo, 127.0.0.1)
+00:19:31.763 [Test worker] DEBUG io.netty.util.NetUtil - /proc/sys/net/core/somaxconn: 128
+00:19:31.764 [Test worker] DEBUG io.netty.channel.DefaultChannelId - -Dio.netty.machineId: 02:42:85:ff:fe:ff:16:54 (auto-detected)
+00:19:31.799 [Test worker] DEBUG io.micronaut.context.event.ApplicationEventPublisher - Publishing event: io.micronaut.runtime.server.event.ServerStartupEvent[source=io.micronaut.http.server.netty.NettyHttpServer@739e9786]
+00:19:31.799 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ServerStartupEvent&gt; io.micronaut.context.event.ApplicationEventListener 
+00:19:31.799 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ServerStartupEvent&gt; 
+00:19:31.800 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ServerStartupEvent&gt; 
+00:19:31.869 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.client.RxHttpClient
+00:19:31.874 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.client.DefaultHttpClient] for type: interface io.micronaut.http.client.RxHttpClient
+00:19:31.874 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.client.DefaultHttpClient]
+00:19:31.874 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.client.DefaultHttpClient] for type: io.micronaut.http.client.RxHttpClient 
+00:19:31.882 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.client.HttpClientConfiguration
+00:19:31.884 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.client.DefaultHttpClientConfiguration] for type: class io.micronaut.http.client.HttpClientConfiguration
+00:19:31.884 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.client.DefaultHttpClientConfiguration]
+00:19:31.884 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.client.DefaultHttpClientConfiguration] for type: io.micronaut.http.client.HttpClientConfiguration 
+00:19:31.884 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.runtime.ApplicationConfiguration@131fbcd8] for type [class io.micronaut.runtime.ApplicationConfiguration] and qualifier [null]
+00:19:31.885 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ClientSslConfiguration
+00:19:31.887 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.ssl.ClientSslConfiguration] for type: class io.micronaut.http.ssl.ClientSslConfiguration
+00:19:31.887 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.ssl.ClientSslConfiguration]
+00:19:31.887 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.ssl.ClientSslConfiguration] for type: io.micronaut.http.ssl.ClientSslConfiguration 
+00:19:31.887 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.ssl.DefaultSslConfiguration@13c555ec] for type [class io.micronaut.http.ssl.DefaultSslConfiguration] and qualifier [null]
+00:19:31.887 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration@47e83ef4] for type [class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration] and qualifier [null]
+00:19:31.888 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration@576c1da9] for type [class io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyStoreConfiguration] and qualifier [null]
+00:19:31.888 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration@71738727] for type [class io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration] and qualifier [null]
+00:19:31.888 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyConfiguration
+00:19:31.889 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyConfiguration] will not be loaded due to failing conditions:
+00:19:31.889 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.http.client.ssl.key] not present
+00:19:31.889 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyConfiguration
+00:19:31.890 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.891 [Test worker] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.891 [Test worker] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.http.client.ssl.key-store] not present
+00:19:31.891 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultKeyStoreConfiguration
+00:19:31.892 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultTrustStoreConfiguration
+00:19:31.892 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - Bean [Definition: io.micronaut.http.ssl.ClientSslConfiguration$DefaultTrustStoreConfiguration] will not be loaded due to failing conditions:
+00:19:31.893 [ForkJoinPool.commonPool-worker-1] DEBUG io.micronaut.context.condition.Condition - * Required property [micronaut.http.client.ssl.trust-store] not present
+00:19:31.893 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: class io.micronaut.http.ssl.ClientSslConfiguration$DefaultTrustStoreConfiguration
+00:19:31.893 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ClientSslConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.893 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClientSslConfiguration&gt; 
+00:19:31.894 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;ClientSslConfiguration&gt; 
+00:19:31.894 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.ssl.ClientSslConfiguration@684173c1] from definition [Definition: io.micronaut.http.ssl.ClientSslConfiguration] with qualifier [null]
+00:19:31.894 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.ssl.ClientSslConfiguration]: io.micronaut.http.ssl.ClientSslConfiguration@684173c1 
+00:19:31.894 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultHttpClientConfiguration&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.895 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultHttpClientConfiguration&gt; 
+00:19:31.895 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultHttpClientConfiguration&gt; 
+00:19:31.895 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.client.DefaultHttpClientConfiguration@7c0108ad] from definition [Definition: io.micronaut.http.client.DefaultHttpClientConfiguration] with qualifier [null]
+00:19:31.895 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.client.HttpClientConfiguration]: io.micronaut.http.client.DefaultHttpClientConfiguration@7c0108ad 
+00:19:31.903 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.netty.util.concurrent.DefaultThreadFactory@54fb8325] for type [interface java.util.concurrent.ThreadFactory] and qualifier [@Named('netty')]
+00:19:31.903 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: class io.micronaut.http.client.ssl.NettyClientSslBuilder
+00:19:31.904 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [Definition: io.micronaut.http.client.ssl.NettyClientSslBuilder] for type: class io.micronaut.http.client.ssl.NettyClientSslBuilder
+00:19:31.904 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finalized bean definitions candidates: [Definition: io.micronaut.http.client.ssl.NettyClientSslBuilder]
+00:19:31.904 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found concrete candidate [Definition: io.micronaut.http.client.ssl.NettyClientSslBuilder] for type: io.micronaut.http.client.ssl.NettyClientSslBuilder 
+00:19:31.905 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.ssl.ClientSslConfiguration@684173c1] for type [class io.micronaut.http.ssl.ClientSslConfiguration] and qualifier [null]
+00:19:31.905 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.core.io.ResourceResolver@24fdc664] for type [class io.micronaut.core.io.ResourceResolver] and qualifier [null]
+00:19:31.905 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;NettyClientSslBuilder&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:31.906 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyClientSslBuilder&gt; 
+00:19:31.906 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;NettyClientSslBuilder&gt; 
+00:19:31.906 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.client.ssl.NettyClientSslBuilder@3289270] from definition [Definition: io.micronaut.http.client.ssl.NettyClientSslBuilder] with qualifier [null]
+00:19:31.906 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Registering singleton bean for type [io.micronaut.http.client.ssl.NettyClientSslBuilder]: io.micronaut.http.client.ssl.NettyClientSslBuilder@3289270 
+00:19:31.907 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved existing bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@130af059] for type [interface io.micronaut.http.codec.MediaTypeCodecRegistry] and qualifier [null]
+00:19:31.907 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: io.micronaut.http.filter.HttpClientFilter
+00:19:31.907 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Finding candidate beans for type: interface io.micronaut.http.filter.HttpClientFilter
+00:19:31.908 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolved bean candidates [] for type: interface io.micronaut.http.filter.HttpClientFilter
+00:19:31.927 [Test worker] DEBUG io.netty.handler.ssl.OpenSsl - netty-tcnative not in the classpath; OpenSslEngine will be unavailable.
+00:19:32.133 [Test worker] DEBUG io.netty.handler.ssl.JdkSslContext - Default protocols (JDK): [TLSv1.2, TLSv1.1, TLSv1] 
+00:19:32.133 [Test worker] DEBUG io.netty.handler.ssl.JdkSslContext - Default cipher suites (JDK): [TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_256_CBC_SHA]
+00:19:32.143 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;DefaultHttpClient&gt; io.micronaut.context.event.BeanCreatedEventListener 
+00:19:32.144 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultHttpClient&gt; 
+00:19:32.144 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.BeanCreatedEventListener] for qualifier: &lt;DefaultHttpClient&gt; 
+00:19:32.148 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Created bean [io.micronaut.http.client.DefaultHttpClient@199f823] from definition [Definition: io.micronaut.http.client.DefaultHttpClient] with qualifier [null]
+00:19:32.294 [nioEventLoopGroup-1-3] DEBUG io.netty.buffer.AbstractByteBuf - -Dio.netty.buffer.bytebuf.checkAccessible: true
+00:19:32.296 [nioEventLoopGroup-1-3] DEBUG io.netty.util.ResourceLeakDetectorFactory - Loaded default ResourceLeakDetector: io.netty.util.ResourceLeakDetector@6e336429
+00:19:32.327 [nioEventLoopGroup-1-3] DEBUG io.micronaut.http.client.DefaultHttpClient - Sending HTTP Request: GET /java/supplier/string
+00:19:32.327 [nioEventLoopGroup-1-3] DEBUG io.micronaut.http.client.DefaultHttpClient - Chosen Server: localhost(49483)
+00:19:32.332 [nioEventLoopGroup-1-3] DEBUG io.netty.util.Recycler - -Dio.netty.recycler.maxCapacityPerThread: 32768
+00:19:32.332 [nioEventLoopGroup-1-3] DEBUG io.netty.util.Recycler - -Dio.netty.recycler.maxSharedCapacityFactor: 2
+00:19:32.332 [nioEventLoopGroup-1-3] DEBUG io.netty.util.Recycler - -Dio.netty.recycler.linkCapacity: 16
+00:19:32.332 [nioEventLoopGroup-1-3] DEBUG io.netty.util.Recycler - -Dio.netty.recycler.ratio: 8
+00:19:32.365 [nioEventLoopGroup-1-4] DEBUG io.micronaut.http.server.netty.NettyHttpServer - Server localhost:49483 Received Request: GET /java/supplier/string
+00:19:32.371 [nioEventLoopGroup-1-4] DEBUG io.micronaut.http.server.netty.RoutingInBoundHandler - Matching route GET - /java/supplier/string
+00:19:32.377 [nioEventLoopGroup-1-4] DEBUG io.micronaut.http.server.netty.RoutingInBoundHandler - No matching route found for URI /java/supplier/string and method GET
+00:19:32.700 [Test worker] DEBUG io.micronaut.context.event.ApplicationEventPublisher - Publishing event: io.micronaut.runtime.server.event.ServerShutdownEvent[source=io.micronaut.http.server.netty.NettyHttpServer@739e9786]
+00:19:32.700 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ServerShutdownEvent&gt; io.micronaut.context.event.ApplicationEventListener 
+00:19:32.701 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ServerShutdownEvent&gt; 
+00:19:32.701 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ServerShutdownEvent&gt; 
+00:19:32.701 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Stopping BeanContext
+00:19:32.701 [Test worker] DEBUG io.micronaut.context.event.ApplicationEventPublisher - Publishing event: io.micronaut.context.event.ShutdownEvent[source=io.micronaut.context.DefaultApplicationContext@7ea51c35]
+00:19:32.701 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Resolving beans for type: &lt;ShutdownEvent&gt; io.micronaut.context.event.ApplicationEventListener 
+00:19:32.702 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Qualifying bean [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ShutdownEvent&gt; 
+00:19:32.702 [Test worker] DEBUG io.micronaut.context.DefaultBeanContext - Found no matching beans of type [io.micronaut.context.event.ApplicationEventListener] for qualifier: &lt;ShutdownEvent&gt; 
+</pre>
+</span>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="http://www.gradle.org">Gradle 4.6</a> at Jun 5, 2018 12:19:34 AM</p>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/CachingCompositeDiscoveryClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/ClientUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/DiscoveryClientCacheConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/DiscoveryClientConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/DiscoveryServerInstanceList.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/config/DistributedPropertySourceLocator.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/config/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/registration/DiscoveryServiceAutoRegistration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/client/registration/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/ConsulConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/ConsulServiceInstance.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/ConsulServiceInstanceList.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/AbstractConsulClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/AbstractServiceEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/CatalogEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/Check.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/CheckEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/ConsulAslTokenFilter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/ConsulClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/ConsulOperations.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/HTTPCheck.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/HealthEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/KeyValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/NewCheck.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/NewServiceEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/NodeEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/ServiceEntry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/TTLCheck.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/client/v1/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/condition/RequiresConsul.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/condition/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/config/ConsulConfigurationClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/config/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/health/ConsulHealthIndicator.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/health/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/registration/ConsulAutoRegistration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/consul/registration/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/EurekaConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/EurekaServiceInstance.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/EurekaServiceInstanceList.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/AbstractEurekaClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/ApplicationInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/ConfigurableInstanceInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/DataCenterTypeInfoResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/EurekaClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/EurekaOperations.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/InstanceInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/MyDataCenterInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/client/v2/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/condition/RequiresEureka.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/condition/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/health/EurekaHealthIndicator.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/health/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/registration/EurekaAutoRegistration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/eureka/registration/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/kubernetes/KubernetesDiscoveryClient.java">
+<error line="60" severity="error" message="&apos;CTOR_DEF&apos; should be separated from previous statement." source="com.puppycrawl.tools.checkstyle.checks.whitespace.EmptyLineSeparatorCheck"/>
+<error line="75" column="21" severity="error" message="&apos;}&apos; at column 21 should be on the same line as the next part of a multi-block statement (one that directly contains multiple blocks: if/else-if/else, do/while or try/catch/finally)." source="com.puppycrawl.tools.checkstyle.checks.blocks.RightCurlyCheck"/>
+<error line="82" column="25" severity="error" message="&apos;}&apos; at column 25 should be on the same line as the next part of a multi-block statement (one that directly contains multiple blocks: if/else-if/else, do/while or try/catch/finally)." source="com.puppycrawl.tools.checkstyle.checks.blocks.RightCurlyCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/discovery-client/src/main/java/io/micronaut/discovery/kubernetes/package-info.java">
+</file>
+</checkstyle>

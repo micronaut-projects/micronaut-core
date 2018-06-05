@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/Around.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/HotSwappableInterceptedProxy.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/InterceptPhase.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/Intercepted.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/InterceptedProxy.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/Interceptor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/Introduced.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/Introduction.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/InvocationContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/MethodInterceptor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/MethodInvocationContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/chain/InterceptorChain.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/chain/MethodInterceptorChain.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/chain/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/exceptions/UnimplementedAdviceException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/writer/AopProxyWriter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/aop/src/main/java/io/micronaut/aop/writer/package-info.java">
+</file>
+</checkstyle>

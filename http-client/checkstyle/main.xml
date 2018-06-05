@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/BlockingHttpClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/Client.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/DefaultHttpClient.java">
+<error line="1289" severity="error" message="&apos;METHOD_DEF&apos; has more than 1 empty lines before." source="com.puppycrawl.tools.checkstyle.checks.whitespace.EmptyLineSeparatorCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/DefaultHttpClientConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/DefaultLoadBalancerResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/FullNettyClientHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/HttpClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/HttpClientConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/LoadBalancer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/LoadBalancerResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/NettyClientHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/NettyClientHttpRequestFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/NettyStreamedHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/ReactiveClientResultTransformer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/RxHttpClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/RxStreamingHttpClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/StreamingHttpClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/converters/ClientResponseConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/converters/LoadBalancerConverters.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/converters/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/ContentLengthExceededException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/EmptyResponseException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/HttpClientException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/HttpClientResponseException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/ReadTimeoutException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/interceptor/HttpClientIntroductionAdvice.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/interceptor/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/AbstractRoundRobinLoadBalancer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/DiscoveryClientLoadBalancerFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/DiscoveryClientRoundRobinLoadBalancer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/FixedLoadBalancer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/ServiceInstanceListLoadBalancerFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/ServiceInstanceListRoundRobinLoadBalancer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/loadbalance/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/AbstractFilePart.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/BytePart.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/FilePart.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/InputStreamPart.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/MultipartBody.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/Part.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/StringPart.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/multipart/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/reactor/ReactorReactiveClientResultTransformer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/reactor/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/rxjava2/RxReactiveClientResultTransformer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/rxjava2/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/scope/ClientScope.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/scope/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/ssl/NettyClientSslBuilder.java">
+<error line="26" column="8" severity="error" message="Unused import - javax.annotation.Nullable." source="com.puppycrawl.tools.checkstyle.checks.imports.UnusedImportsCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-client/src/main/java/io/micronaut/http/client/ssl/package-info.java">
+</file>
+</checkstyle>

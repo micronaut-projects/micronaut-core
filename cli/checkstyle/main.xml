@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/interactive/CandidateListCompletionHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/interactive/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/ConsoleAntBuilder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/ConsoleBuildListener.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/ConsoleErrorPrintStream.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/ConsoleLogger.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/ConsolePrintStream.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/MicronautConsole.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/logging/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/CommandLine.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/CommandLineParser.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/DefaultCommandLine.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/Option.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/ParseException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/console/parsing/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/exceptions/reporting/DefaultStackTraceFilterer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/exceptions/reporting/SourceCodeAware.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/exceptions/reporting/StackTraceFilterer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/exceptions/reporting/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/interactive/completers/SortedAggregateCompleter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/interactive/completers/StringsCompleter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/interactive/completers/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/AbstractFileResolvingResource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/AntPathMatcher.java">
+<error line="525" severity="error" message="Class AntPatternComparator should be declared as final." source="com.puppycrawl.tools.checkstyle.checks.design.FinalClassCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/ClassPathResource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/DefaultResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/FileSystemResource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/FileSystemResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/PathMatchingResourcePatternResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/Resource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/ResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/ResourceLocator.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/ResourceUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/SpringIOUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/StaticResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/UrlResource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/io/support/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/profile/CommandCancellationListener.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/profile/Profile.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/profile/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/util/NameUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/cli/src/main/groovy/io/micronaut/cli/util/package-info.java">
+</file>
+</checkstyle>

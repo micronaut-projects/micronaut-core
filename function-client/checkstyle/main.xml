@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/DefaultFunctionDiscoveryClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/DefaultFunctionInvokerChooser.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionDefinition.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionDefinitionProvider.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionDiscoveryClient.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionInvoker.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/FunctionInvokerChooser.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aop/FunctionClientAdvice.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aop/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aws/AWSInvokeRequestDefinition.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aws/AWSLambdaAsyncClientFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aws/AWSLambdaConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aws/AWSLambdaFunctionExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/aws/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/exceptions/FunctionException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/exceptions/FunctionExecutionException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/exceptions/FunctionNotFoundException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/http/HttpFunctionExecutor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/http/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/local/LocalFunctionDefinitionProvider.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/local/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-client/src/main/java/io/micronaut/function/client/package-info.java">
+</file>
+</checkstyle>

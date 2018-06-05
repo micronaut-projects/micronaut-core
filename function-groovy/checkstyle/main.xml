@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-groovy/src/main/groovy/io/micronaut/function/groovy/FunctionScript.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-groovy/src/main/groovy/io/micronaut/function/groovy/package-info.java">
+</file>
+</checkstyle>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/AbstractBufferingHttpContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/AbstractHttpContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/DefaultHttpContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/DelegateHttpMessage.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/DelegateHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/DelegateStreamedHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/FormDataHttpContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/FormDataHttpContentSubscriberFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/HttpContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/HttpContentSubscriberFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/NettyEmbeddedServerInstance.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/NettyHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/NettyHttpResponseFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/NettyHttpServer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/RequestArgumentSatisfier.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/RoutingInBoundHandler.java">
+<error line="583" severity="warning" message="Comment matches to-do format &apos;TODO:&apos;." source="com.puppycrawl.tools.checkstyle.checks.TodoCommentCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/SmartHttpContentCompressor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/async/ContextCompletionAwareSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/async/DefaultCloseHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/async/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/binders/CompletableFutureBodyBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/binders/ObservableBodyBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/binders/PublisherBodyBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/binders/SingleBodyBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/binders/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/configuration/NettyChannelOptionConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/configuration/NettyHttpServerConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/configuration/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/AttributeConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/ByteBufToArrayConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/ByteBufToObjectConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/ByteBufToStringConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/DuplicateRouteHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/FileUploadToCompletedFileUploadConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/FileUploadToObjectConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/HttpDataToByteArrayConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/HttpDataToStringConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/NettyPartDataToArrayConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/NettyPartDataToObjectConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/UnsatisfiedRouteHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/decoders/HttpRequestDecoder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/decoders/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/handler/ChannelOutboundHandlerFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/handler/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/jackson/JsonContentProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/jackson/JsonHttpContentSubscriberFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/jackson/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/multipart/NettyCompletedFileUpload.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/multipart/NettyPartData.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/multipart/NettyStreamingFileUpload.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/multipart/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/ssl/NettyServerSslBuilder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/ssl/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/DefaultCustomizableResponseTypeHandlerRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/NettyCustomizableResponseType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/NettyCustomizableResponseTypeHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/NettyCustomizableResponseTypeHandlerRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/NettyFileCustomizableResponseType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/files/FileTypeHandler.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/files/FileTypeHandlerConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/files/NettyStreamedFileCustomizableResponseType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/files/NettySystemFileCustomizableResponseType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/files/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http-server-netty/src/main/java/io/micronaut/http/server/netty/types/package-info.java">
+</file>
+</checkstyle>

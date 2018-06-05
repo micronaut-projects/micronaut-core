@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-web/src/main/java/io/micronaut/function/web/AnnotatedFunctionRouteBuilder.java">
+<error line="114" column="29" severity="error" message="&apos;}&apos; at column 29 should be on the same line as the next part of a multi-block statement (one that directly contains multiple blocks: if/else-if/else, do/while or try/catch/finally)." source="com.puppycrawl.tools.checkstyle.checks.blocks.RightCurlyCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/function-web/src/main/java/io/micronaut/function/web/package-info.java">
+</file>
+</checkstyle>

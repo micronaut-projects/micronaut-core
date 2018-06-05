@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpAttributes.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpHeaders.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpMessage.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpMessageWrapper.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpMethod.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpParameters.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpRequestFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpRequestWrapper.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpResponseFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/HttpStatus.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/MediaType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/MutableHttpHeaders.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/MutableHttpMessage.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/MutableHttpRequest.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/MutableHttpResponse.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Body.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Consumes.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Controller.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/CookieValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Delete.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Error.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Filter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Get.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Head.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Header.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Headers.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/HttpMethodMapping.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Options.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Part.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Patch.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Post.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Produces.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Put.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/QueryValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Status.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/Trace.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/annotation/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/codec/CodecException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/codec/DefaultMediaTypeCodecRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/codec/MediaTypeCodec.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/codec/MediaTypeCodecRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/codec/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/cookie/Cookie.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/cookie/CookieFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/cookie/Cookies.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/cookie/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/ConnectionClosedException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/ContentLengthExceededException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/HttpException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/HttpStatusException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/UriSyntaxException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/ClientFilterChain.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/FilterChain.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/HttpClientFilter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/HttpFilter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/HttpServerFilter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/OncePerRequestHttpServerFilter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/ServerFilterChain.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/filter/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/AbstractResource.java">
+<error line="156" severity="warning" message="Comment matches to-do format &apos;TODO:&apos;." source="com.puppycrawl.tools.checkstyle.checks.TodoCommentCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/DefaultLink.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/JsonError.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/Link.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/Resource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/VndError.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/hateos/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/CompletedFileUpload.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/FileUpload.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/MultipartException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/PartData.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/StreamingFileUpload.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/multipart/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/resource/ResourceLoaderFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/resource/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/sse/DefaultEvent.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/sse/Event.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/sse/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/ClientAuthentication.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/ClientSslConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/DefaultSslConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/ServerSslConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/SslBuilder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/SslConfiguration.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/SslConfigurationException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/ssl/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/UriMatchInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/UriMatchTemplate.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/UriMatcher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/UriTemplate.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/UriTypeMatchTemplate.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/uri/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/util/HttpUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/http/src/main/java/io/micronaut/http/util/package-info.java">
+</file>
+</checkstyle>

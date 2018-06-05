@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.10">
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotatedTypeInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationMetadata.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationMetadataDelegate.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationMetadataProvider.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationMetadataResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationSource.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/AnnotationUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/Blocking.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/EmptyAnnotationMetadata.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/Experimental.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/Internal.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/NonBlocking.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/annotation/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/SupplierUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/processor/SingleSubscriberProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/processor/SingleThreadedBufferingProcessor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/processor/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/publisher/AsyncSingleResultPublisher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/publisher/CompletableFuturePublisher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/publisher/Publishers.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/publisher/SingleSubscriberPublisher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/publisher/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/Completable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/CompletionAwareSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/Emitter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/SingleThreadedBufferingSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/TypedSubscriber.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/async/subscriber/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/attr/AttributeHolder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/attr/MutableAttributeHolder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/attr/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/BeanInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/BeanMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/Introspector.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/PropertyDescriptor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/ReflectionBeanMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/SimpleBeanInfo.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/beans/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/ArgumentBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/ArgumentBinderRegistry.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/BeanPropertyBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/TypeArgumentBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/annotation/AbstractAnnotatedArgumentBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/annotation/AnnotatedArgumentBinder.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/annotation/Bindable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/annotation/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/bind/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/CommandLine.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/CommandLineParser.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/DefaultCommandLine.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/Option.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/exceptions/ParseException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/cli/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/ArgumentConversionContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/ConversionContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/ConversionError.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/ConversionService.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/DefaultArgumentConversionContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/DefaultConversionService.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/ErrorsContext.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/TypeConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/TypeConverterRegistrar.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/exceptions/ConversionErrorException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/Format.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/FormattingTypeConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/MapFormat.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/ReadableBytes.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/ReadableBytesTypeConverter.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/format/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/ConvertibleMultiValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/ConvertibleMultiValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/ConvertibleValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/ConvertibleValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/MutableConvertibleMultiValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/MutableConvertibleMultiValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/MutableConvertibleValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/MutableConvertibleValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/convert/value/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/IOUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/ResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/ResourceResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/Streamable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/Writable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/buffer/ByteBuffer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/buffer/ByteBufferFactory.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/buffer/ReferenceCounted.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/buffer/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/file/DefaultFileSystemResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/file/FileSystemResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/file/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/AnnotatedTypeInfoVisitor.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/AnnotationClassReader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/AnnotationScanner.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/Attribute.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/CachingClassPathAnnotationScanner.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/ClassPathAnnotationScanner.java">
+<error line="151" severity="warning" message="Comment matches to-do format &apos;TODO:&apos;." source="com.puppycrawl.tools.checkstyle.checks.TodoCommentCheck"/>
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/ClassPathResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/Context.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/DefaultClassPathResourceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/scan/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/DefaultServiceDefinition.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/ServiceDefinition.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/ServiceDescriptorGenerator.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/SoftServiceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/StreamSoftServiceLoader.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/service/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/socket/SocketUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/io/socket/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/Described.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/NameResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/NameUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/Named.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/conventions/MethodConvention.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/conventions/PropertyConvention.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/conventions/StringConvention.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/conventions/TypeConvention.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/conventions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/naming/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/order/OrderUtil.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/order/Ordered.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/order/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/ClassUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/GenericTypeUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/InstantiationUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/ReflectionUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/exception/InstantiationException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/exception/InvocationException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/exception/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/reflect/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/serialize/JdkSerializer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/serialize/ObjectSerializer.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/serialize/exceptions/SerializationException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/serialize/exceptions/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/serialize/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/Argument.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/ArgumentValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/DefaultArgument.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/DefaultArgumentValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/DefaultMutableArgumentValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/Executable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/MutableArgumentValue.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/ReturnType.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/TypeVariableResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/type/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/AntPathMatcher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/ArgumentUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/ArrayUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/CollectionUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/PathMatcher.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/StreamUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/StringUtils.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/Toggleable.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/util/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/MapPropertyResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/MapValueResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/OptionalMultiValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/OptionalMultiValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/OptionalValues.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/OptionalValuesMap.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/PropertyNotFoundException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/PropertyResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/ValueException.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/ValueResolver.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/value/package-info.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/version/SemanticVersion.java">
+</file>
+<file name="/home/travis/build/micronaut-projects/micronaut-core/core/src/main/java/io/micronaut/core/version/package-info.java">
+</file>
+</checkstyle>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - Class io.micronaut.health.HeartbeatTaskSpec</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>Class io.micronaut.health.HeartbeatTaskSpec</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/io.micronaut.health.html">io.micronaut.health</a> &gt; HeartbeatTaskSpec</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">1</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">5.253s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox failures" id="successRate">
+<div class="percent">0%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="tabs">
+<ul class="tabLinks">
+<li>
+<a href="#tab0">Failed tests</a>
+</li>
+<li>
+<a href="#tab1">Tests</a>
+</li>
+<li>
+<a href="#tab2">Standard output</a>
+</li>
+</ul>
+<div id="tab0" class="tab">
+<h2>Failed tests</h2>
+<div class="test">
+<a name="test that by default a heartbeat is sent"></a>
+<h3 class="failures">test that by default a heartbeat is sent</h3>
+<span class="code">
+<pre>Condition not satisfied after 5.00 seconds and 11 attempts
+	at spock.util.concurrent.PollingConditions.within(PollingConditions.java:164)
+	at spock.util.concurrent.PollingConditions.eventually(PollingConditions.java:134)
+	at io.micronaut.health.HeartbeatTaskSpec.test that by default a heartbeat is sent(HeartbeatTaskSpec.groovy:44)
+Caused by: Condition not satisfied:
+
+listener.event != null
+|        |     |
+|        null  false
+&lt;io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 event=null&gt;
+
+	at io.micronaut.health.HeartbeatTaskSpec.test that by default a heartbeat is sent_closure1(HeartbeatTaskSpec.groovy:45)
+	at io.micronaut.health.HeartbeatTaskSpec.test that by default a heartbeat is sent_closure1(HeartbeatTaskSpec.groovy)
+	at groovy.lang.Closure.call(Closure.java:421)
+	at spock.util.concurrent.PollingConditions.within(PollingConditions.java:158)
+	... 2 more
+</pre>
+</span>
+</div>
+</div>
+<div id="tab1" class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="failures">test that by default a heartbeat is sent</td>
+<td>5.253s</td>
+<td class="failures">failed</td>
+</tr>
+</table>
+</div>
+<div id="tab2" class="tab">
+<h2>Standard output</h2>
+<span class="code">
+<pre>00:20:16.527 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+00:20:16.529 [Test worker] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [test, cloud, gcp]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a1d7845 return event null
+Test Heartbeat listener io.micronaut.health.HeartbeatTaskSpec$HeartbeatListener@4a610d7d received event io.micronaut.health.HeartbeatEvent[source=io.micronaut.http.server.netty.NettyEmbeddedServerInstance@4f329eb2]
+</pre>
+</span>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="http://www.gradle.org">Gradle 4.6</a> at Jun 5, 2018 12:21:29 AM</p>
+</div>
+</div>
+</body>
+</html>
