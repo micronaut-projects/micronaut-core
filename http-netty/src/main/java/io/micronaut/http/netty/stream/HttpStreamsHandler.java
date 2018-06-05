@@ -18,17 +18,13 @@ package io.micronaut.http.netty.stream;
 
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.FullHttpMessage;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpMessage;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.channel.*;
+import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -45,6 +41,7 @@ import java.util.Queue;
  */
 abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessage> extends ChannelDuplexHandler {
 
+    private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);
     private final Queue<Outgoing> outgoing = new LinkedList<>();
     private final Class<In> inClass;
     private final Class<Out> outClass;
@@ -319,8 +316,18 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
                 @Override
                 protected void error(Throwable error) {
-                    out.promise.tryFailure(error);
-                    ctx.close();
+                    try {
+
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error occurred writing stream response: " + error.getMessage(), error);
+                        }
+                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
+                           .addListener(ChannelFutureListener.CLOSE);
+                    } catch (Exception e) {
+                        ctx.close();
+                    } finally {
+                        ctx.read();
+                    }
                 }
 
                 @Override
@@ -352,10 +359,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                     flushNext(ctx);
                 })
             );
+            ctx.read();
         } else {
             outgoing.remove().promise.setSuccess();
             sentOutMessage(ctx);
             flushNext(ctx);
+            ctx.read();
         }
     }
 

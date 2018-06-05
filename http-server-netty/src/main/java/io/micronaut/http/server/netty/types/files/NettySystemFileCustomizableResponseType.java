@@ -124,7 +124,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
 
             // Write the content.
-            ChannelFuture flushFuture;
             if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 // Remove the content compressor to prevent incorrect behavior with zero-copy
@@ -134,19 +133,18 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 }
 
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
-                flushFuture = context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
+                    context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
                         context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
 
-            flushFuture.addListener(new DefaultCloseHandler(context, request, response.code()));
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }

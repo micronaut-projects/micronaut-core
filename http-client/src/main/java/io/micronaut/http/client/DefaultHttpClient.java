@@ -121,7 +121,6 @@ import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.net.ssl.SSLEngine;
 import java.io.Closeable;
 import java.net.Proxy.Type;
 import java.net.SocketAddress;
@@ -540,7 +539,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 AtomicBoolean received = new AtomicBoolean(false);
 
                                 @Override
-                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                                     if (received.compareAndSet(false, true)) {
                                         emitter.onError(cause);
                                     }
@@ -622,6 +621,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         );
         // apply filters
         streamResponsePublisher = Flowable.fromPublisher(applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher));
+
         return streamResponsePublisher.subscribeOn(Schedulers.from(group));
     }
 
@@ -761,7 +761,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected ChannelFuture doConnect(String host, int port, @Nullable SslContext sslCtx) {
         Bootstrap localBootstrap = this.bootstrap.clone();
-        localBootstrap.handler(new HttpClientInitializer(sslCtx, host,port, false));
+        localBootstrap.handler(new HttpClientInitializer(sslCtx, host, port, false));
         return doConnect(localBootstrap, host, port);
     }
 
@@ -1285,7 +1285,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         return new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver());
     }
 
-
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
             .getContentType()
@@ -1337,7 +1336,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
          * @param port The port
          * @param stream     Whether is stream
          */
-        protected HttpClientInitializer(SslContext sslContext,String host, int port, boolean stream) {
+        protected HttpClientInitializer(SslContext sslContext, String host, int port, boolean stream) {
             this.sslContext = sslContext;
             this.stream = stream;
             this.host = host;
