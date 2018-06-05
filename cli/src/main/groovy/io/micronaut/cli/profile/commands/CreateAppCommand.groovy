@@ -32,10 +32,12 @@ import io.micronaut.cli.io.support.XmlMerger
 import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Feature
+import io.micronaut.cli.profile.OneOfFeature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.util.NameUtils
+import io.micronaut.cli.util.VersionInfo
 
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -56,10 +58,13 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     public static final String NAME = "create-app"
     public static final String PROFILE_FLAG = "profile"
     public static final String FEATURES_FLAG = "features"
+    public static final String LANG_FLAG = "lang"
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
     public static final String INPLACE_FLAG = "inplace"
     public static final String BUILD_FLAG = "build"
 
+    protected static final List<String> LANG_OPTIONS = ["java", "groovy", "kotlin"]
+    protected static final String LANG_DEFAULT = "java"
     protected static final List<String> BUILD_OPTIONS = ["gradle", "maven"]
     protected static final String APPLICATION_YML = "application.yml"
     protected static final String BUILD_GRADLE = "build.gradle"
@@ -69,10 +74,11 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     Map<String, String> variables = [:]
     String appname
     String groupname
+    String lang
     String defaultpackagename
     File targetDirectory
 
-    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME]")
+    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME] -lang [LANG]")
 
     CreateAppCommand() {
         populateDescription()
@@ -83,6 +89,9 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         if (flags.contains(BUILD_FLAG)) {
             description.flag(name: BUILD_FLAG, description: "Which build tool to configure. Possible values: ${BUILD_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
         }
+        if (flags.contains(LANG_FLAG)) {
+            description.flag(name: LANG_FLAG, description: "Which language to use. Possible values: ${LANG_OPTIONS.collect({ "\"${it}\"" }).join(', ')}.", required: false)
+        }
         if (flags.contains(PROFILE_FLAG)) {
             description.flag(name: PROFILE_FLAG, description: "The profile to use", required: false)
         }
@@ -92,7 +101,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     protected List<String> getFlags() {
-        [INPLACE_FLAG, BUILD_FLAG, PROFILE_FLAG, FEATURES_FLAG]
+        [INPLACE_FLAG, BUILD_FLAG, LANG_FLAG, PROFILE_FLAG, FEATURES_FLAG]
     }
 
     protected void populateDescription() {
@@ -158,6 +167,15 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
                 } else if (!BUILD_OPTIONS.contains(val)) {
                     def valStr = val.toString()
                     candidates.addAll(BUILD_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
+                }
+                return cursor
+            } else if (lastOption.key == LANG_FLAG) {
+                def val = lastOption.value
+                if (val == true) {
+                    candidates.addAll(LANG_OPTIONS.collect { "$it ".toString() })
+                } else if (!LANG_OPTIONS.contains(val)) {
+                    def valStr = val.toString()
+                    candidates.addAll(LANG_OPTIONS.findAll { it.startsWith(valStr) }.collect { "$it " })
                 }
                 return cursor
             }
@@ -274,7 +292,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             Files.walkFileTree(projectDir.absoluteFile.toPath(), new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes mainAtts)
-                    throws IOException {
+                        throws IOException {
                     if (path.fileName.toString() == fileName) {
                         files.add(path.toFile())
                     }
@@ -396,21 +414,27 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             }
         }
 
-        boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
-        List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        Set<String> features = new HashSet<>()
+        features.add(resolveLang(commandLine))
+        String[] commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')
+        if (commandLineFeatures != null) {
+            features.addAll(commandLineFeatures)
+        }
+
         String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-            appName: appName,
-            baseDir: executionContext.baseDir,
-            profileName: profileName,
-            micronautVersion: MicronautCli.getPackage().getImplementationVersion(),
-            features: features,
-            inplace: inPlace,
-            build: build,
-            console: executionContext.console
+                appName: appName,
+                baseDir: executionContext.baseDir,
+                profileName: profileName,
+                micronautVersion: VersionInfo.getVersion(MicronautCli),
+                features: features,
+                inplace: inPlace,
+                build: build,
+                console: executionContext.console
         )
 
         return this.handle(cmd)
@@ -466,23 +490,23 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             tokens = new MavenBuildTokens().getTokens(profile, features)
         }
 
-        if(tokens) {
+        if (tokens) {
             List<String> requestedFeatureNames = features.findAll { it.requested }*.name
             List<String> allFeatureNames = features*.name
             String testFramework = null
             String sourceLanguage = null
 
-            if(requestedFeatureNames) {
-                testFramework = evaulateTestFramework(requestedFeatureNames)
-                sourceLanguage = evaulateSourceLanguage(requestedFeatureNames)
+            if (requestedFeatureNames) {
+                testFramework = evaluateTestFramework(requestedFeatureNames)
+                sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
             }
 
-            if(!testFramework) {
-                testFramework = evaulateTestFramework(allFeatureNames)
+            if (!testFramework) {
+                testFramework = evaluateTestFramework(allFeatureNames)
             }
 
-            if(!sourceLanguage) {
-                sourceLanguage = evaulateSourceLanguage(allFeatureNames)
+            if (!sourceLanguage) {
+                sourceLanguage = evaluateSourceLanguage(allFeatureNames)
             }
 
             tokens.put("testFramework", testFramework)
@@ -492,8 +516,12 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
                 replacefilter {
-                    if (k) {replacetoken("@${k}@".toString()) }
-                    if (v) { replacevalue(v) }
+                    if (k) {
+                        replacetoken("@${k}@".toString())
+                    }
+                    if (v) {
+                        replacevalue(v)
+                    }
                 }
             }
             variables.each { k, v ->
@@ -505,25 +533,25 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
     }
 
-    protected String evaulateTestFramework(List<String> features) {
+    protected String evaluateTestFramework(List<String> features) {
         String testFramework = null
-        if(features.contains("spock"))
+        if (features.contains("spock"))
             testFramework = "spock"
-        else if(features.contains("junit"))
+        else if (features.contains("junit"))
             testFramework = "junit"
-        else if(features.contains("spek"))
+        else if (features.contains("spek"))
             testFramework = "spek"
 
         testFramework
     }
 
-    protected String evaulateSourceLanguage(List<String> features) {
+    protected String evaluateSourceLanguage(List<String> features) {
         String sourceLanguage = null
-        if(features.contains("groovy"))
+        if (features.contains("groovy"))
             sourceLanguage = "groovy"
-        else if(features.contains("kotlin"))
+        else if (features.contains("kotlin"))
             sourceLanguage = "kotlin"
-        else if(features.contains("java"))
+        else if (features.contains("java"))
             sourceLanguage = "java"
 
         sourceLanguage
@@ -533,13 +561,19 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         mainCommandLine.optionValue(PROFILE_FLAG)?.toString() ?: getDefaultProfile()
     }
 
-    protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
+    protected String resolveLang(CommandLine commandLine) {
+        if (!lang) lang = commandLine.optionValue(LANG_FLAG) ?: LANG_DEFAULT
+        lang
+    }
+
+    @CompileStatic(TypeCheckingMode.SKIP)
+    protected Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures) {
         Set<Feature> features = []
-        List<String> validFeatureNames
+        List<String> validRequestedFeatureNames
 
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
-            validFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
+            validRequestedFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -553,8 +587,8 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
                 MicronautConsole.getInstance().warn(warning.toString())
             }
 
-            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validFeatureNames.contains(f.name) }
-// as List<Feature>
+            Iterable<Feature> validFeatures = profile.features.findAll { Feature f -> validRequestedFeatureNames.contains(f.name) }
+
             features.addAll(validFeatures)
         } else {
             features.addAll(profile.defaultFeatures)
@@ -562,17 +596,32 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         features.addAll(profile.requiredFeatures)
 
+        if (!profile.oneOfFeatures.empty) {
+            List<Feature> toRemove = []
+            boolean remove = false
+            for (OneOfFeature oneOf: profile.oneOfFeatures) {
+                boolean isOneOf = features.contains(oneOf.feature)
+                if (isOneOf) {
+                    if (remove) {
+                        toRemove.add(oneOf.feature)
+                    } else {
+                        remove = true
+                    }
+                }
+            }
+
+            features.removeAll(toRemove)
+        }
+
         for (int i = 0; i < features.size(); i++) {
             features.addAll(features[i].getDependentFeatures(profile))
         }
 
-        if(validFeatureNames) {
-            features = features.collect { feature ->
-                if(validFeatureNames.contains(feature.name)) {
+        if (validRequestedFeatureNames) {
+            features = features.each { feature ->
+                if (validRequestedFeatureNames.contains(feature.name)) {
                     feature.setRequested(true)
                 }
-
-                feature
             }.toSet()
         }
 
@@ -762,13 +811,12 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
     }
 
-
     static class CreateServiceCommandObject {
         String appName
         File baseDir
         String profileName
         String micronautVersion
-        List<String> features
+        Set<String> features
         boolean inplace = false
         String build = "gradle"
         MicronautConsole console

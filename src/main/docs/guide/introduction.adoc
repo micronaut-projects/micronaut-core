@@ -19,7 +19,7 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 * Minimal use of proxies
 * Easy Unit Testing
 
-Whilst frameworks like Spring and Grails were never designed to run in scenarios such as as functions on a Server-less platform, or on Android or as a low memory footprint microservice; Micronaut on the other hand is designed to be suitable for all of these scenarios.
+Whilst frameworks like Spring and Grails were never designed to run in scenarios such as functions on a Server-less platform, or on Android or as a low memory footprint microservice; Micronaut on the other hand is designed to be suitable for all of these scenarios.
 
 The way this is achieved is through a series of Java annotation processors, that are usable on any JVM language that supports them, and an HTTP Server and Client built on Netty.
 

@@ -98,7 +98,9 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public BeanDefinition load(BeanContext context) {
         BeanDefinition definition = load();
-        ((AbstractBeanDefinition) definition).configure(context);
+        if (context instanceof ApplicationContext && definition instanceof EnvironmentConfigurable) {
+            ((EnvironmentConfigurable) definition).configure(((ApplicationContext) context).getEnvironment());
+        }
         return definition;
     }
 

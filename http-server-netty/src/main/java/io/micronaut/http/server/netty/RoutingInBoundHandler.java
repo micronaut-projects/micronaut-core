@@ -1072,6 +1072,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else if (body instanceof byte[]) {
             byteBuf = Unpooled.copiedBuffer((byte[]) body);
         } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Encoding emitted response object {} using codec: {}", body, codec);
+            }
             byteBuf = (ByteBuf) codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
         }
         return byteBuf;
@@ -1246,6 +1249,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
                         new TextPlainCodec(serverConfiguration.getDefaultCharset()));
 
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Encoding emitted response object {} using codec: {}", message, codec);
+                    }
                     ByteBuffer encoded = codec.encode(message, byteBufferFactory);
                     httpContent = new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
                 }

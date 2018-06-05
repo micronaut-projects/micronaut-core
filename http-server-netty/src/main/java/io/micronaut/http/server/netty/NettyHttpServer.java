@@ -36,7 +36,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.ssl.NettyServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -59,6 +59,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -105,7 +106,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private final SslConfiguration sslConfiguration;
+    private final ServerSslConfiguration sslConfiguration;
     private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
     private final Router router;
@@ -218,6 +219,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                 serverConfiguration.isValidateHeaders(),
                                 serverConfiguration.getInitialBufferSize()
                         ));
+                        pipeline.addLast(new FlowControlHandler());
                         pipeline.addLast(new HttpServerKeepAliveHandler());
                         pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());

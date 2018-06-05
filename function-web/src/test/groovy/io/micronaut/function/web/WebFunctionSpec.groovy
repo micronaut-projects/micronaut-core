@@ -39,7 +39,7 @@ class WebFunctionSpec extends Specification {
 
     void "test the function registry"() {
         given:
-        LocalFunctionRegistry registry = ApplicationContext.run(LocalFunctionRegistry)
+        LocalFunctionRegistry registry = ApplicationContext.run().getBean(LocalFunctionRegistry)
 
         expect:
         registry.findConsumer("consumer/string").isPresent()
@@ -142,10 +142,12 @@ class WebFunctionSpec extends Specification {
 
     @FunctionBean("supplier/string")
     static class StringSupplier implements Supplier<String> {
-
+        String getValue() {
+            return "value"
+        }
         @Override
         String get() {
-            return "value"
+            return getValue()
         }
     }
 

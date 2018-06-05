@@ -25,13 +25,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
 import javax.inject.Scope;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -201,7 +195,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata metadata,
         boolean isDeclared) {
         String annotationName = getAnnotationTypeName(annotationMirror);
-        Set<String> parentAnnotations = CollectionUtils.setOf(annotationName);
+        List<String> parentAnnotations = new ArrayList<>();
+        parentAnnotations.add(annotationName);
         Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
         if (CollectionUtils.isEmpty(elementValues)) {
             return Collections.emptyMap();
@@ -243,7 +238,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void processAnnotationAlias(
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
-            Set<String> parentAnnotations,
+            List<String> parentAnnotations,
             Map<CharSequence, Object> annotationValues,
             Object annotationValue,
             OptionalValues<?> aliasForValues) {
@@ -312,8 +307,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             for (A annotationMirror : annotationHierarchy) {
                 String parentAnnotationName = getAnnotationTypeName(annotationMirror);
                 T annotationType = getTypeForAnnotation(annotationMirror);
+                List<String> parentAnnotations = new ArrayList<>();
+                parentAnnotations.add(parentAnnotationName);
                 buildStereotypeHierarchy(
-                    CollectionUtils.setOf(parentAnnotationName),
+                    parentAnnotations,
                     annotationType,
                     annotationMetadata,
                     isDeclared
@@ -328,7 +325,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationMetadata;
     }
 
-    private void buildStereotypeHierarchy(Set<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void buildStereotypeHierarchy(List<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
         if (!annotationMirrors.isEmpty()) {
 
@@ -352,8 +349,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             for (A annotationMirror : topLevel) {
                 T typeForAnnotation = getTypeForAnnotation(annotationMirror);
                 String annotationTypeName = getAnnotationTypeName(annotationMirror);
-                Set<String> stereoTypeParents = CollectionUtils.setOf(annotationTypeName);
-                stereoTypeParents.addAll(parents);
+                List<String> stereoTypeParents = new ArrayList<>(parents);
+                stereoTypeParents.add(annotationTypeName);
                 buildStereotypeHierarchy(stereoTypeParents, typeForAnnotation, metadata, isDeclared);
             }
         }

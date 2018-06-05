@@ -17,6 +17,7 @@
 package io.micronaut.discovery.client;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.ServiceInstance;
@@ -50,7 +51,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     private List<ServiceInstance> defaultZone = Collections.emptyList();
     private List<ServiceInstance> otherZones = Collections.emptyList();
 
-    private String host = LOCALHOST;
+    private String host = SocketUtils.LOCALHOST;
     private int port = -1;
     private boolean secure;
 

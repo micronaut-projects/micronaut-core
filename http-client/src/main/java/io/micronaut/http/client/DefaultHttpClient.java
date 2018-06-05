@@ -53,7 +53,7 @@ import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
@@ -250,7 +250,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this(loadBalancer,
             new DefaultHttpClientConfiguration(),
             new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-            new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
+            new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
             createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -268,7 +268,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(url), createDefaultMediaTypeRegistry(),
+                createSslBuilder(), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -280,7 +280,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
             configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-            new NettyClientSslBuilder(new SslConfiguration(), new ResourceResolver()),
+            new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
             createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -761,7 +761,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected ChannelFuture doConnect(String host, int port, @Nullable SslContext sslCtx) {
         Bootstrap localBootstrap = this.bootstrap.clone();
-        localBootstrap.handler(new HttpClientInitializer(sslCtx, false));
+        localBootstrap.handler(new HttpClientInitializer(sslCtx, host,port, false));
         return doConnect(localBootstrap, host, port);
     }
 
@@ -820,6 +820,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
             sslCtx = sslContext;
+            if (sslCtx == null) {
+                throw new HttpClientException("Cannot send HTTPS request. SSL is disabled");
+            }
         } else {
             sslCtx = null;
         }
@@ -1278,13 +1281,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         );
     }
 
-    private static NettyClientSslBuilder createSslBuilder(URL url) {
-        boolean isHTTPS = "https".equalsIgnoreCase(url.getProtocol());
-        SslConfiguration sslConfiguration = new SslConfiguration();
-        if (isHTTPS) {
-            sslConfiguration.setEnabled(true);
-        }
-        return new NettyClientSslBuilder(sslConfiguration, new ResourceResolver());
+    private static NettyClientSslBuilder createSslBuilder() {
+        return new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver());
     }
 
 
@@ -1328,16 +1326,22 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
      */
     protected class HttpClientInitializer extends ChannelInitializer<Channel> {
 
-        SslContext sslContext;
-        boolean stream;
+        final SslContext sslContext;
+        final boolean stream;
+        final String host;
+        final int port;
 
         /**
          * @param sslContext The ssl context
+         * @param host The host
+         * @param port The port
          * @param stream     Whether is stream
          */
-        protected HttpClientInitializer(SslContext sslContext, boolean stream) {
+        protected HttpClientInitializer(SslContext sslContext,String host, int port, boolean stream) {
             this.sslContext = sslContext;
             this.stream = stream;
+            this.host = host;
+            this.port = port;
         }
 
         /**
@@ -1346,8 +1350,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         protected void initChannel(Channel ch) {
             ChannelPipeline p = ch.pipeline();
             if (sslContext != null) {
-                SSLEngine engine = sslContext.newEngine(ch.alloc());
-                p.addFirst("ssl-handler", new SslHandler(engine));
+                SslHandler sslHandler = sslContext.newHandler(
+                        ch.alloc(),
+                        host,
+                        port
+                );
+                p.addFirst("ssl-handler", sslHandler);
             }
 
             Optional<SocketAddress> proxy = configuration.getProxyAddress();

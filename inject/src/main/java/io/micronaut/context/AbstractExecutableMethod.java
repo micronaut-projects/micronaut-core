@@ -16,13 +16,18 @@
 
 package io.micronaut.context;
 
+import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -39,10 +44,12 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractExecutableMethod extends AbstractExecutable implements ExecutableMethod {
+public abstract class AbstractExecutableMethod extends AbstractExecutable implements ExecutableMethod, EnvironmentConfigurable {
 
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
+    private Environment environment;
+    private AnnotationMetadata methodAnnotationMetadata;
 
     /**
      * @param declaringType     The declaring type
@@ -71,6 +78,20 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                                        String methodName,
                                        Argument genericReturnType) {
         this(declaringType, methodName, genericReturnType, Argument.ZERO_ARGUMENTS);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (this.methodAnnotationMetadata == null) {
+            this.methodAnnotationMetadata = initializeAnnotationMetadata();
+        }
+        return this.methodAnnotationMetadata;
+
+    }
+
+    @Override
+    public void configure(Environment environment) {
+        this.environment = environment;
     }
 
     @Override
@@ -134,6 +155,26 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     @SuppressWarnings("WeakerAccess")
     protected abstract Object invokeInternal(Object instance, Object[] arguments);
 
+    /**
+     * Resolves the annotation metadata for this method. Subclasses
+     *
+     * @return The {@link AnnotationMetadata}
+     */
+    protected AnnotationMetadata resolveAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    private AnnotationMetadata initializeAnnotationMetadata() {
+        AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            // we make a copy of the result of annotation metadata which is normally a reference
+            // to the class metadata
+            return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        } else {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+    }
+
     private void validateArguments(Object[] argArray) {
         Argument[] arguments = getArguments();
         int requiredCount = arguments.length;
@@ -196,6 +237,23 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                 return genericReturnType.getTypeVariables();
             }
             return Collections.emptyMap();
+        }
+    }
+
+
+
+    /**
+     * Internal environment aware annotation metadata delegate.
+     */
+    private final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+        MethodAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+            super(targetMetadata);
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return environment;
         }
     }
 }

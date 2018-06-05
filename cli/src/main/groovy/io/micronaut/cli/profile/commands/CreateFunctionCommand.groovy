@@ -21,6 +21,7 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.ExecutionContext
+import io.micronaut.cli.util.VersionInfo
 
 import java.nio.file.Paths
 
@@ -104,18 +105,19 @@ class CreateFunctionCommand extends CreateAppCommand {
         checkInvalidSelections(executionContext, langFeature, testFeature)
 
         final List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        List<String> features = [langFeature, testFeature]
+        Set<String> features = new HashSet<>()
+        features.addAll(langFeature, testFeature)
         if (commandLineFeatures) features.addAll(commandLineFeatures)
 
         final String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
-        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG) || MicronautCli.isInteractiveModeActive()
+        final boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         final String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
         final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: appName,
                 baseDir: executionContext.baseDir,
                 profileName: functionProfile,
-                micronautVersion: MicronautCli.getPackage().getImplementationVersion(),
+                micronautVersion: VersionInfo.getVersion(MicronautCli),
                 features: features,
                 inplace: inPlace,
                 build: build,

@@ -1,0 +1,4 @@
+This section will document breaking changes that may happen during milestone or release candidate releases, as well as major releases eg (1.x.x -> 2.x.x).
+
+==== 1.0.0.M2
+

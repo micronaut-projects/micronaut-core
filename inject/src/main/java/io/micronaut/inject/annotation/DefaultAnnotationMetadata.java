@@ -16,11 +16,7 @@
 
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -38,24 +34,24 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
+ *
  * <p>
  * NOTE: Although required to be public This is an internal class and should not be referenced directly in user code
+ * </p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement, Cloneable {
+public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, AnnotatedElement, Cloneable {
 
     static {
         ConversionService.SHARED.addConverter(AnnotationValue.class, Annotation.class, (TypeConverter<AnnotationValue, Annotation>) (object, targetType, context) -> {
@@ -86,24 +82,16 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     Map<String, Map<CharSequence, Object>> declaredAnnotations;
+    Map<String, Map<CharSequence, Object>> allAnnotations;
     Map<String, Map<CharSequence, Object>> declaredStereotypes;
     Map<String, Map<CharSequence, Object>> allStereotypes;
-    Map<String, Map<CharSequence, Object>> allAnnotations;
-    Map<String, Set<String>> annotationsByStereotype;
-
-    private Annotation[] allAnnotationArray;
-    private Annotation[] declaredAnnotationArray;
-    private final Map<String, Annotation> annotationMap;
-    private final Map<String, Annotation> declaredAnnotationMap;
-    private Environment environment;
+    Map<String, List<String>> annotationsByStereotype;
 
     /**
      * Constructs empty annotation metadata.
      */
     @Internal
     protected DefaultAnnotationMetadata() {
-        annotationMap = new ConcurrentHashMap<>(2);
-        declaredAnnotationMap = new ConcurrentHashMap<>(2);
     }
 
     /**
@@ -121,27 +109,13 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
         @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
         @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-        @Nullable Map<String, Set<String>> annotationsByStereotype) {
+        @Nullable Map<String, List<String>> annotationsByStereotype) {
+        super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
-        this.declaredAnnotationMap = declaredAnnotations != null ? new ConcurrentHashMap<>(declaredAnnotations.size()) : null;
-        this.annotationMap = allAnnotations != null ? new ConcurrentHashMap<>(allAnnotations.size()) : null;
         this.annotationsByStereotype = annotationsByStereotype;
-    }
-
-    /**
-     * Configures annotation metadata for the environment. This is an internal method and should not be called directly.
-     *
-     * @param context The context
-     */
-    @Internal
-    public void configure(BeanContext context) {
-        if (context instanceof ApplicationContext) {
-            ApplicationContext applicationContext = (ApplicationContext) context;
-            this.environment = applicationContext.getEnvironment();
-        }
     }
 
     @Override
@@ -188,41 +162,57 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     @Override
-    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
+    public List<String> getAnnotationNamesByStereotype(String stereotype) {
         if (annotationsByStereotype != null) {
-            Set<String> annotations = annotationsByStereotype.get(stereotype);
+            List<String> annotations = annotationsByStereotype.get(stereotype);
             if (annotations != null) {
-                return Collections.unmodifiableSet(annotations);
+                return Collections.unmodifiableList(annotations);
             }
         }
         if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
-            return CollectionUtils.setOf(stereotype);
+            return StringUtils.internListOf(stereotype);
         }
         if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
-            return CollectionUtils.setOf(stereotype);
+            return StringUtils.internListOf(stereotype);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Set<String> getAnnotationNames() {
+        if (allAnnotations != null) {
+            return allAnnotations.keySet();
         }
         return Collections.emptySet();
     }
 
     @Override
-    public Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+    public Set<String> getDeclaredAnnotationNames() {
+        if (declaredAnnotations != null) {
+            return declaredAnnotations.keySet();
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
         if (annotationsByStereotype != null) {
-            Set<String> annotations = annotationsByStereotype.get(stereotype);
+            List<String> annotations = annotationsByStereotype.get(stereotype);
             if (annotations != null) {
-                annotations = new HashSet<>(annotations);
+                annotations = new ArrayList<>(annotations);
                 if (declaredAnnotations != null) {
                     annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
-                    return Collections.unmodifiableSet(annotations);
+                    return Collections.unmodifiableList(annotations);
                 } else {
                     // no declared
-                    return Collections.emptySet();
+                    return Collections.emptyList();
                 }
             }
         }
         if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
-            return CollectionUtils.setOf(stereotype);
+            return StringUtils.internListOf(stereotype);
         }
-        return Collections.emptySet();
+        return Collections.emptyList();
     }
 
     @SuppressWarnings("Duplicates")
@@ -258,103 +248,25 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
-                if (environment != null) {
-                    return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
-                } else {
-                    return OptionalValues.of(valueType, values);
-                }
+                return OptionalValues.of(valueType, values);
             } else {
                 values = allStereotypes.get(annotation);
                 if (values != null) {
-                    if (environment != null) {
-                        return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
-                    } else {
-                        return OptionalValues.of(valueType, values);
-                    }
+                    return OptionalValues.of(valueType, values);
                 }
             }
         }
         return OptionalValues.empty();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        if (annotationClass == null || annotationMap == null) {
-            return null;
-        }
-        String annotationName = annotationClass.getName().intern();
-        if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
-            return (T) annotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
-
-            });
-        }
-        return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
-        if (annotationClass == null || declaredAnnotationMap == null) {
-            return null;
-        }
-        String annotationName = annotationClass.getName().intern();
-        if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
-            return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
-
-            });
-        }
-        return null;
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        if (annotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        }
-        Annotation[] annotations = this.allAnnotationArray;
-        if (annotations == null) {
-            synchronized (this) { // double check
-                annotations = this.allAnnotationArray;
-                if (annotations == null) {
-                    annotations = initializeAnnotations(allAnnotations.keySet());
-                    this.allAnnotationArray = annotations;
-                }
-            }
-        }
-        return annotations;
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        if (declaredAnnotationMap == null) {
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        }
-        Annotation[] annotations = this.declaredAnnotationArray;
-        if (annotations == null) {
-            synchronized (this) { // double check
-                annotations = this.declaredAnnotationArray;
-                if (annotations == null) {
-                    annotations = initializeAnnotations(declaredAnnotations.keySet());
-                    this.declaredAnnotationArray = annotations;
-                }
-            }
-        }
-        return annotations;
-    }
-
-    @Override
-    protected AnnotationMetadata clone() throws CloneNotSupportedException {
+    public AnnotationMetadata clone() {
         return new DefaultAnnotationMetadata(
-            declaredAnnotations != null ? new LinkedHashMap<>(declaredAnnotations) : null,
-            declaredStereotypes != null ? new LinkedHashMap<>(declaredStereotypes) : null,
-            allStereotypes != null ? new LinkedHashMap<>(allStereotypes) : null,
-            allAnnotations != null ? new LinkedHashMap<>(allAnnotations) : null,
-            annotationsByStereotype != null ? new LinkedHashMap<>(annotationsByStereotype) : null
+            declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
+            declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
+            allStereotypes != null ? new HashMap<>(allStereotypes) : null,
+            allAnnotations != null ? new HashMap<>(allAnnotations) : null,
+            annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null
         );
     }
 
@@ -382,10 +294,15 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param values            The values
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+    protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            getAnnotationsByStereotypeInternal(stereotype).addAll(parentAnnotations);
+            List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+            for (String parentAnnotation : parentAnnotations) {
+                if (!annotationList.contains(parentAnnotation)) {
+                    annotationList.add(parentAnnotation);
+                }
+            }
             addAnnotation(stereotype, values, null, allStereotypes, false);
         }
     }
@@ -399,11 +316,16 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param values            The values
      */
     @SuppressWarnings("WeakerAccess")
-    protected final void addDeclaredStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+    protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
             Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            getAnnotationsByStereotypeInternal(stereotype).addAll(parentAnnotations);
+            List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+            for (String parentAnnotation : parentAnnotations) {
+                if (!annotationList.contains(parentAnnotation)) {
+                    annotationList.add(parentAnnotation);
+                }
+            }
             addAnnotation(stereotype, values, declaredStereotypes, allStereotypes, true);
         }
     }
@@ -472,11 +394,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     }
 
     private ConvertibleValues<Object> convertibleValuesOf(Map<CharSequence, Object> values) {
-        if (environment != null) {
-            return EnvironmentConvertibleValuesMap.of(environment, values);
-        } else {
-            return ConvertibleValues.of(values);
-        }
+        return ConvertibleValues.of(values);
     }
 
     @SuppressWarnings("MagicNumber")
@@ -519,36 +437,18 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         return annotations;
     }
 
-    private Set<String> getAnnotationsByStereotypeInternal(String stereotype) {
-        return getAnnotationsByStereotypeInternal().computeIfAbsent(stereotype, s -> new HashSet<>());
+    private List<String> getAnnotationsByStereotypeInternal(String stereotype) {
+        return getAnnotationsByStereotypeInternal().computeIfAbsent(stereotype, s -> new ArrayList<>());
     }
 
     @SuppressWarnings("MagicNumber")
-    private Map<String, Set<String>> getAnnotationsByStereotypeInternal() {
-        Map<String, Set<String>> annotations = this.annotationsByStereotype;
+    private Map<String, List<String>> getAnnotationsByStereotypeInternal() {
+        Map<String, List<String>> annotations = this.annotationsByStereotype;
         if (annotations == null) {
             annotations = new HashMap<>(3);
             this.annotationsByStereotype = annotations;
         }
         return annotations;
-    }
-
-    private Annotation[] initializeAnnotations(Set<String> names) {
-        if (CollectionUtils.isNotEmpty(names)) {
-            List<Annotation> annotations = new ArrayList<>();
-            for (String name : names) {
-                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
-                loaded.ifPresent(aClass -> {
-                    Annotation ann = getAnnotation(aClass);
-                    if (ann != null) {
-                        annotations.add(ann);
-                    }
-                });
-            }
-            return annotations.toArray(new Annotation[annotations.size()]);
-        }
-
-        return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     /**
@@ -569,45 +469,53 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         String annotationName,
         String member,
         Object value) {
+
+        return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
+    }
+
+    /**
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
+     * mutating the existing.</p>
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param annotationMetadata The metadata
+     * @param annotationName     The annotation name
+     * @param members            The key/value set of members and values
+     * @return The metadata
+     */
+    @Internal
+    public static AnnotationMetadata mutateMember(
+            AnnotationMetadata annotationMetadata,
+            String annotationName,
+            Map<CharSequence, Object> members) {
         if (StringUtils.isEmpty(annotationName)) {
             throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
         }
-        if (StringUtils.isEmpty(member)) {
-            throw new IllegalArgumentException("Argument [member] cannot be blank");
-        }
-        if (value == null) {
-            throw new IllegalArgumentException("Argument [value] cannot be null");
+        if (!members.isEmpty()) {
+            for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
+                if (StringUtils.isEmpty(entry.getKey())) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a blank key");
+                }
+                if (entry.getValue() == null) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a null value. Key [" + entry.getKey() + "]");
+                }
+            }
         }
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             return new DefaultAnnotationMetadata() {{
-                addDeclaredAnnotation(annotationName, Collections.singletonMap(
-                    member, value
-                ));
+                addDeclaredAnnotation(annotationName, members);
             }};
         } else {
             DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
 
-            try {
-                defaultMetadata = (DefaultAnnotationMetadata) defaultMetadata.clone();
+            defaultMetadata = (DefaultAnnotationMetadata) defaultMetadata.clone();
 
-            } catch (CloneNotSupportedException e) {
-                throw new IllegalStateException("Couldn't clone annotation metadata");
-            }
             defaultMetadata
-                .addDeclaredAnnotation(annotationName, Collections.singletonMap(
-                    member, value
-                ));
+                    .addDeclaredAnnotation(annotationName, members);
 
             return defaultMetadata;
         }
     }
 
-    /**
-     * Flushes the annotation cache.
-     */
-    @Internal
-    public void flushCache() {
-        annotationMap.clear();
-        declaredAnnotationMap.clear();
-    }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.function.groovy
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.function.FunctionBean
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -24,6 +25,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.MultipleCompilationErrorsException
 import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
@@ -55,8 +57,71 @@ int round(float value) {
 ''')
 
         expect:
+        functionClass.getAnnotation(FunctionBean).method() == 'round'
         functionClass.main(['-d','1.6f'] as String[])
         TestFunctionExitHandler.lastError == null
+    }
+
+    void 'test parse supplier'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['micronaut.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+
+        Class functionClass = gcl.parseClass('''
+int val() {
+    return 10 
+}
+''')
+
+        expect:
+        functionClass.getAnnotation(FunctionBean).method() == 'val'
+        functionClass.main([] as String[])
+        TestFunctionExitHandler.lastError == null
+    }
+
+    void 'test parse two functions'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['micronaut.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+
+        when:
+        Class functionClass = gcl.parseClass('''
+int round(float value) {
+    Math.round(value) 
+}
+int round2(float value) {
+    Math.round(value) 
+}
+''')
+
+        then:
+        def e = thrown(MultipleCompilationErrorsException)
+        e.message.contains("must have exactly one public method that represents the function")
+    }
+
+    void 'test parse function and field'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['micronaut.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+
+        when:
+        Class functionClass = gcl.parseClass('''
+import groovy.transform.EqualsAndHashCode
+import groovy.transform.Field
+import io.micronaut.core.convert.*
+
+@Field ConversionService conversionService
+
+int round(float value) {
+    Math.round(value) 
+}
+''')
+
+        then:
+        functionClass
     }
 
     //TODO: Fix me and remove @Ignore
