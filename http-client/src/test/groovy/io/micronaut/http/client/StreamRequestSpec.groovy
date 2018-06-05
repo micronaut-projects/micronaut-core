@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -215,6 +216,7 @@ class StreamRequestSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @ToString(includePackage = false)
     static class Book {
         String title
     }
