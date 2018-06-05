@@ -47,6 +47,22 @@ import javax.inject.Singleton
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test find closest stereotype"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+@ScopeTwo
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getAnnotationNameByStereotype(Scope).get() == ScopeTwo.name
+    }
+
     void "test annotation names by stereotype"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
@@ -409,7 +425,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name]
     }
 
 

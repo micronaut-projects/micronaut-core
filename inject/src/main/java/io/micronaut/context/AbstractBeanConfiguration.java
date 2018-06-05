@@ -30,7 +30,7 @@ import io.micronaut.inject.BeanDefinitionReference;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanConfiguration extends AbstractBeanContextConditional implements BeanConfiguration {
+public abstract class AbstractBeanConfiguration extends AbstractBeanContextConditional implements BeanConfiguration {
 
     private final String packageName;
 

@@ -17,15 +17,8 @@
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringTokenizer;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -34,12 +27,25 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class StringUtils {
+public final class StringUtils {
 
+    /**
+     * Constant for the value true.
+     */
     public static final String TRUE = "true";
+    /**
+     * Constant for the value false.
+     */
     public static final String FALSE = "false";
+
+    /**
+     * Constant for an empty String array.
+     */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
+
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
+
+    private static final Map<Integer, List<String>> INTERN_SET_POOL = new ConcurrentHashMap<>();
 
     /**
      * Return whether the given string is empty.
@@ -82,21 +88,24 @@ public class StringUtils {
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
+     * Converts the given objects into a set of interned strings contained within an internal pool of sets. See {@link String#intern()}.
      *
      * @param objects The objects
-     * @return An set of strings
+     * @return A unmodifiable, pooled set of strings
      */
     @SuppressWarnings("unused")
-    public static Set<String> internSetOf(Object... objects) {
+    public static List<String> internListOf(Object... objects) {
         if (objects == null || objects.length == 0) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
-        Set<String> strings = new HashSet<>(objects.length);
-        for (Object object : objects) {
-            strings.add(object.toString().intern());
-        }
-        return strings;
+        Integer hash = Arrays.hashCode(objects);
+        return INTERN_SET_POOL.computeIfAbsent(hash, integer -> {
+            List<String> strings = new ArrayList<>(objects.length);
+            for (Object object : objects) {
+                strings.add(object.toString().intern());
+            }
+            return Collections.unmodifiableList(strings);
+        });
     }
 
     /**
