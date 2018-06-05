@@ -71,7 +71,11 @@ class CreateFederationCommand extends CreateAppCommand {
         }
 
         final String federationName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
-        final List<String> features = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
+        final String[] featuresArray = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')
+        final Set<String> features = new HashSet<>()
+        if (featuresArray) {
+            features.addAll(featuresArray)
+        }
         services = commandLine.optionValue(SERVICES_FLAG)?.toString()?.split(',')?.toList()
         if (!services) {
             StringBuilder warning = new StringBuilder("Missing required flag: --services= <service1 service2 service3 ..>")

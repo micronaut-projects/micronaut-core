@@ -78,7 +78,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     String defaultpackagename
     File targetDirectory
 
-    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME]-lang [LANG]")
+    CommandDescription description = new CommandDescription(name, "Creates an application", "create-app [NAME] -lang [LANG]")
 
     CreateAppCommand() {
         populateDescription()
@@ -417,9 +417,12 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
         String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
 
-        List<String> features = [resolveLang(commandLine)]
-        List<String> commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')?.toList()
-        if (commandLineFeatures) features.addAll(commandLineFeatures)
+        Set<String> features = new HashSet<>()
+        features.add(resolveLang(commandLine))
+        String[] commandLineFeatures = commandLine.optionValue(FEATURES_FLAG)?.toString()?.split(',')
+        if (commandLineFeatures != null) {
+            features.addAll(commandLineFeatures)
+        }
 
         String build = commandLine.hasOption(BUILD_FLAG) ? commandLine.optionValue(BUILD_FLAG) : "gradle"
 
@@ -564,7 +567,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
     }
 
     @CompileStatic(TypeCheckingMode.SKIP)
-    protected Iterable<Feature> evaluateFeatures(Profile profile, List<String> requestedFeatures) {
+    protected Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures) {
         Set<Feature> features = []
         List<String> validRequestedFeatureNames
 
@@ -593,25 +596,21 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         features.addAll(profile.requiredFeatures)
 
-        if (profile.oneOfFeatures.size() > 0) {
-            Set<Feature> oneOfFeatures = features.findAll { profile.oneOfFeatures*.feature.contains(it) }
-
-            if (!oneOfFeatures) {
-                features.add(profile.oneOfFeatures.min { it.priority}.feature )
+        if (!profile.oneOfFeatures.empty) {
+            List<Feature> toRemove = []
+            boolean remove = false
+            for (OneOfFeature oneOf: profile.oneOfFeatures) {
+                boolean isOneOf = features.contains(oneOf.feature)
+                if (isOneOf) {
+                    if (remove) {
+                        toRemove.add(oneOf.feature)
+                    } else {
+                        remove = true
+                    }
+                }
             }
-        }
 
-        if (profile.oneOfFeatures.size() > 0) {
-            Iterable<OneOfFeature> includedOneOfFeatures = features.
-                    findAll { Feature f -> profile.oneOfFeatures*.feature.contains(f) }
-                    .collect { Feature f ->
-                profile.oneOfFeatures.find { OneOfFeature oof -> oof.feature.name == f.name }
-            }
-
-            if (includedOneOfFeatures.size() > 1) {
-                OneOfFeature highestPriority = includedOneOfFeatures.min { it.priority }
-                features.removeAll(includedOneOfFeatures.findAll { OneOfFeature oof -> oof.priority > highestPriority.priority }*.feature)
-            }
+            features.removeAll(toRemove)
         }
 
         for (int i = 0; i < features.size(); i++) {
@@ -619,16 +618,13 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
 
         if (validRequestedFeatureNames) {
-            features = features.collect { feature ->
+            features = features.each { feature ->
                 if (validRequestedFeatureNames.contains(feature.name)) {
                     feature.setRequested(true)
                 }
-
-                feature
             }.toSet()
         }
 
-        println "final features: ${features*.name.join(',')}"
         features
     }
 
@@ -820,7 +816,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         File baseDir
         String profileName
         String micronautVersion
-        List<String> features
+        Set<String> features
         boolean inplace = false
         String build = "gradle"
         MicronautConsole console
