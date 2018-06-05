@@ -23,11 +23,13 @@ public class MeterRegistryCreationListener implements BeanCreatedEventListener<M
     public MeterRegistry onCreated(BeanCreatedEvent<MeterRegistry> event) {
         MeterRegistry meterRegistry = event.getBean();
         BeanContext ctx = event.getSource();
-        if (meterRegistry.getClass() != CompositeMeterRegistry.class) {
-            MeterRegistryConfigurer meterRegistryConfigurer = ctx.getBean(MeterRegistryConfigurer.class);
-            if (meterRegistryConfigurer != null) {
-                meterRegistryConfigurer.configure(meterRegistry);
-            }
+        if (!(meterRegistry instanceof CompositeMeterRegistry)) {
+            ctx.streamOfType(MeterRegistryConfigurer.class).forEach(meterRegistryConfigurer -> {
+                if (meterRegistryConfigurer.supports(meterRegistry)) {
+                    meterRegistryConfigurer.configure(meterRegistry);
+                }
+            });
+
             ctx.findBean(CompositeMeterRegistry.class)
                     .ifPresent(compositeMeterRegistry -> compositeMeterRegistry.add(meterRegistry));
         }
