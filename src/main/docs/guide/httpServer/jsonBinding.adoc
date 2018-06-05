@@ -1,0 +1,112 @@
+:jackson-annotations: http://fasterxml.github.io/jackson-annotations/javadoc/2.9/
+:jackson-databind: http://fasterxml.github.io/jackson-databind/javadoc/2.9/
+:jackson-core: http://fasterxml.github.io/jackson-core/javadoc/2.9/
+
+The most common data interchange format nowadays is JSON.
+
+In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
+
+In order to do so in a non-blocking manner Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+
+== Binding using Reactive Frameworks
+
+From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
+
+.Using RxJava 2 to Read the JSON
+[source,java]
+----
+include::{testsuite}/server/json/PersonController.java[tags=class, indent=0]
+
+include::{testsuite}/server/json/PersonController.java[tags=single, indent=4]
+}
+----
+
+<1> The method receives a RxJava rx:Single[] which emits the POJO once the JSON has been read
+<2> The `map` method is used to store the instance in `Map`
+<3> An api:http.HttpResponse[] is returned
+
+Using CURL from the command line you can POST JSON to the `/people` URI for the server to receive it:
+
+.Using CURL to Post JSON
+----
+$ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintstone","age":45}'
+----
+
+== Binding Using CompletableFuture
+
+The same method as the previous example can also be written with the jdk:java.util.concurrent.CompletableFuture[] API instead:
+
+.Using CompletableFuture to Read the JSON
+[source,java]
+----
+include::{testsuite}/server/json/PersonController.java[tags=future, indent=0]
+----
+
+The above example uses the `thenApply` method to achieve the same as the previous example.
+
+
+== Binding using POJOs
+
+Note however, that if your method does not do any blocking I/O then you can just as easily write:
+
+.Binding JSON POJOs
+[source,java]
+----
+include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
+----
+
+Micronaut will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.
+
+In other words, as a rule reactive types should be used when you plan to do further downstream I/O operations in which case they can greatly simplify composing operations.
+
+
+TIP: The output produced by Jackson can be customized in a variety of manners, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson's annotations]
+
+== Jackson Configuration
+
+The Jackson ObjectMapper can be configured through normal configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+
+All jackson configuration keys start with `jackson`.
+
+|=======
+| dateFormat | String | The date format
+| locale     | String | Uses link:{javase}java/util/Locale.html#forLanguageTag-java.lang.String-[Locale.forLanguageTag]. Example: `en-US`
+| timeZone   | String |Uses link:{javase}java/util/TimeZone.html#getTimeZone-java.lang.String-[TimeZone.getTimeZone]. Example: 'PST`
+| serializationInclusion | String | One of link:{jackson-annotations}com/fasterxml/jackson/annotation/JsonInclude.Include.html[JsonInclude.Include]
+|=======
+
+=== Features
+
+All features can be configured with their name as the key and a boolean to indicate enabled or disabled.
+
+|======
+|serialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/SerializationFeature.html[SerializationFeature]
+|deserialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/DeserializationFeature.html[DeserializationFeature]
+|mapper | Map | link:{jackson-databind}com/fasterxml/jackson/databind/MapperFeature.html[MapperFeature]
+|parser | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonParser.Feature.html[JsonParser.Feature]
+|generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
+|======
+
+
+Example:
+
+[source,yaml]
+----
+jackson:
+    serialization:
+        indentOutput: true
+        writeDatesAsTimestamps: false
+    deserialization:
+        useBigIntegerForInts: true
+        failOnUnknownProperties: false
+----
+
+=== Beans
+
+In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes will be registered with the object mapper.
+
+* link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
+* link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
+* link:{jackson-databind}com/fasterxml/jackson/databind/JsonSerializer.html[JsonSerializer]
+* link:{jackson-databind}com/fasterxml/jackson/databind/deser/BeanDeserializerModifier.html[BeanDeserializerModifier]
+* link:{jackson-databind}com/fasterxml/jackson/databind/ser/BeanSerializerModifier.html[BeanSerializerModifier]
