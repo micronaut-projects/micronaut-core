@@ -132,7 +132,7 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run([
                 (STATSD_ENABLED)           : true,
                 (STATSD_CONFIG + ".flavor"): StatsdFlavor.DATADOG,
-                (STATSD_CONFIG + ".host")  : "zerocool",
+                (STATSD_CONFIG + ".host")  : "127.0.0.1",
                 (STATSD_CONFIG + ".port")  : 8122,
                 (STATSD_CONFIG + ".step")  : "PT2M",
         ])
@@ -143,7 +143,7 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         statsdMeterRegistry.get().statsdConfig.enabled()
         statsdMeterRegistry.get().statsdConfig.flavor() == StatsdFlavor.DATADOG
         statsdMeterRegistry.get().statsdConfig.port() == 8122
-        statsdMeterRegistry.get().statsdConfig.host() == "zerocool"
+        statsdMeterRegistry.get().statsdConfig.host() == "127.0.0.1"
         statsdMeterRegistry.get().statsdConfig.step() == Duration.ofMinutes(2)
 
         cleanup:
