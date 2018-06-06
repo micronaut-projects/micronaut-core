@@ -1,6 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
-    compile project(":management")
+    compileOnly project(":management")
 
     compile "io.micrometer:micrometer-core:$micrometerVersion"
 
