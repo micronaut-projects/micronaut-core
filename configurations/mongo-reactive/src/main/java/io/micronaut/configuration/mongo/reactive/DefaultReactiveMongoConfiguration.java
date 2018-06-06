@@ -16,7 +16,8 @@
 
 package io.micronaut.configuration.mongo.reactive;
 
-import com.mongodb.async.client.MongoClientSettings;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.ServerAddress;
 import com.mongodb.connection.ClusterSettings;
 import com.mongodb.connection.ConnectionPoolSettings;
 import com.mongodb.connection.ServerSettings;
@@ -27,6 +28,10 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * The default MongoDB configuration class.
  *
@@ -36,7 +41,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 @Requires(property = MongoSettings.PREFIX)
 @Requires(missingProperty = MongoSettings.MONGODB_SERVERS)
 @ConfigurationProperties(MongoSettings.PREFIX)
-public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfiguration {
+public class DefaultReactiveMongoConfiguration extends AbstractReactiveMongoConfiguration {
 
     @ConfigurationBuilder(prefixes = "")
     protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();
@@ -60,15 +65,30 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
      * Constructor.
      * @param applicationConfiguration applicationConfiguration
      */
-    public ReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public DefaultReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }
 
-    @Override
-    public void setUri(String uri) {
-        super.setUri(uri);
+
+    /**
+     * Sets the server MongoDB server address.
+     *
+     * @param serverAddress The server address
+     */
+    public void setHost(ServerAddress serverAddress) {
+        getClusterSettings().hosts(Collections.singletonList(serverAddress));
     }
 
+    /**
+     * Sets the server MongoDB server address.
+     *
+     * @param serverAddresses The server addresses
+     */
+    public void setHosts(List<ServerAddress> serverAddresses) {
+        if (serverAddresses != null) {
+            getClusterSettings().hosts(serverAddresses);
+        }
+    }
     /**
      * @return The {@link ClusterSettings#builder()}
      */
@@ -119,7 +139,7 @@ public class ReactiveMongoConfiguration extends AbstractReactiveMongoConfigurati
 
     @Override
     public String toString() {
-        return "ReactiveMongoConfiguration{" +
+        return "DefaultReactiveMongoConfiguration{" +
             "uri='" + getUri() + '\'' +
             ", clientSettings=" + clientSettings +
             ", clusterSettings=" + clusterSettings +

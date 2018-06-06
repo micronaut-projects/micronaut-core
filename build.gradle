@@ -69,12 +69,6 @@ ext {
                 group:'com.google.code.findbugs',
                 name:'jsr305'
             ],
-            mongodb:[
-                version: mongoVersion,
-                group:'org.mongodb',
-                name:'mongo-java-driver',
-                modules:['mongodb-driver-async']
-            ],
             neo4j: [
                 version: neo4jVersion,
                 group:'org.neo4j.test',

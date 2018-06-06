@@ -17,22 +17,15 @@
 package io.micronaut.configuration.mongo.reactive.test;
 
 import com.mongodb.ConnectionString;
-import com.mongodb.ServerAddress;
-import de.flapdoodle.embed.mongo.MongodExecutable;
+import com.mongodb.connection.ClusterSettings;
 import de.flapdoodle.embed.mongo.MongodProcess;
-import de.flapdoodle.embed.mongo.MongodStarter;
-import de.flapdoodle.embed.mongo.config.IMongodConfig;
-import de.flapdoodle.embed.mongo.config.MongodConfigBuilder;
-import de.flapdoodle.embed.mongo.config.Net;
-import de.flapdoodle.embed.mongo.distribution.Version;
-import de.flapdoodle.embed.process.runtime.Network;
-import io.micronaut.configuration.mongo.reactive.ReactiveMongoConfiguration;
+import io.micronaut.configuration.mongo.reactive.DefaultReactiveMongoConfiguration;
+import io.micronaut.configuration.mongo.reactive.MongoSettings;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.io.socket.SocketUtils;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -47,33 +40,19 @@ import java.util.Optional;
  * @since 1.0
  */
 @Requires(classes = MongodProcess.class)
-@Requires(beans = ReactiveMongoConfiguration.class)
+@Requires(beans = DefaultReactiveMongoConfiguration.class)
 @Requires(env = Environment.TEST)
+@Requires(property = MongoSettings.EMBEDDED, notEquals = "false", defaultValue = "true")
 @Singleton
-public class ReactiveMongoProcessFactory implements BeanCreatedEventListener<ReactiveMongoConfiguration>, Closeable {
-
-    private MongodProcess process;
+public class ReactiveMongoProcessFactory extends AbstractMongoProcessFactory implements BeanCreatedEventListener<DefaultReactiveMongoConfiguration>, Closeable {
 
     @Override
-    public ReactiveMongoConfiguration onCreated(BeanCreatedEvent<ReactiveMongoConfiguration> event) {
-        ReactiveMongoConfiguration configuration = event.getBean();
+    public DefaultReactiveMongoConfiguration onCreated(BeanCreatedEvent<DefaultReactiveMongoConfiguration> event) {
+        DefaultReactiveMongoConfiguration configuration = event.getBean();
         try {
             Optional<ConnectionString> connectionString = configuration.getConnectionString();
-            if (connectionString.isPresent()) {
-                String first = connectionString.get().getHosts().get(0);
-                if (SocketUtils.isTcpPortAvailable(new ServerAddress(first).getPort())) {
-
-                    // should be ok to do this without checking unless MongoNotAvailableCondition is not working properly
-                    int port = new ServerAddress(first).getPort();
-                    IMongodConfig mongodConfig = new MongodConfigBuilder()
-                        .version(Version.Main.PRODUCTION)
-                        .net(new Net("localhost", port, Network.localhostIsIPv6()))
-                        .build();
-
-                    MongodExecutable mongodExecutable = MongodStarter.getDefaultInstance().prepare(mongodConfig);
-                    this.process = mongodExecutable.start();
-                }
-            }
+            ClusterSettings.Builder clusterSettings = configuration.getClusterSettings();
+            startEmbeddedMongoIfPossible(connectionString.orElse(null), clusterSettings);
         } catch (IOException e) {
             throw new ConfigurationException("Error starting Embedded MongoDB server: " + e.getMessage(), e);
         }
