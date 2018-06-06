@@ -18,7 +18,6 @@ package io.micronaut.discovery.consul
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -96,7 +95,7 @@ not:
                         'consul.client.config.format': 'file',
                         'micronaut.application.name':'test-app',
                         'consul.client.host': 'localhost',
-                        'consul.client.port': serverPort]
+                        'consul.client.port': consulServer.getPort()]
         )
         ConfigurationClient configurationClient = applicationContext.getBean(ConfigurationClient)
 
