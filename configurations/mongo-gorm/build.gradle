@@ -18,6 +18,3 @@ dependencies {
     testCompile project(":http-client")
     testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
 }
-tasks.withType(Test) {
-    maxParallelForks = 1
-}

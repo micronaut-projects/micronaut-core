@@ -14,7 +14,3 @@ dependencies {
     testCompile project(":http-client")
     testCompile "com.github.kstyrc:embedded-redis:0.6"
 }
-
-tasks.withType(Test) {
-    maxParallelForks = 1
-}
