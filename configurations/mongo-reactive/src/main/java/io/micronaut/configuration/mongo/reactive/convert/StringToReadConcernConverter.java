@@ -16,33 +16,38 @@
 
 package io.micronaut.configuration.mongo.reactive.convert;
 
-import com.mongodb.ServerAddress;
+import com.mongodb.ReadConcern;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 
 import javax.inject.Singleton;
+import java.util.Locale;
 import java.util.Optional;
 
+
 /**
+ * Converters strings to {@link ReadConcern} objects.
+ *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
-public class StringToServerAddressConverter implements TypeConverter<CharSequence, ServerAddress> {
+public class StringToReadConcernConverter implements TypeConverter<CharSequence, ReadConcern> {
     @Override
-    public Optional<ServerAddress> convert(CharSequence object, Class<ServerAddress> targetType, ConversionContext context) {
-        String address = object.toString();
-        if (address.contains(":")) {
-            String[] hostAndPort = address.split(":");
-            try {
-                return Optional.of(new ServerAddress(hostAndPort[0], Integer.valueOf(hostAndPort[1])));
-            } catch (NumberFormatException e) {
-                context.reject(address, e);
+    public Optional<ReadConcern> convert(CharSequence object, Class<ReadConcern> targetType, ConversionContext context) {
+        String readConcern = object.toString().toUpperCase(Locale.ENGLISH);
+        switch (readConcern) {
+            case "DEFAULT":
+                return Optional.of(ReadConcern.DEFAULT);
+            case "LINEARIZABLE":
+                return Optional.of(ReadConcern.LINEARIZABLE);
+            case "LOCAL":
+                return Optional.of(ReadConcern.LOCAL);
+            case "MAJORITY":
+                return Optional.of(ReadConcern.MAJORITY);
+            default:
                 return Optional.empty();
-            }
-        }
-        else {
-            return Optional.of(new ServerAddress(address));
         }
     }
 }
+

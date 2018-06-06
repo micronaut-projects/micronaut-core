@@ -20,7 +20,7 @@ import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 import com.mongodb.ConnectionString;
-import com.mongodb.async.client.MongoClientSettings;
+import com.mongodb.MongoClientSettings;
 import com.mongodb.connection.ClusterSettings;
 import com.mongodb.connection.ConnectionPoolSettings;
 import com.mongodb.connection.ServerSettings;
@@ -134,11 +134,11 @@ public abstract class AbstractReactiveMongoConfiguration {
 
         MongoClientSettings.Builder clientSettings = getClientSettings();
         clientSettings.applicationName(getApplicationName());
-        clientSettings.clusterSettings(clusterSettings.build())
-            .serverSettings(serverSettings.build())
-            .connectionPoolSettings(poolSettings.build())
-            .socketSettings(socketSettings.build())
-            .sslSettings(sslSettings.build());
+        clientSettings.applyToClusterSettings(builder -> builder.applySettings(clusterSettings.build()));
+        clientSettings.applyToServerSettings(builder -> builder.applySettings(serverSettings.build()));
+        clientSettings.applyToConnectionPoolSettings(builder -> builder.applySettings(poolSettings.build()));
+        clientSettings.applyToSocketSettings(builder -> builder.applySettings(socketSettings.build()));
+        clientSettings.applyToSslSettings(builder -> builder.applySettings(sslSettings.build()));
 
         clientSettings.codecRegistry(
             fromRegistries(MongoClients.getDefaultCodecRegistry(),

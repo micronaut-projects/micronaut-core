@@ -16,7 +16,11 @@
 
 package io.micronaut.configuration.mongo.reactive
 
-import com.mongodb.async.client.MongoClientSettings
+import com.mongodb.MongoClientSettings
+import com.mongodb.ReadConcern
+import com.mongodb.ReadPreference
+import com.mongodb.WriteConcern
+import com.mongodb.connection.netty.NettyStreamFactory
 import com.mongodb.reactivestreams.client.MongoClient
 import groovy.transform.NotYetImplemented
 import io.reactivex.Flowable
@@ -28,7 +32,8 @@ import spock.lang.Unroll
 
 class MongoReactiveConfigurationSpec extends Specification {
 
-    void "test a basic connection"() {
+
+    void "test connection with connection string"() {
         when:
         ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}")
         MongoClient mongoClient = applicationContext.getBean(MongoClient)
@@ -40,15 +45,56 @@ class MongoReactiveConfigurationSpec extends Specification {
         applicationContext.stop()
     }
 
+    void "test connection with host"() {
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_HOST): "")
+        MongoClient mongoClient = applicationContext.getBean(MongoClient)
+
+        then:
+        !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+
+    @Unroll
+    void "test configure #property client setting"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
+                ("${MongoSettings.PREFIX}.${property}".toString()): value
+        )
+
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
+        MongoClientSettings clientSettings = configuration.buildSettings()
+
+
+        expect:
+        clientSettings."$property" == expected
+
+        and:
+        context.stop()
+
+        where:
+        property         | value          | expected
+        "readConcern"    | "LINEARIZABLE" | ReadConcern.LINEARIZABLE
+        "writeConcern"   | "W1"           | WriteConcern.W1
+        "readPreference" | "SECONDARY"    | ReadPreference.secondary()
+
+    }
+
+
     @Unroll
     void "test configure #property pool setting"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}",
                 ("${MongoSettings.PREFIX}.connectionPool.${property}".toString()): value
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
 
@@ -73,12 +119,13 @@ class MongoReactiveConfigurationSpec extends Specification {
     void "test configure #property cluster setting"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 ("${MongoSettings.PREFIX}.cluster.${property}".toString()): value,
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:27017"
 
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
         expect:
@@ -94,21 +141,19 @@ class MongoReactiveConfigurationSpec extends Specification {
 
     @Unroll
     void "test configure #property cluster setting for hosts"() {
+
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 ("${MongoSettings.PREFIX}.cluster.${property}".toString()): value,
-                ("${MongoSettings.PREFIX}.cluster.hosts".toString()): "localhost:27017"
 
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
         expect:
         clientSettings.clusterSettings."$property" == value
-        clientSettings.clusterSettings.hosts.size() == 1
-        clientSettings.clusterSettings.hosts[0].host == 'localhost'
-        clientSettings.clusterSettings.hosts[0].port == 27017
 
 
         and:
@@ -124,6 +169,7 @@ class MongoReactiveConfigurationSpec extends Specification {
     void "test configure #property pool setting for named server"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 'mongodb.servers.myServer.uri': "mongodb://localhost:27017",
                 ("mongodb.servers.myServer.connectionPool.${property}".toString()): value
         )
