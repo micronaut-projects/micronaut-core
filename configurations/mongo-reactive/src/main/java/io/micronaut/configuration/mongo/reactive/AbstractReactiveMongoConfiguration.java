@@ -73,7 +73,7 @@ public abstract class AbstractReactiveMongoConfiguration {
         Optional<ConnectionString> connectionString = getConnectionString();
         if (connectionString.isPresent()) {
             ConnectionString cs = connectionString.get();
-
+            getClientSettings().applyConnectionString(cs);
             getServerSettings().applyConnectionString(cs);
             getClusterSettings().applyConnectionString(cs);
             getPoolSettings().applyConnectionString(cs);

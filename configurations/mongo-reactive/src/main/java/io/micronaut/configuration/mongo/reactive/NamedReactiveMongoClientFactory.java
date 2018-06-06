@@ -44,9 +44,6 @@ public class NamedReactiveMongoClientFactory {
     @EachBean(NamedReactiveMongoConfiguration.class)
     @Refreshable(MongoSettings.PREFIX)
     MongoClient mongoClient(NamedReactiveMongoConfiguration configuration) {
-        Optional<ConnectionString> connectionString = configuration.getConnectionString();
-        return connectionString.map(MongoClients::create).orElseGet(() ->
-                MongoClients.create(configuration.buildSettings())
-        );
+        return MongoClients.create(configuration.buildSettings());
     }
 }

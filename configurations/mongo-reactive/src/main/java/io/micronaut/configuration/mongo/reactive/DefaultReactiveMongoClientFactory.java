@@ -46,9 +46,6 @@ public class DefaultReactiveMongoClientFactory {
     @Refreshable(MongoSettings.PREFIX)
     @Primary
     MongoClient mongoClient(DefaultReactiveMongoConfiguration mongoConfiguration) {
-        Optional<ConnectionString> connectionString = mongoConfiguration.getConnectionString();
-        return connectionString.map(MongoClients::create).orElseGet(() ->
-                MongoClients.create(mongoConfiguration.buildSettings())
-        );
+        return MongoClients.create(mongoConfiguration.buildSettings());
     }
 }

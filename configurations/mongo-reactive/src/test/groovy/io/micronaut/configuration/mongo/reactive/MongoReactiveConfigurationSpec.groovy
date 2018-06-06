@@ -22,16 +22,17 @@ import com.mongodb.ReadPreference
 import com.mongodb.WriteConcern
 import com.mongodb.connection.netty.NettyStreamFactory
 import com.mongodb.reactivestreams.client.MongoClient
+import com.mongodb.reactivestreams.client.Success
 import groovy.transform.NotYetImplemented
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.reactivex.Single
 import spock.lang.Specification
 import spock.lang.Unroll
 
 class MongoReactiveConfigurationSpec extends Specification {
-
 
     void "test connection with connection string"() {
         when:
@@ -40,6 +41,14 @@ class MongoReactiveConfigurationSpec extends Specification {
 
         then:
         !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
+
+        when:"A POJO is saved"
+        Success success = Single.fromPublisher(mongoClient.getDatabase("test").getCollection("test", Book).insertOne(new Book(
+                title: "The Stand"
+        ))).blockingGet()
+
+        then:
+        success != null
 
         cleanup:
         applicationContext.stop()
@@ -52,6 +61,14 @@ class MongoReactiveConfigurationSpec extends Specification {
 
         then:
         !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
+
+        when:"A POJO is saved"
+        Success success = Single.fromPublisher(mongoClient.getDatabase("test").getCollection("test", Book).insertOne(new Book(
+                title: "The Stand"
+        ))).blockingGet()
+
+        then:
+        success != null
 
         cleanup:
         applicationContext.stop()
@@ -186,4 +203,8 @@ class MongoReactiveConfigurationSpec extends Specification {
         property  | value
         "maxSize" | 10
     }
+
+     static class Book {
+         String title
+     }
 }
