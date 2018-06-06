@@ -37,7 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
-
     protected final Map<String, Annotation> annotationMap;
     protected final Map<String, Annotation> declaredAnnotationMap;
     private Annotation[] allAnnotationArray;

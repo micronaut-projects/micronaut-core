@@ -16,6 +16,9 @@ dependencies {
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
 tasks.withType(Test) {
+    testLogging {
+        showStandardStreams = true
+    }
     maxParallelForks = 1
     forkEvery = 5
 }
