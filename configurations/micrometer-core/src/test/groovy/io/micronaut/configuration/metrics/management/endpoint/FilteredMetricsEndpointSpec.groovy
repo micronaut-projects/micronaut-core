@@ -12,10 +12,8 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import javax.inject.Singleton
 
@@ -43,7 +41,6 @@ class FilteredMetricsEndpointSpec extends Specification {
         context.close()
     }
 
-    @Unroll
     void "test metrics endpoint with filtered metrics"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -62,7 +59,6 @@ class FilteredMetricsEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
         result.names.size() == 1
         !result.names[0].toString().startsWith("jvm")
-
 
         cleanup:
         embeddedServer.close()
