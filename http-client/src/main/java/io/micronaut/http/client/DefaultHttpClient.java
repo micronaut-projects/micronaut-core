@@ -428,8 +428,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 return httpContentFlowable.map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Streaming Response Received Chunk");
-                        traceBody(byteBuf);
+                        LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
+                        traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                     nettyStreamedHttpResponse.setBody(byteBuffer);
@@ -465,8 +465,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
                             if (LOG.isTraceEnabled()) {
-                                LOG.trace("HTTP Client JSON Streaming Response Received Chunk");
-                                traceBody(chunk);
+                                LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", chunk.readableBytes());
+                                traceBody("Chunk", chunk);
                             }
                             try {
                                 return ByteBufUtil.getBytes(chunk);
@@ -1100,7 +1100,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                     LOG.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
                     LOG.trace("Status Code: {}", status);
                     traceHeaders(headers);
-                    traceBody(fullResponse.content());
+                    traceBody("Response", fullResponse.content());
                 }
                 int statusCode = status.code();
                 // it is a redirect
@@ -1246,19 +1246,21 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
             FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
             ByteBuf content = fullHttpRequest.content();
-            traceBody(content);
+            if (LOG.isTraceEnabled()) {
+                traceBody("Request", content);
+            }
         }
     }
 
-    private void traceBody(ByteBuf content) {
-        LOG.trace("Body");
+    private void traceBody(String type, ByteBuf content) {
+        LOG.trace(type + " Body");
         LOG.trace("----");
         LOG.trace(content.toString(defaultCharset));
         LOG.trace("----");
     }
 
     private void traceChunk(ByteBuf content) {
-        LOG.trace("Stream Chunk");
+        LOG.trace("Sending Chunk");
         LOG.trace("----");
         LOG.trace(content.toString(defaultCharset));
         LOG.trace("----");
