@@ -18,3 +18,6 @@ dependencies {
 }
 //compileJava.options.forkOptions.jvmArgs =['-verbose']
 //compileJava.options.fork=true
+tasks.withType(Test) {
+    maxParallelForks = 1
+}
