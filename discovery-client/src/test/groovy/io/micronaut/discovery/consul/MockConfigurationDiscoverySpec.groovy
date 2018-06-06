@@ -61,7 +61,7 @@ class MockConfigurationDiscoverySpec extends Specification {
                         (ConfigurationClient.ENABLED): true,
                         'micronaut.application.name' :'test-app',
                         'consul.client.host'         : 'localhost',
-                        'consul.client.port'         : serverPort]
+                        'consul.client.port'         : consulServer.port]
         )
 
         when:"A configuration value is read"
@@ -94,7 +94,7 @@ class MockConfigurationDiscoverySpec extends Specification {
                 [
                         'consul.client.config.enabled': false,
                         'consul.client.host'          : 'localhost',
-                        'consul.client.port'          : serverPort]
+                        'consul.client.port'          : consulServer.port]
         )
 
         def result = applicationContext.environment.getProperty("some.consul.value2", String)
