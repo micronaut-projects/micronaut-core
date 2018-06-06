@@ -32,13 +32,10 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ConsulMockConfigurationClientFilesSpec extends Specification {
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
 
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'   : serverPort,
             (MockConsulServer.ENABLED): true
     ])
 
@@ -51,7 +48,7 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
                     'micronaut.application.name'  : 'test-app',
                     'consul.client.config.format' : 'file',
                     'consul.client.host'          : 'localhost',
-                    'consul.client.port'          : serverPort]
+                    'consul.client.port'          : consulServer.getPort()]
     )
 
     @AutoCleanup
@@ -59,7 +56,7 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
     ApplicationContext someContext = ApplicationContext.run(
             [
                     'consul.client.host': 'localhost',
-                    'consul.client.port': serverPort]
+                    'consul.client.port': consulServer.getPort()]
     )
 
     @Shared
