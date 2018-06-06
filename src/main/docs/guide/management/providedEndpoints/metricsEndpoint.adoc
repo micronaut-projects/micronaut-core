@@ -4,13 +4,52 @@ To execute the metrics endpoint, send a GET request to /metrics.  This will retu
 
 == Configuration
 
-Currently the metrics endpoint will only be enabled if you include the `micrometer-core` or one of the reporters (which transitively include the core library) such as `micrometer-statsd` or `micrometer-graphite`.  You will also need to have the global metrics flag enabled.
+Currently the metrics endpoint will only be enabled if you include the `micrometer-core` (or one of the typed registries such as `micrometer-registry-statsd` or `micrometer-registry-graphite`) AND the `management` dependencies.  You will also need to have the global metrics flag enabled (true by default).
+
+.Property
 
 [source,yaml]
 ----
 micronaut:
   metrics:
     enabled: true
+----
+
+.Gradle
+
+[source,groovy]
+----
+dependencies {
+    ...
+    compile "io.micronaut.configuration:micrometer-core"
+    // micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example
+    compile "io.micronaut.configuration:micrometer-registry-statsd"
+    // Also required to enable endpoint
+    compile "io.micronaut:management"
+    ...
+}
+----
+
+.Maven
+[source,xml]
+----
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-core</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+<!-- micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example -->
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-registry-statsd</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+<!-- Also required to enable endpoint -->
+<dependency>
+	<groupId>io.micronaut</groupId>
+	<artifactId>management</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
 ----
 
 To configure the metrics endpoint, supply configuration through `endpoints.metrics`.
