@@ -21,7 +21,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 
 class FilteredMetricsEndpointSpec extends Specification {
 
-    void "test the beans are available"() {
+    void "test the filter beans are available"() {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'endpoints.metrics.sensitive' : false,
