@@ -376,7 +376,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      */
     private void removeHandlerIfActive(ChannelHandlerContext ctx, String name) {
         if (ctx.channel().isActive()) {
-            ctx.pipeline().remove(name);
+            ChannelPipeline pipeline = ctx.pipeline();
+            ChannelHandler handler = pipeline.get(name);
+            if (handler != null) {
+                pipeline.remove(name);
+            }
         }
     }
 
