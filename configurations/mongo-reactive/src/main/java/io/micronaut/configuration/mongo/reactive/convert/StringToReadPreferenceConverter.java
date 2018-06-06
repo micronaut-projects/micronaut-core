@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.mongo.reactive.convert;
 
-import com.mongodb.ReadConcern;
 import com.mongodb.ReadPreference;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
