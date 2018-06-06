@@ -40,8 +40,7 @@ public class StringToServerAddressConverter implements TypeConverter<CharSequenc
                 context.reject(address, e);
                 return Optional.empty();
             }
-        }
-        else {
+        } else {
             return Optional.of(new ServerAddress(address));
         }
     }
