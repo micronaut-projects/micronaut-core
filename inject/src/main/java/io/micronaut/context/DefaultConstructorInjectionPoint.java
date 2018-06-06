@@ -68,8 +68,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         this.declaringType = declaringType;
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
-        }
-        else {
+        } else {
             this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
         }
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;

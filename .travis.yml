@@ -1,7 +1,6 @@
 dist: trusty
 addons:
   chrome: stable
-sudo: required
 language: java
 jdk:
 - openjdk8

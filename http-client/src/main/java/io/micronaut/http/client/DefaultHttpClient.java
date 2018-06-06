@@ -1163,8 +1163,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 if (complete.compareAndSet(false, true)) {
 
+                    String message = cause.getMessage();
+                    if (message == null) {
+                        message = cause.getClass().getSimpleName();
+                    }
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client exception ({}) occurred for request : {} {}", cause.getMessage(), request.getMethod(), request.getUri());
+                        LOG.trace("HTTP Client exception ({}) occurred for request : {} {}", message, request.getMethod(), request.getUri());
                     }
 
                     if (cause instanceof TooLongFrameException) {
@@ -1172,7 +1176,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                     } else if (cause instanceof ReadTimeoutException) {
                         emitter.onError(io.micronaut.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
                     } else {
-                        emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + cause.getMessage(), cause));
+                        emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
                     }
                 }
             }

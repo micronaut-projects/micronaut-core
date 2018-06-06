@@ -10,3 +10,6 @@ dependencies {
     testCompile dependencyVersion("neo4j")
     testCompile project(":management")
 }
+tasks.withType(Test) {
+    maxParallelForks = 1
+}

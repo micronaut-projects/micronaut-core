@@ -111,8 +111,7 @@ public class AnnotatedFunctionRouteBuilder
                             String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                             if (argCount == 0) {
                                 route = GET(functionPath, method);
-                            }
-                            else {
+                            } else {
                                 route = POST(functionPath, method);
                             }
                         }
