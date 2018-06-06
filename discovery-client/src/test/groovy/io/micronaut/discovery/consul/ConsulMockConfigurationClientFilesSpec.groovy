@@ -18,7 +18,6 @@ package io.micronaut.discovery.consul
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -32,13 +31,10 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ConsulMockConfigurationClientFilesSpec extends Specification {
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
 
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'   : serverPort,
             (MockConsulServer.ENABLED): true
     ])
 
@@ -51,7 +47,7 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
                     'micronaut.application.name'  : 'test-app',
                     'consul.client.config.format' : 'file',
                     'consul.client.host'          : 'localhost',
-                    'consul.client.port'          : serverPort]
+                    'consul.client.port'          : consulServer.getPort()]
     )
 
     @AutoCleanup
@@ -59,7 +55,7 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
     ApplicationContext someContext = ApplicationContext.run(
             [
                     'consul.client.host': 'localhost',
-                    'consul.client.port': serverPort]
+                    'consul.client.port': consulServer.getPort()]
     )
 
     @Shared
@@ -99,7 +95,7 @@ not:
                         'consul.client.config.format': 'file',
                         'micronaut.application.name':'test-app',
                         'consul.client.host': 'localhost',
-                        'consul.client.port': serverPort]
+                        'consul.client.port': consulServer.getPort()]
         )
         ConfigurationClient configurationClient = applicationContext.getBean(ConfigurationClient)
 
