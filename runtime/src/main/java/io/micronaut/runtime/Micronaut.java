@@ -22,6 +22,7 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.cli.CommandLine;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -69,12 +70,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             embeddedContainerBean.ifPresent((embeddedServer -> {
                 try {
                     embeddedServer.start();
-                    if (LOG.isInfoEnabled()) {
-                        long end = System.currentTimeMillis();
-                        long took = end - start;
-                        LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
+                    if (!SocketUtils.isTcpPortAvailable(embeddedServer.getPort())) {
+                        handleStartupException(applicationContext.getEnvironment(), new ApplicationStartupException("Unable to bind server to port"));
+                    } else {
+
+                        if (LOG.isInfoEnabled()) {
+                            long end = System.currentTimeMillis();
+                            long took = end - start;
+                            LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
+                        }
+                        Runtime.getRuntime().addShutdownHook(new Thread(embeddedServer::stop));
                     }
-                    Runtime.getRuntime().addShutdownHook(new Thread(embeddedServer::stop));
 
                 } catch (Throwable e) {
                     handleStartupException(applicationContext.getEnvironment(), e);
