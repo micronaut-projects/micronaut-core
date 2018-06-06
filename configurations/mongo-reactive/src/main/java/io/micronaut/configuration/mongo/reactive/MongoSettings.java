@@ -31,6 +31,16 @@ public interface MongoSettings {
      * The MongoDB URI setting.
      */
     String MONGODB_URI = PREFIX + ".uri";
+
+    /**
+     * The MongoDB URI setting.
+     */
+    String EMBEDDED = PREFIX + ".embedded.enabled";
+
+    /**
+     * The MongoDB host setting.
+     */
+    String MONGODB_HOST = PREFIX + ".host";
     /**
      * The MongoDB servers settings.
      */
