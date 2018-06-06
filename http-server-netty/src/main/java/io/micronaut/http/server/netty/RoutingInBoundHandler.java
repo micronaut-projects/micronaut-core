@@ -579,16 +579,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 this.s = subscription;
-                // TODO: so wrong. Fix me
-                subscription.request(Long.MAX_VALUE);
+                subscription.request(1);
             }
 
             @Override
             protected void doOnNext(Object message) {
+
                 boolean executed = this.executed.get();
                 if (message instanceof ByteBufHolder) {
                     if (message instanceof HttpData) {
                         HttpData data = (HttpData) message;
+
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
+                        }
+
                         String name = data.getName();
                         Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
 
@@ -697,6 +702,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                         } else {
                             request.addContent(data);
+                            s.request(1);
                         }
 
                     } else {
@@ -725,7 +731,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 if (!executed) {
-                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
+                    if ((routeMatch.isExecutable() && subjects.isEmpty() && childSubjects.isEmpty()) || message instanceof LastHttpContent) {
                         // we have enough data to satisfy the route, continue
                         executeRoute();
                     } else {
