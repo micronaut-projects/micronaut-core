@@ -16,3 +16,6 @@ dependencies {
     testCompile project(":http-client")
     testRuntime dependencyVersion("neo4j")
 }
+tasks.withType(Test) {
+    maxParallelForks = 1
+}
