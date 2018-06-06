@@ -41,13 +41,10 @@ import java.time.Duration
  * @since 1.0
  */
 class ConsulMockAutoRegistrationSpec extends Specification {
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
 
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'                   : serverPort,
             (MockConsulServer.ENABLED):true
     ])
 
@@ -57,7 +54,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             ['micronaut.application.name'              : 'test-auto-reg',
              "micronaut.caches.discoveryClient.enabled": false,
              'consul.client.host'                     : 'localhost',
-             'consul.client.port'                     : serverPort]
+             'consul.client.port'                     : consulServer.getPort()]
     )
 
     @Shared
