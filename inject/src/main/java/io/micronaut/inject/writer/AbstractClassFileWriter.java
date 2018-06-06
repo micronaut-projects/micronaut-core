@@ -718,6 +718,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 methodName,
                 getMethodDescriptor(returnType, argumentTypes));
     }
+
     /**
      * Generates a service discovery for the given class name and file.
      *
