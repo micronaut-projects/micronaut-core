@@ -3,7 +3,7 @@ addons:
   chrome: stable
 language: java
 jdk:
-- openjdk8
+- oraclejdk8
 env:
   global:
   - TERM=dumb
