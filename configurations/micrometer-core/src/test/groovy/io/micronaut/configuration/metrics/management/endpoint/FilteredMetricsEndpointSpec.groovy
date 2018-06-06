@@ -63,21 +63,21 @@ class FilteredMetricsEndpointSpec extends Specification {
         cleanup:
         embeddedServer.close()
     }
-}
 
-@Factory
-class MeterFilterFactory {
-    @Bean
-    @Singleton
-    @Requires(property = "metrics.test.filters.enabled", value = "true", defaultValue = "false")
-    MeterFilter denyNameStartsWithJvmFilter() {
-        return MeterFilter.denyNameStartsWith("jvm")
-    }
+    @Factory
+    static class MeterFilterFactory {
+        @Bean
+        @Singleton
+        @Requires(property = "metrics.test.filters.enabled", value = "true", defaultValue = "false")
+        MeterFilter denyNameStartsWithJvmFilter() {
+            return MeterFilter.denyNameStartsWith("jvm")
+        }
 
-    @Bean
-    @Singleton
-    @Requires(property = "metrics.test.filters.enabled", value = "true", defaultValue = "false")
-    MeterFilter maximumAllowableMetricsFilter() {
-        return MeterFilter.maximumAllowableMetrics(1)
+        @Bean
+        @Singleton
+        @Requires(property = "metrics.test.filters.enabled", value = "true", defaultValue = "false")
+        MeterFilter maximumAllowableMetricsFilter() {
+            return MeterFilter.maximumAllowableMetrics(1)
+        }
     }
 }
