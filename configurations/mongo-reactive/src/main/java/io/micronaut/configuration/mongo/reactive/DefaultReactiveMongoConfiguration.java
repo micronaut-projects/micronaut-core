@@ -28,7 +28,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -89,6 +88,7 @@ public class DefaultReactiveMongoConfiguration extends AbstractReactiveMongoConf
             getClusterSettings().hosts(serverAddresses);
         }
     }
+
     /**
      * @return The {@link ClusterSettings#builder()}
      */

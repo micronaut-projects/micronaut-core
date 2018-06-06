@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.mongo.reactive;
 
-import com.mongodb.ConnectionString;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
 import io.micronaut.context.annotation.Bean;
@@ -24,8 +23,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
-
-import java.util.Optional;
 
 /**
  * Factory for the default {@link MongoClient}. Creates the injectable {@link Primary} bean
