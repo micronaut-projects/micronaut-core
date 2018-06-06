@@ -260,8 +260,6 @@ subprojects { subproject ->
             System.out.println("FINISHED: ${it.className}.$it.name")
             System.out.flush()
         }
-        maxParallelForks = 2
-        forkEvery = 50
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
     }
