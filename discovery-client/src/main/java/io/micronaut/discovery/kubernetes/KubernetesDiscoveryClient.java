@@ -54,6 +54,7 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
     private static final String HTTPS_PORT_SUFFIX = SERVICE_SUFFIX + "_PORT_HTTPS";
 
     private final Map<String, ServiceInstance> serviceIds;
+
     /**
      * Default constructor.
      */
@@ -72,15 +73,14 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
                     port = env.get(serviceId + HTTPS_PORT_SUFFIX);
                     if (StringUtils.isEmpty(port)) {
                         port = env.get(serviceId + PORT_SUFFIX);
-                    }
-                    else {
+                    } else {
                         isSecure = true;
                     }
+
                     if (port != null) {
                         if (serviceId.endsWith(PUBLISHED_SUFFIX)) {
                             serviceId = serviceId.substring(0, serviceId.length() - PUBLISHED_SUFFIX.length());
-                        }
-                        else if (serviceId.endsWith(RANDOM_PORTS_SUFFIX)) {
+                        } else if (serviceId.endsWith(RANDOM_PORTS_SUFFIX)) {
                             serviceId = serviceId.substring(0, serviceId.length() - RANDOM_PORTS_SUFFIX.length());
                         }
 
