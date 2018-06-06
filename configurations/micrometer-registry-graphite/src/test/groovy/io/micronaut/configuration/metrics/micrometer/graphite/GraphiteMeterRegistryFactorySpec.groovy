@@ -87,7 +87,7 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         when:
         ApplicationContext context = ApplicationContext.run([
                 (GRAPHITE_ENABLED)         : true,
-                (GRAPHITE_CONFIG + ".host"): "zerocool",
+                (GRAPHITE_CONFIG + ".host"): "127.0.0.1",
                 (GRAPHITE_CONFIG + ".port"): 2345,
                 (GRAPHITE_CONFIG + ".step"): "PT2M",
         ])
@@ -97,7 +97,7 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         meterRegistry.isPresent()
         meterRegistry.get().config.enabled()
         meterRegistry.get().config.port() == 2345
-        meterRegistry.get().config.host() == "zerocool"
+        meterRegistry.get().config.host() == "127.0.0.1"
         meterRegistry.get().config.step() == Duration.ofMinutes(2)
     }
 }
