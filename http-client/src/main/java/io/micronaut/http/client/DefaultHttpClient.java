@@ -981,13 +981,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             } else if (o instanceof ByteBuf) {
                                 ByteBuf byteBuf = (ByteBuf) o;
                                 if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Stream Bytes Chunk. Length: {}", byteBuf.readableBytes());
+                                    LOG.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
                                 }
                                 return new DefaultHttpContent(byteBuf);
                             } else if (o instanceof byte[]) {
                                 byte[] bodyBytes = (byte[]) o;
                                 if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Stream Bytes Chunk. Length: {}", bodyBytes.length);
+                                    LOG.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
                                 }
                                 return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
                             } else if (mediaTypeCodecRegistry != null) {
@@ -1009,7 +1009,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 boolean first = true;
 
                                 @Override
-                                public HttpContent apply(HttpContent httpContent) throws Exception {
+                                public HttpContent apply(HttpContent httpContent) {
                                     if (!first) {
                                         return HttpContentUtil.prefixComma(httpContent);
                                     } else {
