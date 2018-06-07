@@ -15,3 +15,8 @@ dependencies {
     testRuntime project(":configurations:hibernate-validator")
 }
 
+tasks.withType(Test) {
+    testLogging {
+        showStandardStreams = true
+    }
+}
