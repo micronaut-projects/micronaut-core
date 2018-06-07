@@ -17,6 +17,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -24,15 +25,8 @@ import io.micronaut.http.filter.HttpFilter;
 
 import javax.inject.Singleton;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -200,13 +194,29 @@ public class DefaultRouter implements Router {
 
     @Override
     public <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error) {
+        Map<ErrorRoute, RouteMatch<T>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<T>> match = errorRoute.match(originatingClass, error);
-            if (match.isPresent()) {
-                return match;
+            match.ifPresent((m) -> {
+                matchedRoutes.put(errorRoute, m);
+            });
+        }
+        return findRouteMatch(matchedRoutes, error);
+    }
+
+    @Override
+    public <T> Optional<RouteMatch<T>> route(Throwable error) {
+        Map<ErrorRoute, RouteMatch<T>> matchedRoutes = new LinkedHashMap<>();
+        for (ErrorRoute errorRoute : errorRoutes) {
+            if (errorRoute.originatingType() == null) {
+                Optional<RouteMatch<T>> match = errorRoute.match(error);
+                match.ifPresent((m) -> {
+                    matchedRoutes.put(errorRoute, m);
+                });
             }
         }
-        return Optional.empty();
+
+        return findRouteMatch(matchedRoutes, error);
     }
 
     @Override
@@ -226,19 +236,6 @@ public class DefaultRouter implements Router {
         }
     }
 
-    @Override
-    public <T> Optional<RouteMatch<T>> route(Throwable error) {
-        for (ErrorRoute errorRoute : errorRoutes) {
-            if (errorRoute.originatingType() == null) {
-                Optional<RouteMatch<T>> match = errorRoute.match(error);
-                if (match.isPresent()) {
-                    return match;
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     public <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri) {
@@ -255,5 +252,37 @@ public class DefaultRouter implements Router {
         Collections.sort(routes);
         Collections.reverse(routes);
         return routes.toArray(new UriRoute[routes.size()]);
+    }
+
+    private <T> Optional<RouteMatch<T>> findRouteMatch(Map<ErrorRoute, RouteMatch<T>> matchedRoutes, Throwable error) {
+        if (matchedRoutes.size() == 1) {
+            return matchedRoutes.values().stream().findFirst();
+        } else if (matchedRoutes.size() > 1) {
+            int minCount = Integer.MAX_VALUE;
+
+            Supplier<List<Class>> hierarchySupplier = () -> ClassUtils.resolveHierarchy(error.getClass());
+            Optional<RouteMatch<T>> match = Optional.empty();
+            Class errorClass = error.getClass();
+
+            for (Map.Entry<ErrorRoute, RouteMatch<T>> entry: matchedRoutes.entrySet()) {
+                Class exceptionType = entry.getKey().exceptionType();
+                if (exceptionType.equals(errorClass)) {
+                    match = Optional.of(entry.getValue());
+                    break;
+                } else {
+                    List<Class> hierarchy = hierarchySupplier.get();
+                    //measures the distance in the hierarchy from the error and the route error type
+                    int index = hierarchy.indexOf(exceptionType);
+                    //the class closest in the hierarchy should be chosen
+                    if (index > -1 && index < minCount) {
+                        minCount = index;
+                        match = Optional.of(entry.getValue());
+                    }
+                }
+            }
+
+            return match;
+        }
+        return Optional.empty();
     }
 }
