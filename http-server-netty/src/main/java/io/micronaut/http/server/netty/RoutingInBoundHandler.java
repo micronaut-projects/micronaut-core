@@ -163,7 +163,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         super.channelReadComplete(ctx);
-        NettyHttpRequest request = NettyHttpRequest.get(ctx);
+        NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
             request.release();
         }
@@ -175,7 +175,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (ctx.channel().isWritable()) {
             ctx.flush();
         }
-        NettyHttpRequest request = NettyHttpRequest.get(ctx);
+        NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
             request.release();
         }
