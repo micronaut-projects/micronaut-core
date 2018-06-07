@@ -19,4 +19,12 @@ tasks.withType(Test) {
     testLogging {
         showStandardStreams = true
     }
+    beforeTest {
+        System.out.println("STARTING: ${it.className}.$it.name")
+        System.out.flush()
+    }
+    afterTest {
+        System.out.println("FINISHED: ${it.className}.$it.name")
+        System.out.flush()
+    }
 }

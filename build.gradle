@@ -232,14 +232,11 @@ subprojects { subproject ->
         testLogging {
             exceptionFormat = 'full'
         }
-        beforeTest {
-            System.out.println("STARTING: ${it.className}.$it.name")
+        afterSuite {
+            System.out.print(".")
             System.out.flush()
         }
-        afterTest {
-            System.out.println("FINISHED: ${it.className}.$it.name")
-            System.out.flush()
-        }
+
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
     }
