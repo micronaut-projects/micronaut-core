@@ -20,6 +20,7 @@ import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.TypeParameterMatcher;
@@ -29,6 +30,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -289,7 +291,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     private void receivedDemand(long demand) {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("HandlerPublisher received demand: {}", demand);
+            LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
         }
         switch (state) {
             case BUFFERING:
@@ -357,7 +359,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     private void receivedCancel() {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("HandlerPublisher received cancellation request");
+            LOG.trace("HandlerPublisher (state: {}) received cancellation request", state);
         }
 
         switch (state) {
@@ -381,7 +383,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             switch (state) {
                 case IDLE:
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("HandlerPublisher idle, buffering message: {}", message);
+                        Object msg = messageForTrace(message);
+                        LOG.trace("HandlerPublisher (state: IDLE) buffering message: {}", msg);
                     }
                     buffer.add(message);
                     state = BUFFERING;
@@ -389,7 +392,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 case NO_SUBSCRIBER:
                 case BUFFERING:
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("HandlerPublisher buffering message: {}", message);
+                        Object msg = messageForTrace(message);
+                        LOG.trace("HandlerPublisher (state: BUFFERING) buffering message: {}", msg);
                     }
                     buffer.add(message);
                     break;
@@ -398,6 +402,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                     break;
                 case DRAINING:
                 case DONE:
+                    if (LOG.isTraceEnabled()) {
+                        Object msg = messageForTrace(message);
+                        LOG.trace("HandlerPublisher (state: DONE) releasing message: {}", msg);
+                    }
                     ReferenceCountUtil.release(message);
                     break;
                 case NO_CONTEXT:
@@ -411,10 +419,19 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         }
     }
 
+    private Object messageForTrace(Object message) {
+        Object msg = message;
+        if (message instanceof HttpContent) {
+            HttpContent content = (HttpContent) message;
+            msg = content.content().toString(StandardCharsets.UTF_8);
+        }
+        return msg;
+    }
+
     private void publishMessage(Object message) {
         if (COMPLETE.equals(message)) {
             if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher complete. Calling onComplete()");
+                LOG.trace("HandlerPublisher (state: {}) complete. Calling onComplete()", state);
             }
             subscriber.onComplete();
             state = DONE;
@@ -422,7 +439,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             @SuppressWarnings("unchecked")
             T next = (T) message;
             if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher emitting next message: {}", next);
+                LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, next);
             }
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
