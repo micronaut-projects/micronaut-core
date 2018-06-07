@@ -18,10 +18,7 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Utility methods for loading classes.
@@ -151,5 +148,49 @@ public class ClassUtils {
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             return Optional.empty();
         }
+    }
+
+    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
+        if (!hierarchy.contains(superclass)) {
+            hierarchy.add(superclass);
+        }
+        for (Class<?> aClass : superclass.getInterfaces()) {
+            if (!hierarchy.contains(aClass)) {
+                hierarchy.add(aClass);
+            }
+            populateHierarchyInterfaces(aClass, hierarchy);
+        }
+    }
+
+    /**
+     * Builds a class hierarchy that includes all super classes
+     * and interfaces that the given class implements or extends from.
+     *
+     * @param type The class to start with
+     * @return The class hierarchy
+     */
+    public static List<Class> resolveHierarchy(Class<?> type) {
+        Class<?> superclass = type.getSuperclass();
+        List<Class> hierarchy = new ArrayList<>();
+        if (superclass != null) {
+            populateHierarchyInterfaces(type, hierarchy);
+
+            while (superclass != Object.class) {
+                populateHierarchyInterfaces(superclass, hierarchy);
+                superclass = superclass.getSuperclass();
+            }
+        } else if (type.isInterface()) {
+            populateHierarchyInterfaces(type, hierarchy);
+        }
+
+        if (type.isArray()) {
+            if (!type.getComponentType().isPrimitive()) {
+                hierarchy.add(Object[].class);
+            }
+        } else {
+            hierarchy.add(Object.class);
+        }
+
+        return hierarchy;
     }
 }
