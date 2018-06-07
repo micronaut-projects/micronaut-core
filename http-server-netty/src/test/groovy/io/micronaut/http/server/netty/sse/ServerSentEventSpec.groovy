@@ -25,6 +25,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
 import io.micronaut.http.annotation.Get
 import org.reactivestreams.Publisher
+import spock.lang.Ignore
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @author Graeme Rocher
  * @since 1.0
  */
+@Ignore
 class ServerSentEventSpec extends AbstractMicronautSpec {
 
 
