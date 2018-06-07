@@ -10,12 +10,20 @@ import java.lang.management.ThreadMXBean;
 @Singleton
 public class BuildDebug {
 
+    static {
+        new Thread(new DeadlockDetection()).run();
+    }
+
     @Scheduled( fixedRate = "5m",
                 initialDelay = "5m" )
     void dumpThreads() {
-        StringBuilder dump = new StringBuilder();
         ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
         ThreadInfo[] threadInfos = threadMxBean.getThreadInfo(threadMxBean.getAllThreadIds(), 150);
+        dumpThreadInfos(threadInfos);
+    }
+
+    static void dumpThreadInfos(ThreadInfo[] threadInfos) {
+        StringBuilder dump = new StringBuilder();
         for(ThreadInfo info : threadInfos)
         {
             dump.append('"').append(info.getThreadName()).append('"').append("\n");

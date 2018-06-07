@@ -766,7 +766,6 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                 reduced
-                    .parallel()
                     .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
             );
