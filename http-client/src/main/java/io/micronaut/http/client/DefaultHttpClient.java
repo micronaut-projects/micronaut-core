@@ -104,10 +104,7 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Emitter;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
+import io.reactivex.*;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
@@ -167,6 +164,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
@@ -204,6 +202,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build().orElse(null);
         this.group = createEventLoopGroup(configuration, threadFactory);
+        this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
         this.bootstrap.group(group)
             .channel(NioSocketChannel.class)
@@ -564,6 +563,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                                 redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
                                                     .flatMap(uri -> buildStreamExchange(redirectRequest, uri));
 
+                                                //noinspection SubscriberImplementation
                                                 redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {
                                                     Subscription sub;
 
@@ -620,9 +620,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             }, BackpressureStrategy.BUFFER
         );
         // apply filters
-        streamResponsePublisher = Flowable.fromPublisher(applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher));
+        streamResponsePublisher = Flowable.fromPublisher(
+                applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher)
+        );
 
-        return streamResponsePublisher.subscribeOn(Schedulers.from(group));
+        return streamResponsePublisher.subscribeOn(scheduler);
     }
 
     /**
@@ -683,7 +685,16 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             } else {
                 finalFlowable = Flowable.fromPublisher(finalPublisher);
             }
-            return finalFlowable.subscribeOn(Schedulers.from(group));
+            // apply timeout to flowable too in case a filter applied another policy
+            Optional<Duration> readTimeout = configuration.getReadTimeout();
+            if (readTimeout.isPresent()) {
+                Duration duration = readTimeout.get();
+                finalFlowable = finalFlowable.timeout(
+                        duration.toMillis(),
+                        TimeUnit.MILLISECONDS
+                );
+            }
+            return finalFlowable.subscribeOn(scheduler);
         };
     }
 
