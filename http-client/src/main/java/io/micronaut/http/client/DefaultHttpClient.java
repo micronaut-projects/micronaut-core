@@ -33,7 +33,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -41,6 +40,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.CodecException;
@@ -100,7 +100,6 @@ import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -698,7 +697,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                         TimeUnit.MILLISECONDS
                 ).onErrorResumeNext(throwable -> {
                     if (throwable instanceof TimeoutException) {
-                        return Flowable.error(ReadTimeoutException.INSTANCE);
+                        return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
                     }
                     return Flowable.error(throwable);
                 });
@@ -1193,8 +1192,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                     if (cause instanceof TooLongFrameException) {
                         emitter.onError(new ContentLengthExceededException(configuration.getMaxContentLength()));
-                    } else if (cause instanceof ReadTimeoutException) {
-                        emitter.onError(io.micronaut.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
+                    } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+                        emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
                     } else {
                         emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
                     }
