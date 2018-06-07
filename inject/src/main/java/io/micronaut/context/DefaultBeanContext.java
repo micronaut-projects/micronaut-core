@@ -964,7 +964,7 @@ public class DefaultBeanContext implements BeanContext {
         if (!processedBeans.isEmpty()) {
 
             @SuppressWarnings("unchecked") Stream<BeanDefinitionMethodReference<?, ?>> methodStream = processedBeans
-                .parallelStream()
+                .stream()
                 // is the bean reference enabled
                 .filter(ref -> ref.isEnabled(this))
                 // ok - continue and load it
@@ -1029,7 +1029,7 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
 
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
-                .parallelStream()
+                .stream()
                 .filter(reference -> {
                     Class<?> candidateType = reference.getBeanType();
                     return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
@@ -1099,7 +1099,7 @@ public class DefaultBeanContext implements BeanContext {
             if (!beanDefinitionsClasses.isEmpty()) {
 
                 List<BeanDefinition> candidates = beanDefinitionsClasses
-                    .parallelStream()
+                    .stream()
                     .filter(reference -> {
                         Class<?> candidateType = reference.getBeanType();
 
