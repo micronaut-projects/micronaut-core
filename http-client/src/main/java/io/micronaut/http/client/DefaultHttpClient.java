@@ -1373,6 +1373,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
          */
         protected void initChannel(Channel ch) {
             ChannelPipeline p = ch.pipeline();
+
+            if (stream) {
+                // for streaming responses we disable auto read
+                // so that the consumer is in charge of back pressure
+                ch.config().setAutoRead(false);
+            }
+            
             if (sslContext != null) {
                 SslHandler sslHandler = sslContext.newHandler(
                         ch.alloc(),
