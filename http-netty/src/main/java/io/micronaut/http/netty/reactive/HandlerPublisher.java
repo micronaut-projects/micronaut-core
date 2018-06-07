@@ -453,6 +453,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                         state = BUFFERING;
                     }
                 }
+                else if (outstandingDemand > 0 && state == DEMANDING) {
+                    requestDemand();
+                }
             }
         }
     }
