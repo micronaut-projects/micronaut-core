@@ -457,6 +457,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                     requestDemand();
                 }
             }
+            else {
+                // Long.MAX_VALUE to demand all items
+                requestDemand();
+            }
         }
     }
 
