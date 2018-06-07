@@ -658,6 +658,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static ComputePlatform determineCloudProvider() {
+        if (System.getenv("TRAVIS") != null) {
+            return ComputePlatform.OTHER;
+        }
+        
         String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
 

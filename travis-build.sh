@@ -10,10 +10,7 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 ./gradlew --stop
 ./gradlew testClasses || EXIT_STATUS=$?
 if [[ $EXIT_STATUS -eq 0 ]]; then
-    ./gradlew check -x test-suite:test --no-daemon || EXIT_STATUS=$?
-fi
-if [[ $EXIT_STATUS -eq 0 ]]; then
-    ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
+    ./gradlew check --no-daemon || EXIT_STATUS=$?
 fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
