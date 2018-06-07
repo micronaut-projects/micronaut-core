@@ -108,13 +108,8 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> putIfAbsent(Object key, T value) {
-        Class<T> aClass = (Class<T>) value.getClass();
-        Optional<T> existing = get(key, aClass);
-        if (!existing.isPresent()) {
-            put(key, value);
-            return Optional.empty();
-        }
-        return existing;
+        Object previous = cache.asMap().putIfAbsent(key, value);
+        return Optional.ofNullable((T) previous);
     }
 
     /**
