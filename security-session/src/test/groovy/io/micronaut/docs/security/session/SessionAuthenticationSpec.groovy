@@ -18,13 +18,17 @@ package io.micronaut.docs.security.session
 import geb.spock.GebSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.YamlAsciidocTagCleaner
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 
-@IgnoreIf({ !sys['geb.env'] })
 class SessionAuthenticationSpec extends GebSpec implements YamlAsciidocTagCleaner {
 
     String yamlConfig = '''\
@@ -72,6 +76,11 @@ micronaut:
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
+    @Shared
+    @AutoCleanup
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+    @IgnoreIf({ !sys['geb.env'] })
     def "verify session based authentication works"() {
         given:
         context.getBean(HomeController.class)
@@ -136,5 +145,39 @@ micronaut:
 
         then:
         homePage.username() == null
+    }
+
+    @Ignore("TODO: not working yet")
+    def "verify session based authentication works without a real browser"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/')
+        HttpResponse<String> rsp = client.toBlocking().exchange(request, String)
+
+        then:
+        rsp.status().code == 200
+        rsp.body()
+        rsp.body().contains('You are not logged in')
+
+        when:
+        HttpRequest loginRequest = HttpRequest.POST('/login', new LoginForm(username: 'foo', password: 'foo'))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+
+        HttpResponse<String> loginRsp = client.toBlocking().exchange(loginRequest, String)
+
+        then:
+        loginRsp.status().code == 200
+        loginRsp.body().contains('li id="errors')
+
+
+        when:
+        loginRequest = HttpRequest.POST('/login', new LoginForm(username: 'sherlock', password: 'password'))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+
+        loginRsp = client.toBlocking().exchange(loginRequest, String)
+
+        then:
+        loginRsp.status().code == 200
+        loginRsp.getHeaders().get('Set-Cookie')
+        loginRsp.body().contains('sherlock')
     }
 }
