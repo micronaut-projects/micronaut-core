@@ -160,14 +160,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverConfiguration = serverConfiguration;
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        super.channelReadComplete(ctx);
-        NettyHttpRequest request = NettyHttpRequest.remove(ctx);
-        if (request != null) {
-            request.release();
-        }
-    }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
@@ -199,7 +191,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     @SuppressWarnings("unchecked")
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.get(ctx);
+        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
         RouteMatch<?> errorRoute = null;
         if (nettyHttpRequest == null) {
             if (LOG.isErrorEnabled()) {
