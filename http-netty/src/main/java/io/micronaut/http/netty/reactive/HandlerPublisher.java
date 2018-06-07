@@ -302,7 +302,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 break;
 
             case DEMANDING:
-                addDemand(demand);
+                if (addDemand(demand)) {
+                    flushBuffer();
+                }
                 break;
 
             case IDLE:
@@ -439,7 +441,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             @SuppressWarnings("unchecked")
             T next = (T) message;
             if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, next);
+                LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, messageForTrace(next));
             }
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
