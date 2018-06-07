@@ -30,8 +30,3 @@ dependencies {
     testCompile 'io.opentracing.brave:brave-opentracing:0.30.0'
 
 }
-tasks.withType(Test) {
-    testLogging {
-        showStandardStreams = true
-    }
-}
