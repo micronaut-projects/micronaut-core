@@ -16,15 +16,7 @@
 
 package io.micronaut.http.netty.reactive;
 
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.BUFFERING;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DEMANDING;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DONE;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DRAINING;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.IDLE;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_CONTEXT;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_ERROR;
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_OR_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -34,6 +26,8 @@ import io.netty.util.internal.TypeParameterMatcher;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -67,7 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publisher<T> {
-
+    private static final Logger LOG = LoggerFactory.getLogger(HandlerPublisher.class);
     /**
      * Used for buffering a completion signal.
      */
@@ -129,12 +123,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             });
             subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
         } else {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    provideSubscriber(subscriber);
-                }
-            });
+            executor.execute(() -> provideSubscriber(subscriber));
         }
     }
 
@@ -144,9 +133,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
      *
      * @param msg The message to check.
      * @return True if the message should be accepted.
-     * @throws Exception if there is a problem with the message
      */
-    protected boolean acceptInboundMessage(Object msg) throws Exception {
+    protected boolean acceptInboundMessage(Object msg) {
         return matcher.match(msg);
     }
 
@@ -165,6 +153,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
      * By default, a channel read is invoked.
      */
     protected void requestDemand() {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Demand received for next message. Calling context.read()");
+        }
+
         ctx.read();
     }
 
@@ -247,7 +239,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         // If the channel is not yet registered, then it's not safe to invoke any methods on it, eg read() or close()
         // So don't provide the context until it is registered.
         if (ctx.channel().isRegistered()) {
@@ -256,7 +248,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+    public void channelRegistered(ChannelHandlerContext ctx) {
         provideChannelContext(ctx);
         ctx.fireChannelRegistered();
     }
@@ -287,7 +279,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+    public void channelActive(ChannelHandlerContext ctx) {
         // If we subscribed before the channel was active, then our read would have been ignored.
         if (state == DEMANDING) {
             requestDemand();
@@ -296,6 +288,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void receivedDemand(long demand) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("HandlerPublisher received demand: {}", demand);
+        }
         switch (state) {
             case BUFFERING:
             case DRAINING:
@@ -361,6 +356,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void receivedCancel() {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("HandlerPublisher received cancellation request");
+        }
+
         switch (state) {
             case BUFFERING:
             case DEMANDING:
@@ -377,15 +376,21 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object message) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object message) {
         if (acceptInboundMessage(message)) {
             switch (state) {
                 case IDLE:
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("HandlerPublisher idle, buffering message: {}", message);
+                    }
                     buffer.add(message);
                     state = BUFFERING;
                     break;
                 case NO_SUBSCRIBER:
                 case BUFFERING:
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("HandlerPublisher buffering message: {}", message);
+                    }
                     buffer.add(message);
                     break;
                 case DEMANDING:
@@ -408,11 +413,17 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     private void publishMessage(Object message) {
         if (COMPLETE.equals(message)) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher complete. Calling onComplete()");
+            }
             subscriber.onComplete();
             state = DONE;
         } else {
             @SuppressWarnings("unchecked")
             T next = (T) message;
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher emitting next message: {}", next);
+            }
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
                 outstandingDemand--;
@@ -428,19 +439,19 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+    public void channelReadComplete(ChannelHandlerContext ctx) {
         if (state == DEMANDING) {
             requestDemand();
         }
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx) {
         complete();
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+    public void handlerRemoved(ChannelHandlerContext ctx) {
         complete();
     }
 
@@ -467,7 +478,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         switch (state) {
             case NO_SUBSCRIBER:
                 noSubscriberError = cause;
@@ -502,22 +513,12 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     private class ChannelSubscription implements Subscription {
         @Override
         public void request(final long demand) {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    receivedDemand(demand);
-                }
-            });
+            executor.execute(() -> receivedDemand(demand));
         }
 
         @Override
         public void cancel() {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    receivedCancel();
-                }
-            });
+            executor.execute(HandlerPublisher.this::receivedCancel);
         }
     }
 }
