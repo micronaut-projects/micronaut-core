@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
@@ -69,7 +70,8 @@ micronaut:
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
-                    'spec.name': 'securitysession'
+                    'spec.name': 'securitysession',
+                    'micronaut.http.client.followRedirects': false
             ] << flatten(configMap), 'test')
 
     @Shared
@@ -83,16 +85,7 @@ micronaut:
     @IgnoreIf({ !sys['geb.env'] })
     def "verify session based authentication works"() {
         given:
-        context.getBean(HomeController.class)
-        context.getBean(LoginAuthController.class)
-        context.getBean(AuthenticationProviderUserPassword.class)
         browser.baseUrl = "http://localhost:${embeddedServer.port}"
-
-        when:
-        Map m = new Yaml().load(cleanYamlAsciidocTag(yamlConfig))
-
-        then:
-        m == configMap
 
         when:
         to HomePage
@@ -147,8 +140,18 @@ micronaut:
         homePage.username() == null
     }
 
-    @Ignore("TODO: not working yet")
     def "verify session based authentication works without a real browser"() {
+        given:
+        context.getBean(HomeController.class)
+        context.getBean(LoginAuthController.class)
+        context.getBean(AuthenticationProviderUserPassword.class)
+
+        when:
+        Map m = new Yaml().load(cleanYamlAsciidocTag(yamlConfig))
+
+        then:
+        m == configMap
+
         when:
         HttpRequest request = HttpRequest.GET('/')
         HttpResponse<String> rsp = client.toBlocking().exchange(request, String)
@@ -165,9 +168,10 @@ micronaut:
         HttpResponse<String> loginRsp = client.toBlocking().exchange(loginRequest, String)
 
         then:
-        loginRsp.status().code == 200
-        loginRsp.body().contains('li id="errors')
+        loginRsp.status().code == 303
 
+        and: 'login fails, cookie is not set'
+        !loginRsp.getHeaders().get('Set-Cookie')
 
         when:
         loginRequest = HttpRequest.POST('/login', new LoginForm(username: 'sherlock', password: 'password'))
@@ -176,8 +180,24 @@ micronaut:
         loginRsp = client.toBlocking().exchange(loginRequest, String)
 
         then:
-        loginRsp.status().code == 200
-        loginRsp.getHeaders().get('Set-Cookie')
-        loginRsp.body().contains('sherlock')
+        loginRsp.status().code == 303
+
+        when:
+        String cookie = loginRsp.getHeaders().get('Set-Cookie')
+        println cookie
+        then:
+        cookie
+        cookie.contains('SESSION=')
+        cookie.endsWith('; HTTPOnly')
+
+        when:
+        String sessionId = cookie.replaceAll('SESSION=', '').replaceAll('; HTTPOnly', '')
+        request = HttpRequest.GET('/').cookie(Cookie.of('SESSION', sessionId))
+        rsp = client.toBlocking().exchange(request, String)
+
+        then:
+        rsp.status().code == 200
+        rsp.body()
+        rsp.body().contains('sherlock')
     }
 }

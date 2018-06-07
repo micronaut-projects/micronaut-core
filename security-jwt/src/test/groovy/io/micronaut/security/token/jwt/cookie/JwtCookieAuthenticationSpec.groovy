@@ -18,6 +18,11 @@ package io.micronaut.security.token.jwt.cookie
 import geb.spock.GebSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.cookie.Cookie
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.endpoints.LoginController
@@ -29,7 +34,6 @@ import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 
-@IgnoreIf({ !sys['geb.env']})
 class JwtCookieAuthenticationSpec extends GebSpec {
 
     @Shared
@@ -37,6 +41,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
     ApplicationContext context = ApplicationContext.run(
             [
                     'spec.name': 'jwtcookie',
+                    'micronaut.http.client.followRedirects': false,
                     'micronaut.security.enabled': true,
                     'micronaut.security.endpoints.login.enabled': true,
                     'micronaut.security.endpoints.logout.enabled': true,
@@ -50,10 +55,12 @@ class JwtCookieAuthenticationSpec extends GebSpec {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    
-    def "verify session based authentication works"() {
-        given:
-        browser.baseUrl = "http://localhost:${embeddedServer.port}"
+
+    @Shared
+    @AutoCleanup
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+    def "verify jwt cookie authentication works without Geb"() {
         context.getBean(HomeController.class)
         context.getBean(LoginAuthController.class)
         context.getBean(AuthenticationProviderUserPassword.class)
@@ -76,6 +83,59 @@ class JwtCookieAuthenticationSpec extends GebSpec {
 
         then:
         thrown(NoSuchBeanException)
+
+        when:
+        HttpRequest request = HttpRequest.GET('/')
+        HttpResponse<String> rsp = client.toBlocking().exchange(request, String)
+
+        then:
+        rsp.status().code == 200
+        rsp.body()
+        rsp.body().contains('You are not logged in')
+
+        when:
+        HttpRequest loginRequest = HttpRequest.POST('/login', new LoginForm(username: 'foo', password: 'foo'))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+
+        HttpResponse<String> loginRsp = client.toBlocking().exchange(loginRequest, String)
+
+        then:
+        loginRsp.status().code == 303
+
+        and: 'login fails, cookie is not set'
+        !loginRsp.getHeaders().get('Set-Cookie')
+
+        when:
+        loginRequest = HttpRequest.POST('/login', new LoginForm(username: 'sherlock', password: 'password'))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+
+        loginRsp = client.toBlocking().exchange(loginRequest, String)
+
+        then:
+        loginRsp.status().code == 303
+
+        when:
+        String cookie = loginRsp.getHeaders().get('Set-Cookie')
+        println cookie
+        then:
+        cookie
+        cookie.contains('JWT=')
+
+        when:
+        String sessionId = cookie.substring('JWT='.size(), cookie.indexOf(';'))
+        request = HttpRequest.GET('/').cookie(Cookie.of('JWT', sessionId))
+        rsp = client.toBlocking().exchange(request, String)
+
+        then:
+        rsp.status().code == 200
+        rsp.body()
+        rsp.body().contains('sherlock')
+    }
+
+    @IgnoreIf({ !sys['geb.env']})
+    def "verify jwt cookie authentication works"() {
+        given:
+        browser.baseUrl = "http://localhost:${embeddedServer.port}"
 
         when:
         to HomePage
@@ -129,4 +189,9 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         then:
         homePage.username() == null
     }
+}
+
+class LoginForm {
+    String username
+    String password
 }
