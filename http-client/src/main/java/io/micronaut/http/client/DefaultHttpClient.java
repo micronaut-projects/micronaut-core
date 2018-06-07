@@ -33,6 +33,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -137,6 +138,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -688,11 +690,18 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             // apply timeout to flowable too in case a filter applied another policy
             Optional<Duration> readTimeout = configuration.getReadTimeout();
             if (readTimeout.isPresent()) {
-                Duration duration = readTimeout.get();
+                // add an additional second, because generally the timeout should occur
+                // from the Netty request handling pipeline
+                Duration duration = readTimeout.get().plus(Duration.ofSeconds(1));
                 finalFlowable = finalFlowable.timeout(
                         duration.toMillis(),
                         TimeUnit.MILLISECONDS
-                );
+                ).onErrorResumeNext(throwable -> {
+                    if (throwable instanceof TimeoutException) {
+                        return Flowable.error(ReadTimeoutException.INSTANCE);
+                    }
+                    return Flowable.error(throwable);
+                });
             }
             return finalFlowable.subscribeOn(scheduler);
         };
