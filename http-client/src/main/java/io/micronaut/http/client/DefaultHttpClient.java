@@ -40,6 +40,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.CodecException;
@@ -99,15 +100,11 @@ import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Emitter;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
+import io.reactivex.*;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
@@ -140,6 +137,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -167,6 +165,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
@@ -204,6 +203,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build().orElse(null);
         this.group = createEventLoopGroup(configuration, threadFactory);
+        this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
         this.bootstrap.group(group)
             .channel(NioSocketChannel.class)
@@ -428,8 +428,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 return httpContentFlowable.map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Streaming Response Received Chunk");
-                        traceBody(byteBuf);
+                        LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
+                        traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                     nettyStreamedHttpResponse.setBody(byteBuffer);
@@ -465,8 +465,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
                             if (LOG.isTraceEnabled()) {
-                                LOG.trace("HTTP Client JSON Streaming Response Received Chunk");
-                                traceBody(chunk);
+                                LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", chunk.readableBytes());
+                                traceBody("Chunk", chunk);
                             }
                             try {
                                 return ByteBufUtil.getBytes(chunk);
@@ -564,6 +564,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                                 redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
                                                     .flatMap(uri -> buildStreamExchange(redirectRequest, uri));
 
+                                                //noinspection SubscriberImplementation
                                                 redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {
                                                     Subscription sub;
 
@@ -620,9 +621,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             }, BackpressureStrategy.BUFFER
         );
         // apply filters
-        streamResponsePublisher = Flowable.fromPublisher(applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher));
+        streamResponsePublisher = Flowable.fromPublisher(
+                applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher)
+        );
 
-        return streamResponsePublisher.subscribeOn(Schedulers.from(group));
+        return streamResponsePublisher.subscribeOn(scheduler);
     }
 
     /**
@@ -683,7 +686,23 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             } else {
                 finalFlowable = Flowable.fromPublisher(finalPublisher);
             }
-            return finalFlowable.subscribeOn(Schedulers.from(group));
+            // apply timeout to flowable too in case a filter applied another policy
+            Optional<Duration> readTimeout = configuration.getReadTimeout();
+            if (readTimeout.isPresent()) {
+                // add an additional second, because generally the timeout should occur
+                // from the Netty request handling pipeline
+                Duration duration = readTimeout.get().plus(Duration.ofSeconds(1));
+                finalFlowable = finalFlowable.timeout(
+                        duration.toMillis(),
+                        TimeUnit.MILLISECONDS
+                ).onErrorResumeNext(throwable -> {
+                    if (throwable instanceof TimeoutException) {
+                        return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                    }
+                    return Flowable.error(throwable);
+                });
+            }
+            return finalFlowable.subscribeOn(scheduler);
         };
     }
 
@@ -981,13 +1000,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             } else if (o instanceof ByteBuf) {
                                 ByteBuf byteBuf = (ByteBuf) o;
                                 if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Stream Bytes Chunk. Length: {}", byteBuf.readableBytes());
+                                    LOG.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
                                 }
                                 return new DefaultHttpContent(byteBuf);
                             } else if (o instanceof byte[]) {
                                 byte[] bodyBytes = (byte[]) o;
                                 if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Stream Bytes Chunk. Length: {}", bodyBytes.length);
+                                    LOG.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
                                 }
                                 return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
                             } else if (mediaTypeCodecRegistry != null) {
@@ -1009,7 +1028,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 boolean first = true;
 
                                 @Override
-                                public HttpContent apply(HttpContent httpContent) throws Exception {
+                                public HttpContent apply(HttpContent httpContent) {
                                     if (!first) {
                                         return HttpContentUtil.prefixComma(httpContent);
                                     } else {
@@ -1100,7 +1119,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                     LOG.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
                     LOG.trace("Status Code: {}", status);
                     traceHeaders(headers);
-                    traceBody(fullResponse.content());
+                    traceBody("Response", fullResponse.content());
                 }
                 int statusCode = status.code();
                 // it is a redirect
@@ -1173,8 +1192,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                     if (cause instanceof TooLongFrameException) {
                         emitter.onError(new ContentLengthExceededException(configuration.getMaxContentLength()));
-                    } else if (cause instanceof ReadTimeoutException) {
-                        emitter.onError(io.micronaut.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
+                    } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+                        emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
                     } else {
                         emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
                     }
@@ -1246,19 +1265,21 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
             FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
             ByteBuf content = fullHttpRequest.content();
-            traceBody(content);
+            if (LOG.isTraceEnabled()) {
+                traceBody("Request", content);
+            }
         }
     }
 
-    private void traceBody(ByteBuf content) {
-        LOG.trace("Body");
+    private void traceBody(String type, ByteBuf content) {
+        LOG.trace(type + " Body");
         LOG.trace("----");
         LOG.trace(content.toString(defaultCharset));
         LOG.trace("----");
     }
 
     private void traceChunk(ByteBuf content) {
-        LOG.trace("Stream Chunk");
+        LOG.trace("Sending Chunk");
         LOG.trace("----");
         LOG.trace(content.toString(defaultCharset));
         LOG.trace("----");

@@ -259,35 +259,18 @@ public class NettyHttpServer implements EmbeddedServer {
             LOG.debug("Binding server to port: {}", serverPort);
         }
         try {
-            boolean success = false;
-            int attemptCount = 0;
-            while (!success && attemptCount < 3) {
-                attemptCount = attempts.getAndIncrement();
-                if (host.isPresent()) {
-                    success = serverBootstrap.bind(host.get(), serverPort).await(2, TimeUnit.SECONDS);
-                } else {
-                    success = serverBootstrap.bind(serverPort).await(2, TimeUnit.SECONDS);
-                }
-
-                if (!success && isRandomPort) {
-                    // try another port
-                    serverPort = SocketUtils.findAvailableTcpPort();
-                }
-            }
-
-            if (success) {
-                applicationContext.publishEvent(new ServerStartupEvent(this));
-                Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-                applicationName.ifPresent(id -> {
-                    this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                    applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-                });
+            if (host.isPresent()) {
+                serverBootstrap.bind(host.get(), serverPort).sync();
             } else {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Unable to bind Micronaut server to available port");
-                }
-                stop();
+                serverBootstrap.bind(serverPort).sync();
             }
+
+            applicationContext.publishEvent(new ServerStartupEvent(this));
+            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+            applicationName.ifPresent(id -> {
+                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+            });
 
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {

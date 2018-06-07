@@ -160,14 +160,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverConfiguration = serverConfiguration;
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        super.channelReadComplete(ctx);
-        NettyHttpRequest request = NettyHttpRequest.get(ctx);
-        if (request != null) {
-            request.release();
-        }
-    }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
@@ -175,7 +167,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (ctx.channel().isWritable()) {
             ctx.flush();
         }
-        NettyHttpRequest request = NettyHttpRequest.get(ctx);
+        NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
             request.release();
         }
@@ -198,8 +190,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @SuppressWarnings("unchecked")
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.get(ctx);
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
         RouteMatch<?> errorRoute = null;
         if (nettyHttpRequest == null) {
             if (LOG.isErrorEnabled()) {
@@ -317,7 +309,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
         ctx.channel().config().setAutoRead(false);
         io.micronaut.http.HttpMethod httpMethod = request.getMethod();
         String requestPath = request.getPath();
@@ -1296,6 +1288,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 return future;
             });
         }
+
+        httpContentPublisher = Publishers.then(httpContentPublisher, httpContent -> {
+            // once an http content is written, read the next item if it is available
+            context.read();
+        });
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
         io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();

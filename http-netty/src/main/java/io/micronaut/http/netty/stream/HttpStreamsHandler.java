@@ -226,6 +226,9 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (currentlyStreamedMessage == msg) {
             ignoreBodyRead = true;
             // Need to do a read in case the subscriber ignored a read completed.
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Calling ctx.read() for cancelled subscription");
+            }
             ctx.read();
         }
     }
