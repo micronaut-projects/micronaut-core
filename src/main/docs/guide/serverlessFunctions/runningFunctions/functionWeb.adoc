@@ -33,7 +33,7 @@ The URI mapped to is defined by the either the value of the ann:function.Functio
 
 .Function URI Mapping with @FunctionBean
 |===
-|Annotation|Dependency
+|Annotation|URI
 
 |`@FunctionBean("hello")` | `/hello`
 |`@FunctionBean("helloWorld")` | `/hello-world`
@@ -43,7 +43,7 @@ The URI mapped to is defined by the either the value of the ann:function.Functio
 
 .Function URI Mapping with Groovy Function Script
 |===
-|Method Name|Dependency
+|Method Name|URI
 
 |`hello` | `/hello`
 |`helloWorld` | `/hello-world`
