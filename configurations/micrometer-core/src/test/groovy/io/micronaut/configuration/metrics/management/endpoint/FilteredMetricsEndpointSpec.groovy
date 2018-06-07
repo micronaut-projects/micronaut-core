@@ -30,6 +30,7 @@ class FilteredMetricsEndpointSpec extends Specification {
         ])
 
         expect:
+        context.getBeansOfType(MeterFilter.class)?.size() == 2
         MicrometerMeterRegistryConfigurer configurer = context.getBean(MeterRegistryConfigurer)
         configurer.filters.size() == 2
         context.containsBean(MetricsEndpoint)
