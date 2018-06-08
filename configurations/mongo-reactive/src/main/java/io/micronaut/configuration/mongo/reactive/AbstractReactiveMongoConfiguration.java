@@ -26,6 +26,7 @@ import com.mongodb.connection.ConnectionPoolSettings;
 import com.mongodb.connection.ServerSettings;
 import com.mongodb.connection.SocketSettings;
 import com.mongodb.connection.SslSettings;
+import com.mongodb.connection.netty.NettyStreamFactoryFactory;
 import com.mongodb.reactivestreams.client.MongoClients;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.StringUtils;
@@ -73,6 +74,10 @@ public abstract class AbstractReactiveMongoConfiguration {
         Optional<ConnectionString> connectionString = getConnectionString();
         if (connectionString.isPresent()) {
             ConnectionString cs = connectionString.get();
+            String streamType = cs.getStreamType();
+            if ("netty".equalsIgnoreCase(streamType)) {
+                getClientSettings().streamFactoryFactory(NettyStreamFactoryFactory.builder().build());
+            }
             getClientSettings().applyConnectionString(cs);
             getServerSettings().applyConnectionString(cs);
             getClusterSettings().applyConnectionString(cs);

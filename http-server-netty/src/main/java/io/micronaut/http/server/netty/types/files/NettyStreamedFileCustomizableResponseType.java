@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -73,8 +73,8 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
 
     @Override
     public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
-        if (response instanceof NettyHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyHttpResponse) response).getNativeResponse();
+        if (response instanceof NettyMutableHttpResponse) {
+            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
 
             //The streams codec prevents non full responses from being written
             Optional

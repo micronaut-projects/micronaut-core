@@ -114,6 +114,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
+        if (uri.length() > 1 && uri.charAt(uri.length() - 1) == '/') {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+
         int len = uri.length();
         if (isRoot && (len == 0 || (len == 1 && uri.charAt(0) == '/'))) {
             return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap()));
