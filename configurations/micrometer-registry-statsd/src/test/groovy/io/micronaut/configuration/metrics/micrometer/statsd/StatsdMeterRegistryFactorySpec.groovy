@@ -2,7 +2,6 @@ package io.micronaut.configuration.metrics.micrometer.statsd
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micrometer.statsd.StatsdFlavor
 import io.micrometer.statsd.StatsdMeterRegistry
 import io.micronaut.configuration.metrics.micrometer.MeterRegistryCreationListener
@@ -36,8 +35,8 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.getBeansOfType(MeterRegistry).size() == 3
-        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'SimpleMeterRegistry', 'StatsdMeterRegistry'])
+        context.getBeansOfType(MeterRegistry).size() == 2
+        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'StatsdMeterRegistry'])
 
         cleanup:
         context.stop()
@@ -52,9 +51,8 @@ class StatsdMeterRegistryFactorySpec extends Specification {
         compositeRegistry
         context.getBean(MeterRegistryCreationListener)
         context.getBean(StatsdMeterRegistry)
-        context.getBean(SimpleMeterRegistry)
-        compositeRegistry.registries.size() == 2
-        compositeRegistry.registries*.class.containsAll([StatsdMeterRegistry, SimpleMeterRegistry])
+        compositeRegistry.registries.size() == 1
+        compositeRegistry.registries*.class.containsAll([StatsdMeterRegistry])
 
         cleanup:
         context.stop()
