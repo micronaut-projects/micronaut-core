@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
@@ -39,18 +39,18 @@ import java.util.Optional;
  */
 public class NettyHttpResponseFactory implements HttpResponseFactory {
 
-    private static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
+    private static final AttributeKey<NettyMutableHttpResponse> KEY = AttributeKey.valueOf(NettyMutableHttpResponse.class.getSimpleName());
 
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        MutableHttpResponse<T> ok = new NettyHttpResponse<>(ConversionService.SHARED);
+        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
 
         return body != null ? ok.body(body) : ok;
     }
 
     @Override
     public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
-        MutableHttpResponse<T> ok = new NettyHttpResponse<>(ConversionService.SHARED);
+        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
         ok.status(status);
         return body != null ? ok.body(body) : ok;
     }
@@ -65,17 +65,17 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
         }
 
         DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, nettyStatus);
-        return new NettyHttpResponse(fullHttpResponse, ConversionService.SHARED);
+        return new NettyMutableHttpResponse(fullHttpResponse, ConversionService.SHARED);
     }
 
     /**
      * Lookup the response from the context.
      *
      * @param request The context
-     * @return The {@link NettyHttpResponse}
+     * @return The {@link NettyMutableHttpResponse}
      */
     @Internal
-    public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
+    public static NettyMutableHttpResponse getOrCreate(NettyHttpRequest<?> request) {
         return getOr(request, io.micronaut.http.HttpResponse.ok());
     }
 
@@ -84,14 +84,14 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      *
      * @param request     The context
      * @param alternative The alternative HttpResponse
-     * @return The {@link NettyHttpResponse}
+     * @return The {@link NettyMutableHttpResponse}
      */
     @Internal
-    public static NettyHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
-        Attribute<NettyHttpResponse> attr = request.attr(KEY);
-        NettyHttpResponse nettyHttpResponse = attr.get();
+    public static NettyMutableHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
+        Attribute<NettyMutableHttpResponse> attr = request.attr(KEY);
+        NettyMutableHttpResponse nettyHttpResponse = attr.get();
         if (nettyHttpResponse == null) {
-            nettyHttpResponse = (NettyHttpResponse) alternative;
+            nettyHttpResponse = (NettyMutableHttpResponse) alternative;
             attr.set(nettyHttpResponse);
         }
         return nettyHttpResponse;
@@ -101,11 +101,11 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      * Lookup the response from the request.
      *
      * @param request The request
-     * @return The {@link NettyHttpResponse}
+     * @return The {@link NettyMutableHttpResponse}
      */
     @Internal
-    public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
-        NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
+    public static Optional<NettyMutableHttpResponse> get(NettyHttpRequest<?> request) {
+        NettyMutableHttpResponse nettyHttpResponse = request.attr(KEY).get();
         return Optional.ofNullable(nettyHttpResponse);
     }
 
@@ -114,11 +114,11 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      *
      * @param request  The request
      * @param response The Http Response
-     * @return The {@link NettyHttpResponse}
+     * @return The {@link NettyMutableHttpResponse}
      */
     @Internal
-    public static Optional<NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
-        request.attr(KEY).set((NettyHttpResponse) response);
-        return Optional.ofNullable((NettyHttpResponse) response);
+    public static Optional<NettyMutableHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
+        request.attr(KEY).set((NettyMutableHttpResponse) response);
+        return Optional.ofNullable((NettyMutableHttpResponse) response);
     }
 }
