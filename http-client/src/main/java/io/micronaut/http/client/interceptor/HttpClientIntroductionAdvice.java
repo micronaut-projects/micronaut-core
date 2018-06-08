@@ -47,14 +47,7 @@ import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Headers;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.client.BlockingHttpClient;
-import io.micronaut.http.client.Client;
-import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.LoadBalancerResolver;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
+import io.micronaut.http.client.*;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -304,33 +297,53 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     isSingle = true;
                 }
 
-                if (!isSingle) {
-                    publisherArgument = Argument.of(List.class, publisherArgument);
-                }
 
                 Publisher<?> publisher;
 
                 MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
-                if (ArrayUtils.isNotEmpty(contentTypes)) {
+                if (ArrayUtils.isNotEmpty(contentTypes) && HttpMethod.permitsRequestBody(request.getMethod())) {
                     request.contentType(contentTypes[0]);
                 }
 
-                if (HttpResponse.class.isAssignableFrom(argumentType)) {
-                    request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
-                    publisher = httpClient.exchange(
-                        request, publisherArgument
-                    );
-                } else if (Void.class.isAssignableFrom(argumentType)) {
-                    publisher = httpClient.exchange(
-                        request
-                    );
-                } else {
-                    MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
-                    request.accept(acceptTypes);
+                if (!isSingle && httpClient instanceof StreamingHttpClient) {
+                    StreamingHttpClient streamingHttpClient = (StreamingHttpClient) httpClient;
+                    if (HttpResponse.class.isAssignableFrom(argumentType)) {
+                        request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
+                        publisher = streamingHttpClient.exchangeStream(
+                                request
+                        );
+                    } else if (Void.class.isAssignableFrom(argumentType)) {
+                        publisher = streamingHttpClient.exchangeStream(
+                                request
+                        );
+                    } else {
+                        MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                        request.accept(acceptTypes);
 
-                    publisher = httpClient.retrieve(
-                        request, publisherArgument
-                    );
+                        publisher = streamingHttpClient.jsonStream(
+                                request, publisherArgument
+                        );
+                    }
+
+                } else {
+
+                    if (HttpResponse.class.isAssignableFrom(argumentType)) {
+                        request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
+                        publisher = httpClient.exchange(
+                                request, publisherArgument
+                        );
+                    } else if (Void.class.isAssignableFrom(argumentType)) {
+                        publisher = httpClient.exchange(
+                                request
+                        );
+                    } else {
+                        MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                        request.accept(acceptTypes);
+
+                        publisher = httpClient.retrieve(
+                                request, publisherArgument
+                        );
+                    }
                 }
 
                 if (isFuture) {

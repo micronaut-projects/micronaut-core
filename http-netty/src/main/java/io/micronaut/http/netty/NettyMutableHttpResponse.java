@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @Internal
-public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
+public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     protected FullHttpResponse nettyResponse;
     final NettyHttpHeaders headers;
@@ -65,7 +65,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param conversionService The conversion service
      */
     @SuppressWarnings("MagicNumber")
-    public NettyHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
+    public NettyMutableHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
@@ -76,7 +76,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param conversionService The conversion service
      */
     @SuppressWarnings("MagicNumber")
-    public NettyHttpResponse(ConversionService conversionService) {
+    public NettyMutableHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
@@ -168,7 +168,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public NettyHttpResponse<B> body(B body) {
+    public NettyMutableHttpResponse<B> body(B body) {
         this.body = body;
         if (body instanceof ByteBuf) {
             replace((ByteBuf) body);
@@ -180,7 +180,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param body The body to replace
      * @return The current instance
      */
-    public NettyHttpResponse replace(ByteBuf body) {
+    public NettyMutableHttpResponse replace(ByteBuf body) {
         this.nettyResponse = this.nettyResponse.replace(body);
         return this;
     }

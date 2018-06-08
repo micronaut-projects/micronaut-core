@@ -453,12 +453,15 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
                 }
+
                 JsonMediaTypeCodec mediaTypeCodec = (JsonMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
                     .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
 
                 NettyStreamedHttpResponse<?> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                boolean streamArray = !Iterable.class.isAssignableFrom(type.getType());
+
+                boolean isJsonStream = request.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
+                boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
                 JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(), streamArray) {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
@@ -595,8 +598,15 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                                 emitter.onError(e);
                                             }
                                         } else {
-                                            emitter.onNext(response);
-                                            emitter.onComplete();
+                                            boolean errorStatus = statusCode >= 400;
+                                            if (errorStatus) {
+                                                emitter.onError(new HttpClientResponseException(response.getStatus().getReason(), response));
+                                            }
+                                            else {
+                                                emitter.onNext(response);
+                                                emitter.onComplete();
+                                            }
+
                                         }
 
                                     }
