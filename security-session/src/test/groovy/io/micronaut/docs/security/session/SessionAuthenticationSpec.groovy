@@ -26,7 +26,6 @@ import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 

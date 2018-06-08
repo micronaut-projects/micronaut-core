@@ -17,8 +17,6 @@ package io.micronaut.docs.env;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Factory;
 
 import java.net.URI;
 import java.sql.Connection;

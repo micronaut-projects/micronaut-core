@@ -27,7 +27,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.StreamRequestSpec.Book
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
@@ -35,9 +34,7 @@ import io.reactivex.FlowableEmitter
 import io.reactivex.FlowableOnSubscribe
 import io.reactivex.Single
 import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Function
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import java.nio.charset.StandardCharsets

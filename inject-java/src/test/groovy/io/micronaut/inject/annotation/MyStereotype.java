@@ -21,13 +21,6 @@ import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.retry.annotation.Recoverable;
-import io.micronaut.aop.Around;
-import io.micronaut.aop.Introduction;
-import io.micronaut.aop.introduction.StubIntroducer;
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.retry.annotation.Recoverable;
 
 import javax.inject.Scope;
 import java.lang.annotation.Documented;

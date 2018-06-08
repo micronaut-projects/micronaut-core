@@ -29,7 +29,6 @@ import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher

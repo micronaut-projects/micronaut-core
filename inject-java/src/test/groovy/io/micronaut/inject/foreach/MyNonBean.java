@@ -17,7 +17,6 @@ package io.micronaut.inject.foreach;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.EachProperty;
 
 @Factory
 public class MyNonBean {

@@ -19,10 +19,6 @@ import io.micronaut.aop.interceptors.Mutating
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
-import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Primary
 
 import javax.inject.Named
 
