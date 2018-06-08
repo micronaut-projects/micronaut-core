@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 /**
- * Configuration for Micrometer metrics.
- *
- * @author Christian Oestreich
- * @since 1.0
+ * Configuration for Micrometer-Prometheus metrics.
  */
 @Configuration
-@Requires(classes = MeterRegistry.class)
-package io.micronaut.configuration.metrics.micrometer;
+@Requires(classes = PrometheusMeterRegistry.class)
+package io.micronaut.configuration.metrics.micrometer.prometheus;
 
-import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.prometheus.PrometheusMeterRegistry;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

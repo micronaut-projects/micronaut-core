@@ -36,8 +36,8 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.getBeansOfType(MeterRegistry).size() == 3
-        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'SimpleMeterRegistry', 'GraphiteMeterRegistry'])
+        context.getBeansOfType(MeterRegistry).size() == 2
+        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'GraphiteMeterRegistry'])
     }
 
     void "verify CompositeMeterRegistry created by default"() {
@@ -48,10 +48,9 @@ class GraphiteMeterRegistryFactorySpec extends Specification {
         then:
         context.getBean(MeterRegistryCreationListener)
         context.getBean(GraphiteMeterRegistry)
-        context.getBean(SimpleMeterRegistry)
         compositeRegistry
-        compositeRegistry.registries.size() == 2
-        compositeRegistry.registries*.class.containsAll([GraphiteMeterRegistry, SimpleMeterRegistry])
+        compositeRegistry.registries.size() == 1
+        compositeRegistry.registries*.class.containsAll([GraphiteMeterRegistry])
     }
 
     @Unroll

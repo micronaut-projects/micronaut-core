@@ -35,8 +35,8 @@ class AtlasMeterRegistryFactorySpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.getBeansOfType(MeterRegistry).size() == 3
-        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'SimpleMeterRegistry', 'AtlasMeterRegistry'])
+        context.getBeansOfType(MeterRegistry).size() == 2
+        context.getBeansOfType(MeterRegistry)*.class*.simpleName.containsAll(['CompositeMeterRegistry', 'AtlasMeterRegistry'])
 
         cleanup:
         context.stop()
@@ -52,10 +52,9 @@ class AtlasMeterRegistryFactorySpec extends Specification {
         then:
         context.getBean(MeterRegistryCreationListener)
         context.getBean(AtlasMeterRegistry)
-        context.getBean(SimpleMeterRegistry)
         compositeRegistry
-        compositeRegistry.registries.size() == 2
-        compositeRegistry.registries*.class.containsAll([AtlasMeterRegistry, SimpleMeterRegistry])
+        compositeRegistry.registries.size() == 1
+        compositeRegistry.registries*.class.containsAll([AtlasMeterRegistry])
 
         cleanup:
         context.stop()

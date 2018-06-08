@@ -19,7 +19,6 @@ package io.micronaut.configuration.metrics.micrometer;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
 import io.micronaut.configuration.metrics.aggregator.MicrometerMeterRegistryConfigurer;
 import io.micronaut.context.annotation.Bean;
@@ -38,27 +37,10 @@ import java.util.Collection;
  */
 @Factory
 public class MeterRegistryFactory {
+
     public static final String MICRONAUT_METRICS = "micronaut.metrics.";
     public static final String MICRONAUT_METRICS_ENABLED = MICRONAUT_METRICS + "enabled";
     public static final String MICRONAUT_METRICS_EXPORT = MICRONAUT_METRICS + "export";
-
-    /**
-     * Create a SimpleMeterRegistry bean if metrics are enabled, true by default.
-     * <p>
-     * Micrometer packs with a SimpleMeterRegistry that holds the latest value of each meter
-     * in memory and doesn't export the data anywhere. If you don’t yet have a preferred monitoring
-     * system, you can get started playing with metrics by using the simple registry.
-     *
-     * @return A SimpleMeterRegistry.
-     */
-    @Bean
-    @Singleton
-    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-    @Requires(beans = CompositeMeterRegistry.class)
-    //todo: need a way to only include this when no other meter registry EXCEPT CompositeMeterRegistry exists
-    SimpleMeterRegistry simpleMeterRegistry() {
-        return new SimpleMeterRegistry();
-    }
 
     /**
      * Create a CompositeMeterRegistry bean if metrics are enabled, true by default.

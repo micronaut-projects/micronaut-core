@@ -405,8 +405,8 @@ You can configure this reporter using `micronaut.metrics.export.graphite`.  The 
 |*Name* |*Description*
 |enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
 |step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
-|host |The host to communicate to graphite on. Default: `localhost`
-|port |The port to communicate to graphite on. Default: `2004`
+|host |The host to communicate with graphite. Default: `localhost`
+|port |The port to communicate with graphite. Default: `2004`
 |=======
 
 .Example Graphite Config
@@ -446,7 +446,7 @@ You can configure this reporter using `micronaut.metrics.export.atlas`.  The mos
 |uri |The uri for the atlas backend. Default: `http://localhost:7101/api/v1/publish`
 |=======
 
-.Example Graphite Config
+.Example Atlas Config
 [source,yml]
 ----
 micronaut:
@@ -457,4 +457,40 @@ micronaut:
         enabled: true
         uri: http://localhost:7101/api/v1/publish
         step: PT1M
+----
+
+=== Prometheus Registry
+
+You can include the prometheus reporter via `io.micronaut.configuration:micrometer-registry-prometheus:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+	<groupId>io.micronaut.configuration</groupId>
+	<artifactId>micrometer-registry-prometheus</artifactId>
+	<version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.prometheus`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-prometheus/src/main/java/io/micrometer/prometheus/PrometheusConfig.java[PrometheusConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|descriptions | Boolean if meter descriptions should be sent to Prometheus. Turn this off to minimize the amount of data sent on each scrape. Default: `true`
+|=======
+
+.Example Prometheus Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true
 ----

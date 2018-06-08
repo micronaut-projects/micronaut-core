@@ -84,6 +84,11 @@ ext {
                     group  : 'io.micrometer',
                     name   : 'micrometer-registry-graphite'
             ],
+            'micrometer.prometheus'   : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-prometheus'
+            ],
             'micrometer.statsd'  : [
                     version: micrometerVersion,
                     group  : 'io.micrometer',
