@@ -16,7 +16,6 @@
 package io.micronaut.docs.requires;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Requires;
 
 import javax.sql.DataSource;
 import java.lang.annotation.*;

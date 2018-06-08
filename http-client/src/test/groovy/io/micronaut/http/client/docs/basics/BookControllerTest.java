@@ -25,13 +25,11 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
 import org.junit.Test;
 
-import java.net.MalformedURLException;
 import java.util.Optional;
 
 import static io.micronaut.http.HttpRequest.POST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * @author graemerocher

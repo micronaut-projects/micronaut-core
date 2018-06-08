@@ -20,11 +20,6 @@ import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
-import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import spock.lang.Ignore
 
 /**
  * @author Graeme Rocher

@@ -20,9 +20,6 @@ import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import org.hibernate.SessionFactory
 import org.hibernate.engine.spi.SessionFactoryDelegatingImpl
-import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
 
 /**
  * @author Graeme Rocher

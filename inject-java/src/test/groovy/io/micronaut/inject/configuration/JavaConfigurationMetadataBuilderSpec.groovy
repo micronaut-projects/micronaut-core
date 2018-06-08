@@ -21,8 +21,6 @@ import com.sun.tools.javac.util.Context
 import groovy.json.JsonSlurper
 import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder
 import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder
-import io.micronaut.inject.AbstractTypeElementSpec
 
 import javax.lang.model.element.TypeElement
 import javax.tools.*

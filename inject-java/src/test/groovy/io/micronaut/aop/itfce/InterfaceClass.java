@@ -16,7 +16,6 @@
 package io.micronaut.aop.itfce;
 
 import io.micronaut.aop.simple.Mutating;
-import io.micronaut.aop.simple.Mutating;
 
 import java.util.List;
 

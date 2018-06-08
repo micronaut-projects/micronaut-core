@@ -2,7 +2,6 @@ package io.micronaut.runtime.context.scope
 
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractTypeElementSpec
-import spock.lang.Specification
 
 import javax.inject.Scope
 

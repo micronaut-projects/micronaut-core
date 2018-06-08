@@ -17,18 +17,6 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Infrastructure
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.runtime.context.scope.Refreshable
-import io.micronaut.runtime.context.scope.ScopedProxy
-import io.micronaut.aop.Around
-import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.context.annotation.Infrastructure
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires

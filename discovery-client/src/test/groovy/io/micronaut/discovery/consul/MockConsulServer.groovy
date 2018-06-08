@@ -30,7 +30,6 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors

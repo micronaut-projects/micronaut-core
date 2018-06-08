@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.server.netty.java;
 
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;

@@ -18,7 +18,6 @@ package io.micronaut.aop.compile
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-import spock.lang.Specification
 
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank

@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.docs.factories
-
-import javax.inject.Singleton
-
 /**
  * @author Graeme Rocher
  * @since 1.0
