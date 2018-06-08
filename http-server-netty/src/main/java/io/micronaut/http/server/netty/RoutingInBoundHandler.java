@@ -42,7 +42,7 @@ import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -884,7 +884,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         @SuppressWarnings("unchecked")
                         Flowable<Object> bodyFlowable = responseBody.map(o -> Publishers.convertPublisher(o, Flowable.class)).orElse(Flowable.empty());
 
-                        NettyHttpResponse nettyHttpResponse = (NettyHttpResponse) response;
+                        NettyMutableHttpResponse nettyHttpResponse = (NettyMutableHttpResponse) response;
                         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
                         Optional<MediaType> specifiedMediaType = response.getContentType();
                         MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
@@ -1018,7 +1018,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
-        NettyHttpResponse nettyHttpResponse = (NettyHttpResponse) message;
+        NettyMutableHttpResponse nettyHttpResponse = (NettyMutableHttpResponse) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
         Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
         if (customizableTypeBody.isPresent()) {
@@ -1144,7 +1144,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private MutableHttpResponse<?> messageToResponse(RouteMatch<?> finalRoute, Object message) {
         MutableHttpResponse<?> response;
         if (message instanceof HttpResponse) {
-            response = ConversionService.SHARED.convert(message, NettyHttpResponse.class)
+            response = ConversionService.SHARED.convert(message, NettyMutableHttpResponse.class)
                     .orElseThrow(() -> new InternalServerException("Emitted response is not mutable"));
         } else {
             if (message instanceof HttpStatus) {
@@ -1331,7 +1331,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         @SuppressWarnings("unchecked")
-        void invoke(HttpRequest<?> request, NettyHttpResponse response, ChannelHandlerContext channelHandlerContext) {
+        void invoke(HttpRequest<?> request, NettyMutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
             this.handler.handle(body, request, response, channelHandlerContext);
         }
     }
