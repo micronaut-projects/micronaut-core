@@ -22,7 +22,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
-import com.google.testing.compile.JavaFileObjects;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;

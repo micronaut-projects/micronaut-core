@@ -19,7 +19,6 @@ package io.micronaut.web.router;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -43,7 +42,6 @@ import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.stream.StreamSupport;
 
 /**
  * Responsible for building {@link Route} instances for the annotations found in the {@code io.micronaut.http.annotation}

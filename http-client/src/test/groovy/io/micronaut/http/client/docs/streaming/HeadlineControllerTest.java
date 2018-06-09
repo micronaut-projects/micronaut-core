@@ -17,25 +17,17 @@
 package io.micronaut.http.client.docs.streaming;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.RxStreamingHttpClient;
-import io.micronaut.http.client.docs.basics.Book;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
 import org.junit.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static io.micronaut.http.HttpRequest.*;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
