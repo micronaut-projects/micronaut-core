@@ -489,5 +489,22 @@ interface ITest {
         !metadata.hasStereotype(Singleton)
     }
 
+    void "test a circular annotation is read correctly"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+package test;
+
+class Test {
+
+    @io.micronaut.inject.annotation.Circular
+    void testMethod() {}
+}
+''', 'testMethod')
+
+
+        expect:
+        metadata != null
+        metadata.hasAnnotation(Circular)
+    }
 
 }
