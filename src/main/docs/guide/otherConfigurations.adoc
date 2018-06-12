@@ -1,0 +1,1 @@
+This section covers other configurations available for use in Micronaut applications.
