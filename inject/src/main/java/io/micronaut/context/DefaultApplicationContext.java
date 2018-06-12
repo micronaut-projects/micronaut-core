@@ -440,6 +440,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             // no-op .. @Context scope beans are not started for bootstrap
         }
 
+        @Override
+        public void publishEvent(Object event) {
+            // no-op .. the bootstrap context shouldn't publish events
+        }
+
     }
 
     /**

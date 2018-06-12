@@ -51,15 +51,19 @@ import io.micronaut.http.client.*;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -97,7 +101,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
-    final int HEADERS_INITIAL_CAPACITY = 3;
+    private final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
@@ -320,9 +324,26 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                         request.accept(acceptTypes);
 
-                        publisher = streamingHttpClient.jsonStream(
-                                request, publisherArgument
-                        );
+                        boolean isEventStream = Arrays.stream(acceptTypes).anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_EVENT_STREAM_TYPE));
+
+                        if (isEventStream && streamingHttpClient instanceof SseClient) {
+                            SseClient sseClient = (SseClient) streamingHttpClient;
+                            if (publisherArgument.getType() == Event.class) {
+                                publisher = sseClient.eventStream(
+                                        request, publisherArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                                );
+                            }
+                            else {
+                                publisher = Flowable.fromPublisher(sseClient.eventStream(
+                                        request, publisherArgument
+                                )).map(Event::getData);
+                            }
+                        }
+                        else {
+                            publisher = streamingHttpClient.jsonStream(
+                                    request, publisherArgument
+                            );
+                        }
                     }
 
                 } else {
