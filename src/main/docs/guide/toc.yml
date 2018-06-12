@@ -140,6 +140,7 @@ dataAccess:
   redisSupport: Configuring Redis
   cassandraSupport: Configuring Cassandra
 otherConfigurations:
+  title: Other Configurations
   rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
