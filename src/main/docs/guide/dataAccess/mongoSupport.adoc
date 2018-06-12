@@ -16,10 +16,6 @@ Then configure the URI of the MongoDB server in `application.yml`:
 [source,yaml]
 ----
 mongodb:
-    uri: mongodb://localhost:27017
-
-# Or with user authentication
-mongodb:
     uri: mongodb://username:password@localhost:27017/databaseName
 ----
 
