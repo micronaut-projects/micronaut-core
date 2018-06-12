@@ -31,7 +31,6 @@ import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 import javax.validation.constraints.NotNull
 import java.util.concurrent.ConcurrentHashMap
 

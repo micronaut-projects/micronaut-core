@@ -34,7 +34,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

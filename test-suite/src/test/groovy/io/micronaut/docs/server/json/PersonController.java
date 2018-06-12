@@ -28,7 +28,6 @@ import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.reactivex.*;
 
-import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 

@@ -98,7 +98,6 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import javax.inject.Inject
 import javax.inject.Provider
-import javax.inject.Qualifier
 import javax.inject.Scope
 import java.lang.reflect.Modifier
 

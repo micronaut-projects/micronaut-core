@@ -15,20 +15,13 @@
  */
 package io.micronaut.inject.annotation
 
-import groovy.transform.NotYetImplemented
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.AbstractBeanDefinitionSpec
-import io.micronaut.aop.Around
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 
 import javax.inject.Qualifier
-import javax.inject.Scope
 import javax.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention

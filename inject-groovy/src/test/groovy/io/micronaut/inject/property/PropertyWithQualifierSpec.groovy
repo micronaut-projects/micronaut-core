@@ -18,14 +18,8 @@ package io.micronaut.inject.property
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.One
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.qualifiers.One
-import io.micronaut.inject.writer.BeanDefinitionVisitor
-import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Named

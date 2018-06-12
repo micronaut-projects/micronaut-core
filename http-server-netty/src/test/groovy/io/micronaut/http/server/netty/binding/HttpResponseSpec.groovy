@@ -15,14 +15,9 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.http.HttpMessage
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import spock.lang.Shared
 import spock.lang.Unroll
 

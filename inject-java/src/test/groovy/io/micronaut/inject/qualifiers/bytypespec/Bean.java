@@ -16,7 +16,6 @@
 package io.micronaut.inject.qualifiers.bytypespec;
 
 import io.micronaut.context.annotation.Type;
-import io.micronaut.context.annotation.Type;
 
 import javax.inject.Singleton;
 import java.util.Arrays;

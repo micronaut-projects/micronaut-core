@@ -16,7 +16,6 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 import java.net.URL;
 import java.util.List;

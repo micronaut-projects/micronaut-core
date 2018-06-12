@@ -19,7 +19,6 @@ import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
-import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 

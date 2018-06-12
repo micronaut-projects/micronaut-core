@@ -18,8 +18,6 @@ package io.micronaut.javax.inject.tck
 import groovy.transform.PackageScope
 import io.micronaut.javax.inject.tck.accessories.RoundThing
 import io.micronaut.javax.inject.tck.accessories.SpareTire
-import io.micronaut.javax.inject.tck.accessories.RoundThing
-import io.micronaut.javax.inject.tck.accessories.SpareTire
 
 import javax.inject.Inject
 

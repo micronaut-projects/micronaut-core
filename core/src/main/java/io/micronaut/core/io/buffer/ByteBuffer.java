@@ -208,8 +208,8 @@ public interface ByteBuffer<T> {
     ByteBuffer write(java.nio.ByteBuffer... buffers);
 
     /**
-     * Create a new {@code DataBuffer} whose contents is a shared subsequence of this
-     * data buffer's content.  Data between this data buffer and the returned buffer is
+     * Create a new {@code ByteBuffer} whose contents is a shared subsequence of this
+     * data buffer's content.  Data between this byte buffer and the returned buffer is
      * shared; though changes in the returned buffer's position will not be reflected
      * in the reading nor writing position of this data buffer.
      *
@@ -276,4 +276,20 @@ public interface ByteBuffer<T> {
      * @return string
      */
     String toString(Charset charset);
+
+    /**
+     * Find the index of the first occurrence of the given byte.
+     *
+     * @param b The byte to find
+     * @return The index of the byte
+     */
+    int indexOf(byte b);
+
+    /**
+     * Get the byte at the specified index.
+     *
+     * @param index The index
+     * @return The byte
+     */
+    byte getByte(int index);
 }

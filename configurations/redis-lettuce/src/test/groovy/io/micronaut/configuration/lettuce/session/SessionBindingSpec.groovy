@@ -29,8 +29,6 @@ import io.micronaut.session.annotation.SessionValue
 import io.reactivex.Flowable
 import spock.lang.Specification
 
-import javax.inject.Singleton
-
 /**
  * @author Graeme Rocher
  * @since 1.0

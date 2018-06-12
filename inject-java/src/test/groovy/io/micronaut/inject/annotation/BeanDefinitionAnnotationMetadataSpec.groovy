@@ -24,16 +24,6 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.EachBean
-import io.micronaut.context.annotation.Executable
-import io.micronaut.context.annotation.EachProperty
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanConfiguration
-import io.micronaut.inject.BeanDefinition
 
 import javax.inject.Scope
 import javax.inject.Singleton

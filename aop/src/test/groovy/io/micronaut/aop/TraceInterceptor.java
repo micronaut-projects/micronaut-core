@@ -18,9 +18,6 @@ package io.micronaut.aop;
 import io.micronaut.core.type.ArgumentValue;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.core.type.ArgumentValue;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.core.type.MutableArgumentValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

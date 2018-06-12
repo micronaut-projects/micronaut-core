@@ -15,9 +15,6 @@
  */
 package io.micronaut.aop.factory;
 
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.aop.simple.Mutating;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;

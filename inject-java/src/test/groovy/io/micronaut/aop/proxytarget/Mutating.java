@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.aop.proxytarget;
-import io.micronaut.context.annotation.Type;
+
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Type;
 

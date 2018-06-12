@@ -23,7 +23,6 @@ import io.micronaut.tracing.annotation.SpanTag
 import io.reactivex.Single
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

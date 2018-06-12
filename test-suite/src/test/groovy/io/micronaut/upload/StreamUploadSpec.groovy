@@ -22,7 +22,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
-import spock.lang.Ignore
 
 /**
  * @author Graeme Rocher
