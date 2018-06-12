@@ -23,11 +23,11 @@ import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
-import io.micronaut.cli.profile.commands.script.GroovyScriptCommandTransform
 import io.micronaut.cli.util.NameUtils
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import picocli.groovy.PicocliScriptASTTransformation
 
 /**
  * A {@link CommandFactory} that creates {@link Command} instances from Groovy scripts
@@ -68,7 +68,19 @@ class GroovyScriptCommandFactory extends ResourceResolvingCommandFactory<GroovyS
         importCustomizer.addStarImports("io.micronaut.cli.interactive.completers")
         importCustomizer.addStarImports("io.micronaut.cli.util")
         importCustomizer.addStarImports("io.micronaut.cli.codegen.model")
-        configuration.addCompilationCustomizers(importCustomizer, new ASTTransformationCustomizer(new GroovyScriptCommandTransform()))
+        importCustomizer.addStarImports("io.micronaut.cli.profile.commands.script")
+        importCustomizer.addImports("groovy.transform.Field")
+        importCustomizer.addImports("picocli.groovy.PicocliScript")
+        importCustomizer.addImports("picocli.CommandLine.Command")
+        importCustomizer.addImports("picocli.CommandLine.Mixin")
+        importCustomizer.addImports("picocli.CommandLine.Option")
+        importCustomizer.addImports("picocli.CommandLine.Parameters")
+        importCustomizer.addImports("picocli.CommandLine.ParentCommand")
+        importCustomizer.addImports("picocli.CommandLine.Spec")
+        importCustomizer.addImports("picocli.CommandLine.Unmatched")
+
+        //configuration.addCompilationCustomizers(importCustomizer, new ASTTransformationCustomizer(new PicocliScriptASTTransformation()))
+        configuration.addCompilationCustomizers(importCustomizer)
         def classLoader = new GroovyClassLoader(Thread.currentThread().contextClassLoader, configuration)
         return classLoader
     }

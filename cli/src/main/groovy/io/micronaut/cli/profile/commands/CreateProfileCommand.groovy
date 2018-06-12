@@ -16,23 +16,23 @@
 
 package io.micronaut.cli.profile.commands
 
+import picocli.CommandLine.Command
+import picocli.CommandLine.Parameters
+
 /**
  *  Creates a profile
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Command(name = "create-profile", description = "Creates a profile")
 class CreateProfileCommand extends CreateAppCommand {
     public static final String NAME = "create-profile"
 
-    CreateProfileCommand() {
-        description.description = "Creates a profile"
-        description.usage = "create-profile [NAME]"
-    }
+    @Parameters(arity = "0..1", paramLabel = "NAME", description = "The name of the profile to create.")
+    String profileName
 
-    @Override
-    protected void populateDescription() {
-        description.argument(name: "Profile Name", description: "The name of the profile to create.", required: false)
+    CreateProfileCommand() {
     }
 
     @Override
@@ -40,8 +40,4 @@ class CreateProfileCommand extends CreateAppCommand {
 
     @Override
     protected String getDefaultProfile() { "profile" }
-
-    protected List<String> getFlags() {
-        [INPLACE_FLAG, PROFILE_FLAG, FEATURES_FLAG]
-    }
 }
