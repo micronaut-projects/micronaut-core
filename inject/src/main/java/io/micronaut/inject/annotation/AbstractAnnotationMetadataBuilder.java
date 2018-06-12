@@ -333,6 +333,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             List<A> topLevel = new ArrayList<>();
             for (A annotationMirror : annotationMirrors) {
 
+                if (getTypeForAnnotation(annotationMirror) == element) {
+                    continue;
+                }
+
                 String annotationName = getAnnotationTypeName(annotationMirror);
                 if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
                     topLevel.add(annotationMirror);

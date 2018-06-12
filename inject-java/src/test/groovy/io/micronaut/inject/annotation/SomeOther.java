@@ -16,7 +16,6 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.aop.Around;
-import io.micronaut.aop.Around;
 
 import javax.inject.Scope;
 import java.lang.annotation.Documented;

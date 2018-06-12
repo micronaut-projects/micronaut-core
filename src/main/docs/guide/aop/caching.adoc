@@ -35,6 +35,8 @@ micronaut:
 
 The above example will configure a cache called "myCache" with a maximum size of 20.
 
+To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
+
 == Caching with Redis
 
 If you wish to use Redis to cache results then you need to add the Lettuce configuration to your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Micronaut provides an implementation that allows cached results to be read reactively. To configure the Lettuce configuration add the following dependency to your application:

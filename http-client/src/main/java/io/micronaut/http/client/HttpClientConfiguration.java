@@ -28,6 +28,7 @@ import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +55,8 @@ public abstract class HttpClientConfiguration {
     private Duration connectTimeout;
 
     private Duration readTimeout = Duration.ofSeconds(10);
+
+    private Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
 
     private Duration shutdownTimeout = Duration.ofMillis(100);
 
@@ -159,6 +162,18 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(readTimeout);
     }
 
+
+    /**
+     * For streaming requests, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * idle timeout is applied.
+     *
+     * @return The default amount of time to allow read operation connections  to remain idle
+     */
+    public Optional<Duration> getReadIdleTime() {
+        return Optional.ofNullable(readIdleTime);
+    }
+
+
     /**
      * @return The default connect timeout. Defaults to Netty default.
      */
@@ -191,6 +206,15 @@ public abstract class HttpClientConfiguration {
      */
     public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets the max read idle time for streaming requests.
+     *
+     * @param readIdleTime The read idle time
+     */
+    public void setReadIdleTime(@Nullable Duration readIdleTime) {
+        this.readIdleTime = readIdleTime;
     }
 
     /**

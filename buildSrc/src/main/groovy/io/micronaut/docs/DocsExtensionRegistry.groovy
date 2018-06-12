@@ -19,8 +19,6 @@ import org.asciidoctor.extension.spi.ExtensionRegistry
 import org.asciidoctor.extension.JavaExtensionRegistry
 import org.asciidoctor.Asciidoctor
 
-import groovy.transform.CompileStatic
-
 class DocsExtensionRegistry implements ExtensionRegistry{
     @Override
     void register(Asciidoctor asciidoctor) {

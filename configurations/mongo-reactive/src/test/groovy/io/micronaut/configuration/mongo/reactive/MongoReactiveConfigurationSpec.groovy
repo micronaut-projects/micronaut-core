@@ -20,7 +20,6 @@ import com.mongodb.MongoClientSettings
 import com.mongodb.ReadConcern
 import com.mongodb.ReadPreference
 import com.mongodb.WriteConcern
-import com.mongodb.connection.netty.NettyStreamFactory
 import com.mongodb.reactivestreams.client.MongoClient
 import com.mongodb.reactivestreams.client.Success
 import groovy.transform.NotYetImplemented

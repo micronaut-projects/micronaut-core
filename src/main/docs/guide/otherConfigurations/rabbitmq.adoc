@@ -1,0 +1,29 @@
+To get started with RabbitMQ in Micronaut, add the following dependency:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:rabbitmq"
+----
+
+.pom.xml
+[source,xml]
+----
+<dependency>
+    <groupId>io.micronaut.configuration</groupId>
+    <artifactId>rabbitmq</artifactId>
+</dependency>
+----
+
+A RabbitMQ connection factory bean will be provided based on the configuration values supplied under the `rabbitmq` configuration key. All setter methods on link:https://rabbitmq.github.io/rabbitmq-java-client/api/current/com/rabbitmq/client/ConnectionFactory.html[ConnectionFactory] are available to be configured.
+
+For example:
+
+[source,yaml]
+----
+rabbitmq:
+    uri: amqp://user:pass@host:10000/vhost
+    requestedFrameMax: 10
+    requestedChannelMax: 10
+    connectionTimeout: 5000
+----

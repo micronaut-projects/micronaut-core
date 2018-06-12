@@ -16,7 +16,6 @@
 package io.micronaut.inject.constructor.factoryinjection;
 
 import io.micronaut.context.annotation.Provided;
-import io.micronaut.context.annotation.Provided;
 
 import javax.inject.Inject;
 

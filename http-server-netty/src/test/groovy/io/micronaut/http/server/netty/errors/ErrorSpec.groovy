@@ -25,8 +25,6 @@ import io.micronaut.http.hateos.JsonError
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Get
 
-import javax.inject.Singleton
-
 /**
  * Tests for different kinds of errors and the expected responses
  *

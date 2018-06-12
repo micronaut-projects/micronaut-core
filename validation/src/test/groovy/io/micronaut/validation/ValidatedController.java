@@ -17,8 +17,7 @@ package io.micronaut.validation;
 
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
+
 import javax.validation.constraints.Digits;
 
 /**

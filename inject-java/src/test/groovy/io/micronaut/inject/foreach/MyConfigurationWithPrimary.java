@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.foreach;
 
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 

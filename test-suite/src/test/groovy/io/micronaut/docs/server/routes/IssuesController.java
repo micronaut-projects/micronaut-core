@@ -17,7 +17,6 @@ package io.micronaut.docs.server.routes;
 
 // tag::imports[]
 import io.micronaut.http.annotation.*;
-import javax.inject.Singleton;
 // end::imports[]
 
 

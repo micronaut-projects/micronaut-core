@@ -16,7 +16,6 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;

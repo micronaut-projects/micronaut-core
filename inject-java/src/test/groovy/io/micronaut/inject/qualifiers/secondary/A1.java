@@ -16,7 +16,6 @@
 package io.micronaut.inject.qualifiers.secondary;
 
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.context.annotation.Secondary;
 
 import javax.inject.Singleton;
 

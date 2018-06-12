@@ -21,18 +21,12 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import org.junit.Test;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.DefaultApplicationContext;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.web.router.*;
 
 import javax.inject.Inject;
 
 import java.util.List;
 
-import static io.micronaut.http.MediaType.*;
 import static org.junit.Assert.*;
 /**
  * @author Graeme Rocher
