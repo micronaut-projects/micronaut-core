@@ -25,18 +25,19 @@ import io.micronaut.cli.interactive.completers.StringsCompleter
 import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.commands.CommandRegistry
-import io.micronaut.cli.profile.commands.DefaultMultiStepCommand
+
+import io.micronaut.cli.profile.commands.PicocliCompleter
 import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.util.CliSettings
 import io.micronaut.cli.util.CosineSimilarity
 import io.micronaut.cli.util.VersionInfo
-import jline.console.completer.ArgumentCompleter
 import jline.console.completer.Completer
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 import org.yaml.snakeyaml.Yaml
+import picocli.CommandLine
 
 /**
  * Abstract implementation of the profile class
@@ -137,16 +138,6 @@ abstract class AbstractProfile implements Profile {
                     cmd.profile = this
                     cmd.profileRepository = profileRepository
                     internalCommands.add cmd
-                } else if (fileName.endsWith('.yml')) {
-                    def yamlCommand = profileDir.createRelative("commands/$fileName")
-                    if (yamlCommand.exists()) {
-                        def data = new Yaml().loadAs(yamlCommand.getInputStream(), Map.class)
-                        Command cmd = new DefaultMultiStepCommand(clsName.toString(), this, data)
-                        Object minArguments = data?.minArguments
-                        cmd.minArguments = minArguments instanceof Integer ? (Integer) minArguments : 1
-                        internalCommands.add cmd
-                    }
-
                 }
             }
         }
@@ -418,29 +409,8 @@ abstract class AbstractProfile implements Profile {
         Collection<Completer> completers = []
 
         for (Command cmd in commands) {
-            def description = cmd.description
-
-            def commandNameCompleter = new StringsCompleter(cmd.name)
-            if (cmd instanceof Completer) {
-                completers << new ArgumentCompleter(commandNameCompleter, (Completer) cmd)
-            } else {
-                if (description.completer) {
-                    if (description.flags) {
-                        completers << new ArgumentCompleter(commandNameCompleter,
-                                description.completer,
-                                new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
-                    } else {
-                        completers << new ArgumentCompleter(commandNameCompleter, description.completer)
-                    }
-
-                } else {
-                    if (description.flags) {
-                        completers << new ArgumentCompleter(commandNameCompleter, new StringsCompleter(description.flags.collect() { CommandArgument arg -> "-$arg.name".toString() }))
-                    } else {
-                        completers << commandNameCompleter
-                    }
-                }
-            }
+            completers << new StringsCompleter(cmd.name) // commandNameCompleter
+            completers << new PicocliCompleter(cmd.commandSpec)
         }
 
         return completers
@@ -458,14 +428,15 @@ abstract class AbstractProfile implements Profile {
             commandsByName = [:]
             List excludes = []
             def registerCommand = { Command command ->
+                new CommandLine(command) // initialize @Spec
                 def name = command.name
                 if (!commandsByName.containsKey(name) && !excludes.contains(name)) {
                     if (command instanceof ProfileRepositoryAware) {
                         ((ProfileRepositoryAware) command).setProfileRepository(profileRepository)
                     }
                     commandsByName[name] = command
-                    def desc = command.description
-                    def synonyms = desc.synonyms
+                    def desc = command.commandSpec
+                    def synonyms = desc?.aliases()
                     if (synonyms) {
                         for (syn in synonyms) {
                             commandsByName[syn] = command
@@ -512,18 +483,12 @@ abstract class AbstractProfile implements Profile {
     boolean handleCommand(io.micronaut.cli.profile.ExecutionContext context) {
         getCommands(context) // ensure initialization
 
-        def commandLine = context.commandLine
-        def commandName = commandLine.commandName
+        def parseResult = context.parseResult
+        while (parseResult.hasSubcommand()) { parseResult = parseResult.subcommand() }
+        def commandName = parseResult.commandSpec().name()
         def cmd = commandsByName[commandName]
         if (cmd) {
-            def requiredArguments = cmd?.description?.arguments
-            int requiredArgumentCount = requiredArguments?.findAll() { CommandArgument ca -> ca.required }?.size() ?: 0
-            if (commandLine.remainingArgs.size() < requiredArgumentCount) {
-                context.console.error "Command [$commandName] missing required arguments: ${requiredArguments*.name}. Type 'mn help $commandName' for more info."
-                return false
-            } else {
-                return cmd.handle(context)
-            }
+            return cmd.handle(context)
         } else {
             // Apply command name expansion (rA for run-app, tA for test-app etc.)
             cmd = commandsByName.values().find() { Command c ->
@@ -532,7 +497,7 @@ abstract class AbstractProfile implements Profile {
             if (cmd) {
                 return cmd.handle(context)
             } else {
-                context.console.error("Command not found ${context.commandLine.commandName}")
+                context.console.error("Command not found ${commandName}")
                 def mostSimilar = CosineSimilarity.mostSimilar(commandName, commandsByName.keySet())
                 List<String> topMatches = mostSimilar.subList(0, Math.min(3, mostSimilar.size()));
                 if (topMatches) {

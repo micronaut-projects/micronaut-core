@@ -16,51 +16,40 @@
 
 package io.micronaut.cli.profile.commands
 
-import io.micronaut.cli.console.parsing.CommandLine
-import io.micronaut.cli.console.parsing.CommandLineParser
+import groovy.transform.CompileStatic
 import io.micronaut.cli.profile.Command
-import io.micronaut.cli.profile.CommandDescription
+import jline.console.completer.ArgumentCompleter
 import jline.console.completer.Completer
+import picocli.AutoComplete
+import picocli.CommandLine
+import picocli.CommandLine.Spec
+import picocli.CommandLine.Model.CommandSpec
 
 /**
- * @author Graeme Rocher
+ * Base class for commands that generates JLine completion candidates based on the
+ * {@link picocli.CommandLine.Model.ArgSpec#completionCandidates completionCandidates} defined
+ * on the options and positional parameters (or the enum values of the type if the ArgSpec has an enum type).
+ *
+ * @author Remko Popma
  * @since 1.0
  */
+@CompileStatic
 abstract class ArgumentCompletingCommand implements Command, Completer {
 
-    CommandLineParser cliParser = new CommandLineParser()
+    CommandSpec commandSpec
 
-    @Override
-    final int complete(String buffer, int cursor, List<CharSequence> candidates) {
-        def desc = getDescription()
-        def commandLine = cliParser.parseString(buffer)
-        return complete(commandLine, desc, candidates, cursor)
+    @Spec
+    void setCommandSpec(CommandSpec commandSpec) {
+        this.commandSpec = commandSpec
     }
 
-    protected int complete(CommandLine commandLine, CommandDescription desc, List<CharSequence> candidates, int cursor) {
-        def invalidOptions = commandLine.undeclaredOptions.keySet().findAll { String str ->
-            desc.getFlag(str.trim()) == null
-        }
+    @Override
+    CommandSpec getCommandSpec() {
+        commandSpec
+    }
 
-        def lastOption = commandLine.lastOption()
-
-
-        for (arg in desc.flags) {
-            def argName = arg.name
-            def flag = "-$argName".toString()
-            if (!commandLine.hasOption(arg.name)) {
-                if (lastOption) {
-                    def lastArg = lastOption.key
-                    if (arg.name.startsWith(lastArg)) {
-                        candidates.add("${argName.substring(lastArg.length())} ".toString())
-                    } else if (!invalidOptions) {
-                        candidates.add "$flag ".toString()
-                    }
-                } else {
-                    candidates.add "$flag ".toString()
-                }
-            }
-        }
-        return cursor
+    @Override
+    int complete(String buffer, int cursor, List<CharSequence> candidates) {
+        return new PicocliCompleter(commandSpec).complete(buffer, cursor, candidates)
     }
 }
