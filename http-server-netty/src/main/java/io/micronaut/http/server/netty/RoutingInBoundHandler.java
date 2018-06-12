@@ -160,7 +160,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverConfiguration = serverConfiguration;
     }
 
-
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
@@ -1274,7 +1273,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (request == null || !request.getHeaders().isKeepAlive()) {
                     if (context.channel().isOpen()) {
                         context.pipeline()
-                            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                            .writeAndFlush(new DefaultLastHttpContent())
                             .addListener(f -> {
                                     if (f.isSuccess()) {
                                         future.complete(null);

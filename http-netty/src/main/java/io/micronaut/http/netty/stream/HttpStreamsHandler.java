@@ -326,8 +326,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         }
                         ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
                            .addListener(ChannelFutureListener.CLOSE);
-                    } catch (Exception e) {
-                        ctx.close();
                     } finally {
                         ctx.read();
                     }
