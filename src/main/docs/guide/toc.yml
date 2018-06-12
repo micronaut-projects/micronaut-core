@@ -139,6 +139,8 @@ dataAccess:
   neo4jSupport: Configuring Neo4j
   redisSupport: Configuring Redis
   cassandraSupport: Configuring Cassandra
+otherConfigurations:
+  rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
   java: Micronaut for Java
