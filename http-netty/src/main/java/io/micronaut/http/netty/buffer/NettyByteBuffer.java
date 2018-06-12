@@ -26,6 +26,7 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ByteProcessor;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -232,5 +233,15 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
     @Override
     public String toString(Charset charset) {
         return delegate.toString(charset);
+    }
+
+    @Override
+    public int indexOf(byte b) {
+        return delegate.bytesBefore(b);
+    }
+
+    @Override
+    public byte getByte(int index) {
+        return delegate.getByte(index);
     }
 }
