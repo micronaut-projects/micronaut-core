@@ -92,6 +92,7 @@ httpClient:
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
+    clientAnnotationStreaming: Streaming with @Client
     clientHeaders: Customizing Request Headers
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
