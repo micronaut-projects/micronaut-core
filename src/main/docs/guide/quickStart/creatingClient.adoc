@@ -1,4 +1,4 @@
-As mentioned previously, Micronaut is both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided out of the box which you can use to test the `HelloController` created in the previous section.
+As mentioned previously, Micronaut includes both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided out of the box which you can use to test the `HelloController` created in the previous section.
 
 For example, the following test is written using http://spockframework.org[Spock Framework]:
 
