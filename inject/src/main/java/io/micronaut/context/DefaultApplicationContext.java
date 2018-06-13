@@ -471,21 +471,28 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
             Set<String> activeNames = getActiveNames();
-            String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
-            if (this.bootstrapEnvironment == null) {
-                this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
-            }
-            BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
-            for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
-                addPropertySource(propertySource);
+            // fast path for functions
+            if (activeNames.contains(Environment.FUNCTION)) {
+                return super.readPropertySourceList(name);
             }
+            else {
+                String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
+                if (this.bootstrapEnvironment == null) {
+                    this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
+                }
+                BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
-            Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
-            for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
-                addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
+                    addPropertySource(propertySource);
+                }
+
+                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                }
+                return super.readPropertySourceList(name);
             }
-            return super.readPropertySourceList(name);
         }
 
         private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(String... environmentNames) {
