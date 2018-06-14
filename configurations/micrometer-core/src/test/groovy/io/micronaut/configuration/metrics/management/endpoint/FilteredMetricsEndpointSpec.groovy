@@ -6,6 +6,8 @@ import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer
 import io.micronaut.configuration.metrics.aggregator.MicrometerMeterRegistryConfigurer
+import io.micronaut.configuration.metrics.binder.jvm.JvmMeterRegistryBinder
+import io.micronaut.configuration.metrics.binder.system.SystemMeterRegistryBinder
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
@@ -50,7 +52,15 @@ class FilteredMetricsEndpointSpec extends Specification {
                 'metrics.test.filters.enabled': true
         ])
         URL server = embeddedServer.getURL()
+
+        when:
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        then:
+        embeddedServer.applicationContext.findBean(MetricsEndpoint.class).isPresent()
+        embeddedServer.applicationContext.findBean(CompositeMeterRegistry.class).isPresent()
+        embeddedServer.applicationContext.findBean(JvmMeterRegistryBinder.class).isPresent()
+        embeddedServer.applicationContext.findBean(SystemMeterRegistryBinder.class).isPresent()
 
         when:
         def response = rxClient.exchange("/metrics", Map).blockingFirst()
