@@ -65,9 +65,34 @@ ext {
                     modules:['jackson-datatype-jsr310']
             ],
             jsr305:[
-                version:jsr305Version,
-                group:'com.google.code.findbugs',
-                name:'jsr305'
+                    version:jsr305Version,
+                    group:'com.google.code.findbugs',
+                    name:'jsr305'
+            ],
+            'micrometer.core'    : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-core'
+            ],
+            'micrometer.atlas'   : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-atlas'
+            ],
+            'micrometer.graphite': [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-graphite'
+            ],
+            'micrometer.prometheus'   : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-prometheus'
+            ],
+            'micrometer.statsd'  : [
+                    version: micrometerVersion,
+                    group  : 'io.micrometer',
+                    name   : 'micrometer-registry-statsd'
             ],
             neo4j: [
                 version: neo4jVersion,
