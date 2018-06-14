@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("unchecked")
 public abstract class AbstractRibbonClientConfig implements IClientConfig {
 
     /**
@@ -119,6 +120,7 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
      * @see IClientConfig#setProperty(IClientConfigKey, Object)
      */
     @Override
+    @Deprecated
     public void setProperty(IClientConfigKey key, Object value) {
         set(key, value);
     }
@@ -127,6 +129,7 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
      * @see IClientConfig#getProperty(IClientConfigKey)
      */
     @Override
+    @Deprecated
     public Object getProperty(IClientConfigKey key) {
         return get(key, null);
     }
@@ -134,8 +137,8 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     /**
      * @see IClientConfig#getProperty(IClientConfigKey, Object)
      */
-    @SuppressWarnings("unchecked")
     @Override
+    @Deprecated
     public Object getProperty(IClientConfigKey key, Object defaultVal) {
         return get(key, defaultVal);
     }
@@ -143,7 +146,6 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     /**
      * @see IClientConfig#containsProperty(IClientConfigKey)
      */
-    @SuppressWarnings("unchecked")
     @Override
     public boolean containsProperty(IClientConfigKey key) {
         return key != null && (customSettings.containsKey(key) || environment.get(qualifyKey(key), key.type()).isPresent());

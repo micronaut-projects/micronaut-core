@@ -1,7 +1,11 @@
 introduction: Introduction
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI:
+    title: Build/Install the CLI
+    installSdkman: Install with Sdkman
+    installWindows: Install through Binary on Windows
+    buildSource: Building from Source
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
@@ -160,6 +164,7 @@ management:
     beansEndpoint: The Beans Endpoint
     infoEndpoint: The Info Endpoint
     healthEndpoint: The Health Endpoint
+    metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     stopEndpoint: The Server Stop Endpoint

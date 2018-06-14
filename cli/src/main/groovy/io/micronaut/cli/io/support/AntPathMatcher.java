@@ -522,7 +522,7 @@ public class AntPathMatcher {
     /**
      * The default {@link Comparator} implementation returned by {@link #getPatternComparator(String)}.
      */
-    private static class AntPatternComparator implements Comparator<String> {
+    private static final class AntPatternComparator implements Comparator<String> {
 
         private final String path;
 

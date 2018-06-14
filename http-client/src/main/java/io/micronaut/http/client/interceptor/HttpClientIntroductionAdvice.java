@@ -63,7 +63,6 @@ import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -332,14 +331,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 publisher = sseClient.eventStream(
                                         request, publisherArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
                                 );
-                            }
-                            else {
+                            } else {
                                 publisher = Flowable.fromPublisher(sseClient.eventStream(
                                         request, publisherArgument
                                 )).map(Event::getData);
                             }
-                        }
-                        else {
+                        } else {
                             publisher = streamingHttpClient.jsonStream(
                                     request, publisherArgument
                             );

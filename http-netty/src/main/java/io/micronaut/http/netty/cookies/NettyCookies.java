@@ -83,6 +83,7 @@ public class NettyCookies implements Cookies {
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
         if (requiredType == Cookie.class || requiredType == Object.class) {
+            //noinspection unchecked
             return (Optional<T>) findCookie(name);
         } else {
             return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType)));

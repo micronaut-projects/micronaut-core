@@ -37,13 +37,12 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
         super(propertyResolver, placeholderResolver);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
         if (Settings.SETTING_FAIL_ON_ERROR.equals(key) && defaultValue == null) {
-            //noinspection unchecked
             return (T) super.getProperty(key, Boolean.class, Boolean.TRUE);
         } else {
-
             return super.getProperty(key, targetType, defaultValue);
         }
     }

@@ -50,6 +50,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * Construct a sync cache implementation with given configurations.
      *
      * @param cacheConfiguration The cache configurations
+     * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
     public DefaultSyncCache(CacheConfiguration cacheConfiguration, ApplicationContext applicationContext, ConversionService<?> conversionService) {
@@ -138,7 +139,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     }
 
     @SuppressWarnings("unchecked")
-    private Weigher<Object,Object> findWeigher() {
+    private Weigher<Object, Object> findWeigher() {
         return applicationContext.findBean(Weigher.class, Qualifiers.byName(cacheConfiguration.getCacheName()))
                 .orElseGet(() -> applicationContext.findBean(Weigher.class)
                         .orElse(Weigher.singletonWeigher()));

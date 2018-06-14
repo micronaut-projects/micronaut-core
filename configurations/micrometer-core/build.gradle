@@ -1,0 +1,12 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compileOnly project(":management")
+
+    compile "io.micrometer:micrometer-core:$micrometerVersion"
+
+    testCompile project(":management")
+    testCompile project(":http-client")
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
+    testCompile dependencyModuleVersion("groovy", "groovy-json")
+}
