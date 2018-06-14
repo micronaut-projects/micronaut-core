@@ -156,6 +156,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     command.toObservable().toSingle().subscribe(new SingleSubscriber<Object>() {
                         @Override
                         public void onSuccess(Object value) {
+                            //noinspection unchecked
                             future.complete(value);
                         }
 
@@ -177,7 +178,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                 HystrixCommand<Object> hystrixCommand = new HystrixCommand<Object>(setter) {
                     @Override
-                    protected Object run() throws Exception {
+                    protected Object run() {
                         return context.proceed();
                     }
 
