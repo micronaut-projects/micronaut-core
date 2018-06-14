@@ -54,15 +54,19 @@ class FilteredMetricsEndpointSpec extends Specification {
         URL server = embeddedServer.getURL()
 
         when:
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+        ApplicationContext context = embeddedServer.getApplicationContext()
 
         then:
-        embeddedServer.applicationContext.findBean(MetricsEndpoint.class).isPresent()
-        embeddedServer.applicationContext.findBean(CompositeMeterRegistry.class).isPresent()
-        embeddedServer.applicationContext.findBean(JvmMeterRegistryBinder.class).isPresent()
-        embeddedServer.applicationContext.findBean(SystemMeterRegistryBinder.class).isPresent()
+        context.getBeansOfType(MeterFilter.class)?.size() == 2
+        MicrometerMeterRegistryConfigurer configurer = context.getBean(MeterRegistryConfigurer)
+        configurer.filters.size() == 2
+        context.containsBean(MetricsEndpoint)
+        context.containsBean(MeterRegistry)
+        context.containsBean(CompositeMeterRegistry)
+        context.containsBean(SimpleMeterRegistry)
 
         when:
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
         def response = rxClient.exchange("/metrics", Map).blockingFirst()
         Map result = response.body()
 
