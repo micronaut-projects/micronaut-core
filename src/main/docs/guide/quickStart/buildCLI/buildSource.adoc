@@ -37,4 +37,4 @@ You should now be able to run the Micronaut CLI.
 mn>
 ----
 
-TIP: You can also point SDKMAN to local installation for dev purpose using following command `sdk install micronaut dev /path/to/checkout`
+TIP: You can also point SDKMAN to local installation for dev purpose using following command `sdk install micronaut dev /path/to/checkout/cli/build`
