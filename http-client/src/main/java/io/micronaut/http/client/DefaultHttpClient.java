@@ -133,8 +133,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
-    private static final byte LF = (byte) '\n';
-    private static final byte CR = (byte) '\r';
 
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
@@ -1691,7 +1689,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         /**
          * @return The Netty request
          */
-        public HttpRequest getNettyRequest() {
+        HttpRequest getNettyRequest() {
             return nettyRequest;
         }
     }
@@ -1705,7 +1703,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         String name;
         Duration retry;
 
-        public CurrentEvent(CompositeByteBuf data) {
+        CurrentEvent(CompositeByteBuf data) {
             this.data = data;
         }
     }

@@ -404,7 +404,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         List<String> validFlags = getFlags()
         commandLine.undeclaredOptions.each { String key, Object value ->
             if (!validFlags.contains(key)) {
-                List possibleSolutions = validFlags.findAll { it.substring(0, 2) == key.substring(0, 2) }
+                List possibleSolutions = validFlags.findAll { it.startsWith(key.take(2).toString()) }
                 StringBuilder warning = new StringBuilder("Unrecognized flag: ${key}.")
                 if (possibleSolutions) {
                     warning.append(" Possible solutions: ")
@@ -577,7 +577,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
-                    it.substring(0, 2) == invalidFeature.substring(0, 2)
+                    it.startsWith(invalidFeature.take(2).toString())
                 }
                 StringBuilder warning = new StringBuilder("Feature ${invalidFeature} does not exist in the profile ${profile.name}!")
                 if (possibleSolutions) {
