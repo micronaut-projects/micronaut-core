@@ -57,16 +57,19 @@ class InMemorySessionStoreSpec extends Specification {
 
         when:
         session == sessionStore.findSession(session.id).get().get()
+        def conditions = new PollingConditions(timeout: 10)
 
         then:
-        session.lastAccessedTime > lastAccessedTime
-        session.get("foo").isPresent()
-        session.get("foo").get() == "bar"
+        conditions.eventually {
+            session.lastAccessedTime > lastAccessedTime
+            session.get("foo").isPresent()
+            session.get("foo").get() == "bar"
+        }
 
         when:
         listener.events.clear()
         sessionStore.deleteSession(session.id)
-        def conditions = new PollingConditions(timeout: 10)
+
 
         then:
         conditions.eventually {
