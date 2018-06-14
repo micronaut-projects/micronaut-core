@@ -162,8 +162,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
                     .map(codec -> {
                         if (data != null) {
                             return codec.decode(type, data);
-                        }
-                        else {
+                        } else {
                             // try System.in
                             return codec.decode(type, System.in);
                         }
@@ -175,8 +174,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
         private <T> IllegalArgumentException newIllegalArgument(Class<T> dataType, String data) {
             if (data != null) {
                 return new IllegalArgumentException("Passed data [" + data + "] cannot be converted to type: " + dataType);
-            }
-            else {
+            } else {
                 return new IllegalArgumentException("Input data cannot be converted to type: " + dataType);
             }
         }

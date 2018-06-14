@@ -26,7 +26,6 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.util.ByteProcessor;
 
 import java.io.InputStream;
 import java.io.OutputStream;

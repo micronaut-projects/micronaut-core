@@ -475,8 +475,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             // fast path for functions
             if (activeNames.contains(Environment.FUNCTION)) {
                 return super.readPropertySourceList(name);
-            }
-            else {
+            } else {
                 String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
                 if (this.bootstrapEnvironment == null) {
                     this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
