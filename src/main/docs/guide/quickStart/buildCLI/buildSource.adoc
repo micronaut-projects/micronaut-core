@@ -8,10 +8,10 @@ Clone the repository:
 `cd` into the `micronaut-core` directory and run the following command:
 
 ----
-> ./gradlew publishToMavenLocal
+> ./gradlew cli:fatJar
 ----
 
-This will publish the CLI and core libraries to your local Maven cache.
+This will create the farJar for CLI.
 
 In your shell profile (`~/.bash_profile` if you are using the Bash shell), export the `MICRONAUT_HOME` directory and add the CLI path to your `PATH`:
 
