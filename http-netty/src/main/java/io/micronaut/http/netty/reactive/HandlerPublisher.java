@@ -452,12 +452,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                     } else {
                         state = BUFFERING;
                     }
-                }
-                else if (outstandingDemand > 0 && state == DEMANDING) {
+                } else if (outstandingDemand > 0 && state == DEMANDING) {
                     requestDemand();
                 }
-            }
-            else {
+            } else {
                 // Long.MAX_VALUE to demand all items
                 requestDemand();
             }
