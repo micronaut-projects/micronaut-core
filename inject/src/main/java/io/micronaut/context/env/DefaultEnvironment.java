@@ -134,12 +134,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
-        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
-        specifiedNames.addAll(environmentsAndPackage.enviroments);
-        String aPackage = environmentsAndPackage.aPackage;
-        if (aPackage != null) {
-            packages.add(aPackage);
+
+        if (!specifiedNames.contains(Environment.FUNCTION)) {
+            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
+            specifiedNames.addAll(environmentsAndPackage.enviroments);
+            String aPackage = environmentsAndPackage.aPackage;
+            if (aPackage != null) {
+                packages.add(aPackage);
+            }
         }
+
         this.classLoader = resourceLoader.getClassLoader();
         this.names = specifiedNames;
         conversionService.addConverter(

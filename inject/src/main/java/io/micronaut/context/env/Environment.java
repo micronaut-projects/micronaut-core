@@ -63,6 +63,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String CLOUD = "cloud";
 
     /**
+     * The application is executing as a function.
+     */
+    String FUNCTION = "function";
+
+    /**
      * The default bootstrap name.
      */
     String BOOTSTRAP_NAME_PROPERTY = "micronaut.bootstrap.name";

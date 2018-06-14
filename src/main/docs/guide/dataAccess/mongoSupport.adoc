@@ -16,7 +16,7 @@ Then configure the URI of the MongoDB server in `application.yml`:
 [source,yaml]
 ----
 mongodb:
-    uri: mongodb://localhost:27017
+    uri: mongodb://username:password@localhost:27017/databaseName
 ----
 
 TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string[MongoDB Connection String] format.
@@ -75,7 +75,7 @@ You can create multiple MongoDB connections using the `mongodb.servers` setting.
 mongodb:
     servers:
         another:
-            uri: "mongodb://localhost:27018"
+            uri: mongodb://localhost:27018
 ----
 
 With the above configuration in place you can inject a `MongoClient` using the name `another`:
