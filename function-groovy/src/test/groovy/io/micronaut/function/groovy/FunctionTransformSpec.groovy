@@ -44,6 +44,20 @@ class FunctionTransformSpec extends Specification{
         uploadDir.delete()
     }
 
+    void 'test generics return type of get function'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['micronaut.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+
+        Class functionClass = gcl.parseClass('''
+import io.reactivex.Maybe
+Maybe<String> helloWorldMaster() {
+    Maybe.just('hello-world-master')
+}
+''')
+    }
+
     void 'test parse function'() {
         given:
         CompilerConfiguration configuration = new CompilerConfiguration()
