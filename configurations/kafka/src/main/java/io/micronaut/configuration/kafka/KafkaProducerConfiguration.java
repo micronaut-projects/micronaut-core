@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
-import javax.annotation.Nonnull;
 import java.util.Properties;
 
 /**
@@ -32,7 +31,7 @@ import java.util.Properties;
  * @since 1.0
  */
 @ConfigurationProperties(KafkaProducerConfiguration.PREFIX)
-public class KafkaProducerConfiguration {
+public class KafkaProducerConfiguration extends AbstractKafkaConfiguration {
 
     /**
      * The default configuration for producers.
@@ -42,7 +41,6 @@ public class KafkaProducerConfiguration {
 
     private static final Class DEFAULT_KEY_SERIALIZER = org.apache.kafka.common.serialization.ByteArraySerializer.class;
     private static final Class DEFAULT_VALUE_SERIALIZER = org.apache.kafka.common.serialization.StringSerializer.class;
-    private final Properties config;
 
 
     /**
@@ -54,20 +52,13 @@ public class KafkaProducerConfiguration {
     public KafkaProducerConfiguration(
             KafkaDefaultConfiguration defaultConfiguration,
             Environment environment) {
-        this.config = new Properties();
-        this.config.putAll(defaultConfiguration.getConfig());
-        this.config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
+        super(new Properties());
+        Properties config = getConfig();
+        config.putAll(defaultConfiguration.getConfig());
+        config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
         config.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, DEFAULT_KEY_SERIALIZER);
         config.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_SERIALIZER);
 
-    }
-
-    /**
-     * @return The Kafka Producer configuration
-     */
-    @SuppressWarnings("WeakerAccess")
-    public @Nonnull Properties getConfig() {
-        return config;
     }
 
 }
