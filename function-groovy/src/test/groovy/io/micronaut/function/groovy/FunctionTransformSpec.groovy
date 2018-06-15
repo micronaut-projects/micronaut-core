@@ -35,7 +35,7 @@ import spock.util.concurrent.PollingConditions
  * @author Graeme Rocher
  * @since 1.0
  */
-class FunctionTransformSpec extends Specification{
+class FunctionTransformSpec extends Specification {
 
     @Shared File uploadDir = File.createTempDir()
 
@@ -44,6 +44,7 @@ class FunctionTransformSpec extends Specification{
         uploadDir.delete()
     }
 
+//    @Ignore
     void 'test generics return type of get function'() {
         given:
         CompilerConfiguration configuration = new CompilerConfiguration()
@@ -56,6 +57,9 @@ Maybe<String> helloWorldMaster() {
     Maybe.just('hello-world-master')
 }
 ''')
+
+        expect:
+        functionClass.getAnnotation(FunctionBean).method() == 'helloWorldMaster'
     }
 
     void 'test parse function'() {
@@ -101,7 +105,7 @@ int val() {
         GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
 
         when:
-        Class functionClass = gcl.parseClass('''
+        gcl.parseClass('''
 int round(float value) {
     Math.round(value) 
 }
@@ -254,7 +258,7 @@ Test test(Test test) {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(
                 client.exchange(
                         HttpRequest.POST("/sum", data)
-                                .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                                .contentType(MediaType.APPLICATION_JSON_TYPE),
                         String
                 )
         )
@@ -279,7 +283,7 @@ Test test(Test test) {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(
                 client.exchange(
                         HttpRequest.POST("/round", data)
-                                .contentType(io.micronaut.http.MediaType.TEXT_PLAIN_TYPE),
+                                .contentType(MediaType.TEXT_PLAIN_TYPE),
                         String
                 )
         )
