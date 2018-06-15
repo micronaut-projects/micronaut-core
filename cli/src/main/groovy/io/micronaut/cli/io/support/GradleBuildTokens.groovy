@@ -18,6 +18,7 @@ package io.micronaut.cli.io.support
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.graph.Dependency
 
 /**
@@ -52,10 +53,6 @@ class GradleBuildTokens extends BuildTokens {
             buildDependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope == 'build' }
         }
 
-        if (getJavaVersion() >= 9) {
-            dependencies.add(getAnnotationApi())
-        }
-
         dependencies = dependencies.unique()
 
         dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
@@ -87,7 +84,7 @@ class GradleBuildTokens extends BuildTokens {
         tokens.put("buildDependencies", buildDependencies)
         tokens.put("buildRepositories", buildRepositories)
         tokens.put("repositories", repositories)
-        tokens.put("jdkversion", getJdkVersion())
+        tokens.put("jdkversion", VersionInfo.getJdkVersion())
 
         tokens
     }

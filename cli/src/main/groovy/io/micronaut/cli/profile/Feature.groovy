@@ -77,4 +77,14 @@ interface Feature {
      * @return Whether the feature was requested on the command line
      */
     Boolean getRequested()
+
+    /**
+     * @return The minimum required Java version
+     */
+    Integer getMinJavaVersion()
+
+    /**
+     * @return The maximum supported Java version
+     */
+    Integer getMaxJavaVersion()
 }
