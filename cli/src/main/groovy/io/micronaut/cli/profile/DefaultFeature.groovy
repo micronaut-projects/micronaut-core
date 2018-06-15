@@ -46,6 +46,8 @@ class DefaultFeature implements Feature {
     final List<String> buildPlugins
     final List<String> dependentFeatures = []
     private Boolean requested = false
+    final Integer minJava
+    final Integer maxJava
 
     DefaultFeature(Profile profile, String name, Resource location) {
         this.profile = profile
@@ -84,6 +86,9 @@ class DefaultFeature implements Feature {
             }
         }
         this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
+
+        this.minJava = (Integer) configuration.get("java.min") ?: null
+        this.maxJava = (Integer) configuration.get("java.max") ?: null
     }
 
     @Override
@@ -94,6 +99,16 @@ class DefaultFeature implements Feature {
     @Override
     Iterable<Feature> getDependentFeatures(io.micronaut.cli.profile.Profile profile) {
         profile.getFeatures().findAll { Feature f -> dependentFeatures.contains(f.name) }
+    }
+
+    @Override
+    Integer getMinJavaVersion() {
+        minJava
+    }
+
+    @Override
+    Integer getMaxJavaVersion() {
+        maxJava
     }
 
     @Override
