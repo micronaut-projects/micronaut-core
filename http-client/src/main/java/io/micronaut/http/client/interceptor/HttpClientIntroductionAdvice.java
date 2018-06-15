@@ -185,6 +185,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     String headerValue = header.value();
                     headers.put(headerName, headerValue);
                 }
+            } else {
+                Header header = context.getAnnotation(Header.class);
+                headers.put(header.name(), header.value());
             }
 
             List<NettyCookie> cookies = new ArrayList<>();
