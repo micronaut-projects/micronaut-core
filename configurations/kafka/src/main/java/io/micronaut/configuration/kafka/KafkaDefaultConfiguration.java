@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
-import javax.annotation.Nonnull;
 import java.util.Properties;
 
 /**
@@ -29,20 +28,8 @@ import java.util.Properties;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(KafkaDefaultConfiguration.PREFIX)
-public class KafkaDefaultConfiguration {
-    /**
-     * The default prefix used for Kafka configuration.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final String PREFIX = "kafka";
-    /**
-     * The default bootstrap server address.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
-
-    private final Properties config;
+@ConfigurationProperties(AbstractKafkaConfiguration.PREFIX)
+public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
 
     /**
      * Constructs the default Kafka configuration.
@@ -50,22 +37,11 @@ public class KafkaDefaultConfiguration {
      * @param environment The environment
      */
     public KafkaDefaultConfiguration(Environment environment) {
-        this.config = environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new);
-        config.putIfAbsent(
+        super(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
+        getConfig().putIfAbsent(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                KafkaDefaultConfiguration.DEFAULT_BOOTSTRAP_SERVERS
+                AbstractKafkaConfiguration.DEFAULT_BOOTSTRAP_SERVERS
         );
-    }
-
-    /**
-     * @return The Kafka configuration
-     */
-    @SuppressWarnings("WeakerAccess")
-    public @Nonnull Properties getConfig() {
-        if (config != null) {
-            return config;
-        }
-        return new Properties();
     }
 
 }
