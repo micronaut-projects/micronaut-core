@@ -30,7 +30,7 @@ import java.util.Properties;
  * @since 1.0
  */
 @ConfigurationProperties(KafkaConsumerConfiguration.PREFIX)
-public class KafkaConsumerConfiguration {
+public class KafkaConsumerConfiguration extends AbstractKafkaConfiguration {
 
     /**
      * The default consumers configuration.
@@ -41,8 +41,6 @@ public class KafkaConsumerConfiguration {
     private static final Class DEFAULT_VALUE_DESERIALIZER = org.apache.kafka.common.serialization.StringDeserializer.class;
 
 
-    private final Properties config;
-
     /**
      * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.
      *
@@ -52,19 +50,13 @@ public class KafkaConsumerConfiguration {
     public KafkaConsumerConfiguration(
             KafkaDefaultConfiguration defaultConfiguration,
             Environment environment) {
-        this.config = new Properties();
-        this.config.putAll(defaultConfiguration.getConfig());
-        this.config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
-
+        super(new Properties());
+        Properties config = getConfig();
+        config.putAll(defaultConfiguration.getConfig());
+        config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
         config.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, DEFAULT_KEY_DESERIALIZER);
         config.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_DESERIALIZER);
     }
 
-    /**
-     * @return The Kafka Consumer configuration
-     */
-    public Properties getConfig() {
-        return config;
-    }
 
 }
