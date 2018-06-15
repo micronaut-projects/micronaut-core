@@ -35,6 +35,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     public static final String PREFIX = "${";
 
+    /**
+     * Suffix for placeholder in properties.
+     */
+    public static final String SUFFIX = "}";
+
     private final PropertyResolver environment;
     private final String prefix;
 
