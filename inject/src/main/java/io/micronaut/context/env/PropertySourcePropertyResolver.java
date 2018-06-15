@@ -228,6 +228,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         if (LOG.isTraceEnabled()) {
                 LOG.trace("No value found for property: {}", name);
         }
+
+        Class<T> requiredType = conversionContext.getArgument().getType();
+        if (Properties.class.isAssignableFrom(requiredType)) {
+            return Optional.of((T) new Properties());
+        }
+        else if (Map.class.isAssignableFrom(requiredType)) {
+            return Optional.of((T) Collections.emptyMap());
+        }
         return Optional.empty();
     }
 
