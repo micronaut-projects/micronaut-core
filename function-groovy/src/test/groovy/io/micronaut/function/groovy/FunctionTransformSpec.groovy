@@ -44,7 +44,6 @@ class FunctionTransformSpec extends Specification {
         uploadDir.delete()
     }
 
-//    @Ignore
     void 'test generics return type of get function'() {
         given:
         CompilerConfiguration configuration = new CompilerConfiguration()
