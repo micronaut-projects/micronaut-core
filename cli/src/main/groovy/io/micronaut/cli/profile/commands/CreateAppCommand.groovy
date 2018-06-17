@@ -415,7 +415,8 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
 
         boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
-        String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0] : ""
+        String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0]
+        : ""
 
         Set<String> features = new HashSet<>()
         features.add(resolveLang(commandLine))
@@ -613,8 +614,18 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             features.removeAll(toRemove)
         }
 
+        Integer javaVersion = VersionInfo.getJavaVersion()
+
+        features = features.findAll { it.isSupported(javaVersion) }
+
         for (int i = 0; i < features.size(); i++) {
-            features.addAll(features[i].getDependentFeatures(profile))
+            Iterator<Feature> dependents = features[i].getDependentFeatures(profile).iterator()
+            while (dependents.hasNext()) {
+                Feature d = dependents.next()
+                if (d.isSupported(javaVersion)) {
+                    features.add(d)
+                }
+            }
         }
 
         if (validRequestedFeatureNames) {
@@ -627,7 +638,6 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
 
         features
     }
-
 
     protected String getDefaultProfile() {
         ProfileRepository.DEFAULT_PROFILE_NAME
