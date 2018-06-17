@@ -30,7 +30,7 @@ class VersionInfo {
         int dotPos = version.indexOf('.')
         int dashPos = version.indexOf('-')
         return Integer.parseInt(version.substring(0,
-                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : version.size()));
+                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : version.size()))
     }
 
     static String getJdkVersion() {

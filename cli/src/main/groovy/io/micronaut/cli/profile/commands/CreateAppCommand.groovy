@@ -415,7 +415,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
         }
 
         boolean inPlace = commandLine.hasOption(INPLACE_FLAG)
-        String appName = commandLine.remainingArgs ? commandLine.remainingArgs [0]
+        String appName = commandLine.remainingArgs ? commandLine.remainingArgs[0]
         : ""
 
         Set<String> features = new HashSet<>()
@@ -614,10 +614,18 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             features.removeAll(toRemove)
         }
 
-        features = supportedFeatures(features)
+        Integer javaVersion = VersionInfo.getJavaVersion()
+
+        features = features.findAll { it.isSupported(javaVersion) }
 
         for (int i = 0; i < features.size(); i++) {
-            features.addAll(features[i].getDependentFeatures(profile))
+            Iterator<Feature> dependents = features[i].getDependentFeatures(profile).iterator()
+            while (dependents.hasNext()) {
+                Feature d = dependents.next()
+                if (d.isSupported(javaVersion)) {
+                    features.add(d)
+                }
+            }
         }
 
         if (validRequestedFeatureNames) {
@@ -628,17 +636,7 @@ class CreateAppCommand extends ArgumentCompletingCommand implements ProfileRepos
             }.toSet()
         }
 
-        //final check in case dependent features require Java min/max
-        supportedFeatures(features)
-    }
-
-
-    protected static Set<Feature> supportedFeatures(Set<Feature> features) {
-        Integer javaVersion = VersionInfo.getJavaVersion()
-        features.findAll {
-            (!it.minJavaVersion || it.minJavaVersion <= javaVersion) &&
-                    (!it.maxJavaVersion || it.maxJavaVersion >= javaVersion)
-        }
+        features
     }
 
     protected String getDefaultProfile() {

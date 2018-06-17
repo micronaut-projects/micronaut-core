@@ -87,4 +87,6 @@ interface Feature {
      * @return The maximum supported Java version
      */
     Integer getMaxJavaVersion()
+
+    boolean isSupported(Integer javaVersion)
 }
