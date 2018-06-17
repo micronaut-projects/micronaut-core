@@ -22,8 +22,6 @@ import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.type.TypeKind.ARRAY;
 
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
-import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
@@ -40,8 +38,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -88,7 +84,6 @@ import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -99,7 +94,6 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * <p>The core annotation processed used to generate bean definitions and power AOP for Micronaut.</p>
@@ -146,15 +140,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return false;
         }
 
-        JavaVisitorContext visitorContext = new JavaVisitorContext(processingEnv.getMessager());
-        SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
-        Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
-        for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
-            if (definition.isPresent()) {
-                loadedVisitors.put(definition.getName(), new LoadedVisitor(definition.load(), visitorContext, genericUtils, processingEnv, annotationUtils));
-            }
-        }
-
         annotations = annotations
             .stream()
             .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
@@ -162,13 +147,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
-            for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
-                try {
-                    loadedVisitor.getVisitor().start(visitorContext);
-                } catch (Throwable e) {
-                    error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
-                }
-            }
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
             // accumulate all the class elements for all annotated elements
@@ -187,16 +165,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String name = typeElement.getQualifiedName().toString();
                     if (!beanDefinitionWriters.containsKey(name)) {
                         if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                            Stream<LoadedVisitor> matchedVisitors = loadedVisitors.values().stream().filter((v) -> v.matches(typeElement));
                             boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
                             if (!isInterface) {
                                 if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement, matchedVisitors.collect(Collectors.toList()));
+                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
                                     beanDefinitionWriters.put(name, visitor);
                                 }
                             } else {
                                 if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE)) {
-                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement, matchedVisitors.collect(Collectors.toList()));
+                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
                                     beanDefinitionWriters.put(name, visitor);
                                 }
                             }
@@ -249,13 +226,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
 
-                for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
-                    try {
-                        loadedVisitor.getVisitor().finish(visitorContext);
-                    } catch (Throwable e) {
-                        error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
-                    }
-                }
                 AnnotationUtils.invalidateCache();
                 return true;
             }
@@ -307,7 +277,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
      */
     class AnnBeanElementVisitor extends ElementScanner8<Object, Object> {
         private final TypeElement concreteClass;
-        private final List<LoadedVisitor> visitors;
         private final Map<Name, BeanDefinitionVisitor> beanDefinitionWriters;
         private final boolean isConfigurationPropertiesType;
         private final boolean isFactoryType;
@@ -319,11 +288,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         /**
          * @param concreteClass The {@link TypeElementVisitor}
-         * @param visitors      The loaded visitors
          */
-        AnnBeanElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
+        AnnBeanElementVisitor(TypeElement concreteClass) {
             this.concreteClass = concreteClass;
-            this.visitors = visitors;
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
@@ -358,7 +325,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         public Object visitType(TypeElement classElement, Object o) {
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
 
-            visitors.forEach(v -> v.visit(classElement, typeAnnotationMetadata));
 
             if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
@@ -366,10 +332,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
                 if (constructorData != null) {
-                    visitors.stream()
-                        .filter(v -> v.matches(constructorData.getAnnotationMetadata()))
-                        .forEach(v -> v.visit(constructor, constructorData.getAnnotationMetadata()));
-
                     aopProxyWriter.visitBeanDefinitionConstructor(
                         constructorData.getAnnotationMetadata(),
                         constructorData.isRequiresReflection(),
@@ -413,10 +375,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement);
                         this.constructorParamterInfo = populateParameterData(constructor);
-
-                        visitors.stream()
-                            .filter(v -> v.matches(constructorParamterInfo.getAnnotationMetadata()))
-                            .forEach(v -> v.visit(constructor, constructorParamterInfo.getAnnotationMetadata()));
 
                         Name proxyKey = createProxyKey(beanDefinitionWriter.getBeanDefinitionName());
                         BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
@@ -546,10 +504,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
-
-            visitors.stream()
-                .filter(v -> v.matches(methodAnnotationMetadata))
-                .forEach(v -> v.visit(method, methodAnnotationMetadata));
 
             // handle @Bean annotation for @Factory class
             if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
@@ -981,10 +935,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-
-            visitors.stream()
-                .filter(v -> v.matches(fieldAnnotationMetadata))
-                .forEach(v -> v.visit(variable, fieldAnnotationMetadata));
 
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(Inject.class);
             boolean isValue = !isInjected &&
