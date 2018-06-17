@@ -120,4 +120,18 @@ class DefaultFeature implements Feature {
     Boolean getRequested() {
         requested
     }
+
+    @Override
+    boolean isSupported(Integer javaVersion) {
+        if (minJavaVersion != null) {
+            if (maxJavaVersion != null) {
+                return javaVersion >= minJavaVersion && javaVersion <= maxJavaVersion
+            } else {
+                return javaVersion >= minJavaVersion
+            }
+        }
+        if (maxJavaVersion != null) {
+            return javaVersion <= maxJavaVersion
+        }
+    }
 }
