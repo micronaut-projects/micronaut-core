@@ -19,6 +19,7 @@ import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 
@@ -83,10 +84,6 @@ class MavenBuildTokens extends BuildTokens {
             dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
         }
 
-        if (getJavaVersion() >= 9) {
-            dependencies.add(getAnnotationApi())
-        }
-
         dependencies = dependencies.unique()
             .findAll { scopeConversions.containsKey(it.scope) }
             .collect { convertScope(it) }
@@ -122,7 +119,7 @@ class MavenBuildTokens extends BuildTokens {
 
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
-        tokens.put("jdkversion", getJdkVersion())
+        tokens.put("jdkversion", VersionInfo.getJdkVersion())
 
         tokens
     }
