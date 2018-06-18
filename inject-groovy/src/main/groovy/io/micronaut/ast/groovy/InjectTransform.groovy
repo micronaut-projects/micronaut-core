@@ -141,35 +141,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
-        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, InjectTransform.classLoader)
-        Map<String, LoadedVisitor> loadedVisitors = [:]
-        for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
-            if (definition.isPresent()) {
-                LoadedVisitor newLoadedVisitor = new LoadedVisitor(definition.load(), visitorContext)
-                loadedVisitors.put(definition.getName(), newLoadedVisitor)
-            }
-        }
-
-        for(loadedVisitor in loadedVisitors.values()) {
-            loadedVisitor.visitor.start(visitorContext)
-        }
-
         for (ClassNode classNode in classes) {
             if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             } else {
-                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
                 if (classNode.isInterface()) {
                     if (AstAnnotationUtils.hasStereotype(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
                         InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
-                        injectVisitor.typeElementVisitors.addAll(matchedVisitors)
                         injectVisitor.visitClass(classNode)
                         beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
                     }
                 } else {
                     InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
-                    injectVisitor.typeElementVisitors.addAll(matchedVisitors)
                     injectVisitor.visitClass(classNode)
                     beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
                 }
@@ -253,17 +236,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     e.printStackTrace(System.err)
                 }
             }
-
-            for(loadedVisitor in loadedVisitors.values()) {
-                try {
-                    loadedVisitor.visitor.finish(visitorContext)
-                } catch (Throwable e) {
-                    AstMessageUtils.error(
-                            source,
-                            moduleNode,
-                            "Error finalizing type visitor [$loadedVisitor.visitor]: $e.message")
-                }
-            }
         }
 
         if (classStreams != null) {
@@ -303,7 +275,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         ConfigurationMetadata configurationMetadata
 
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-        final List<LoadedVisitor> typeElementVisitors = []
         private BeanDefinitionVisitor beanWriter
         BeanDefinitionVisitor aopProxyWriter
 
@@ -351,9 +322,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitClass(ClassNode node) {
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node)
-            typeElementVisitors.each {
-                it.visit(node, annotationMetadata)
-            }
             if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 String packageName = node.packageName
                 String beanClassName = node.nameWithoutPackage
@@ -503,9 +471,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
-            typeElementVisitors.findAll { it.matches(methodAnnotationMetadata) }.each {
-                it.visit(methodNode, methodAnnotationMetadata)
-            }
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
                 methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
@@ -873,9 +838,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             ClassNode declaringClass = fieldNode.declaringClass
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
-            typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
-                it.visit(fieldNode, fieldAnnotationMetadata)
-            }
             boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
 
@@ -973,9 +935,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 return
             }
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
-            typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
-                it.visit(fieldNode, fieldAnnotationMetadata)
-            }
             boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && fieldNode != null && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
             String propertyName = propertyNode.name
