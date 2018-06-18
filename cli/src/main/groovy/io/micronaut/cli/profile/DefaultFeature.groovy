@@ -46,6 +46,8 @@ class DefaultFeature implements Feature {
     final List<String> buildPlugins
     final List<String> dependentFeatures = []
     private Boolean requested = false
+    final Integer minJava
+    final Integer maxJava
 
     DefaultFeature(Profile profile, String name, Resource location) {
         this.profile = profile
@@ -84,6 +86,9 @@ class DefaultFeature implements Feature {
             }
         }
         this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
+
+        this.minJava = (Integer) configuration.get("java.min") ?: null
+        this.maxJava = (Integer) configuration.get("java.max") ?: null
     }
 
     @Override
@@ -97,6 +102,16 @@ class DefaultFeature implements Feature {
     }
 
     @Override
+    Integer getMinJavaVersion() {
+        minJava
+    }
+
+    @Override
+    Integer getMaxJavaVersion() {
+        maxJava
+    }
+
+    @Override
     void setRequested(Boolean r) {
         requested = r
     }
@@ -104,5 +119,21 @@ class DefaultFeature implements Feature {
     @Override
     Boolean getRequested() {
         requested
+    }
+
+    @Override
+    boolean isSupported(Integer javaVersion) {
+        if (minJavaVersion != null) {
+            if (maxJavaVersion != null) {
+                return javaVersion >= minJavaVersion && javaVersion <= maxJavaVersion
+            } else {
+                return javaVersion >= minJavaVersion
+            }
+        }
+        if (maxJavaVersion != null) {
+            return javaVersion <= maxJavaVersion
+        }
+
+        true
     }
 }
