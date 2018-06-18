@@ -78,7 +78,7 @@ class ThirdPartyClientFilterSpec extends Specification {
         given:
         BintrayService bintrayService = context.getBean(BintrayService)
 
-        PollingConditions conditions = new PollingConditions(timeout: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 1)
 
         when:
         String result
