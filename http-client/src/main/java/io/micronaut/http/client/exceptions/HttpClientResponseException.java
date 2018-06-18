@@ -57,7 +57,7 @@ public class HttpClientResponseException extends HttpClientException {
     @Override
     public String getMessage() {
         Optional<JsonError> body = getResponse().getBody(JsonError.class);
-        if (body.isPresent()) {
+        if (body.isPresent() && body.get().getMessage() != null) {
             return body.get().getMessage();
         } else {
             return super.getMessage();
