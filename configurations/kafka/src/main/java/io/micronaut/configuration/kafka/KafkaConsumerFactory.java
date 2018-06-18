@@ -19,7 +19,11 @@ package io.micronaut.configuration.kafka;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.exceptions.ConfigurationException;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.Deserializer;
+
+import java.util.Optional;
 
 /**
  * A factory class for creating Kafka {@link org.apache.kafka.clients.consumer.Consumer} instances.
@@ -39,9 +43,24 @@ public class KafkaConsumerFactory {
      * @return The consumer
      */
     @Prototype
-    public <K, V> KafkaConsumer<K, V> createConsumer(@Parameter KafkaConsumerConfiguration consumerConfiguration) {
-        return new KafkaConsumer<>(
-                consumerConfiguration.getConfig()
-        );
+    public <K, V> KafkaConsumer<K, V> createConsumer(@Parameter AbstractKafkaConsumerConfiguration<K, V> consumerConfiguration) {
+
+        Optional<Deserializer<K>> keyDeserializer = consumerConfiguration.getKeyDeserializer();
+        Optional<Deserializer<V>> valueDeserializer = consumerConfiguration.getValueDeserializer();
+
+        if (keyDeserializer.isPresent() && valueDeserializer.isPresent()) {
+            return new KafkaConsumer<>(
+                    consumerConfiguration.getConfig(),
+                    keyDeserializer.get(),
+                    valueDeserializer.get()
+            );
+        } else if (keyDeserializer.isPresent() || valueDeserializer.isPresent()) {
+            throw new ConfigurationException("Both the [keyDeserializer] and [valueDeserializer] must be set when setting either");
+        } else {
+            return new KafkaConsumer<>(
+                    consumerConfiguration.getConfig()
+            );
+        }
+
     }
 }

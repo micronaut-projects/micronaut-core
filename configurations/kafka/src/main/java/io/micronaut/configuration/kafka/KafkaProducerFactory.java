@@ -19,7 +19,11 @@ package io.micronaut.configuration.kafka;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.exceptions.ConfigurationException;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.serialization.Serializer;
+
+import java.util.Optional;
 
 /**
  * A factory class for creating Kafka {@link org.apache.kafka.clients.producer.Producer} instances.
@@ -39,9 +43,22 @@ public class KafkaProducerFactory {
      * @return The consumer
      */
     @Prototype
-    public <K, V> KafkaProducer<K, V> createProducer(@Parameter KafkaProducerConfiguration producerConfiguration) {
-        return new KafkaProducer<>(
-                producerConfiguration.getConfig()
-        );
+    public <K, V> KafkaProducer<K, V> createProducer(@Parameter AbstractKafkaProducerConfiguration<K, V> producerConfiguration) {
+        Optional<Serializer<K>> keySerializer = producerConfiguration.getKeySerializer();
+        Optional<Serializer<V>> valueSerializer = producerConfiguration.getValueSerializer();
+
+        if (keySerializer.isPresent() && valueSerializer.isPresent()) {
+            return new KafkaProducer<>(
+                    producerConfiguration.getConfig(),
+                    keySerializer.get(),
+                    valueSerializer.get()
+            );
+        } else if (keySerializer.isPresent() || valueSerializer.isPresent()) {
+            throw new ConfigurationException("Both the [keySerializer] and [valueSerializer] must be set when setting either");
+        } else {
+            return new KafkaProducer<>(
+                    producerConfiguration.getConfig()
+            );
+        }
     }
 }
