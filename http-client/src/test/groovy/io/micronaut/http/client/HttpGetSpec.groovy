@@ -81,6 +81,27 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test 500 request with body"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/error")
+        ))
+
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Server error"
+        e.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
     void "test simple 404 request as VndError"() {
         given:
         HttpClient client = HttpClient.create(embeddedServer.getURL())
@@ -249,9 +270,18 @@ class HttpGetSpec extends Specification {
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
         }
+
+        @Get("/error")
+        HttpResponse error() {
+            return HttpResponse.serverError().body(new Error(message: "Server error"))
+        }
     }
 
     static class Book {
         String title
+    }
+
+    static class Error {
+        String message
     }
 }
