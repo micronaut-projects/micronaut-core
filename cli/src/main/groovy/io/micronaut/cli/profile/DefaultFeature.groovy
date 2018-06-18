@@ -133,5 +133,7 @@ class DefaultFeature implements Feature {
         if (maxJavaVersion != null) {
             return javaVersion <= maxJavaVersion
         }
+
+        true
     }
 }
