@@ -1,6 +1,15 @@
 dependencies {
     compile project(":inject")
+    compile project(":runtime")
     compile 'org.apache.kafka:kafka-clients:1.1.0'
 
+    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0'
+    compileOnly 'org.apache.kafka:kafka-clients:1.1.0:test'
+    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0:test'
+
     compileOnly project(":inject-java")
+
+    testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
+    testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
+    testCompile 'org.apache.kafka:kafka_2.12:1.1.0:test'
 }
