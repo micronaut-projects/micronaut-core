@@ -118,10 +118,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-
-        String injectTarget = System.getProperty('micronaut.inject.target')
-        File classesDir = injectTarget ? new File(injectTarget) : source.configuration.targetDirectory
-
+        File classesDir = source.configuration.targetDirectory
         DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                 classesDir
         )
