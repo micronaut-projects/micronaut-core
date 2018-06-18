@@ -29,15 +29,25 @@ import java.util.Properties;
  */
 public abstract class AbstractKafkaConfiguration<K, V> {
     /**
+     * The default kafka port
+     */
+    public static final int DEFAULT_KAFKA_PORT = 9092;
+    /**
      * The default prefix used for Kafka configuration.
      */
     @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = "kafka";
+
+    /**
+     * The property to use to enable embedded Kafka.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String EMBEDDED = "kafka.embedded.enabled";
     /**
      * The default bootstrap server address.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
+    public static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:" + DEFAULT_KAFKA_PORT;
 
     private final Properties config;
 
