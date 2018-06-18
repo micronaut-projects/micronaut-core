@@ -16,8 +16,10 @@
 
 package io.micronaut.configuration.kafka;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.naming.NameUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.util.Properties;
@@ -25,38 +27,38 @@ import java.util.Properties;
 /**
  * Configuration for Apache Kafka Consumer. See http://kafka.apache.org/documentation/#consumerconfigs
  *
+ * @param <K> The key deserializer type
+ * @param <V> The value deserializer type
  * @author Iván López
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(KafkaConsumerConfiguration.PREFIX)
-public class KafkaConsumerConfiguration extends AbstractKafkaConfiguration {
+@EachProperty(value = KafkaConsumerConfiguration.PREFIX, primary = "default")
+public class KafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfiguration<K, V> {
 
     /**
      * The default consumers configuration.
      */
     public static final String PREFIX = "kafka.consumers";
 
-    private static final Class DEFAULT_KEY_DESERIALIZER = org.apache.kafka.common.serialization.ByteArrayDeserializer.class;
-    private static final Class DEFAULT_VALUE_DESERIALIZER = org.apache.kafka.common.serialization.StringDeserializer.class;
-
-
     /**
      * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.
      *
+     * @param consumerName The name of the consumer
      * @param defaultConfiguration The default configuration
      * @param environment The environment
      */
     public KafkaConsumerConfiguration(
+            @Parameter String consumerName,
             KafkaDefaultConfiguration defaultConfiguration,
             Environment environment) {
         super(new Properties());
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
-        config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
+        String propertyKey = PREFIX + '.' + NameUtils.hyphenate(consumerName, true);
+        config.putAll(environment.getProperty(propertyKey, Properties.class).orElseGet(Properties::new));
         config.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, DEFAULT_KEY_DESERIALIZER);
         config.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_DESERIALIZER);
     }
-
 
 }
