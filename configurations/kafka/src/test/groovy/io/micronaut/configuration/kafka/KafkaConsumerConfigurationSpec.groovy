@@ -14,7 +14,7 @@ class KafkaConsumerConfigurationSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run()
 
         when:
-        KafkaConsumerConfiguration config = applicationContext.getBean(KafkaConsumerConfiguration)
+        AbstractKafkaConsumerConfiguration config = applicationContext.getBean(AbstractKafkaConsumerConfiguration)
         Properties props = config.getConfig()
 
         then:
@@ -42,7 +42,7 @@ class KafkaConsumerConfigurationSpec extends Specification {
         )
 
         when:
-        KafkaConsumerConfiguration config = applicationContext.getBean(KafkaConsumerConfiguration)
+        AbstractKafkaConsumerConfiguration config = applicationContext.getBean(AbstractKafkaConsumerConfiguration)
         Properties props = config.getConfig()
 
         then:
@@ -66,9 +66,9 @@ class KafkaConsumerConfigurationSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run(
                 ("kafka.${ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG}".toString()):"localhost:1111",
                 ("kafka.${ConsumerConfig.GROUP_ID_CONFIG}".toString()):"mygroup",
-                ("kafka.consumers.${ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG}".toString()):"localhost:2222",
+                ("kafka.consumers.default.${ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG}".toString()):"localhost:2222",
                 ("kafka.${ConsumerConfig.GROUP_ID_CONFIG}".toString()):"mygroup",
-                ("kafka.consumers.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100"
+                ("kafka.consumers.default.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100"
         )
 
         when:

@@ -22,10 +22,12 @@ import java.util.Properties;
 /**
  * An abstract Kafka configuration class.
  *
+ * @param <K> The key deserializer type
+ * @param <V> The value deserializer type
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AbstractKafkaConfiguration {
+public abstract class AbstractKafkaConfiguration<K, V> {
     /**
      * The default prefix used for Kafka configuration.
      */
@@ -59,4 +61,5 @@ public abstract class AbstractKafkaConfiguration {
         }
         return new Properties();
     }
+
 }

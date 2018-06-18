@@ -16,8 +16,10 @@
 
 package io.micronaut.configuration.kafka;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.naming.NameUtils;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
 import java.util.Properties;
@@ -25,13 +27,15 @@ import java.util.Properties;
 /**
  * Configuration for Apache Kafka Producer. See http://kafka.apache.org/documentation.html#producerconfigs
  *
+ * @param <K> The key deserializer type
+ * @param <V> The value deserializer type
  * @author Iván López
  * @author Graeme Rocher
  *
  * @since 1.0
  */
-@ConfigurationProperties(KafkaProducerConfiguration.PREFIX)
-public class KafkaProducerConfiguration extends AbstractKafkaConfiguration {
+@EachProperty(value = KafkaProducerConfiguration.PREFIX, primary = "default")
+public class KafkaProducerConfiguration<K, V> extends AbstractKafkaProducerConfiguration<K, V> {
 
     /**
      * The default configuration for producers.
@@ -39,23 +43,22 @@ public class KafkaProducerConfiguration extends AbstractKafkaConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = "kafka.producers";
 
-    private static final Class DEFAULT_KEY_SERIALIZER = org.apache.kafka.common.serialization.ByteArraySerializer.class;
-    private static final Class DEFAULT_VALUE_SERIALIZER = org.apache.kafka.common.serialization.StringSerializer.class;
-
-
     /**
      * Constructs the default producer configuration.
      *
+     * @param producerName The name of the producer
      * @param defaultConfiguration The default Kafka configuration
      * @param environment The environment
      */
     public KafkaProducerConfiguration(
+            @Parameter String producerName,
             KafkaDefaultConfiguration defaultConfiguration,
             Environment environment) {
         super(new Properties());
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
-        config.putAll(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
+        String propertyKey = PREFIX + '.' + NameUtils.hyphenate(producerName, true);
+        config.putAll(environment.getProperty(propertyKey, Properties.class).orElseGet(Properties::new));
         config.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, DEFAULT_KEY_SERIALIZER);
         config.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_SERIALIZER);
 
