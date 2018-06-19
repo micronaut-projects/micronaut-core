@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.Properties;
@@ -61,6 +62,16 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
     private ZkUtils zkUtils;
     private KafkaServer kafkaServer;
 
+    private final KafkaEmbeddedConfiguration embeddedConfiguration;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param embeddedConfiguration The {@link KafkaEmbeddedConfiguration}
+     */
+    public KafkaEmbedded(KafkaEmbeddedConfiguration embeddedConfiguration) {
+        this.embeddedConfiguration = embeddedConfiguration;
+    }
 
     @Override
     public AbstractKafkaConfiguration onCreated(BeanCreatedEvent<AbstractKafkaConfiguration> event) {
@@ -71,7 +82,8 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
 
 
         // only handle localhost
-        if (kafkaServer == null &&
+        if (embeddedConfiguration.isEnabled() &&
+                kafkaServer == null &&
                 AbstractKafkaConfiguration.DEFAULT_BOOTSTRAP_SERVERS.equals(bootstrapServer) &&
                 SocketUtils.isTcpPortAvailable(AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT)) {
             try {
@@ -79,14 +91,22 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
                     initZooKeeper();
                 }
 
-// setup Broker
-                Properties brokerProps = new Properties();
-                String zkConnect = "localhost:" + zkServer.port();
+                // setup Broker
+                Properties brokerProps = embeddedConfiguration.getProperties();
+                String zkConnect = "127.0.0.1:" + zkServer.port();
+
                 brokerProps.setProperty("zookeeper.connect", zkConnect);
-                brokerProps.setProperty("broker.id", "0");
-                brokerProps.setProperty("log.dirs", Files.createTempDirectory("kafka-").toAbsolutePath().toString());
-                brokerProps.setProperty("listeners", "PLAINTEXT://localhost:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT);
-                brokerProps.setProperty("offsets.topic.replication.factor" , "1");
+                brokerProps.putIfAbsent("broker.id", "0");
+                brokerProps.putIfAbsent("offsets.topic.replication.factor" , "1");
+
+                brokerProps.computeIfAbsent("log.dirs", o -> {
+                    try {
+                        return Files.createTempDirectory("kafka-").toAbsolutePath().toString();
+                    } catch (IOException e) {
+                        throw new ConfigurationException("Error creating log directory for embedded Kafka server: " + e.getMessage(), e);
+                    }
+                });
+                brokerProps.setProperty("listeners", "PLAINTEXT://127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT);
                 KafkaConfig kafkaConfig = new KafkaConfig(brokerProps);
                 this.kafkaServer = TestUtils.createServer(kafkaConfig, new MockTime());
             } catch (Throwable e) {

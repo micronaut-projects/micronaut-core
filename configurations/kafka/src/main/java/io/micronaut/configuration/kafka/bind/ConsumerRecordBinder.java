@@ -14,28 +14,17 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.serialize.exceptions;
+package io.micronaut.configuration.kafka.bind;
+
+import io.micronaut.core.bind.ArgumentBinder;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 /**
- * A generic exception that occurs during serialization or deserialization.
+ * Interface for binders that bind method arguments from a {@link ConsumerRecord}.
  *
+ * @param <T> The target type
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SerializationException extends RuntimeException {
-
-    /**
-     * @param message The message
-     * @param cause   The throwable
-     */
-    public SerializationException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    /**
-     * @param message The message
-     */
-    public SerializationException(String message) {
-        super(message);
-    }
+public interface ConsumerRecordBinder<T> extends ArgumentBinder<T, ConsumerRecord<?, ?>> {
 }

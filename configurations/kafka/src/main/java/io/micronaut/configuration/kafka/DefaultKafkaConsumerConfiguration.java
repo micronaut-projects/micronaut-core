@@ -17,9 +17,11 @@
 package io.micronaut.configuration.kafka;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
+import javax.inject.Inject;
 import java.util.Properties;
 
 /**
@@ -33,15 +35,32 @@ import java.util.Properties;
  */
 @Requires(missingProperty = KafkaConsumerConfiguration.PREFIX + ".default")
 @Primary
+@Prototype
 public class DefaultKafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfiguration<K, V> {
     /**
      * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.
      *
      * @param defaultConfiguration The default configuration
      */
+    @Inject
     public DefaultKafkaConsumerConfiguration(
             KafkaDefaultConfiguration defaultConfiguration) {
         super(new Properties());
+        init(defaultConfiguration);
+    }
+
+    /**
+     * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.
+     *
+     * @param defaultConfiguration The default configuration
+     */
+    public DefaultKafkaConsumerConfiguration(
+            AbstractKafkaConfiguration defaultConfiguration) {
+        super(new Properties());
+        init(defaultConfiguration);
+    }
+
+    private void init(AbstractKafkaConfiguration defaultConfiguration) {
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
         config.putIfAbsent(
