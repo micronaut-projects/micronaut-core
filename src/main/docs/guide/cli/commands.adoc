@@ -28,8 +28,8 @@ All of the code-generation commands will honor the values written in `micronaut-
 profile: service
 defaultPackage: example
 ---
-testFramework: java
-sourceLanguage: spock
+testFramework: spock
+sourceLanguage: java
 ----
 
 With the above settings, the `create-controller` command will (by default) generate Java controllers with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
