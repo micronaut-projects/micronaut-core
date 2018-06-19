@@ -34,7 +34,7 @@ import java.util.Properties;
  */
 public abstract class AbstractKafkaProducerConfiguration<K, V> extends AbstractKafkaConfiguration<K, V> {
 
-    static final Class DEFAULT_KEY_SERIALIZER = org.apache.kafka.common.serialization.ByteArraySerializer.class;
+    static final Class DEFAULT_KEY_SERIALIZER = org.apache.kafka.common.serialization.StringSerializer.class;
     static final Class DEFAULT_VALUE_SERIALIZER = org.apache.kafka.common.serialization.StringSerializer.class;
 
     private Serializer<K> keySerializer;

@@ -14,30 +14,22 @@
  * limitations under the License.
  */
 
-package io.micronaut.scheduling;
+package io.micronaut.configuration.kafka.bind;
+
+import java.lang.annotation.Annotation;
 
 /**
- * The names of common task schedulers.
+ * Interface for binders that bind method arguments from a {@link org.apache.kafka.clients.consumer.ConsumerRecord} via a annotation.
  *
- * @author graemerocher
+ * @param <T> The target type
+ * @param <A> The annotation type
+ * @author Graeme Rocher
  * @since 1.0
  */
-public interface TaskExecutors {
+public interface AnnotatedConsumerRecordBinder<A extends Annotation, T> extends ConsumerRecordBinder<T> {
 
     /**
-     * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks.
+     * @return The annotation type
      */
-    String IO = "io";
-
-    /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks.
-     */
-    String SCHEDULED = "scheduled";
-
-    /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to run message consumers such as a Kafka or RabbitMQ listeners.
-     */
-    String MESSAGE_CONSUMER = "consumer";
-
-
+    Class<A> annotationType();
 }
