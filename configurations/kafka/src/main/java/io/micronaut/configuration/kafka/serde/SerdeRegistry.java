@@ -14,30 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.scheduling;
+package io.micronaut.configuration.kafka.serde;
+
+import io.micronaut.core.order.Ordered;
+import org.apache.kafka.common.serialization.Serde;
+
+import java.util.Optional;
 
 /**
- * The names of common task schedulers.
+ * A registry of Kafka {@link org.apache.kafka.common.serialization.Serde} instances.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-public interface TaskExecutors {
+public interface SerdeRegistry extends Ordered {
 
     /**
-     * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks.
+     * Obtain a {@link Serde} for the given type.
+     *
+     * @param type The type
+     * @param <T> The generic type
+     * @return The {@link Serde}
      */
-    String IO = "io";
-
-    /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks.
-     */
-    String SCHEDULED = "scheduled";
-
-    /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to run message consumers such as a Kafka or RabbitMQ listeners.
-     */
-    String MESSAGE_CONSUMER = "consumer";
-
-
+    <T> Optional<Serde<T>> getSerde(Class<T> type);
 }

@@ -14,28 +14,21 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.serialize.exceptions;
+package io.micronaut.configuration.kafka.annotation;
+
+import io.micronaut.core.bind.annotation.Bindable;
+
+import java.lang.annotation.*;
 
 /**
- * A generic exception that occurs during serialization or deserialization.
+ * Parameter level annotation to indicate which parameter is bound to the Kafka key.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SerializationException extends RuntimeException {
-
-    /**
-     * @param message The message
-     * @param cause   The throwable
-     */
-    public SerializationException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    /**
-     * @param message The message
-     */
-    public SerializationException(String message) {
-        super(message);
-    }
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.PARAMETER})
+@Bindable
+public @interface KafkaKey {
 }

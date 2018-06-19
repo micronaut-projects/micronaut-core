@@ -42,6 +42,11 @@ public interface ExecutorConfiguration {
     String PREFIX_SCHEDULED = PREFIX + ".scheduled";
 
     /**
+     * The prefix used for Scheduled task configuration.
+     */
+    String PREFIX_CONSUMER = PREFIX + ".consumer";
+
+    /**
      * @return The {@link ExecutorType}
      */
     ExecutorType getType();
