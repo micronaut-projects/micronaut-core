@@ -999,13 +999,7 @@ public class DefaultBeanContext implements BeanContext {
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
                 Class<? extends Annotation> annotationType = entry.getKey();
-                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
-                    .forEach(processor -> {
-                        for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
-                            //noinspection unchecked
-                            processor.process(method.getBeanDefinition(), method);
-                        }
-                    });
+                getBeansOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType));
             }
         }
     }

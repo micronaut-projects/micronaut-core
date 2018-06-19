@@ -9,6 +9,7 @@ dependencies {
 
     compileOnly project(":inject-java")
 
+    testCompile project(":inject-groovy")
     testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
     testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
     testCompile 'org.apache.kafka:kafka_2.12:1.1.0:test'

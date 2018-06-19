@@ -14,30 +14,30 @@
  * limitations under the License.
  */
 
-package io.micronaut.scheduling;
+package io.micronaut.configuration.kafka.annotation;
+
+import java.lang.annotation.*;
 
 /**
- * The names of common task schedulers.
+ * Method level annotation used to specify which topics should be subscribed to.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-public interface TaskExecutors {
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.PARAMETER})
+@Repeatable(Topics.class)
+public @interface Topic {
 
     /**
-     * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks.
+     * @return The topics to subscribe to
      */
-    String IO = "io";
+    String[] value() default {};
+
 
     /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks.
+     * @return The topic pattersn to subscribe to
      */
-    String SCHEDULED = "scheduled";
-
-    /**
-     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to run message consumers such as a Kafka or RabbitMQ listeners.
-     */
-    String MESSAGE_CONSUMER = "consumer";
-
-
+    String[] patterns() default {};
 }

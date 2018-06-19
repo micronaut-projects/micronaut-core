@@ -24,6 +24,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.Deserializer;
 
 import java.util.Optional;
+import java.util.Properties;
 
 /**
  * A factory class for creating Kafka {@link org.apache.kafka.clients.consumer.Consumer} instances.
@@ -43,14 +44,16 @@ public class KafkaConsumerFactory {
      * @return The consumer
      */
     @Prototype
-    public <K, V> KafkaConsumer<K, V> createConsumer(@Parameter AbstractKafkaConsumerConfiguration<K, V> consumerConfiguration) {
+    public <K, V> KafkaConsumer<K, V> createConsumer(
+            @Parameter AbstractKafkaConsumerConfiguration<K, V> consumerConfiguration) {
 
         Optional<Deserializer<K>> keyDeserializer = consumerConfiguration.getKeyDeserializer();
         Optional<Deserializer<V>> valueDeserializer = consumerConfiguration.getValueDeserializer();
+        Properties config = consumerConfiguration.getConfig();
 
         if (keyDeserializer.isPresent() && valueDeserializer.isPresent()) {
             return new KafkaConsumer<>(
-                    consumerConfiguration.getConfig(),
+                    config,
                     keyDeserializer.get(),
                     valueDeserializer.get()
             );
@@ -58,7 +61,7 @@ public class KafkaConsumerFactory {
             throw new ConfigurationException("Both the [keyDeserializer] and [valueDeserializer] must be set when setting either");
         } else {
             return new KafkaConsumer<>(
-                    consumerConfiguration.getConfig()
+                    config
             );
         }
 
