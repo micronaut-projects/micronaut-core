@@ -16,12 +16,11 @@
 
 package io.micronaut.configuration.kafka.processor;
 
-import io.micronaut.configuration.kafka.AbstractKafkaConsumerConfiguration;
-import io.micronaut.configuration.kafka.DefaultKafkaConsumerConfiguration;
-import io.micronaut.configuration.kafka.annotation.KafkaConsumer;
-import io.micronaut.configuration.kafka.annotation.KafkaKey;
-import io.micronaut.configuration.kafka.annotation.OffsetStrategy;
-import io.micronaut.configuration.kafka.annotation.Topic;
+import io.micronaut.configuration.kafka.KafkaConsumerAware;
+import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
+import io.micronaut.configuration.kafka.config.DefaultKafkaConsumerConfiguration;
+import io.micronaut.configuration.kafka.annotation.*;
+import io.micronaut.configuration.kafka.annotation.KafkaListener;
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
@@ -52,20 +51,20 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
 
 /**
- * <p>A {@link ExecutableMethodProcessor} that will process all beans annotated with {@link KafkaConsumer}
+ * <p>A {@link ExecutableMethodProcessor} that will process all beans annotated with {@link KafkaListener}
  * and create and subscribe the relevant methods as consumers to Kafka topics.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaConsumer>, AutoCloseable {
+public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaListener>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerProcessor.class);
     @SuppressWarnings({"unused", "unchecked"})
@@ -83,7 +82,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
     private final ApplicationConfiguration applicationConfiguration;
     private final BeanContext beanContext;
     private final AbstractKafkaConsumerConfiguration defaultConsumerConfiguration;
-    private final Map<ExecutableMethod<?, ?>, Consumer> consumerMap = new ConcurrentHashMap<>();
+    private final Queue<Consumer> consumers = new ConcurrentLinkedDeque<>();
     private final ConsumerRecordBinderRegistry binderRegistry;
     private final DefaultExecutableBinder<ConsumerRecord<?, ?>> executableBinder;
     private final SerdeRegistry serdeRegistry;
@@ -118,13 +117,20 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
 
         Topic[] topicAnnotations = method.getAnnotationsByType(Topic.class);
-        KafkaConsumer consumerAnnotation = method.getAnnotation(KafkaConsumer.class);
+        KafkaListener consumerAnnotation = method.getAnnotation(KafkaListener.class);
 
         if (consumerAnnotation != null && ArrayUtils.isNotEmpty(topicAnnotations)) {
 
-            Object consumerBean = beanContext.getBean(beanDefinition.getBeanType());
-            Duration pollTimeout = method.getValue(KafkaConsumer.class, "pollTimeout", Duration.class)
+            Duration pollTimeout = method.getValue(KafkaListener.class, "pollTimeout", Duration.class)
                                          .orElse(Duration.ofMillis(100));
+
+            Duration sessionTimeout = method.getValue(KafkaListener.class, "sessionTimeout", Duration.class)
+                    .orElse(null);
+
+            Duration heartbeatInterval = method.getValue(KafkaListener.class, "heartbeatInterval", Duration.class)
+                    .orElse(null);
+
+
             String groupId = consumerAnnotation.groupId();
 
             if (StringUtils.isEmpty(groupId)) {
@@ -148,11 +154,34 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
 
             Properties properties = consumerConfiguration.getConfig();
 
+            if (consumerAnnotation.offsetReset() == OffsetReset.EARLIEST) {
+                properties.putIfAbsent(
+                        ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+                        OffsetReset.EARLIEST.name().toLowerCase()
+                );
+
+            }
+
             // enable auto commit offsets if necessary
             properties.putIfAbsent(
                     ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG,
-                    offsetStrategy == OffsetStrategy.AUTO
+                    String.valueOf(offsetStrategy == OffsetStrategy.AUTO)
             );
+
+            if (heartbeatInterval != null) {
+                properties.putIfAbsent(
+                        ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG,
+                        String.valueOf(heartbeatInterval.toMillis())
+                );
+            }
+
+            if (sessionTimeout != null) {
+                long sessionTimeoutMillis = sessionTimeout.toMillis();
+                properties.putIfAbsent(
+                        ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG,
+                        String.valueOf(sessionTimeoutMillis)
+                );
+            }
 
             properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
 
@@ -198,43 +227,47 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
                 }
             }
 
-            Consumer kafaConsumer = consumerMap.computeIfAbsent(method, executableMethod ->
-                    beanContext.createBean(Consumer.class, consumerConfiguration)
-            );
 
-            for (Topic topicAnnotation : topicAnnotations) {
-                String[] topicNames = topicAnnotation.value();
-                if (ArrayUtils.isNotEmpty(topicNames)) {
-                    if (consumerBean instanceof ConsumerRebalanceListener) {
-                        kafaConsumer.subscribe(Arrays.asList(topicNames), (ConsumerRebalanceListener) consumerBean);
-                    } else {
-                        kafaConsumer.subscribe(Arrays.asList(topicNames));
-                    }
+            for (int i = 0; i < consumerThreads; i++) {
+                KafkaConsumer kafkaConsumer =  beanContext.createBean(KafkaConsumer.class, consumerConfiguration);
+                Object consumerBean = beanContext.getBean(beanDefinition.getBeanType());
+
+                if (consumerBean instanceof KafkaConsumerAware) {
+                    //noinspection unchecked
+                    ((KafkaConsumerAware) consumerBean).setKafkaConsumer(kafkaConsumer);
                 }
 
-                String[] patterns = topicAnnotation.patterns();
+                consumers.add(kafkaConsumer);
 
-                if (ArrayUtils.isNotEmpty(patterns)) {
-                    for (String pattern : patterns) {
-                        Pattern p = Pattern.compile(pattern);
-
+                for (Topic topicAnnotation : topicAnnotations) {
+                    String[] topicNames = topicAnnotation.value();
+                    if (ArrayUtils.isNotEmpty(topicNames)) {
                         if (consumerBean instanceof ConsumerRebalanceListener) {
-                            kafaConsumer.subscribe(p, (ConsumerRebalanceListener) consumerBean);
+                            kafkaConsumer.subscribe(Arrays.asList(topicNames), (ConsumerRebalanceListener) consumerBean);
                         } else {
-                            kafaConsumer.subscribe(p);
+                            kafkaConsumer.subscribe(Arrays.asList(topicNames));
+                        }
+                    }
+
+                    String[] patterns = topicAnnotation.patterns();
+
+                    if (ArrayUtils.isNotEmpty(patterns)) {
+                        for (String pattern : patterns) {
+                            Pattern p = Pattern.compile(pattern);
+
+                            if (consumerBean instanceof ConsumerRebalanceListener) {
+                                kafkaConsumer.subscribe(p, (ConsumerRebalanceListener) consumerBean);
+                            } else {
+                                kafkaConsumer.subscribe(p);
+                            }
                         }
                     }
                 }
-            }
-
-
-
-            for (int i = 0; i < consumerThreads; i++) {
                 executorService.submit(() -> {
                     try {
                         //noinspection InfiniteLoopStatement
                         while (true) {
-                            ConsumerRecords<?, ?> consumerRecords = kafaConsumer.poll(pollTimeout.toMillis());
+                            ConsumerRecords<?, ?> consumerRecords = kafkaConsumer.poll(pollTimeout.toMillis());
 
                             try {
                                 if (consumerRecords != null && consumerRecords.count() > 0) {
@@ -246,17 +279,29 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
                                         );
 
                                         if (offsetStrategy == OffsetStrategy.SYNC_PER_RECORD) {
-                                            kafaConsumer.commitSync();
+                                            try {
+                                                kafkaConsumer.commitSync();
+                                            } catch (CommitFailedException e) {
+                                                if (LOG.isErrorEnabled()) {
+                                                    LOG.error("Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(), e);
+                                                }
+                                            }
                                         } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
-                                            kafaConsumer.commitAsync(resolveCommitCallback(consumerBean));
+                                            kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
                                         }
                                     }
                                 }
 
                                 if (offsetStrategy == OffsetStrategy.SYNC) {
-                                    kafaConsumer.commitSync();
+                                    try {
+                                        kafkaConsumer.commitSync();
+                                    } catch (CommitFailedException e) {
+                                        if (LOG.isErrorEnabled()) {
+                                            LOG.error("Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(), e);
+                                        }
+                                    }
                                 } else if (offsetStrategy == OffsetStrategy.ASYNC) {
-                                    kafaConsumer.commitAsync(resolveCommitCallback(consumerBean));
+                                    kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
                                 }
                             } catch (WakeupException e) {
                                 throw e;
@@ -270,14 +315,27 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
                         // ignore for shutdown
                     } finally {
                         try {
-                            kafaConsumer.commitSync();
+                            kafkaConsumer.commitSync();
+                        } catch (Throwable e) {
+                            if (LOG.isWarnEnabled()) {
+                                LOG.warn("Error committing Kafka offsets on shutdown: " + e.getMessage(), e);
+                            }
                         } finally {
-                            kafaConsumer.close();
+                            kafkaConsumer.close();
                         }
                     }
                 });
             }
         }
+    }
+
+    @Override
+    @PreDestroy
+    public void close() {
+        for (Consumer consumer : consumers) {
+            consumer.wakeup();
+        }
+        consumers.clear();
     }
 
     private OffsetCommitCallback resolveCommitCallback(Object consumerBean) {
@@ -286,19 +344,10 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
                 ((OffsetCommitCallback) consumerBean).onComplete(offsets, exception);
             } else if (exception != null) {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Error asynchronously committing Kafka offsets for batch [" + offsets + "]: " + exception.getMessage(), exception);
+                    LOG.error("Error asynchronously committing Kafka offsets [" + offsets + "]: " + exception.getMessage(), exception);
                 }
             }
         };
-    }
-
-    @Override
-    @PreDestroy
-    public void close() {
-        for (Consumer consumer : consumerMap.values()) {
-            consumer.wakeup();
-        }
-        consumerMap.clear();
     }
 
     private Deserializer pickDeserializer(Argument<?> argument) {
@@ -309,8 +358,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaCo
             Class wrapperType = ReflectionUtils.getWrapperType(type);
             deserializer = DEFAULT_DESERIALIZERS.get(wrapperType);
         } else {
-            Optional<? extends Serde<?>> serde = serdeRegistry.getSerde(argument.getType());
-            deserializer = serde.map(Serde::deserializer).orElse(null);
+            deserializer = serdeRegistry.getSerde(argument.getType()).deserializer();
         }
 
         if (deserializer == null) {

@@ -1,11 +1,14 @@
 package io.micronaut.configuration.kafka
 
+import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
+import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration
+import io.micronaut.configuration.kafka.config.KafkaConsumerConfiguration
 import io.micronaut.context.ApplicationContext
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import spock.lang.Specification
 
-class KafkaConsumerConfigurationSpec extends Specification {
+class KafkaConfigurationSpec extends Specification {
 
 
 
