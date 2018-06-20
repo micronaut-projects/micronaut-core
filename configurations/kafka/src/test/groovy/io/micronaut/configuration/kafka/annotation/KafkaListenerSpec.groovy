@@ -137,6 +137,8 @@ class KafkaListenerSpec extends Specification {
         then:
         conditions.eventually {
             myConsumer.lastBook == new Book(title: "The Stand")
+            myConsumer.topic == "books-records"
+            myConsumer.offset != null
         }
 
         cleanup:
@@ -183,10 +185,14 @@ class KafkaListenerSpec extends Specification {
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
     static class PojoConsumer2 {
         Book lastBook
+        String topic
+        Long offset
 
         @Topic("books-records")
-        void receiveBook(ConsumerRecord<String, Book> record) {
+        void receiveBook(String topic, long offset, ConsumerRecord<String, Book> record) {
             lastBook = record.value()
+            this.topic = topic
+            this.offset = offset
         }
     }
 
