@@ -18,6 +18,7 @@ package io.micronaut.configuration.kafka.serde;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.serialize.exceptions.SerializationException;
 import org.apache.kafka.common.serialization.Serde;
 
 import javax.annotation.Nonnull;
@@ -50,13 +51,13 @@ public class CompositeSerdeRegistry implements SerdeRegistry {
 
     @Override
     @Nonnull
-    public <T> Optional<Serde<T>> getSerde(Class<T> type) {
+    public <T> Serde<T> getSerde(Class<T> type) {
         for (SerdeRegistry registry : registries) {
-            Optional<Serde<T>> serde = registry.getSerde(type);
-            if (serde.isPresent()) {
+            Serde<T> serde = registry.getSerde(type);
+            if (serde != null) {
                 return serde;
             }
         }
-        return Optional.empty();
+        throw new SerializationException("No available serde for type: " + type);
     }
 }

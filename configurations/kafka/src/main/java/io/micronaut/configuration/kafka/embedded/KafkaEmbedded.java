@@ -16,7 +16,7 @@
 
 package io.micronaut.configuration.kafka.embedded;
 
-import io.micronaut.configuration.kafka.AbstractKafkaConfiguration;
+import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;

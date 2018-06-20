@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka;
+package io.micronaut.configuration.kafka.config;
 
 import javax.annotation.Nonnull;
 import java.util.Properties;

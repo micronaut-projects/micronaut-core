@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.serde;
-
-import io.micronaut.core.order.Ordered;
-import org.apache.kafka.common.serialization.Serde;
-
+package io.micronaut.configuration.kafka.annotation;
 
 /**
- * A registry of Kafka {@link org.apache.kafka.common.serialization.Serde} instances.
+ * Sets the value of the {@code auto.offset.reset} property for a Kafka consumer.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface SerdeRegistry extends Ordered {
-
+public enum OffsetReset {
     /**
-     * Obtain a {@link Serde} for the given type.
-     *
-     * @param type The type
-     * @param <T> The generic type
-     * @return The {@link Serde}
+     * Earliest means that a consumer will start reading the earliest available records for a topic.
      */
-    <T> Serde<T> getSerde(Class<T> type);
+    EARLIEST,
+    /**
+     * Latest means that a consumer will start reading the latest consumer records.
+     */
+    LATEST
 }
