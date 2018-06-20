@@ -36,6 +36,7 @@ import java.util.Properties;
 @Requires(missingProperty = KafkaConsumerConfiguration.PREFIX + ".default")
 @Primary
 @Prototype
+@Requires(beans = KafkaDefaultConfiguration.class)
 public class DefaultKafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfiguration<K, V> {
     /**
      * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.

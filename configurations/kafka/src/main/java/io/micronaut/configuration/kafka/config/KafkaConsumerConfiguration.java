@@ -18,6 +18,7 @@ package io.micronaut.configuration.kafka.config;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.naming.NameUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -34,6 +35,7 @@ import java.util.Properties;
  * @since 1.0
  */
 @EachProperty(value = KafkaConsumerConfiguration.PREFIX, primary = "default")
+@Requires(beans = KafkaDefaultConfiguration.class)
 public class KafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfiguration<K, V> {
 
     /**
