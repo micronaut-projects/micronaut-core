@@ -17,9 +17,11 @@
 package io.micronaut.configuration.kafka.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
+import java.time.Duration;
 import java.util.Properties;
 
 /**
@@ -29,7 +31,10 @@ import java.util.Properties;
  * @since 1.0
  */
 @ConfigurationProperties(AbstractKafkaConfiguration.PREFIX)
+@Requires(AbstractKafkaConfiguration.PREFIX)
 public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
+
+    private Duration healthTimeout = Duration.ofSeconds(1);
 
     /**
      * Constructs the default Kafka configuration.
@@ -44,4 +49,23 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
         );
     }
 
+    /**
+     * The health check timeout.
+     *
+     * @return The duration
+     */
+    public Duration getHealthTimeout() {
+        return healthTimeout;
+    }
+
+    /**
+     * The health check timeout.
+     *
+     * @param healthTimeout The duration
+     */
+    public void setHealthTimeout(Duration healthTimeout) {
+        if (healthTimeout != null) {
+            this.healthTimeout = healthTimeout;
+        }
+    }
 }

@@ -32,6 +32,7 @@ import java.util.Properties;
 @Requires(missingProperty = KafkaProducerConfiguration.PREFIX + ".default")
 @Primary
 @Prototype
+@Requires(beans = KafkaDefaultConfiguration.class)
 public class DefaultKafkaProducerConfiguration<K, V> extends AbstractKafkaProducerConfiguration<K, V> {
     /**
      * Constructs a new instance.

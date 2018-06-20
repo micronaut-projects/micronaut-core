@@ -3,12 +3,14 @@ dependencies {
     compile project(":runtime")
     compile 'org.apache.kafka:kafka-clients:1.1.0'
 
+    compileOnly project(":management")
     compileOnly 'org.apache.kafka:kafka_2.12:1.1.0'
     compileOnly 'org.apache.kafka:kafka-clients:1.1.0:test'
     compileOnly 'org.apache.kafka:kafka_2.12:1.1.0:test'
 
     compileOnly project(":inject-java")
 
+    testCompile project(":management")
     testCompile project(":inject-groovy")
     testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
     testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
