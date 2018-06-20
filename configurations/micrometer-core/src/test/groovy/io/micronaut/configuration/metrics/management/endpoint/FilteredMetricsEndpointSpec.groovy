@@ -12,6 +12,7 @@ import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -71,7 +72,7 @@ class FilteredMetricsEndpointSpec extends Specification {
 
         then:
         result.names.size() == 1
-        !result.names[0].toString().startsWith("jvm")
+        !result.names[0].toString().startsWith("system")
 
         cleanup:
         embeddedServer.close()
@@ -82,9 +83,9 @@ class FilteredMetricsEndpointSpec extends Specification {
             throw new RuntimeException("Too many attempts to get metrics, failed!")
         }
         def response = rxClient.exchange("/metrics", Map).blockingFirst()
-        Map result = response.body()
-        log.info("/metrics returned ${result}")
-        if (!(result?.names?.size() > 0)) {
+        Map result = response?.body()
+        log.info("/metrics returned status=${response?.status()} data=${result}")
+        if (!(result?.names?.size() > 0) || response?.status() != HttpStatus.OK) {
             Thread.sleep(500)
             log.info("Could not get metrics, retrying attempt $loopCount of 5")
             waitForResponse(rxClient, loopCount + 1)
@@ -108,7 +109,7 @@ class FilteredMetricsEndpointSpec extends Specification {
         @Singleton
         @Requires(property = "metrics.test.filters.enabled", value = "true", defaultValue = "false")
         MeterFilter denyNameStartsWithJvmFilter() {
-            return MeterFilter.denyNameStartsWith("jvm")
+            return MeterFilter.denyNameStartsWith("system")
         }
 
         @Bean
