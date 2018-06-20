@@ -18,28 +18,31 @@ package io.micronaut.configuration.kafka.bind;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.annotation.Body;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
+import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * The default binder that binds the Kafka value for a ConsumerRecord.
+ * The default binder that binds the body of a ConsumerRecord.
  *
  * @param <T> The target generic type
  * @author Graeme Rocher
  * @since 1.0
  */
-public class KafkaValueBinder<T> implements ConsumerRecordBinder<T> {
+@Singleton
+public class KafkaBodyBinder<T> implements AnnotatedConsumerRecordBinder<Body, T> {
+
+    @Override
+    public Class<Body> annotationType() {
+        return Body.class;
+    }
+
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, ConsumerRecord<?, ?> source) {
-        if (context.getArgument().getType() == ConsumerRecord.class) {
-            Optional<? extends ConsumerRecord<?, ?>> opt = Optional.of(source);
-            //noinspection unchecked
-            return () -> (Optional<T>) opt;
-        } else {
-            Object value = source.value();
-            Optional<T> converted = ConversionService.SHARED.convert(value, context);
-            return () -> converted;
-        }
+        Object value = source.value();
+        Optional<T> converted = ConversionService.SHARED.convert(value, context);
+        return () -> converted;
     }
 }
