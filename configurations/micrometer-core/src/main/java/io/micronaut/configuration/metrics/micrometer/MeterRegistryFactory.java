@@ -22,7 +22,6 @@ import io.micrometer.core.instrument.config.MeterFilter;
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
 import io.micronaut.configuration.metrics.aggregator.MicrometerMeterRegistryConfigurer;
 import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
@@ -51,7 +50,6 @@ public class MeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Context
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     @Requires(beans = MeterRegistryConfigurer.class)
     CompositeMeterRegistry compositeMeterRegistry() {
@@ -70,7 +68,6 @@ public class MeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Context
     @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
     MeterRegistryConfigurer meterRegistryConfigurer(Collection<MeterBinder> binders,
                                                     Collection<MeterFilter> filters) {
