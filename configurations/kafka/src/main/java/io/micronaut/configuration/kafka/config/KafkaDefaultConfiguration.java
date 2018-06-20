@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka;
+package io.micronaut.configuration.kafka.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;

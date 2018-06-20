@@ -17,7 +17,7 @@
 package io.micronaut.configuration.kafka.annotation;
 
 /**
- * <p>An enum representing different strategies for committing offsets to Kafka when using {@link KafkaConsumer}.</p>
+ * <p>An enum representing different strategies for committing offsets to Kafka when using {@link KafkaListener}.</p>
  *
  * <p>To track records that have been consumed Kafka allows committing offsets at a frequency desired by the developer. This tracking is done by committing offsets for a given partition back to Kafka.</p>
  *

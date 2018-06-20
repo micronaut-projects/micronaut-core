@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.kafka;
 
+import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;

@@ -1,7 +1,7 @@
 package io.micronaut.configuration.kafka.embedded
 
-import io.micronaut.configuration.kafka.AbstractKafkaConfiguration
-import io.micronaut.configuration.kafka.AbstractKafkaConsumerConfiguration
+import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
+import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration
 import io.micronaut.context.ApplicationContext
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import spock.lang.Specification
