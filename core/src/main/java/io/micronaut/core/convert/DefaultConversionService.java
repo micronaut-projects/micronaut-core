@@ -204,6 +204,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // byte[] -> String
+        addConverter(byte[].class, CharSequence.class, (object, targetType, context) -> Optional.of(new String(object)));
+
         // String -> byte[]
         addConverter(CharSequence.class, byte[].class, (object, targetType, context) -> Optional.of(object.toString().getBytes(context.getCharset())));
         addConverter(Integer.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Integer.BYTES).putInt(object).array()));

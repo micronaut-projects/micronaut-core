@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.annotation;
+package io.micronaut.messaging.annotation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -25,6 +25,7 @@ import java.lang.annotation.Target;
 /**
  * This lets you declare several headers for a client class and have them always included.
  * Example usage:
+ *
  * <pre><code>
  *{@literal @}Headers({
  *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
@@ -32,8 +33,7 @@ import java.lang.annotation.Target;
  * })
  * </code></pre>
  *
- * @author rvanderwerf
- * @author graemerocher Graeme Rocher
+ * @author graemerocher
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

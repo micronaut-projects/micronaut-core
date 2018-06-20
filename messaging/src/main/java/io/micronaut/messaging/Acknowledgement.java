@@ -14,33 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.annotation;
+package io.micronaut.messaging;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.messaging.annotation.MessageMapping;
-
-import java.lang.annotation.*;
+import org.reactivestreams.Publisher;
 
 /**
- * Method level annotation used to specify which topics should be subscribed to.
+ * Interface for manually acknowledging messages that are received in a messaging system.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.PARAMETER})
-@Repeatable(Topics.class)
-public @interface Topic {
+public interface Acknowledgement {
+    /**
+     * Synchronously acknowledge the message
+     */
+    void ackSync();
 
     /**
-     * @return The topics to subscribe to
+     * Synchronously acknowledge the message
      */
-    @AliasFor(annotation = MessageMapping.class, member = "value")
-    String[] value() default {};
-
-    /**
-     * @return The topic pattersn to subscribe to
-     */
-    String[] patterns() default {};
+    Publisher<Boolean> ack();
 }
