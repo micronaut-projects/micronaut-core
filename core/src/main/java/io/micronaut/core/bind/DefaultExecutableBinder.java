@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -53,8 +54,12 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                         source
                 );
 
-                if (!bindingResult.isSatisfied()) {
-                    throw new UnsatisfiedArgumentException(argument);
+                if (!bindingResult.isPresentAndSatisfied()) {
+                    if (argument.getAnnotationMetadata().hasAnnotation(Nullable.class)) {
+                        boundArguments[i] = null;
+                    } else {
+                        throw new UnsatisfiedArgumentException(argument);
+                    }
                 } else {
                     boundArguments[i] = bindingResult.get();
                 }

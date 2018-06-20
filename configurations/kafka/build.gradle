@@ -1,6 +1,5 @@
 dependencies {
-    compile project(":inject")
-    compile project(":runtime")
+    compile project(":messaging")
     compile 'org.apache.kafka:kafka-clients:1.1.0'
 
     compileOnly project(":management")

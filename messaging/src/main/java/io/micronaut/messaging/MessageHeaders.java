@@ -14,18 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.bind;
+package io.micronaut.messaging;
 
-import io.micronaut.core.bind.ArgumentBinder;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
+import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 /**
- * Interface for binders that bind method arguments from a {@link ConsumerRecord}.
+ * Generic container object for message headers.
  *
- * @param <T> The target type
  * @author Graeme Rocher
  * @since 1.0
  */
-@SuppressWarnings("WeakerAccess")
-public interface ConsumerRecordBinder<T> extends ArgumentBinder<T, ConsumerRecord<?, ?>> {
+public interface MessageHeaders extends ConvertibleMultiValues<String> {
 }

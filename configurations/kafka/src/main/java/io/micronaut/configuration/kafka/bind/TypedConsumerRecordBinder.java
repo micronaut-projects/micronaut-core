@@ -16,16 +16,15 @@
 
 package io.micronaut.configuration.kafka.bind;
 
-import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.bind.TypeArgumentBinder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 /**
- * Interface for binders that bind method arguments from a {@link ConsumerRecord}.
+ * Allows binding by type.
  *
  * @param <T> The target type
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@SuppressWarnings("WeakerAccess")
-public interface ConsumerRecordBinder<T> extends ArgumentBinder<T, ConsumerRecord<?, ?>> {
+public interface TypedConsumerRecordBinder<T> extends TypeArgumentBinder<T, ConsumerRecord<?, ?>>, ConsumerRecordBinder<T> {
 }
