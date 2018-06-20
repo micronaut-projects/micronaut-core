@@ -29,7 +29,7 @@ import java.util.Properties;
  */
 public abstract class AbstractKafkaConfiguration<K, V> {
     /**
-     * The default kafka port
+     * The default kafka port.
      */
     public static final int DEFAULT_KAFKA_PORT = 9092;
     /**
