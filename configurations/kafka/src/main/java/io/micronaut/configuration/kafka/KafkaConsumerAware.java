@@ -14,26 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.serde;
+package io.micronaut.configuration.kafka;
 
-import io.micronaut.core.order.Ordered;
-import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
+import javax.annotation.Nonnull;
 
 /**
- * A registry of Kafka {@link org.apache.kafka.common.serialization.Serde} instances.
+ * Interface for {@link io.micronaut.configuration.kafka.annotation.KafkaListener} instances to implement
+ * if they wish to obtain a reference to the underlying {@link org.apache.kafka.clients.consumer.KafkaConsumer}.
  *
+ * @param <K> The key type
+ * @param <V> The value type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface SerdeRegistry extends Ordered {
+public interface KafkaConsumerAware<K, V> {
 
     /**
-     * Obtain a {@link Serde} for the given type.
+     * Called when the underlying {@link KafkaConsumer} is created.
      *
-     * @param type The type
-     * @param <T> The generic type
-     * @return The {@link Serde}
+     * @param consumer The consumer
      */
-    <T> Serde<T> getSerde(Class<T> type);
+    void setKafkaConsumer(@Nonnull KafkaConsumer<K, V> consumer);
 }

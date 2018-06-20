@@ -21,7 +21,6 @@ import org.apache.kafka.common.serialization.Serde;
 
 import javax.inject.Singleton;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -47,9 +46,7 @@ public class JsonSerdeRegistry implements SerdeRegistry {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> Optional<Serde<T>> getSerde(Class<T> type) {
-        return Optional.of(
-                serdes.computeIfAbsent(type, t -> beanContext.createBean(JsonSerde.class, t))
-        );
+    public <T> Serde<T> getSerde(Class<T> type) {
+        return serdes.computeIfAbsent(type, t -> beanContext.createBean(JsonSerde.class, t));
     }
 }

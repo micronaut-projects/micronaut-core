@@ -36,7 +36,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Bean
 @Executable(processOnStartup = true)
 @DefaultScope(Singleton.class)
-public @interface KafkaConsumer {
+public @interface KafkaListener {
 
     /**
      * Sets the consumer group id of the Kafka consumer. If not specified the group id is configured
@@ -72,9 +72,16 @@ public @interface KafkaConsumer {
     OffsetStrategy offsetStrategy() default OffsetStrategy.AUTO;
 
     /**
+     * @return The strategy to use to start consuming records
+     */
+    OffsetReset offsetReset() default OffsetReset.LATEST;
+
+    /**
      * Kafka consumers are by default single threaded. If you wish to increase the number of threads
-     * for a single consumer you can alter this setting. Note that this means that multiple partitions will
+     * for a consumer you can alter this setting. Note that this means that multiple partitions will
      * be allocated to a single application.
+     *
+     * <p>NOTE: When using this setting your bean should be declared as {@link Prototype}</p>
      *
      * @return The number of threads
      */
@@ -86,6 +93,22 @@ public @interface KafkaConsumer {
      * @return The timeout. Defaults to 100ms
      */
     String pollTimeout() default "100ms";
+
+    /**
+     * The session timeout for a consumer. See {@code session.timeout.ms}.
+     *
+     * @return The session timeout as a duration.
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig#SESSION_TIMEOUT_MS_DOC
+     */
+    String sessionTimeout() default "";
+
+    /**
+     * The session timeout for a consumer. See {@code session.timeout.ms}.
+     *
+     * @return The session timeout as a duration.
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig#HEARTBEAT_INTERVAL_MS_DOC
+     */
+    String heartbeatInterval() default "";
 
     /**
      * Additional properties to configure with for Consumer.
