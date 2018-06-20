@@ -30,6 +30,7 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
@@ -999,7 +1000,24 @@ public class DefaultBeanContext implements BeanContext {
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
                 Class<? extends Annotation> annotationType = entry.getKey();
-                getBeansOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType));
+                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
+                    .forEach(processor -> {
+                            for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
+                                BeanDefinition<?> beanDefinition = method.getBeanDefinition();
+
+                                // Only process the method if the the annotation is not declared at the class level
+                                // If declared at the class level it will already have been processed by ExecutableMethodProcessorListener
+                                if (!beanDefinition.hasStereotype(annotationType)) {
+                                    //noinspection unchecked
+                                    processor.process(beanDefinition, method);
+                                }
+                            }
+
+                        if (processor instanceof Completable) {
+                            ((Completable) processor).onComplete();
+                        }
+
+                    });
             }
         }
     }
