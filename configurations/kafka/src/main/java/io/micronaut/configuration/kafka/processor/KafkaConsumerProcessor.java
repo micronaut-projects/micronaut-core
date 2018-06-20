@@ -234,7 +234,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                         }
 
                         if (LOG.isInfoEnabled()) {
-                            LOG.info("Kafka listener [{}] subscribed to topics: {}", method, topics );
+                            LOG.info("Kafka listener [{}] subscribed to topics: {}", method, topics);
                         }
                     }
 
@@ -337,7 +337,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
     private Argument findBodyArgument(ExecutableMethod<?, ?> method) {
         return Arrays.stream(method.getArguments())
-                .filter(arg -> arg.getAnnotationMetadata().hasAnnotation(Body.class))
+                .filter(arg -> arg.getType() == ConsumerRecord.class || arg.getAnnotationMetadata().hasAnnotation(Body.class))
                 .findFirst()
                 .orElseGet(() ->
                         Arrays.stream(method.getArguments())
