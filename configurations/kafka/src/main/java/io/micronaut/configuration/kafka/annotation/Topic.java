@@ -40,7 +40,16 @@ public @interface Topic {
     String[] value() default {};
 
     /**
-     * @return The topic pattersn to subscribe to
+     * @return The topic patterns to subscribe to
      */
     String[] patterns() default {};
+
+    /**
+     * By default each listener will consume a single {@link org.apache.kafka.clients.consumer.ConsumerRecord}.
+     *
+     * By setting this value to {@code true} and specifying a container type in the method signatures you can indicate that the method should instead receive all the records at once in a batch.
+     *
+     * @return Whether to receive a batch of records or not
+     */
+    boolean batch() default false;
 }

@@ -17,7 +17,11 @@
 package io.micronaut.configuration.kafka.serde;
 
 import io.micronaut.core.order.Ordered;
-import org.apache.kafka.common.serialization.Serde;
+import io.micronaut.core.util.CollectionUtils;
+import org.apache.kafka.common.serialization.*;
+
+import java.util.Collections;
+import java.util.Map;
 
 
 /**
@@ -27,6 +31,22 @@ import org.apache.kafka.common.serialization.Serde;
  * @since 1.0
  */
 public interface SerdeRegistry extends Ordered {
+
+    /**
+     * Default deserializers.
+     */
+    @SuppressWarnings({"unused", "unchecked"})
+    Map<Class, Deserializer> DEFAULT_DESERIALIZERS = Collections.unmodifiableMap(
+        CollectionUtils.mapOf(
+            String.class, new StringDeserializer(),
+            Integer.class, new IntegerDeserializer(),
+            Float.class, new FloatDeserializer(),
+            Short.class, new ShortDeserializer(),
+            Long.class, new LongDeserializer(),
+            Double.class, new DoubleDeserializer(),
+            byte[].class, new ByteArrayDeserializer()
+        )
+    );
 
     /**
      * Obtain a {@link Serde} for the given type.

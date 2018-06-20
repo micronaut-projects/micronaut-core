@@ -7,6 +7,7 @@ import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
 import io.micronaut.messaging.MessageHeaders
 import io.micronaut.messaging.annotation.Header
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -118,6 +119,35 @@ class KafkaListenerSpec extends Specification {
 
     }
 
+    void "test receive ConsumerRecord"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                Collections.singletonMap(
+                        AbstractKafkaConfiguration.EMBEDDED, true
+                )
+
+        )
+
+        when:
+        def config = context.getBean(AbstractKafkaProducerConfiguration)
+        KafkaProducer producer = context.createBean(KafkaProducer, config)
+        producer.send(new ProducerRecord("words-records", "key", "hello world")).get()
+
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+
+        MyConsumer3 myConsumer = context.getBean(MyConsumer3)
+        then:
+        conditions.eventually {
+            myConsumer.wordCount == 2
+            myConsumer.key == "key"
+        }
+
+        cleanup:
+        producer.close()
+        context.close()
+
+    }
+
 
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
     static class MyConsumer {
@@ -139,6 +169,18 @@ class KafkaListenerSpec extends Specification {
         @Topic("words")
         void countWord(@KafkaKey String key, String sentence) {
             wordCount += sentence.split(/\s/).size()
+            this.key = key
+        }
+    }
+
+    @KafkaListener(offsetReset = OffsetReset.EARLIEST)
+    static class MyConsumer3 {
+        int wordCount
+        String key
+
+        @Topic("words-records")
+        void countWord(@KafkaKey String key, ConsumerRecord<String, String> record) {
+            wordCount += record.value().split(/\s/).size()
             this.key = key
         }
     }
