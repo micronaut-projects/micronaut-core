@@ -81,7 +81,7 @@ public class ConsumerRecordBinderRegistry implements ArgumentBinderRegistry<Cons
             if (binder != null) {
                 return Optional.of(binder);
             } else {
-                return Optional.of(new KafkaValueBinder<>());
+                return Optional.of(new KafkaDefaultBinder<>());
             }
         }
     }
