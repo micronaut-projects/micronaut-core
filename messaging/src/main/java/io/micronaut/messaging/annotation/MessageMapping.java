@@ -14,33 +14,28 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.annotation;
+package io.micronaut.messaging.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.messaging.annotation.MessageMapping;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import java.lang.annotation.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Method level annotation used to specify which topics should be subscribed to.
+ * Generic stereotype annotation that models a mapping of a message listener onto a target destination, whether that be a queue a topic or whatever.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.PARAMETER})
-@Repeatable(Topics.class)
-public @interface Topic {
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+public @interface MessageMapping {
 
     /**
-     * @return The topics to subscribe to
+     * @return The message destination
      */
-    @AliasFor(annotation = MessageMapping.class, member = "value")
     String[] value() default {};
-
-    /**
-     * @return The topic pattersn to subscribe to
-     */
-    String[] patterns() default {};
 }
