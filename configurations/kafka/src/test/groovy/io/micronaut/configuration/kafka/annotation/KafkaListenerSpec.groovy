@@ -5,8 +5,11 @@ import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.configuration.kafka.config.AbstractKafkaProducerConfiguration
 import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
+import io.micronaut.messaging.MessageHeaders
+import io.micronaut.messaging.annotation.Header
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.StringSerializer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -26,7 +29,17 @@ class KafkaListenerSpec extends Specification {
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
         KafkaProducer producer = context.createBean(KafkaProducer, config)
-        producer.send(new ProducerRecord("words", "key", "hello world")).get()
+        producer.send(
+                new ProducerRecord(
+                        "words",
+                        null,
+                        "key",
+                        "hello world",
+                        Collections.singletonList(
+                                new RecordHeader("topic", "words".bytes)
+                        )
+                )
+        ).get()
 
         PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
 
@@ -34,6 +47,7 @@ class KafkaListenerSpec extends Specification {
         then:
         conditions.eventually {
             myConsumer.wordCount == 2
+            myConsumer.lastTopic == 'words'
         }
 
         cleanup:
@@ -65,6 +79,7 @@ class KafkaListenerSpec extends Specification {
         then:
         conditions.eventually {
             myConsumer.lastBook == new Book(title: "The Stand")
+            myConsumer.messageHeaders != null
         }
 
         cleanup:
@@ -107,10 +122,12 @@ class KafkaListenerSpec extends Specification {
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
     static class MyConsumer {
         int wordCount
+        String lastTopic
 
         @Topic("words")
-        void countWord(String sentence) {
+        void countWord(String sentence, @Header String topic) {
             wordCount += sentence.split(/\s/).size()
+            lastTopic = topic
         }
     }
 
@@ -129,10 +146,13 @@ class KafkaListenerSpec extends Specification {
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
     static class PojoConsumer {
         Book lastBook
+        MessageHeaders messageHeaders
 
         @Topic("books")
-        void receiveBook(Book book) {
+        void receiveBook(Book book, MessageHeaders messageHeaders) {
             lastBook = book
+            this.messageHeaders = messageHeaders
+
         }
     }
 

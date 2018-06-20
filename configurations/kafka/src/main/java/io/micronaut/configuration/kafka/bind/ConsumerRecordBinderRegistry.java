@@ -25,9 +25,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A registry of {@link ConsumerRecordBinder}.
@@ -39,7 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class ConsumerRecordBinderRegistry implements ArgumentBinderRegistry<ConsumerRecord<?, ?>> {
 
-    private final Map<Class<? extends Annotation>, ConsumerRecordBinder<?>> byAnnotation = new ConcurrentHashMap<>();
+    private final Map<Class<? extends Annotation>, ConsumerRecordBinder<?>> byAnnotation = new HashMap<>();
+    private final Map<Integer, ConsumerRecordBinder<?>> byType = new HashMap<>();
 
     /**
      * Creates the registry for the given binders.
@@ -55,6 +56,12 @@ public class ConsumerRecordBinderRegistry implements ArgumentBinderRegistry<Cons
                             annotatedConsumerRecordBinder.annotationType(),
                             annotatedConsumerRecordBinder
                     );
+                } else if (binder instanceof TypedConsumerRecordBinder) {
+                    TypedConsumerRecordBinder typedConsumerRecordBinder = (TypedConsumerRecordBinder) binder;
+                    byType.put(
+                            typedConsumerRecordBinder.argumentType().typeHashCode(),
+                            typedConsumerRecordBinder
+                    );
                 }
             }
         }
@@ -68,7 +75,14 @@ public class ConsumerRecordBinderRegistry implements ArgumentBinderRegistry<Cons
                     (ConsumerRecordBinder<T>) byAnnotation.get(annotation.get().annotationType());
 
             return Optional.ofNullable(consumerRecordBinder);
+        } else {
+            @SuppressWarnings("unchecked")
+            ConsumerRecordBinder<T> binder = (ConsumerRecordBinder<T>) byType.get(argument.typeHashCode());
+            if (binder != null) {
+                return Optional.of(binder);
+            } else {
+                return Optional.of(new KafkaValueBinder<>());
+            }
         }
-        return Optional.of(new KafkaValueBinder<>());
     }
 }

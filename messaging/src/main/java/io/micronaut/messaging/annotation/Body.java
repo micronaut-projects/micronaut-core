@@ -14,33 +14,31 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.kafka.annotation;
+package io.micronaut.messaging.annotation;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.messaging.annotation.MessageMapping;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.lang.annotation.*;
+import io.micronaut.core.bind.annotation.Bindable;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 /**
- * Method level annotation used to specify which topics should be subscribed to.
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from message body.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.PARAMETER})
-@Repeatable(Topics.class)
-public @interface Topic {
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER})
+@Bindable
+public @interface Body {
 
     /**
-     * @return The topics to subscribe to
+     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
      */
-    @AliasFor(annotation = MessageMapping.class, member = "value")
-    String[] value() default {};
-
-    /**
-     * @return The topic pattersn to subscribe to
-     */
-    String[] patterns() default {};
+    String value() default "";
 }
