@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.kafka.executor;
 
-import io.micronaut.configuration.kafka.annotation.KafkaListener;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
@@ -29,7 +28,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Configures a {@link java.util.concurrent.ScheduledExecutorService} for running {@link KafkaListener} instances.
+ * Configures a {@link java.util.concurrent.ScheduledExecutorService} for running {@link io.micronaut.configuration.kafka.annotation.KafkaListener} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
