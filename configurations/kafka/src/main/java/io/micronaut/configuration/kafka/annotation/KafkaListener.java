@@ -88,7 +88,7 @@ public @interface KafkaListener {
     int threads() default 1;
 
     /**
-     * The timeout to use for calls to {@link org.apache.kafka.clients.consumer.Consumer#poll(long)}
+     * The timeout to use for calls to {@link org.apache.kafka.clients.consumer.Consumer#poll(long)}.
      *
      * @return The timeout. Defaults to 100ms
      */

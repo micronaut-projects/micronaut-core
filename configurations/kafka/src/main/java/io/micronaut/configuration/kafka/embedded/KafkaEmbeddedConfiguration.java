@@ -46,7 +46,7 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether the embedded Kafka server is enabled
+     * Sets whether the embedded Kafka server is enabled.
      *
      * @param enabled True if it is.
      */
@@ -62,7 +62,7 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     }
 
     /**
-     * Sets the broker properties
+     * Sets the broker properties.
      *
      * @param properties The broker properties.
      */
