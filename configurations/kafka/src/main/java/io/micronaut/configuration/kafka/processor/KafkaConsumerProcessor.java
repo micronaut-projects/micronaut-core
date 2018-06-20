@@ -38,6 +38,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.messaging.annotation.Body;
+import io.micronaut.messaging.exceptions.MessagingSystemException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import org.apache.kafka.clients.consumer.*;
@@ -67,16 +69,6 @@ import java.util.regex.Pattern;
 public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaListener>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerProcessor.class);
-    @SuppressWarnings({"unused", "unchecked"})
-    private static final Map<Class, Deserializer> DEFAULT_DESERIALIZERS = new LinkedHashMap() {{
-        put(String.class, new StringDeserializer());
-        put(Integer.class, new IntegerDeserializer());
-        put(Float.class, new FloatDeserializer());
-        put(Short.class, new ShortDeserializer());
-        put(Long.class, new LongDeserializer());
-        put(Double.class, new DoubleDeserializer());
-        put(byte[].class, new ByteArrayDeserializer());
-    }};
 
     private final ExecutorService executorService;
     private final ApplicationConfiguration applicationConfiguration;
@@ -197,33 +189,17 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 }
             }
 
-            // figure out the Key deserializer
-            if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
-                Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
-                        .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
+            configureSerializers(method, consumerConfiguration);
 
-                if (keyArgument.isPresent()) {
-                    consumerConfiguration.setKeyDeserializer(
-                            pickDeserializer(keyArgument.get())
-                    );
-                } else {
-                    //noinspection SingleStatementInBlock
-                    consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
+            if (LOG.isDebugEnabled()) {
+                Optional kd = consumerConfiguration.getKeyDeserializer();
+                if (kd.isPresent()) {
+                    LOG.debug("Using key deserializer [{}] for Kafka listener: {}", kd.get(), method);
                 }
-            }
+                Optional vd = consumerConfiguration.getValueDeserializer();
 
-            // figure out the Value deserializer
-            if (!consumerConfiguration.getValueDeserializer().isPresent()) {
-                Optional<Argument> valueArgument = Arrays.stream(method.getArguments())
-                        .filter(arg -> !arg.getAnnotationMetadata().hasStereotype(Bindable.class)).findFirst();
-
-                if (valueArgument.isPresent()) {
-                    consumerConfiguration.setValueDeserializer(
-                            pickDeserializer(valueArgument.get())
-                    );
-                } else {
-                    //noinspection SingleStatementInBlock
-                    consumerConfiguration.setValueDeserializer(new StringDeserializer());
+                if (vd.isPresent()) {
+                    LOG.debug("Using value deserializer [{}] for Kafka listener: {}", vd.get(), method);
                 }
             }
 
@@ -241,24 +217,45 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                 for (Topic topicAnnotation : topicAnnotations) {
                     String[] topicNames = topicAnnotation.value();
-                    if (ArrayUtils.isNotEmpty(topicNames)) {
+                    String[] patterns = topicAnnotation.patterns();
+                    boolean hasTopics = ArrayUtils.isNotEmpty(topicNames);
+                    boolean hasPatterns = ArrayUtils.isNotEmpty(patterns);
+
+                    if (!hasTopics && !hasPatterns) {
+                        throw new MessagingSystemException("Either a topic or a topic must be specified for method: " + method);
+                    }
+
+                    if (hasTopics) {
+                        List<String> topics = Arrays.asList(topicNames);
                         if (consumerBean instanceof ConsumerRebalanceListener) {
-                            kafkaConsumer.subscribe(Arrays.asList(topicNames), (ConsumerRebalanceListener) consumerBean);
+                            kafkaConsumer.subscribe(topics, (ConsumerRebalanceListener) consumerBean);
                         } else {
-                            kafkaConsumer.subscribe(Arrays.asList(topicNames));
+                            kafkaConsumer.subscribe(topics);
+                        }
+
+                        if (LOG.isInfoEnabled()) {
+                            LOG.info("Kafka listener [{}] subscribed to topics: {}", method, topics );
                         }
                     }
 
-                    String[] patterns = topicAnnotation.patterns();
 
-                    if (ArrayUtils.isNotEmpty(patterns)) {
+                    if (hasPatterns) {
                         for (String pattern : patterns) {
-                            Pattern p = Pattern.compile(pattern);
+                            Pattern p;
+                            try {
+                                p = Pattern.compile(pattern);
+                            } catch (Exception e) {
+                                throw new MessagingSystemException("Invalid topic pattern [" + pattern + "] for method [" + method + "]: " + e.getMessage(), e);
+                            }
 
                             if (consumerBean instanceof ConsumerRebalanceListener) {
                                 kafkaConsumer.subscribe(p, (ConsumerRebalanceListener) consumerBean);
                             } else {
                                 kafkaConsumer.subscribe(p);
+                            }
+
+                            if (LOG.isInfoEnabled()) {
+                                LOG.info("Kafka listener [{}] subscribed to topics pattern: {}", method, pattern);
                             }
                         }
                     }
@@ -338,6 +335,72 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         consumers.clear();
     }
 
+    private Argument findBodyArgument(ExecutableMethod<?, ?> method) {
+        return Arrays.stream(method.getArguments())
+                .filter(arg -> arg.getAnnotationMetadata().hasAnnotation(Body.class))
+                .findFirst()
+                .orElseGet(() ->
+                        Arrays.stream(method.getArguments())
+                                .filter(arg -> !arg.getAnnotationMetadata().hasStereotype(Bindable.class))
+                                .findFirst()
+                                .orElse(null)
+                );
+    }
+
+    private void configureSerializers(ExecutableMethod<?, ?> method, DefaultKafkaConsumerConfiguration consumerConfiguration) {
+        // figure out the Key deserializer
+        Argument bodyArgument = findBodyArgument(method);
+        if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
+            Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
+                    .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
+
+            if (keyArgument.isPresent()) {
+                consumerConfiguration.setKeyDeserializer(
+                        pickDeserializer(keyArgument.get())
+                );
+            } else {
+                //noinspection SingleStatementInBlock
+                if (bodyArgument != null && ConsumerRecord.class.isAssignableFrom(bodyArgument.getType())) {
+                    Optional<Argument<?>> keyType = bodyArgument.getTypeVariable("K");
+                    if (keyType.isPresent()) {
+                        consumerConfiguration.setKeyDeserializer(
+                                pickDeserializer(keyType.get())
+                        );
+                    } else {
+                        consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
+                    }
+                } else {
+                    consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
+                }
+            }
+        }
+
+        // figure out the Value deserializer
+        if (!consumerConfiguration.getValueDeserializer().isPresent()) {
+
+            if (bodyArgument != null) {
+                if (ConsumerRecord.class.isAssignableFrom(bodyArgument.getType())) {
+                    Optional<Argument<?>> valueType = bodyArgument.getTypeVariable("V");
+                    if (valueType.isPresent()) {
+                        consumerConfiguration.setValueDeserializer(
+                                pickDeserializer(valueType.get())
+                        );
+                    } else {
+                        consumerConfiguration.setValueDeserializer(new StringDeserializer());
+                    }
+
+                } else {
+                    consumerConfiguration.setValueDeserializer(
+                            pickDeserializer(bodyArgument)
+                    );
+                }
+            } else {
+                //noinspection SingleStatementInBlock
+                consumerConfiguration.setValueDeserializer(new StringDeserializer());
+            }
+        }
+    }
+
     private OffsetCommitCallback resolveCommitCallback(Object consumerBean) {
         return (offsets, exception) -> {
             if (consumerBean instanceof OffsetCommitCallback) {
@@ -356,7 +419,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
         if (ClassUtils.isJavaLangType(type) || byte[].class == type) {
             Class wrapperType = ReflectionUtils.getWrapperType(type);
-            deserializer = DEFAULT_DESERIALIZERS.get(wrapperType);
+            deserializer = SerdeRegistry.DEFAULT_DESERIALIZERS.get(wrapperType);
         } else {
             deserializer = serdeRegistry.getSerde(argument.getType()).deserializer();
         }
