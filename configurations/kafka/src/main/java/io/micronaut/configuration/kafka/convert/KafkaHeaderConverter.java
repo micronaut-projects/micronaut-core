@@ -35,6 +35,6 @@ public class KafkaHeaderConverter implements TypeConverter<org.apache.kafka.comm
     @Override
     public Optional<Object> convert(Header object, Class<Object> targetType, ConversionContext context) {
         byte[] v = object.value();
-        return ConversionService.SHARED.convert(v, targetType, context);
+        return ConversionService.SHARED.convert(new String(v), targetType, context);
     }
 }

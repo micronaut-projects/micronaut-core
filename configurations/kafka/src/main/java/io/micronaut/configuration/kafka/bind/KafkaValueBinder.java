@@ -32,8 +32,14 @@ import java.util.Optional;
 public class KafkaValueBinder<T> implements ConsumerRecordBinder<T> {
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, ConsumerRecord<?, ?> source) {
-        Object value = source.value();
-        Optional<T> converted = ConversionService.SHARED.convert(value, context);
-        return () -> converted;
+        if (context.getArgument().getType() == ConsumerRecord.class) {
+            Optional<? extends ConsumerRecord<?, ?>> opt = Optional.of(source);
+            //noinspection unchecked
+            return () -> (Optional<T>) opt;
+        } else {
+            Object value = source.value();
+            Optional<T> converted = ConversionService.SHARED.convert(value, context);
+            return () -> converted;
+        }
     }
 }
