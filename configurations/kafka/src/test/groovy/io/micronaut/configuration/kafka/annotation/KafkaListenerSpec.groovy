@@ -12,21 +12,22 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.StringSerializer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
 
+@Stepwise
 class KafkaListenerSpec extends Specification {
 
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+            Collections.singletonMap(
+                    AbstractKafkaConfiguration.EMBEDDED, true
+            )
 
+    )
     void "test simple consumer"() {
-        given:
-        ApplicationContext context = ApplicationContext.run(
-                Collections.singletonMap(
-                        AbstractKafkaConfiguration.EMBEDDED, true
-                )
-
-        )
-
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
         KafkaProducer producer = context.createBean(KafkaProducer, config)
@@ -53,20 +54,11 @@ class KafkaListenerSpec extends Specification {
 
         cleanup:
         producer.close()
-        context.close()
 
     }
 
 
     void "test POJO consumer"() {
-        given:
-        ApplicationContext context = ApplicationContext.run(
-                Collections.singletonMap(
-                        AbstractKafkaConfiguration.EMBEDDED, true
-                )
-
-        )
-
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
         config.setKeySerializer(new StringSerializer())
@@ -85,20 +77,10 @@ class KafkaListenerSpec extends Specification {
 
         cleanup:
         producer.close()
-        context.close()
-
     }
 
 
     void "test @KafkaKey annotation"() {
-        given:
-        ApplicationContext context = ApplicationContext.run(
-                Collections.singletonMap(
-                        AbstractKafkaConfiguration.EMBEDDED, true
-                )
-
-        )
-
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
         KafkaProducer producer = context.createBean(KafkaProducer, config)
@@ -109,25 +91,16 @@ class KafkaListenerSpec extends Specification {
         MyConsumer2 myConsumer = context.getBean(MyConsumer2)
         then:
         conditions.eventually {
-            myConsumer.wordCount == 2
+            myConsumer.wordCount == 4
             myConsumer.key == "key"
         }
 
         cleanup:
         producer.close()
-        context.close()
 
     }
 
     void "test receive ConsumerRecord"() {
-        given:
-        ApplicationContext context = ApplicationContext.run(
-                Collections.singletonMap(
-                        AbstractKafkaConfiguration.EMBEDDED, true
-                )
-
-        )
-
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
         KafkaProducer producer = context.createBean(KafkaProducer, config)
@@ -144,10 +117,32 @@ class KafkaListenerSpec extends Specification {
 
         cleanup:
         producer.close()
-        context.close()
 
     }
 
+
+
+    void "test POJO consumer record"() {
+
+        when:
+        def config = context.getBean(AbstractKafkaProducerConfiguration)
+        config.setKeySerializer(new StringSerializer())
+        config.setValueSerializer(new JsonSerde(Book).serializer())
+        KafkaProducer producer = context.createBean(KafkaProducer, config)
+        producer.send(new ProducerRecord("books-records", "Stephen King", new Book(title: "The Stand"))).get()
+
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+
+        PojoConsumer2 myConsumer = context.getBean(PojoConsumer2)
+        then:
+        conditions.eventually {
+            myConsumer.lastBook == new Book(title: "The Stand")
+        }
+
+        cleanup:
+        producer.close()
+
+    }
 
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
     static class MyConsumer {
@@ -182,6 +177,16 @@ class KafkaListenerSpec extends Specification {
         void countWord(@KafkaKey String key, ConsumerRecord<String, String> record) {
             wordCount += record.value().split(/\s/).size()
             this.key = key
+        }
+    }
+
+    @KafkaListener(offsetReset = OffsetReset.EARLIEST)
+    static class PojoConsumer2 {
+        Book lastBook
+
+        @Topic("books-records")
+        void receiveBook(ConsumerRecord<String, Book> record) {
+            lastBook = record.value()
         }
     }
 
