@@ -26,7 +26,6 @@ import io.reactivex.Flowable;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.config.ConfigResource;
-import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.Collection;

@@ -17,8 +17,7 @@
 package io.micronaut.configuration.kafka.annotation;
 
 import io.micronaut.context.annotation.*;
-
-import javax.inject.Singleton;
+import io.micronaut.messaging.annotation.MessageListener;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -29,13 +28,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * <p>Annotation applied at the class level to indicate that a bean is a Kafka {@link org.apache.kafka.clients.consumer.Consumer}.</p>
  *
+ *
+ * @author graemerocher
+ * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
-@Bean
-@Executable(processOnStartup = true)
-@DefaultScope(Singleton.class)
+@MessageListener
 public @interface KafkaListener {
 
     /**
@@ -81,7 +81,8 @@ public @interface KafkaListener {
      * for a consumer you can alter this setting. Note that this means that multiple partitions will
      * be allocated to a single application.
      *
-     * <p>NOTE: When using this setting your bean should be declared as {@link Prototype}</p>
+     * <p>NOTE: When using this setting if your bean is {@link javax.inject.Singleton} then local state will be s
+     * shared between invocations from different consumer threads</p>
      *
      * @return The number of threads
      */
@@ -103,9 +104,9 @@ public @interface KafkaListener {
     String sessionTimeout() default "";
 
     /**
-     * The session timeout for a consumer. See {@code session.timeout.ms}.
+     * The heart beat interval for the consumer. See {@code heartbeat.interval.ms}.
      *
-     * @return The session timeout as a duration.
+     * @return The heartbeat interval as a duration.
      * @see org.apache.kafka.clients.consumer.ConsumerConfig#HEARTBEAT_INTERVAL_MS_DOC
      */
     String heartbeatInterval() default "";
