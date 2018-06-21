@@ -32,7 +32,6 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 import io.micronaut.ast.groovy.InjectTransform
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.AstUtils
 import io.micronaut.context.ApplicationContext
@@ -245,6 +244,9 @@ class FunctionTransform implements ASTTransformation {
 
     protected void implementSupplier(MethodNode functionMethod, ClassNode node) {
         def returnType = ClassHelper.getWrapper(functionMethod.returnType.plainNodeReference)
+        if (functionMethod.returnType.usingGenerics) {
+            returnType = GenericsUtils.makeClassSafeWithGenerics(returnType, functionMethod.returnType.genericsTypes)
+        }
         node.addInterface(GenericsUtils.makeClassSafeWithGenerics(
                 ClassHelper.make(Supplier).plainNodeReference,
                 new GenericsType(returnType)
