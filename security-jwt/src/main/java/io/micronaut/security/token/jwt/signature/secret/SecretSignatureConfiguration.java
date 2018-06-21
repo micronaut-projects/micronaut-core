@@ -29,6 +29,7 @@ import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 public class SecretSignatureConfiguration {
     private JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
     private String secret;
+    private boolean base64 = false;
     private final String name;
 
     /**
@@ -78,4 +79,19 @@ public class SecretSignatureConfiguration {
         return name;
     }
 
+    /**
+     *
+     * @return true if the secret is Base64 encoded
+     */
+    public boolean isBase64() {
+        return base64;
+    }
+
+    /**
+     * base64 setter.
+     * @param base64 boolean flag indicating wether the supplied secret is base64 encoded
+     */
+    public void setBase64(boolean base64) {
+        this.base64 = base64;
+    }
 }
