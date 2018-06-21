@@ -102,7 +102,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
-    private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
+    private final Map<Integer, HttpClient> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
 
@@ -144,9 +144,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         }
 
-        ClientRegistration reg = getClient(context, clientAnnotation);
+        HttpClient httpClient = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        if (httpMethodMapping.isPresent() && reg != null) {
+        if (httpMethodMapping.isPresent() && httpClient != null) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
@@ -159,8 +159,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
 
-            String contextPath = reg.contextPath;
-            UriMatchTemplate uriTemplate = UriMatchTemplate.of(contextPath != null ? contextPath : "/");
+            UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
             if (!(uri.length() == 1 && uri.charAt(0) == '/')) {
                 uriTemplate = uriTemplate.nest(uri);
             }
@@ -289,8 +288,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             cookies.forEach(request::cookie);
-
-            HttpClient httpClient = reg.httpClient;
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<Object> methodDeclaringType = context.getDeclaringType();
@@ -477,7 +474,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param clientAnn client annotation
      * @return client registration
      */
-    private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
+    private HttpClient getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
         String[] clientId = clientAnn.value();
         if (ArrayUtils.isEmpty(clientId)) {
             return null;
@@ -488,17 +485,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 .orElseThrow(() ->
                     new HttpClientException("Invalid service reference [" + ArrayUtils.toString(clientId) + "] specified to @Client")
                 );
-            String contextPath = "";
+            String contextPath = null;
             String path = clientAnn.path();
             if (StringUtils.isNotEmpty(path)) {
                 contextPath = path;
             } else if (ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
-            } else if (loadBalancer instanceof FixedLoadBalancer) {
-                FixedLoadBalancer flb = (FixedLoadBalancer) loadBalancer;
-                String p = flb.getUrl().getPath();
-                if (!StringUtils.isEmpty(p)) {
-                    contextPath = p;
+            } else {
+                if (loadBalancer instanceof FixedLoadBalancer) {
+                    contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
                 }
             }
 
@@ -508,7 +503,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 Qualifiers.byName(clientId[0])
             );
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(clientAnn.configuration()));
-            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
+            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
@@ -546,7 +541,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper, beanContext.getBean(ApplicationConfiguration.class))));
                 }
             }
-            return new ClientRegistration(client, contextPath);
+            return client;
         });
     }
 
@@ -558,28 +553,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Override
     @PreDestroy
     public void close() throws IOException {
-        for (ClientRegistration registration : clients.values()) {
-            HttpClient httpClient = registration.httpClient;
-            httpClient.close();
-        }
-    }
-
-    /**
-     * Client registration inner class.
-     */
-    class ClientRegistration {
-        final HttpClient httpClient;
-        final String contextPath;
-
-        /**
-         * Constructor for client registration.
-         *
-         * @param httpClient  http client for outgoing connection
-         * @param contextPath application context path
-         */
-        ClientRegistration(HttpClient httpClient, String contextPath) {
-            this.httpClient = httpClient;
-            this.contextPath = contextPath;
+        for (HttpClient client : clients.values()) {
+            client.close();
         }
     }
 }
