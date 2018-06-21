@@ -34,6 +34,7 @@ import java.lang.annotation.Target;
  * </code></pre>
  *
  * @author graemerocher
+ * @since 1.0
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
