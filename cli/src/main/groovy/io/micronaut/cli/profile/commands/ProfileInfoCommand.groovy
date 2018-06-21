@@ -73,7 +73,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 console.log('')
                 console.log('Provided Commands:')
                 console.log('--------------------')
-                Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name }
+                Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name }.sort { it.name }
 
                 for (cmd in commands) {
                     def description = cmd.description
@@ -82,7 +82,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 console.log('')
                 console.log('Provided Features:')
                 console.log('--------------------')
-                def features = profile.features
+                def features = profile.features.sort { it.name }
 
                 for (feature in features) {
                     console.log("* ${feature.name} - ${feature.description}")
