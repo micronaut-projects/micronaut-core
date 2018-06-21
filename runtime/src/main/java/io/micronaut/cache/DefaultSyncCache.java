@@ -26,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -135,6 +136,10 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
             builder.weigher(findWeigher());
         });
 
+        if (cacheConfiguration.isTestMode()) {
+            // run commands on same thread
+            builder.executor(Runnable::run);
+        }
         return builder.build();
     }
 
