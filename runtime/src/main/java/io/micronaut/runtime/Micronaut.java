@@ -22,13 +22,16 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.cli.CommandLine;
+import io.micronaut.core.naming.Described;
 import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import io.micronaut.runtime.server.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.net.URL;
 import java.util.*;
 import java.util.function.Function;
 
@@ -64,17 +67,58 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             long start = System.currentTimeMillis();
             applicationContext.start();
 
-            Optional<EmbeddedServer> embeddedContainerBean = applicationContext.findBean(EmbeddedServer.class);
+            Optional<EmbeddedApplication> embeddedContainerBean = applicationContext.findBean(EmbeddedApplication.class);
 
-            embeddedContainerBean.ifPresent((embeddedServer -> {
+            embeddedContainerBean.ifPresent((embeddedApplication -> {
                 try {
-                    embeddedServer.start();
-                    if (LOG.isInfoEnabled()) {
-                        long end = System.currentTimeMillis();
-                        long took = end - start;
-                        LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
+                    embeddedApplication.start();
+
+                    boolean keepAlive = false;
+                    if (embeddedApplication instanceof Described) {
+                        if (LOG.isInfoEnabled()) {
+                            long end = System.currentTimeMillis();
+                            long took = end - start;
+                            String desc = ((Described) embeddedApplication).getDescription();
+                            LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
+                        }
+                        keepAlive = embeddedApplication.isServer();
+                    } else {
+                        if (embeddedApplication instanceof EmbeddedServer) {
+
+                            if (LOG.isInfoEnabled()) {
+                                long end = System.currentTimeMillis();
+                                long took = end - start;
+                                URL url = ((EmbeddedServer) embeddedApplication).getURL();
+                                LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
+                            }
+                        } else {
+                            if (LOG.isInfoEnabled()) {
+                                long end = System.currentTimeMillis();
+                                long took = end - start;
+                                LOG.info("Startup completed in {}ms.", took);
+                            }
+                            keepAlive = embeddedApplication.isServer();
+                        }
                     }
-                    Runtime.getRuntime().addShutdownHook(new Thread(embeddedServer::stop));
+
+                    Thread mainThread = Thread.currentThread();
+                    boolean finalKeepAlive = keepAlive;
+                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                        embeddedApplication.stop();
+                        if (finalKeepAlive) {
+                            mainThread.interrupt();
+                        }
+                    }));
+
+                    if (keepAlive) {
+                        try {
+                            while (embeddedApplication.isRunning()) {
+                                Thread.sleep(Long.MAX_VALUE);
+                            }
+                        } catch (InterruptedException e) {
+                            // ignore
+                        }
+                    }
 
                 } catch (Throwable e) {
                     handleStartupException(applicationContext.getEnvironment(), e);

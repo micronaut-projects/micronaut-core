@@ -43,7 +43,7 @@ class KafkaListenerSpec extends Specification {
                 )
         ).get()
 
-        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         MyConsumer myConsumer = context.getBean(MyConsumer)
         then:
@@ -66,7 +66,7 @@ class KafkaListenerSpec extends Specification {
         KafkaProducer producer = context.createBean(KafkaProducer, config)
         producer.send(new ProducerRecord("books", "Stephen King", new Book(title: "The Stand"))).get()
 
-        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         PojoConsumer myConsumer = context.getBean(PojoConsumer)
         then:
@@ -86,7 +86,7 @@ class KafkaListenerSpec extends Specification {
         KafkaProducer producer = context.createBean(KafkaProducer, config)
         producer.send(new ProducerRecord("words", "key", "hello world")).get()
 
-        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         MyConsumer2 myConsumer = context.getBean(MyConsumer2)
         then:
@@ -106,7 +106,7 @@ class KafkaListenerSpec extends Specification {
         KafkaProducer producer = context.createBean(KafkaProducer, config)
         producer.send(new ProducerRecord("words-records", "key", "hello world")).get()
 
-        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         MyConsumer3 myConsumer = context.getBean(MyConsumer3)
         then:
@@ -131,7 +131,7 @@ class KafkaListenerSpec extends Specification {
         KafkaProducer producer = context.createBean(KafkaProducer, config)
         producer.send(new ProducerRecord("books-records", "Stephen King", new Book(title: "The Stand"))).get()
 
-        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         PojoConsumer2 myConsumer = context.getBean(PojoConsumer2)
         then:
