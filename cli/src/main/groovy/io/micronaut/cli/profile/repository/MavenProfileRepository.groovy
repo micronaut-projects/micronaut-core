@@ -64,6 +64,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     DependencyResolutionContext resolutionContext
     DependencyVersions profileDependencyVersions
     private boolean resolved = false
+    private String mavenLocalLocation
 
     MavenProfileRepository(List<RepositoryConfiguration> repositoryConfigurations) {
         this.repositoryConfigurations = repositoryConfigurations
@@ -109,7 +110,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                              version: art.version ?: null)
         } catch (DependencyResolutionFailedException e) {
 
-            def localData = new File(System.getProperty("user.home"), "/.m2/repository/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
+            def localData = new File(mavenLocal, "/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
             if (localData.exists()) {
                 def currentVersion = parseCurrentVersion(localData)
                 def profileFile = new File(localData.parentFile, "$currentVersion/${art.artifactId}-${currentVersion}.jar")
@@ -139,6 +140,26 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         }
     }
 
+    @CompileDynamic
+    protected String getMavenLocal() {
+        if(!mavenLocalLocation) {
+
+            File settingsXml = new File(System.getProperty("user.home"), "/.m2/settings.xml")
+            if(settingsXml.exists()) {
+                String localRepo = new XmlSlurper().parseText(settingsXml.text)?.localRepository
+                if(localRepo) {
+                    mavenLocalLocation = "${localRepo.replace('${user.home}', System.getProperty("user.home"))}"
+                }
+            }
+
+            if(!mavenLocalLocation) {
+                mavenLocalLocation = "${System.getProperty("user.home")}/.m2/repository/"
+            }
+        }
+
+        mavenLocalLocation
+    }
+
     @Override
     List<Profile> getAllProfiles() {
         if (!resolved) {
@@ -154,7 +175,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                 grapeEngine.grab(profile)
             }
 
-            def localData = new File(System.getProperty("user.home"), "/.m2/repository/io/micronaut/profiles")
+            def localData = new File(mavenLocal, "/io/micronaut/profiles")
             if (localData.exists()) {
                 localData.eachDir { File dir ->
                     if (!dir.name.startsWith('.')) {
