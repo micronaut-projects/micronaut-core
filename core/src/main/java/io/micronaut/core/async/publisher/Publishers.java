@@ -278,7 +278,7 @@ public class Publishers {
      * @param <T> The generic type
      * @return The Resulting in publisher
      */
-    public static <T extends Publisher<?>> T convertPublisher(Object object, Class<T> publisherType) {
+    public static <T> T convertPublisher(Object object, Class<T> publisherType) {
         Objects.requireNonNull(object, "Invalid argument [object]: " + object);
         Objects.requireNonNull(object, "Invalid argument [publisherType]: " + publisherType);
         if (object instanceof CompletableFuture) {

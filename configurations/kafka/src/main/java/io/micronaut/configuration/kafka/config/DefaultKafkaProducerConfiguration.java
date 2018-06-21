@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
+import javax.inject.Inject;
 import java.util.Properties;
 
 /**
@@ -39,11 +40,36 @@ public class DefaultKafkaProducerConfiguration<K, V> extends AbstractKafkaProduc
      *
      * @param defaultConfiguration The default Kafka configuration
      */
-    protected DefaultKafkaProducerConfiguration(KafkaDefaultConfiguration defaultConfiguration) {
+    @Inject
+    public DefaultKafkaProducerConfiguration(KafkaDefaultConfiguration defaultConfiguration) {
         super(new Properties());
+        init(defaultConfiguration);
+    }
+
+
+    /**
+     * Construct a new {@link KafkaConsumerConfiguration} for the given defaults.
+     *
+     * @param defaultConfiguration The default configuration
+     */
+    public DefaultKafkaProducerConfiguration(
+            AbstractKafkaConfiguration defaultConfiguration) {
+        super(new Properties());
+        init(defaultConfiguration);
+    }
+
+    private void init(AbstractKafkaConfiguration defaultConfiguration) {
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
         config.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, DEFAULT_KEY_SERIALIZER);
         config.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_SERIALIZER);
+
+        if (defaultConfiguration instanceof AbstractKafkaProducerConfiguration) {
+            @SuppressWarnings("unchecked")
+            AbstractKafkaProducerConfiguration<K, V> defaultProducerConfig = (AbstractKafkaProducerConfiguration) defaultConfiguration;
+
+            defaultProducerConfig.getKeySerializer().ifPresent(this::setKeySerializer);
+            defaultProducerConfig.getValueSerializer().ifPresent(this::setValueSerializer);
+        }
     }
 }

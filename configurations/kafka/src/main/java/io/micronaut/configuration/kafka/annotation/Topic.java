@@ -52,4 +52,5 @@ public @interface Topic {
      * @return Whether to receive a batch of records or not
      */
     boolean batch() default false;
+
 }
