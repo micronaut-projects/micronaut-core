@@ -31,6 +31,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.ParametrizedProvider;
@@ -110,10 +111,23 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             .orElseThrow(() ->
                 new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + ArrayUtils.toString((Object[]) finalValue) + "] specified to @Client")
             );
+
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
+            String contextPath = null;
+            String annotationPath = annotation.path();
+            String[] annotationValue = annotation.value();
+            if (StringUtils.isNotEmpty(annotationPath)) {
+                contextPath = annotationPath;
+            } else if (ArrayUtils.isNotEmpty(annotationValue) && annotationValue[0].startsWith("/")) {
+                contextPath = annotationValue[0];
+            } else {
+                if (loadBalancer instanceof FixedLoadBalancer) {
+                    contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
+                }
+            }
             HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
-            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration);
+            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
             if (httpClient instanceof DefaultHttpClient) {
                 ((DefaultHttpClient) httpClient).setClientIdentifiers(finalValue);
             }

@@ -234,4 +234,26 @@ public final class StringUtils {
             .map(value -> uppercase ? value.toUpperCase() : value);
         return converted.get();
     }
+
+    /**
+     * Prepends a partial uri and normalizes / characters.
+     * For example, if the base uri is "/foo/" and the uri
+     * is "/bar/", the output will be "/foo/bar/". Similarly
+     * if the base uri is "/foo" and the uri is "bar", the
+     * output will be "/foo/bar"
+     *
+     * @param baseUri The uri to prepend. Eg. /foo
+     * @param uri The uri to combine with the baseUri. Eg. /bar
+     * @return A combined uri string
+     */
+    public static String prependUri(String baseUri, String uri) {
+        if (!uri.startsWith("/")) {
+            uri = "/" + uri;
+        }
+        if (uri.length() == 1 && uri.charAt(0) == '/') {
+            uri = "";
+        }
+        uri = baseUri + uri;
+        return uri.replaceAll("[\\/]{2,}", "/");
+    }
 }

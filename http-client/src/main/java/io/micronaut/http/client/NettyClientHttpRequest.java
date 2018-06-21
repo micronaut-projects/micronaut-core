@@ -63,7 +63,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final io.micronaut.http.HttpMethod httpMethod;
-    private final URI uri;
+    private URI uri;
     private B body;
     private NettyHttpParameters httpParameters;
 
@@ -104,6 +104,12 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
+        return this;
+    }
+
+    @Override
+    public MutableHttpRequest<B> uri(URI uri) {
+        this.uri = uri;
         return this;
     }
 
