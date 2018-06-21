@@ -37,22 +37,39 @@ public interface SerdeRegistry extends Ordered {
      */
     @SuppressWarnings({"unused", "unchecked"})
     Map<Class, Deserializer> DEFAULT_DESERIALIZERS = Collections.unmodifiableMap(
-        CollectionUtils.mapOf(
-            String.class, new StringDeserializer(),
-            Integer.class, new IntegerDeserializer(),
-            Float.class, new FloatDeserializer(),
-            Short.class, new ShortDeserializer(),
-            Long.class, new LongDeserializer(),
-            Double.class, new DoubleDeserializer(),
-            byte[].class, new ByteArrayDeserializer()
-        )
+            CollectionUtils.mapOf(
+                    String.class, new StringDeserializer(),
+                    Integer.class, new IntegerDeserializer(),
+                    Float.class, new FloatDeserializer(),
+                    Short.class, new ShortDeserializer(),
+                    Long.class, new LongDeserializer(),
+                    Double.class, new DoubleDeserializer(),
+                    byte[].class, new ByteArrayDeserializer()
+            )
+    );
+
+
+    /**
+     * Default deserializers.
+     */
+    @SuppressWarnings({"unused", "unchecked"})
+    Map<Class, Serializer> DEFAULT_SERIALIZERS = Collections.unmodifiableMap(
+            CollectionUtils.mapOf(
+                    String.class, new StringSerializer(),
+                    Integer.class, new IntegerSerializer(),
+                    Float.class, new FloatSerializer(),
+                    Short.class, new ShortSerializer(),
+                    Long.class, new LongSerializer(),
+                    Double.class, new DoubleSerializer(),
+                    byte[].class, new ByteArraySerializer()
+            )
     );
 
     /**
      * Obtain a {@link Serde} for the given type.
      *
      * @param type The type
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The {@link Serde}
      */
     <T> Serde<T> getSerde(Class<T> type);
