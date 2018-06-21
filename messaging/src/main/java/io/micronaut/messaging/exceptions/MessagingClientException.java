@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.aop;
-
-import io.micronaut.inject.ExecutableMethod;
-
-import javax.annotation.Nonnull;
+package io.micronaut.messaging.exceptions;
 
 /**
- * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
- *
- *  @param <T> The declaring type
- *  @param <R> The result of the method call
+ * An exception thrown when an unrecoverable error occurs with a messaging client.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, ExecutableMethod<T, R> {
+public class MessagingClientException extends RuntimeException {
+    /**
+     * @param message The message
+     */
+    public MessagingClientException(String message) {
+        super(message);
+    }
 
     /**
-     * The underlying {@link ExecutableMethod} reference.
-     *
-     * @return The underlying method reference.
+     * @param message The message
+     * @param cause   The throwable
      */
-    @Nonnull ExecutableMethod<T, R> getExecutableMethod();
+    public MessagingClientException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

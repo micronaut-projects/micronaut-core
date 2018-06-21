@@ -7,9 +7,11 @@ import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
 import io.micronaut.messaging.MessageHeaders
 import io.micronaut.messaging.annotation.Header
+import io.reactivex.Single
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.serialization.StringSerializer
 import spock.lang.AutoCleanup
@@ -29,74 +31,52 @@ class KafkaListenerSpec extends Specification {
     )
     void "test simple consumer"() {
         when:
-        def config = context.getBean(AbstractKafkaProducerConfiguration)
-        KafkaProducer producer = context.createBean(KafkaProducer, config)
-        producer.send(
-                new ProducerRecord(
-                        "words",
-                        null,
-                        "key",
-                        "hello world",
-                        Collections.singletonList(
-                                new RecordHeader("topic", "words".bytes)
-                        )
-                )
-        ).get()
+        MyClient myClient = context.getBean(MyClient)
+        myClient.sendSentence("key", "hello world", "words")
 
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         MyConsumer myConsumer = context.getBean(MyConsumer)
+
         then:
         conditions.eventually {
             myConsumer.wordCount == 2
             myConsumer.lastTopic == 'words'
         }
-
-        cleanup:
-        producer.close()
-
     }
 
 
     void "test POJO consumer"() {
         when:
-        def config = context.getBean(AbstractKafkaProducerConfiguration)
-        config.setKeySerializer(new StringSerializer())
-        config.setValueSerializer(new JsonSerde(Book).serializer())
-        KafkaProducer producer = context.createBean(KafkaProducer, config)
-        producer.send(new ProducerRecord("books", "Stephen King", new Book(title: "The Stand"))).get()
+        MyClient myClient = context.getBean(MyClient)
+        Book book = myClient.sendReactive("Stephen King", new Book(title: "The Stand")).blockingGet()
 
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         PojoConsumer myConsumer = context.getBean(PojoConsumer)
         then:
         conditions.eventually {
-            myConsumer.lastBook == new Book(title: "The Stand")
+            myConsumer.lastBook == book
             myConsumer.messageHeaders != null
         }
-
-        cleanup:
-        producer.close()
     }
 
 
     void "test @KafkaKey annotation"() {
         when:
-        def config = context.getBean(AbstractKafkaProducerConfiguration)
-        KafkaProducer producer = context.createBean(KafkaProducer, config)
-        producer.send(new ProducerRecord("words", "key", "hello world")).get()
+        MyClient myClient = context.getBean(MyClient)
+        RecordMetadata metadata = myClient.sendGetRecordMetadata("key", "hello world")
 
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         MyConsumer2 myConsumer = context.getBean(MyConsumer2)
         then:
+        metadata != null
+        metadata.topic() == "words"
         conditions.eventually {
             myConsumer.wordCount == 4
             myConsumer.key == "key"
         }
-
-        cleanup:
-        producer.close()
 
     }
 
@@ -144,6 +124,18 @@ class KafkaListenerSpec extends Specification {
         cleanup:
         producer.close()
 
+    }
+
+    @KafkaClient
+    static interface MyClient {
+        @Topic("words")
+        void sendSentence(@KafkaKey String key, String sentence, @Header String topic)
+
+        @Topic("words")
+        RecordMetadata sendGetRecordMetadata(@KafkaKey String key, String sentence)
+
+        @Topic("books")
+        Single<Book> sendReactive(@KafkaKey String key, Book book)
     }
 
     @KafkaListener(offsetReset = OffsetReset.EARLIEST)
