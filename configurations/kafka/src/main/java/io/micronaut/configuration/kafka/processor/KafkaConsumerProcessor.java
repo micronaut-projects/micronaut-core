@@ -22,10 +22,13 @@ import io.micronaut.configuration.kafka.config.DefaultKafkaConsumerConfiguration
 import io.micronaut.configuration.kafka.annotation.*;
 import io.micronaut.configuration.kafka.annotation.KafkaListener;
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
+import io.micronaut.configuration.kafka.config.KafkaDefaultConfiguration;
 import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -55,6 +58,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 
@@ -66,6 +70,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = KafkaDefaultConfiguration.class)
 public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaListener>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerProcessor.class);
@@ -110,6 +115,10 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
         Topic[] topicAnnotations = method.getAnnotationsByType(Topic.class);
         KafkaListener consumerAnnotation = method.getAnnotation(KafkaListener.class);
+
+        if (ArrayUtils.isEmpty(topicAnnotations)) {
+            topicAnnotations = beanDefinition.getAnnotationsByType(Topic.class);
+        }
 
         if (consumerAnnotation != null && ArrayUtils.isNotEmpty(topicAnnotations)) {
 
@@ -270,6 +279,11 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                 if (consumerRecords != null && consumerRecords.count() > 0) {
 
                                     for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
+
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Kafka consumer [{}] received record: {}", method, consumerRecord);
+                                        }
+
                                         BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
                                         boundExecutable.invoke(
                                                 consumerBean
@@ -415,13 +429,24 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
     private Deserializer pickDeserializer(Argument<?> argument) {
         Class<?> type = argument.getType();
+
+        if (Publishers.isConvertibleToPublisher(type) || Future.class.isAssignableFrom(type)) {
+            Optional<Argument<?>> typeArg = argument.getFirstTypeVariable();
+
+            if (typeArg.isPresent()) {
+                type = typeArg.get().getType();
+            } else {
+                return new ByteArrayDeserializer();
+            }
+        }
+
         Deserializer deserializer;
 
         if (ClassUtils.isJavaLangType(type) || byte[].class == type) {
             Class wrapperType = ReflectionUtils.getWrapperType(type);
             deserializer = SerdeRegistry.DEFAULT_DESERIALIZERS.get(wrapperType);
         } else {
-            deserializer = serdeRegistry.getSerde(argument.getType()).deserializer();
+            deserializer = serdeRegistry.getSerde(type).deserializer();
         }
 
         if (deserializer == null) {

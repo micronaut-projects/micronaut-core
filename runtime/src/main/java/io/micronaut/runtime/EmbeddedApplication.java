@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package io.micronaut.runtime.server;
+package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextLifeCyle;
 import io.micronaut.context.env.Environment;
-import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
  * <p>An {@link EmbeddedApplication} is a runnable application that starts and manages the {@link ApplicationContext}.</p>
