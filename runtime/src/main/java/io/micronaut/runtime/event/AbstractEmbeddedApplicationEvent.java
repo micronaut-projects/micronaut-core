@@ -14,31 +14,32 @@
  * limitations under the License.
  */
 
-package io.micronaut.runtime.server.event;
+package io.micronaut.runtime.event;
 
-import io.micronaut.runtime.event.ApplicationStartupEvent;
+import io.micronaut.context.event.ApplicationEvent;
+import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
- * Event fired when the {@link EmbeddedServer} completes startup.
+ * An abstract event for events specific to server applications.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-public class ServerStartupEvent extends ApplicationStartupEvent {
+public abstract class AbstractEmbeddedApplicationEvent extends ApplicationEvent {
 
     /**
      * Constructs a prototypical Event.
      *
-     * @param embeddedServer object on which the Event initially occurred.
+     * @param embeddedApplication The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
-    public ServerStartupEvent(EmbeddedServer embeddedServer) {
-        super(embeddedServer);
+    public AbstractEmbeddedApplicationEvent(EmbeddedApplication<?> embeddedApplication) {
+        super(embeddedApplication);
     }
 
     @Override
-    public EmbeddedServer getSource() {
-        return (EmbeddedServer) super.getSource();
+    public EmbeddedApplication<?> getSource() {
+        return (EmbeddedApplication<?>) super.getSource();
     }
 }

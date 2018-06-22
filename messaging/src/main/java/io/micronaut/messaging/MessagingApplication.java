@@ -17,13 +17,17 @@
 package io.micronaut.messaging;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextLifeCyle;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.messaging.annotation.MessageListener;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.runtime.server.EmbeddedApplication;
+import io.micronaut.runtime.EmbeddedApplication;
+import io.micronaut.runtime.event.ApplicationShutdownEvent;
+import io.micronaut.runtime.event.ApplicationStartupEvent;
+import io.micronaut.runtime.exceptions.ApplicationStartupException;
 
 import javax.inject.Singleton;
 import java.util.Collection;
@@ -70,6 +74,30 @@ public class MessagingApplication implements EmbeddedApplication, Described {
     @Override
     public boolean isServer() {
         return true;
+    }
+
+    @Override
+    public MessagingApplication start() {
+        ApplicationContext applicationContext = getApplicationContext();
+        if (applicationContext != null && !applicationContext.isRunning()) {
+            try {
+                applicationContext.start();
+                applicationContext.publishEvent(new ApplicationStartupEvent(this));
+            } catch (Throwable e) {
+                throw new ApplicationStartupException("Error starting messaging server: " + e.getMessage(), e);
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public ApplicationContextLifeCyle stop() {
+        ApplicationContext applicationContext = getApplicationContext();
+        if (applicationContext != null && applicationContext.isRunning()) {
+            applicationContext.stop();
+            applicationContext.publishEvent(new ApplicationShutdownEvent(this));
+        }
+        return this;
     }
 
     @Override

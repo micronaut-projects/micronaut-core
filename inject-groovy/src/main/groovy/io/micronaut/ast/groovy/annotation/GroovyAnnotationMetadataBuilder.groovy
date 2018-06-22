@@ -170,14 +170,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected OptionalValues<?> getAnnotationValues(AnnotatedNode member, Class<?> annotationType) {
-        def anns = member.getAnnotations(ClassHelper.make(annotationType))
-        if (!anns.isEmpty()) {
-            AnnotationNode ann = anns[0]
-            Map<CharSequence, Object> converted = new LinkedHashMap<>();
-            for (annMember in ann.members) {
-                readAnnotationRawValues(annMember.key, annMember.value, converted)
+        if (member != null) {
+            def anns = member.getAnnotations(ClassHelper.make(annotationType))
+            if (!anns.isEmpty()) {
+                AnnotationNode ann = anns[0]
+                Map<CharSequence, Object> converted = new LinkedHashMap<>();
+                for (annMember in ann.members) {
+                    readAnnotationRawValues(annMember.key, annMember.value, converted)
+                }
+                return OptionalValues.of(Object.class, converted)
             }
-            return OptionalValues.of(Object.class, converted)
         }
         return OptionalValues.empty()
     }

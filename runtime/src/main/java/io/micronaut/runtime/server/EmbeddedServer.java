@@ -16,6 +16,8 @@
 
 package io.micronaut.runtime.server;
 
+import io.micronaut.runtime.EmbeddedApplication;
+
 import java.net.URI;
 import java.net.URL;
 
