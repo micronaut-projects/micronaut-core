@@ -27,7 +27,6 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
-import java.time.Duration;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
