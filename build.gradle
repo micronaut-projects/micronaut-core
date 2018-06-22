@@ -251,6 +251,12 @@ subprojects { subproject ->
         }
     }
 
+    jar {
+        manifest {
+            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}")
+        }
+    }
+
     tasks.withType(Test) {
         jvmArgs '-Duser.country=US'
         jvmArgs '-Duser.language=en'
