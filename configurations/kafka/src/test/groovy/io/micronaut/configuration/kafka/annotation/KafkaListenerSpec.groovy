@@ -5,6 +5,7 @@ import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.configuration.kafka.config.AbstractKafkaProducerConfiguration
 import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.messaging.MessageHeaders
 import io.micronaut.messaging.annotation.Header
 import io.reactivex.Single
@@ -24,9 +25,11 @@ import spock.util.concurrent.PollingConditions
 class KafkaListenerSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            Collections.singletonMap(
-                    AbstractKafkaConfiguration.EMBEDDED, true
+            CollectionUtils.mapOf(
+                    AbstractKafkaConfiguration.EMBEDDED, true,
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["word", "book"]
             )
+
 
     )
     void "test simple consumer"() {

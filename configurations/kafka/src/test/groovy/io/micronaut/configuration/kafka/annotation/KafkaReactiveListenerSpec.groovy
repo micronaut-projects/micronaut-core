@@ -4,6 +4,7 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.CollectionUtils
 import io.reactivex.Flowable
 import io.reactivex.Single
 import org.apache.kafka.clients.producer.RecordMetadata
@@ -21,9 +22,11 @@ class KafkaReactiveListenerSpec extends Specification{
 
     public static final String TOPIC_NAME = "KafkaReactiveListenerSpec-books"
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            Collections.singletonMap(
-                    AbstractKafkaConfiguration.EMBEDDED, true
+            CollectionUtils.mapOf(
+                    AbstractKafkaConfiguration.EMBEDDED, true,
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, [TOPIC_NAME]
             )
+
 
     )
 

@@ -25,26 +25,10 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * The default {@link ExceptionHandler} used when a {@link org.apache.kafka.clients.consumer.KafkaConsumer}
- * fails to process a {@link org.apache.kafka.clients.consumer.ConsumerRecord}. By default just logs the error.
+ * Interface that {@link io.micronaut.configuration.kafka.annotation.KafkaListener} beans can implement to handle exceptions.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
-public class KafkaListenerExceptionHandler implements ExceptionHandler<KafkaListenerException> {
-    private static final Logger LOG = LoggerFactory.getLogger(KafkaListenerExceptionHandler.class);
-
-    @Override
-    public void handle(KafkaListenerException exception) {
-        if (LOG.isErrorEnabled()) {
-            Optional<ConsumerRecord<?, ?>> consumerRecord = exception.getConsumerRecord();
-            if (consumerRecord.isPresent()) {
-                LOG.error("Error processing record [" + consumerRecord + "] for Kafka consumer [" + exception.getKafkaListener() + "] produced error: " + exception.getCause().getMessage(), exception.getCause());
-
-            } else {
-                LOG.error("Kafka consumer [" + exception.getKafkaListener() + "] produced error: " + exception.getCause().getMessage(), exception.getCause());
-            }
-        }
-    }
+public interface KafkaListenerExceptionHandler extends ExceptionHandler<KafkaListenerException> {
 }

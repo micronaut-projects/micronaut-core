@@ -21,6 +21,8 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -38,6 +40,7 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     public static final String PREFIX = AbstractKafkaConfiguration.PREFIX + ".embedded";
 
     private boolean enabled = false;
+    private List<String> topics = new ArrayList<>();
     private Properties properties = new Properties();
 
     @Override
@@ -69,6 +72,23 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     public void setProperties(Properties properties) {
         if (properties != null) {
             this.properties = properties;
+        }
+    }
+
+    /**
+     * @return The topics that should be created by the embedded instance
+     */
+    public List<String> getTopics() {
+        return topics;
+    }
+
+    /**
+     * The topics that should be created by the embedded instance.
+     * @param topics The topic names
+     */
+    public void setTopics(List<String> topics) {
+        if (topics != null) {
+            this.topics = topics;
         }
     }
 }
