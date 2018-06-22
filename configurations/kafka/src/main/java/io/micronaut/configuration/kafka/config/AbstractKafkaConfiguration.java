@@ -43,6 +43,12 @@ public abstract class AbstractKafkaConfiguration<K, V> {
      */
     @SuppressWarnings("WeakerAccess")
     public static final String EMBEDDED = "kafka.embedded.enabled";
+
+    /**
+     * The topics that should be created
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String EMBEDDED_TOPICS = "kafka.embedded.topics";
     /**
      * The default bootstrap server address.
      */
