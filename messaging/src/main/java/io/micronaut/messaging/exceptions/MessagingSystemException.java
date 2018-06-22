@@ -22,7 +22,7 @@ package io.micronaut.messaging.exceptions;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class MessagingSystemException extends RuntimeException {
+public class MessagingSystemException extends MessagingException {
 
     /**
      * @param message The message

@@ -112,6 +112,15 @@ public @interface KafkaListener {
     String heartbeatInterval() default "";
 
     /**
+     * For listeners that return reactive types, message offsets are committed without blocking the consumer.
+     * If the reactive type produces an error, then the message can be lost. Enabling this setting allows the consumer
+     * to redelivery the message so that it can be processed again by another consumer that may have better luck.
+     *
+     * @return True if redelivery should be enabled. Defaults to false.
+     */
+    boolean redelivery() default false;
+
+    /**
      * Additional properties to configure with for Consumer.
      *
      * @return The properties
