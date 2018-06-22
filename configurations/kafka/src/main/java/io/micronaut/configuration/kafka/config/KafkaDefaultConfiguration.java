@@ -22,8 +22,12 @@ import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * The default Kafka configuration to apply to both the consumer and the producer, but can be overridden by either.
@@ -73,12 +77,10 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
     private static Properties resolveDefaultConfiguration(Environment environment) {
         Properties values = environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new);
         Properties properties = new Properties();
-        for (Map.Entry<Object, Object> entry : values.entrySet()) {
-            Object key = entry.getKey();
-            if (!key.toString().startsWith("embedded")) {
-                properties.put(key, entry.getValue());
-            }
-        }
+        values.entrySet().stream().filter(entry -> {
+            String key = entry.getKey().toString();
+            return !Stream.of("embedded", "consumers", "producers").anyMatch(key::startsWith);
+        }).forEach(entry -> properties.put(entry.getKey(), entry.getValue()));
         return properties;
     }
 }
