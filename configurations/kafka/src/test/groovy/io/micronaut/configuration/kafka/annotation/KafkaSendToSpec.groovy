@@ -1,8 +1,8 @@
 package io.micronaut.configuration.kafka.annotation
 
-import groovy.transform.NotYetImplemented
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.messaging.annotation.SendTo
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -20,8 +20,9 @@ class KafkaSendToSpec extends Specification {
 
     public static final String TOPIC_NAME = "KafkaSendToSpec-products"
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            Collections.singletonMap(
-                    AbstractKafkaConfiguration.EMBEDDED, true
+            CollectionUtils.mapOf(
+                    AbstractKafkaConfiguration.EMBEDDED, true,
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, [TOPIC_NAME, "quantity"] 
             )
 
     )

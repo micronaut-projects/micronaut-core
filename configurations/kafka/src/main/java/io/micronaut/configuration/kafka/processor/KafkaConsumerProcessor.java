@@ -312,13 +312,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                                 handleResultFlowable(consumerAnnotation, consumerBean, method, kafkaConsumer, consumerRecord, resultFlowable);
                                             }
                                         } catch (Throwable e) {
-                                            exceptionHandler.handle(new KafkaListenerException(
-                                                    e,
-                                                    consumerBean,
-                                                    kafkaConsumer,
-                                                    consumerRecord
-
-                                            ));
+                                            handleException(kafkaConsumer, consumerBean, consumerRecord, e);
                                             continue;
                                         }
 
@@ -326,15 +320,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                             try {
                                                 kafkaConsumer.commitSync();
                                             } catch (CommitFailedException e) {
-                                                exceptionHandler.handle(new KafkaListenerException(
-                                                        "Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(),
-                                                        e,
-                                                        consumerBean,
-                                                        kafkaConsumer,
-                                                        consumerRecord
-
-                                                ));
-
+                                                handleException(kafkaConsumer, consumerBean, consumerRecord, e);
                                             }
                                         } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
                                             kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
@@ -346,14 +332,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                     try {
                                         kafkaConsumer.commitSync();
                                     } catch (CommitFailedException e) {
-                                        exceptionHandler.handle(new KafkaListenerException(
-                                                "Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(),
-                                                e,
-                                                consumerBean,
-                                                kafkaConsumer,
-                                                null
-
-                                        ));
+                                        handleException(kafkaConsumer, consumerBean, null, e);
                                     }
                                 } else if (offsetStrategy == OffsetStrategy.ASYNC) {
                                     kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
@@ -361,13 +340,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                             } catch (WakeupException e) {
                                 throw e;
                             } catch (Throwable e) {
-                                exceptionHandler.handle(new KafkaListenerException(
-                                        e,
-                                        consumerBean,
-                                        kafkaConsumer,
-                                        null
-
-                                ));
+                                handleException(kafkaConsumer, consumerBean, null, e);
                             }
 
                         }
@@ -396,6 +369,25 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             consumer.wakeup();
         }
         consumers.clear();
+    }
+
+    private void handleException(KafkaConsumer kafkaConsumer, Object consumerBean, ConsumerRecord<?, ?> consumerRecord, Throwable e) {
+        KafkaListenerException kafkaListenerException = new KafkaListenerException(
+                e,
+                consumerBean,
+                kafkaConsumer,
+                consumerRecord
+
+        );
+        handleException(consumerBean, kafkaListenerException);
+    }
+
+    private void handleException(Object consumerBean, KafkaListenerException kafkaListenerException) {
+        if (consumerBean instanceof KafkaListenerExceptionHandler) {
+            ((KafkaListenerExceptionHandler) consumerBean).handle(kafkaListenerException);
+        } else {
+            exceptionHandler.handle(kafkaListenerException);
+        }
     }
 
     @SuppressWarnings("SubscriberImplementation")
@@ -462,19 +454,18 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                         subscription.request(1);
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     public void onError(Throwable t) {
                         subscription.cancel();
 
-                        exceptionHandler.handle(
-                                new KafkaListenerException(
-                                        "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
-                                        t,
-                                        consumerBean,
-                                        kafkaConsumer,
-                                        consumerRecord
-                                )
-                        );
+                        handleException(consumerBean, new KafkaListenerException(
+                                "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
+                                t,
+                                consumerBean,
+                                kafkaConsumer,
+                                consumerRecord
+                        ));
 
                         if (kafkaListener.redelivery()) {
                             if (LOG.isDebugEnabled()) {
@@ -503,15 +494,13 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                                 kafkaProducer.send(record, (metadata, exception) -> {
                                     if (exception != null) {
-                                        exceptionHandler.handle(
-                                                new KafkaListenerException(
-                                                        "Re-delivery failed for record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
-                                                        t,
-                                                        consumerBean,
-                                                        kafkaConsumer,
-                                                        consumerRecord
-                                                )
-                                        );
+                                        handleException(consumerBean, new KafkaListenerException(
+                                                "Redelivery failed for record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
+                                                t,
+                                                consumerBean,
+                                                kafkaConsumer,
+                                                consumerRecord
+                                        ));
                                     }
                                 });
 

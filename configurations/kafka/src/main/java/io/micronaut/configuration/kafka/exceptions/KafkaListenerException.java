@@ -65,7 +65,7 @@ public class KafkaListenerException extends MessageListenerException {
         this.kafkaConsumer = kafkaConsumer;
         this.consumerRecord = consumerRecord;
     }
-
+    
     /**
      * Creates a new exception.
      *

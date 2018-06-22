@@ -30,6 +30,9 @@ import kafka.utils.ZKStringSerializer$;
 import kafka.utils.ZkUtils;
 import kafka.zk.EmbeddedZookeeper;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.utils.MockTime;
 import org.slf4j.Logger;
@@ -39,8 +42,9 @@ import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * This class will configure a Kafka server for the test environment if no server is already available.
@@ -113,6 +117,16 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
                 );
                 KafkaConfig kafkaConfig = new KafkaConfig(brokerProps);
                 this.kafkaServer = TestUtils.createServer(kafkaConfig, new MockTime());
+
+                List<String> topics = embeddedConfiguration.getTopics();
+
+                if (!topics.isEmpty()) {
+                    Properties properties = new Properties();
+                    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, ("127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT));
+                    AdminClient adminClient = AdminClient.create(properties);
+                    adminClient.createTopics(topics.stream().map(s -> new NewTopic(s, 1, (short)1)).collect(Collectors.toList()))
+                               .all().get();
+                }
             } catch (Throwable e) {
                 throw new ConfigurationException("Error starting embedded Kafka server: " + e.getMessage(), e);
             }
