@@ -17,16 +17,17 @@
 package io.micronaut.messaging.exceptions;
 
 /**
- * An exception thrown when an unrecoverable error occurs with a messaging client.
+ * General parent exception for all message related exceptions.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class MessagingClientException extends MessagingException {
+public class MessagingException extends RuntimeException {
+
     /**
      * @param message The message
      */
-    public MessagingClientException(String message) {
+    public MessagingException(String message) {
         super(message);
     }
 
@@ -34,7 +35,9 @@ public class MessagingClientException extends MessagingException {
      * @param message The message
      * @param cause   The throwable
      */
-    public MessagingClientException(String message, Throwable cause) {
+    public MessagingException(String message, Throwable cause) {
         super(message, cause);
     }
 }
+
+
