@@ -27,7 +27,6 @@ import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * The default {@link SerdeRegistry} that combines multiple registries into a single registry.
