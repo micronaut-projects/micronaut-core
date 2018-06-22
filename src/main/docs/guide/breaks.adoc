@@ -2,3 +2,7 @@ This section will document breaking changes that may happen during milestone or 
 
 ==== 1.0.0.M2
 
+* The constructor signature for DefaultHttpClient has changed to include an extra argument
+* Libraries compiled against M1 are not compatible with M2
+* For Java 9+ automatic module name has been set to `<groupId>.<name>`. Previously if you have been using modules named "inject-java", the module is now named "io.micronaut.inject-java"
+

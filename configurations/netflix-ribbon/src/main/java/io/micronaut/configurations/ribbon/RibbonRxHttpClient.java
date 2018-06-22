@@ -80,6 +80,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
     public RibbonRxHttpClient(
         @Parameter LoadBalancer loadBalancer,
         @Parameter HttpClientConfiguration configuration,
+        @Parameter @Nullable String contextPath,
         @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
         NettyClientSslBuilder nettyClientSslBuilder,
         MediaTypeCodecRegistry codecRegistry,
@@ -90,6 +91,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         super(
                 loadBalancer,
                 configuration,
+                contextPath,
                 threadFactory,
                 nettyClientSslBuilder,
                 codecRegistry,
@@ -116,7 +118,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         if (loadBalancer != null) {
             LoadBalancerCommand<HttpResponse<O>> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<HttpResponse<O>> requestOperation = loadBalancerCommand.submit(server -> {
-                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, request.getUri());
+                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
                         .switchMap(super.buildExchangePublisher(request, bodyType))
@@ -135,7 +137,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
 
             LoadBalancerCommand<HttpResponse<ByteBuffer<?>>> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<HttpResponse<ByteBuffer<?>>> requestOperation = loadBalancerCommand.submit(server -> {
-                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, request.getUri());
+                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
                         .switchMap(super.buildExchangeStreamPublisher(request))
@@ -152,7 +154,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         if (loadBalancer != null) {
             LoadBalancerCommand<ByteBuffer<?>> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<ByteBuffer<?>> requestOperation = loadBalancerCommand.submit(server -> {
-                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, request.getUri());
+                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
                         .switchMap(super.buildDataStreamPublisher(request))
@@ -169,7 +171,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         if (loadBalancer != null) {
             LoadBalancerCommand<O> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<O> requestOperation = loadBalancerCommand.submit(server -> {
-                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, request.getUri());
+                URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
                         .switchMap(super.buildJsonStreamPublisher(request, type))
