@@ -26,7 +26,6 @@ class KafkaSendToSpec extends Specification {
 
     )
 
-    @NotYetImplemented
     void "test send to another topic"() {
         given:
         ProductClient client = context.getBean(ProductClient)
@@ -62,22 +61,33 @@ class KafkaSendToSpec extends Specification {
 
         @SendTo("quantity")
         Single<Integer> receiveSingle(Single<Product> product) {
-            product.map({ Product p -> p.quantity })
+            product.map({ Product p ->
+                products << p
+                p.quantity
+            })
         }
 
         @SendTo("quantity")
         Flowable<Integer> receiveFlowable(Flowable<Product> product) {
-            product.map({ Product p -> p.quantity })
+            product.map{ Product p ->
+                products << p.quantity
+            }
         }
 
         @SendTo("quantity")
         Flux<Integer> receiveFlux(Flux<Product> product) {
-            product.map({ Product p -> p.quantity })
+            product.map{ Product p ->
+                products << p
+                p.quantity
+            }
         }
 
         @SendTo("quantity")
         Mono<Integer> receiveMono(Mono<Product> product) {
-            product.map({ Product p -> p.quantity })
+            product.map{ Product p ->
+                products << p
+                p.quantity
+            }
         }
     }
 
