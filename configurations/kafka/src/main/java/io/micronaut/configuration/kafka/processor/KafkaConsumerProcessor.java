@@ -17,6 +17,7 @@
 package io.micronaut.configuration.kafka.processor;
 
 import io.micronaut.configuration.kafka.KafkaConsumerAware;
+import io.micronaut.configuration.kafka.KafkaProducerRegistry;
 import io.micronaut.configuration.kafka.annotation.*;
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
@@ -48,6 +49,8 @@ import io.reactivex.Flowable;
 import io.reactivex.Scheduler;
 import io.reactivex.schedulers.Schedulers;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -89,17 +92,19 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     private final SerdeRegistry serdeRegistry;
     private final Scheduler executorScheduler;
     private final KafkaListenerExceptionHandler exceptionHandler;
+    private final KafkaProducerRegistry producerRegistry;
 
     /**
      * Creates a new processor using the given {@link ExecutorService} to schedule consumers on.
      *
-     * @param executorService The executor service
-     * @param applicationConfiguration The application configuration
-     * @param beanContext The bean context
+     * @param executorService              The executor service
+     * @param applicationConfiguration     The application configuration
+     * @param beanContext                  The bean context
      * @param defaultConsumerConfiguration The default consumer config
-     * @param binderRegistry The {@link ConsumerRecordBinderRegistry}
-     * @param serdeRegistry The {@link Serde} registry
-     * @param exceptionHandler The exception handler to use
+     * @param binderRegistry               The {@link ConsumerRecordBinderRegistry}
+     * @param serdeRegistry                The {@link org.apache.kafka.common.serialization.Serde} registry
+     * @param producerRegistry             The {@link KafkaProducerRegistry}
+     * @param exceptionHandler             The exception handler to use
      */
     public KafkaConsumerProcessor(
             @Named(TaskExecutors.MESSAGE_CONSUMER) ExecutorService executorService,
@@ -108,6 +113,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             AbstractKafkaConsumerConfiguration defaultConsumerConfiguration,
             ConsumerRecordBinderRegistry binderRegistry,
             SerdeRegistry serdeRegistry,
+            KafkaProducerRegistry producerRegistry,
             KafkaListenerExceptionHandler exceptionHandler) {
         this.executorService = executorService;
         this.applicationConfiguration = applicationConfiguration;
@@ -117,6 +123,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         this.executableBinder = new DefaultExecutableBinder<>();
         this.serdeRegistry = serdeRegistry;
         this.executorScheduler = Schedulers.from(executorService);
+        this.producerRegistry = producerRegistry;
         this.exceptionHandler = exceptionHandler;
     }
 
@@ -133,7 +140,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         if (consumerAnnotation != null && ArrayUtils.isNotEmpty(topicAnnotations)) {
 
             Duration pollTimeout = method.getValue(KafkaListener.class, "pollTimeout", Duration.class)
-                                         .orElse(Duration.ofMillis(100));
+                    .orElse(Duration.ofMillis(100));
 
             Duration sessionTimeout = method.getValue(KafkaListener.class, "sessionTimeout", Duration.class)
                     .orElse(null);
@@ -224,7 +231,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
 
             for (int i = 0; i < consumerThreads; i++) {
-                KafkaConsumer kafkaConsumer =  beanContext.createBean(KafkaConsumer.class, consumerConfiguration);
+                KafkaConsumer kafkaConsumer = beanContext.createBean(KafkaConsumer.class, consumerConfiguration);
                 Object consumerBean = beanContext.getBean(beanDefinition.getBeanType());
 
                 if (consumerBean instanceof KafkaConsumerAware) {
@@ -400,59 +407,123 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             ConsumerRecord<?, ?> consumerRecord,
             Flowable<?> resultFlowable) {
         resultFlowable.subscribeOn(executorScheduler)
-                      .subscribe(new Subscriber<Object>() {
-              private Subscription subscription;
+                .subscribe(new Subscriber<Object>() {
+                    private Subscription subscription;
 
-                          @Override
-            public void onSubscribe(Subscription s) {
-                this.subscription = s;
-                s.request(1);
-            }
-
-            @Override
-            public void onNext(Object o) {
-//                String[] destinationTopics = method.getValue(SendTo.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-//                if (ArrayUtils.isNotEmpty(destinationTopics)) {
-//                    Object key = consumerRecord.key();
-//                    for (String destinationTopic : destinationTopics) {
-//                    }
-//                }
-
-                // ask for next
-                subscription.request(1);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                subscription.cancel();
-
-                exceptionHandler.handle(
-                        new KafkaListenerException(
-                                "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
-                                t,
-                                consumerBean,
-                                kafkaConsumer,
-                                consumerRecord
-                        )
-                );
-
-                if (kafkaListener.redelivery()) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        this.subscription = s;
+                        s.request(1);
                     }
 
-                    Object key = consumerRecord.key();
-                    Object value = consumerRecord.value();
+                    @SuppressWarnings("unchecked")
+                    @Override
+                    public void onNext(Object o) {
 
-                    // TODO: handle redelivery
-                }
-            }
+                        String[] destinationTopics = method.getValue(SendTo.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+                        if (ArrayUtils.isNotEmpty(destinationTopics)) {
+                            try {
+                                Object key = consumerRecord.key();
+                                Object value = o;
 
-            @Override
-            public void onComplete() {
-                // no-op
-            }
-        });
+                                if (key != null && value != null) {
+                                    String groupId = kafkaListener.groupId();
+                                    KafkaProducer kafkaProducer = producerRegistry.getProducer(
+                                            StringUtils.isNotEmpty(groupId) ? groupId : null,
+                                            Argument.of(key.getClass()),
+                                            Argument.of(value.getClass())
+                                    );
+
+                                    for (String destinationTopic : destinationTopics) {
+                                        ProducerRecord record = new ProducerRecord(
+                                                destinationTopic,
+                                                null,
+                                                key,
+                                                value,
+                                                consumerRecord.headers()
+                                        );
+
+                                        kafkaProducer.send(record, (metadata, exception) -> {
+                                            if (exception != null) {
+                                                onError(exception);
+                                            }
+                                        });
+
+                                    }
+                                }
+                            } catch (Exception e) {
+                                onError(e);
+                            }
+
+
+                        }
+
+                        // ask for next
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        subscription.cancel();
+
+                        exceptionHandler.handle(
+                                new KafkaListenerException(
+                                        "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
+                                        t,
+                                        consumerBean,
+                                        kafkaConsumer,
+                                        consumerRecord
+                                )
+                        );
+
+                        if (kafkaListener.redelivery()) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
+                            }
+
+                            Object key = consumerRecord.key();
+                            Object value = consumerRecord.value();
+
+
+                            if (key != null && value != null) {
+                                String groupId = kafkaListener.groupId();
+                                KafkaProducer kafkaProducer = producerRegistry.getProducer(
+                                        StringUtils.isNotEmpty(groupId) ? groupId : null,
+                                        Argument.of(key.getClass()),
+                                        Argument.of(value.getClass())
+                                );
+
+                                ProducerRecord record = new ProducerRecord(
+                                        consumerRecord.topic(),
+                                        consumerRecord.partition(),
+                                        key,
+                                        value,
+                                        consumerRecord.headers()
+                                );
+
+                                kafkaProducer.send(record, (metadata, exception) -> {
+                                    if (exception != null) {
+                                        exceptionHandler.handle(
+                                                new KafkaListenerException(
+                                                        "Re-delivery failed for record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
+                                                        t,
+                                                        consumerBean,
+                                                        kafkaConsumer,
+                                                        consumerRecord
+                                                )
+                                        );
+                                    }
+                                });
+
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        // no-op
+                    }
+                });
 
     }
 
