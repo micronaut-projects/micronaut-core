@@ -106,7 +106,11 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
                         throw new ConfigurationException("Error creating log directory for embedded Kafka server: " + e.getMessage(), e);
                     }
                 });
-                brokerProps.setProperty("listeners", "PLAINTEXT://127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT);
+
+                brokerProps.setProperty(
+                        "listeners",
+                        "PLAINTEXT://127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT
+                );
                 KafkaConfig kafkaConfig = new KafkaConfig(brokerProps);
                 this.kafkaServer = TestUtils.createServer(kafkaConfig, new MockTime());
             } catch (Throwable e) {
