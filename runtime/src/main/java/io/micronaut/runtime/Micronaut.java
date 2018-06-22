@@ -25,7 +25,6 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.naming.Described;
 import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
-import io.micronaut.runtime.server.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

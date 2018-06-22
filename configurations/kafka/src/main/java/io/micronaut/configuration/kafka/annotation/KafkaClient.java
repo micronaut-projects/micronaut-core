@@ -63,11 +63,11 @@ public @interface KafkaClient {
     String id() default "";
 
     /**
-     * The default timeout for synchronous send operations.
+     * The maximum duration to block synchronous send operations.
      *
      * @return The timeout
      */
-    String sendTimeout() default "10s";
+    String maxBlock() default "";
 
     /**
      * Whether to include timestamps in outgoing messages.
@@ -82,4 +82,40 @@ public @interface KafkaClient {
      * @return The properties
      */
     Property[] properties() default {};
+
+    /**
+     * @return The {@code ack} setting for the client, which impacts message delivery durability.
+     *
+     * @see org.apache.kafka.clients.producer.ProducerConfig#ACKS_DOC
+     * @see Acknowledge
+     */
+    int acks() default Acknowledge.DEFAULT;
+
+    /**
+     * Constants for the {@code ack} setting for the client, which impacts message delivery durability.
+     *
+     * @see org.apache.kafka.clients.producer.ProducerConfig#ACKS_DOC
+     */
+    @SuppressWarnings("WeakerAccess")
+    class Acknowledge {
+        /**
+         * Relay on the default behaviour.
+         */
+        public static final int DEFAULT = Integer.MIN_VALUE;
+
+        /**
+         * Don't wait for the server to acknowledge receipt.
+         */
+        public static final int NONE = 0;
+
+        /**
+         * Wait for the leader to acknowledge.
+         */
+        public static final int ONE = 1;
+
+        /**
+         * Wait for a full set of in-sync replicas to acknowlege.
+         */
+        public static final int ALL = -1;
+    }
 }

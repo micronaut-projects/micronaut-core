@@ -25,6 +25,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.serialization.Serializer;
 
 import java.util.Optional;
+import java.util.Properties;
 
 /**
  * A factory class for creating Kafka {@link org.apache.kafka.clients.producer.Producer} instances.
@@ -48,9 +49,10 @@ public class KafkaProducerFactory {
         Optional<Serializer<K>> keySerializer = producerConfiguration.getKeySerializer();
         Optional<Serializer<V>> valueSerializer = producerConfiguration.getValueSerializer();
 
+        Properties config = producerConfiguration.getConfig();
         if (keySerializer.isPresent() && valueSerializer.isPresent()) {
             return new KafkaProducer<>(
-                    producerConfiguration.getConfig(),
+                    config,
                     keySerializer.get(),
                     valueSerializer.get()
             );
@@ -58,7 +60,7 @@ public class KafkaProducerFactory {
             throw new ConfigurationException("Both the [keySerializer] and [valueSerializer] must be set when setting either");
         } else {
             return new KafkaProducer<>(
-                    producerConfiguration.getConfig()
+                    config
             );
         }
     }

@@ -22,6 +22,7 @@ import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -42,7 +43,7 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
      * @param environment The environment
      */
     public KafkaDefaultConfiguration(Environment environment) {
-        super(environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new));
+        super(resolveDefaultConfiguration(environment));
         getConfig().putIfAbsent(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
                 AbstractKafkaConfiguration.DEFAULT_BOOTSTRAP_SERVERS
@@ -67,5 +68,17 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
         if (healthTimeout != null) {
             this.healthTimeout = healthTimeout;
         }
+    }
+
+    private static Properties resolveDefaultConfiguration(Environment environment) {
+        Properties values = environment.getProperty(PREFIX, Properties.class).orElseGet(Properties::new);
+        Properties properties = new Properties();
+        for (Map.Entry<Object, Object> entry : values.entrySet()) {
+            Object key = entry.getKey();
+            if (!key.toString().startsWith("embedded")) {
+                properties.put(key, entry.getValue());
+            }
+        }
+        return properties;
     }
 }

@@ -27,6 +27,7 @@ import io.micronaut.configuration.kafka.config.DefaultKafkaProducerConfiguration
 import io.micronaut.configuration.kafka.config.KafkaProducerConfiguration;
 import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
@@ -42,12 +43,17 @@ import io.micronaut.messaging.annotation.Body;
 import io.micronaut.messaging.exceptions.MessagingClientException;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serializer;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +63,10 @@ import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Implementation of the {@link io.micronaut.configuration.kafka.annotation.KafkaClient} advice annotation.
@@ -115,13 +124,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                     .filter(arg -> arg.getAnnotation(KafkaKey.class) != null)
                     .findFirst().orElse(null);
 
-            String clientId = client.id();
-
-            if (StringUtils.isEmpty(clientId)) {
-                clientId = null;
-            }
-
-            KafkaProducer kafkaProducer = getProducer(bodyArgument, keyArgument, clientId);
+            KafkaProducer kafkaProducer = getProducer(bodyArgument, keyArgument, context);
 
             List<Header> kafkaHeaders = new ArrayList<>();
             io.micronaut.messaging.annotation.Header[] headers = context.getAnnotationsByType(io.micronaut.messaging.annotation.Header.class);
@@ -184,52 +187,106 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
             Object key = keyArgument != null ? parameterValues.get(keyArgument.getName()) : null;
             Object value = parameterValues.get(bodyArgument.getName());
+            boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType);
+            Duration maxBlock = context.getValue(KafkaClient.class, "maxBlock", Duration.class)
+                    .orElse(null);
 
             if (value == null) {
                 throw new MessagingClientException("Value cannot be null for method: " + context);
             }
 
-            ProducerRecord record = new ProducerRecord(
-                    topic,
-                    null,
-                    client.timestamp() ? System.currentTimeMillis() : null,
-                    key,
-                    value,
-                    kafkaHeaders.isEmpty() ? null : kafkaHeaders
-            );
+            boolean isReactiveValue = Publishers.isConvertibleToPublisher(value.getClass());
 
-            if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
-                Flowable returnFlowable = Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
-                    if (exception != null) {
-                        emitter.onError(new MessagingClientException(
-                                "Exception sending producer record for method [" + context + "]: " + exception.getMessage(), exception
-                        ));
-                    } else {
-                        if (firstTypeVariable.isPresent()) {
-                            Argument<?> argument = firstTypeVariable.get();
-                            Optional<?> converted = conversionService.convert(metadata, argument);
 
-                            if (converted.isPresent()) {
-                                emitter.onNext(converted.get());
-                            } else if (argument.getType() == bodyArgument.getType()) {
-                                emitter.onNext(value);
+            if (isReactiveReturnType) {
+                Flowable returnFlowable;
+                if (isReactiveValue) {
+                    Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
+                    returnFlowable = buildSendFlowable(
+                            context,
+                            client,
+                            topic,
+                            kafkaProducer,
+                            kafkaHeaders,
+                            firstTypeVariable.orElse(Argument.OBJECT_ARGUMENT),
+                            key,
+                            value,
+                            maxBlock);
+
+                } else {
+                    ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
+                    Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
+                    returnFlowable = Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
+                        if (exception != null) {
+                            emitter.onError(wrapException(context, exception));
+                        } else {
+                            if (firstTypeVariable.isPresent()) {
+                                Argument<?> argument = firstTypeVariable.get();
+                                Optional<?> converted = conversionService.convert(metadata, argument);
+
+                                if (converted.isPresent()) {
+                                    emitter.onNext(converted.get());
+                                } else if (argument.getType() == bodyArgument.getType()) {
+                                    emitter.onNext(value);
+                                }
                             }
+                            emitter.onComplete();
                         }
-                        emitter.onComplete();
-                    }
-                }), BackpressureStrategy.ERROR);
+                    }), BackpressureStrategy.ERROR);
+                }
                 return Publishers.convertPublisher(returnFlowable, javaReturnType);
             } else if (Future.class.isAssignableFrom(javaReturnType)) {
-                if (CompletableFuture.class.isAssignableFrom(javaReturnType)) {
-                    Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
-                    CompletableFuture completableFuture = new CompletableFuture();
+                Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
+                CompletableFuture completableFuture = new CompletableFuture();
 
+                if (isReactiveValue) {
+                    Flowable sendFlowable = buildSendFlowable(
+                            context,
+                            client,
+                            topic,
+                            kafkaProducer,
+                            kafkaHeaders,
+                            firstTypeVariable.orElse(Argument.of(RecordMetadata.class)),
+                            key,
+                            value,
+                            maxBlock);
+
+                    if (!Publishers.isSingle(value.getClass())) {
+                        sendFlowable = sendFlowable.toList().toFlowable();
+                    }
+
+                    sendFlowable.subscribe(new Subscriber() {
+                        boolean completed = false;
+                        @Override
+                        public void onSubscribe(Subscription s) {
+                            s.request(1);
+                        }
+
+                        @Override
+                        public void onNext(Object o) {
+                            completableFuture.complete(o);
+                            completed = true;
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                            completableFuture.completeExceptionally(wrapException(context, t));
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            if (!completed) {
+                                // empty publisher
+                                completableFuture.complete(null);
+                            }
+                        }
+                    });
+                } else {
+
+                    ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
                     kafkaProducer.send(record, (metadata, exception) -> {
                         if (exception != null) {
-                            completableFuture.completeExceptionally(new MessagingClientException(
-                                    "Exception sending producer record for method [" + context + "]: " + exception.getMessage(), exception
-                            ));
+                            completableFuture.completeExceptionally(wrapException(context, exception));
                         } else {
                             if (firstTypeVariable.isPresent()) {
                                 Argument<?> argument = firstTypeVariable.get();
@@ -244,24 +301,57 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                             }
                         }
                     });
-
-                    return completableFuture;
-                } else {
-                    return kafkaProducer.send(record);
                 }
+
+                return completableFuture;
             } else {
-                // synchronous case
-                Duration sendTimeout = context.getValue(KafkaClient.class, "sendTimeout", Duration.class)
-                        .orElse(Duration.ofSeconds(10));
 
-                try {
-                    Object result = kafkaProducer.send(record).get(sendTimeout.toMillis(), TimeUnit.MILLISECONDS);
-
-                    return conversionService.convert(result, returnType.asArgument()).orElse(null);
-                } catch (Exception e) {
-                    throw new MessagingClientException(
-                            "Exception sending producer record for method [" + context + "]: " + e.getMessage(), e
+                Argument<Object> returnTypeArgument = returnType.asArgument();
+                if (isReactiveValue) {
+                    Flowable<Object> sendFlowable = buildSendFlowable(
+                            context,
+                            client,
+                            topic,
+                            kafkaProducer,
+                            kafkaHeaders,
+                            returnTypeArgument,
+                            key,
+                            value,
+                            maxBlock
                     );
+
+                    if (Iterable.class.isAssignableFrom(javaReturnType)) {
+                        return conversionService
+                                .convert(sendFlowable.toList().blockingGet(), returnTypeArgument).orElse(null);
+                    }
+                    else if (void.class.isAssignableFrom(javaReturnType)) {
+                        // a maybe will return null, and not throw an exception
+                        Maybe<Object> maybe = sendFlowable.firstElement();
+                        return maybe.blockingGet();
+                    } else {
+                        return conversionService
+                                .convert(sendFlowable.blockingFirst(), returnTypeArgument).orElse(null);
+                    }
+                } else {
+                    try {
+                        ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
+                        Object result;
+                        if (maxBlock != null) {
+                            result = kafkaProducer.send(record).get(maxBlock.toMillis(), TimeUnit.MILLISECONDS);
+                        } else {
+                            result = kafkaProducer.send(record).get();
+                        }
+
+                        return conversionService.convert(result, returnTypeArgument).orElseGet(() -> {
+                            if (javaReturnType == bodyArgument.getType()) {
+                                return value;
+                            } else {
+                                return null;
+                            }
+                        });
+                    } catch (Exception e) {
+                        throw wrapException(context, e);
+                    }
                 }
             }
 
@@ -271,9 +361,92 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
         }
     }
 
+    @Override
+    @PreDestroy
+    public final void close() {
+        Collection<KafkaProducer> kafkaProducers = producerMap.values();
+        try {
+            for (KafkaProducer kafkaProducer : kafkaProducers) {
+                try {
+                    kafkaProducer.close();
+                } catch (Exception e) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Error closing Kafka producer: " + e.getMessage(), e);
+                    }
+                }
+            }
+        } finally {
+            producerMap.clear();
+        }
+    }
+
+    private Flowable<Object> buildSendFlowable(
+            MethodInvocationContext<Object, Object> context,
+            KafkaClient client,
+            String topic,
+            KafkaProducer kafkaProducer,
+            List<Header> kafkaHeaders,
+            Argument<?> returnType,
+            Object key,
+            Object value,
+            Duration maxBlock) {
+        Flowable<?> valueFlowable = Publishers.convertPublisher(value, Flowable.class);
+        Class<?> javaReturnType = returnType.getType();
+
+        if (Iterable.class.isAssignableFrom(javaReturnType)) {
+            javaReturnType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT).getType();
+        }
+
+        Class<?> finalJavaReturnType = javaReturnType;
+        Flowable<Object> sendFlowable = valueFlowable.flatMap(o -> {
+            ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, o);
+            return Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    emitter.onError(wrapException(context, exception));
+                } else {
+                    if (RecordMetadata.class.isAssignableFrom(finalJavaReturnType)) {
+                        emitter.onNext(metadata);
+                    } else if (finalJavaReturnType.isInstance(o)) {
+                        emitter.onNext(o);
+                    } else {
+                        Optional converted = conversionService.convert(metadata, finalJavaReturnType);
+                        if (converted.isPresent()) {
+                            emitter.onNext(converted.get());
+                        }
+                    }
+
+                    emitter.onComplete();
+                }
+            }), BackpressureStrategy.BUFFER);
+        });
+
+        if (maxBlock != null) {
+            sendFlowable = sendFlowable.timeout(maxBlock.toMillis(), TimeUnit.MILLISECONDS);
+        }
+        return sendFlowable;
+    }
+
+    private MessagingClientException wrapException(MethodInvocationContext<Object, Object> context, Throwable exception) {
+        return new MessagingClientException(
+                "Exception sending producer record for method [" + context + "]: " + exception.getMessage(), exception
+        );
+    }
+
+    private ProducerRecord buildProducerRecord(KafkaClient client, String topic, List<Header> kafkaHeaders, Object key, Object value) {
+        return new ProducerRecord(
+                        topic,
+                        null,
+                        client.timestamp() ? System.currentTimeMillis() : null,
+                        key,
+                        value,
+                        kafkaHeaders.isEmpty() ? null : kafkaHeaders
+                );
+    }
+
     @SuppressWarnings("unchecked")
-    private KafkaProducer getProducer(Argument bodyArgument, @Nullable Argument keyArgument, String clientId) {
+    private KafkaProducer getProducer(Argument bodyArgument, @Nullable Argument keyArgument, AnnotationMetadata metadata) {
         Class keyType = keyArgument != null ? keyArgument.getType() : byte[].class;
+        String clientId = metadata.getValue(KafkaClient.class, String.class).orElse(null);
         ProducerKey key = new ProducerKey(keyType, bodyArgument.getType(), clientId);
         return producerMap.computeIfAbsent(key, producerKey -> {
             String producerId = producerKey.id;
@@ -292,6 +465,22 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             DefaultKafkaProducerConfiguration<?, ?> newConfiguration = new DefaultKafkaProducerConfiguration<>(
                     configuration
             );
+
+            metadata.getValue(KafkaClient.class, "maxBlock", Duration.class).ifPresent(maxBlock ->
+                    newConfiguration.getConfig().put(
+                            ProducerConfig.MAX_BLOCK_MS_CONFIG,
+                            String.valueOf(maxBlock.toMillis())
+                    ));
+
+            Integer ack = metadata.getValue(KafkaClient.class, "acks", Integer.class).orElse(KafkaClient.Acknowledge.DEFAULT);
+
+            if (ack != KafkaClient.Acknowledge.DEFAULT) {
+                String acksValue = ack == -1 ? "all" : String.valueOf(ack);
+                newConfiguration.getConfig().put(
+                        ProducerConfig.ACKS_CONFIG,
+                        acksValue
+                );
+            }
 
 
             Serializer<?> keySerializer = newConfiguration.getKeySerializer().orElse(null);
@@ -313,25 +502,6 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
             return producerFactory.createProducer(newConfiguration);
         });
-    }
-
-    @Override
-    @PreDestroy
-    public final void close() {
-        Collection<KafkaProducer> kafkaProducers = producerMap.values();
-        try {
-            for (KafkaProducer kafkaProducer : kafkaProducers) {
-                try {
-                    kafkaProducer.close();
-                } catch (Exception e) {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Error closing Kafka producer: " + e.getMessage(), e);
-                    }
-                }
-            }
-        } finally {
-            producerMap.clear();
-        }
     }
 
     private Argument findBodyArgument(ExecutableMethod<?, ?> method) {

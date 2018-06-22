@@ -42,25 +42,42 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
     @SuppressWarnings("unchecked")
     @Override
     public void register(ConversionService<?> conversionService) {
+
         // Maybe
         conversionService.addConverter(Maybe.class, Publisher.class, (Function<Maybe, Publisher>) Maybe::toFlowable);
         conversionService.addConverter(Maybe.class, Single.class, (Function<Maybe, Single>) Maybe::toSingle);
         conversionService.addConverter(Maybe.class, Observable.class, (Function<Maybe, Observable>) Maybe::toObservable);
+        conversionService.addConverter(Object.class, Maybe.class, (Function<Object, Maybe>) Maybe::just);
 
         // Observable
         conversionService.addConverter(Observable.class, Publisher.class, (Function<Observable, Publisher>) observable -> observable.toFlowable(BackpressureStrategy.BUFFER));
         conversionService.addConverter(Observable.class, Single.class, (Function<Observable, Single>) Observable::firstOrError);
         conversionService.addConverter(Observable.class, Maybe.class, (Function<Observable, Maybe>) Observable::firstElement);
+        conversionService.addConverter(Object.class, Observable.class, (Function<Object, Observable>) o -> {
+            if (o instanceof Iterable) {
+                return Observable.fromIterable((Iterable) o);
+            } else {
+                return Observable.just(o);
+            }
+        });
 
         // Single
         conversionService.addConverter(Single.class, Publisher.class, (Function<Single, Publisher>) Single::toFlowable);
         conversionService.addConverter(Single.class, Maybe.class, (Function<Single, Maybe>) Single::toMaybe);
         conversionService.addConverter(Single.class, Observable.class, (Function<Single, Observable>) Single::toObservable);
+        conversionService.addConverter(Object.class, Single.class, (Function<Object, Single>) Single::just);
 
         // Flowable
         conversionService.addConverter(Flowable.class, Single.class, (Function<Flowable, Single>) Flowable::firstOrError);
         conversionService.addConverter(Flowable.class, Maybe.class, (Function<Flowable, Maybe>) Flowable::firstElement);
         conversionService.addConverter(Flowable.class, Observable.class, (Function<Flowable, Observable>) Flowable::toObservable);
+        conversionService.addConverter(Object.class, Flowable.class, (Function<Object, Flowable>) o -> {
+            if (o instanceof Iterable) {
+                return Flowable.fromIterable((Iterable) o);
+            } else {
+                return Flowable.just(o);
+            }
+        });
 
         // Publisher
         conversionService.addConverter(

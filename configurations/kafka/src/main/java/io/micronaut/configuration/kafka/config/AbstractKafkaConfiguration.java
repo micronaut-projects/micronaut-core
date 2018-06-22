@@ -17,6 +17,7 @@
 package io.micronaut.configuration.kafka.config;
 
 import javax.annotation.Nonnull;
+import java.util.Map;
 import java.util.Properties;
 
 /**
