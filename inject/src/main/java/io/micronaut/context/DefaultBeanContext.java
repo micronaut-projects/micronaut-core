@@ -1196,11 +1196,13 @@ public class DefaultBeanContext implements BeanContext {
                             throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;
+                        Object convertedValue = null;
                         if (val != null) {
-                            convertedValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                            convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
                                     new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                            ));
+                            );
                         }
+                        convertedValues.put(requiredArgument.getName(), convertedValue);
                     }
 
                     bean = parametrizedBeanFactory.build(
