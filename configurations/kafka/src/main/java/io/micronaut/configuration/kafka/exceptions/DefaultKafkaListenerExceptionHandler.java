@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.kafka.exceptions;
 
-import io.micronaut.core.exceptions.ExceptionHandler;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +24,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * The default {@link ExceptionHandler} used when a {@link org.apache.kafka.clients.consumer.KafkaConsumer}
+ * The default ExceptionHandler used when a {@link org.apache.kafka.clients.consumer.KafkaConsumer}
  * fails to process a {@link org.apache.kafka.clients.consumer.ConsumerRecord}. By default just logs the error.
  *
  * @author graemerocher
