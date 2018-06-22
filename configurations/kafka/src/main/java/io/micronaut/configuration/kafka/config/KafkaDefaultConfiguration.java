@@ -22,11 +22,7 @@ import io.micronaut.context.env.Environment;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.Properties;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
