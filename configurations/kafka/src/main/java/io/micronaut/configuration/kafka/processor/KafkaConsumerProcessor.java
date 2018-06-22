@@ -23,6 +23,8 @@ import io.micronaut.configuration.kafka.annotation.*;
 import io.micronaut.configuration.kafka.annotation.KafkaListener;
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.configuration.kafka.config.KafkaDefaultConfiguration;
+import io.micronaut.configuration.kafka.exceptions.KafkaListenerException;
+import io.micronaut.configuration.kafka.exceptions.KafkaListenerExceptionHandler;
 import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Property;
@@ -45,9 +47,14 @@ import io.micronaut.messaging.annotation.Body;
 import io.micronaut.messaging.exceptions.MessagingSystemException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
+import io.reactivex.Flowable;
+import io.reactivex.Scheduler;
+import io.reactivex.schedulers.Schedulers;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.*;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +90,8 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     private final ConsumerRecordBinderRegistry binderRegistry;
     private final DefaultExecutableBinder<ConsumerRecord<?, ?>> executableBinder;
     private final SerdeRegistry serdeRegistry;
+    private final Scheduler executorScheduler;
+    private final KafkaListenerExceptionHandler exceptionHandler;
 
     /**
      * Creates a new processor using the given {@link ExecutorService} to schedule consumers on.
@@ -93,6 +102,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
      * @param defaultConsumerConfiguration The default consumer config
      * @param binderRegistry The {@link ConsumerRecordBinderRegistry}
      * @param serdeRegistry The {@link Serde} registry
+     * @param exceptionHandler The exception handler to use
      */
     public KafkaConsumerProcessor(
             @Named(TaskExecutors.MESSAGE_CONSUMER) ExecutorService executorService,
@@ -100,7 +110,8 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             BeanContext beanContext,
             AbstractKafkaConsumerConfiguration defaultConsumerConfiguration,
             ConsumerRecordBinderRegistry binderRegistry,
-            SerdeRegistry serdeRegistry) {
+            SerdeRegistry serdeRegistry,
+            KafkaListenerExceptionHandler exceptionHandler) {
         this.executorService = executorService;
         this.applicationConfiguration = applicationConfiguration;
         this.beanContext = beanContext;
@@ -108,6 +119,8 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         this.binderRegistry = binderRegistry;
         this.executableBinder = new DefaultExecutableBinder<>();
         this.serdeRegistry = serdeRegistry;
+        this.executorScheduler = Schedulers.from(executorService);
+        this.exceptionHandler = exceptionHandler;
     }
 
     @Override
@@ -284,18 +297,40 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                             LOG.trace("Kafka consumer [{}] received record: {}", method, consumerRecord);
                                         }
 
-                                        BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
-                                        boundExecutable.invoke(
-                                                consumerBean
-                                        );
+                                        try {
+                                            BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
+                                            Object result = boundExecutable.invoke(
+                                                    consumerBean
+                                            );
+
+                                            if (Publishers.isConvertibleToPublisher(result)) {
+                                                Flowable<?> resultFlowable = Publishers.convertPublisher(result, Flowable.class);
+                                                handleResultFlowable(consumerAnnotation, consumerBean, method, kafkaConsumer, consumerRecord, resultFlowable);
+                                            }
+                                        } catch (Throwable e) {
+                                            exceptionHandler.handle(new KafkaListenerException(
+                                                    e,
+                                                    consumerBean,
+                                                    kafkaConsumer,
+                                                    consumerRecord
+
+                                            ));
+                                            continue;
+                                        }
 
                                         if (offsetStrategy == OffsetStrategy.SYNC_PER_RECORD) {
                                             try {
                                                 kafkaConsumer.commitSync();
                                             } catch (CommitFailedException e) {
-                                                if (LOG.isErrorEnabled()) {
-                                                    LOG.error("Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(), e);
-                                                }
+                                                exceptionHandler.handle(new KafkaListenerException(
+                                                        "Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(),
+                                                        e,
+                                                        consumerBean,
+                                                        kafkaConsumer,
+                                                        consumerRecord
+
+                                                ));
+
                                             }
                                         } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
                                             kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
@@ -307,9 +342,14 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                     try {
                                         kafkaConsumer.commitSync();
                                     } catch (CommitFailedException e) {
-                                        if (LOG.isErrorEnabled()) {
-                                            LOG.error("Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(), e);
-                                        }
+                                        exceptionHandler.handle(new KafkaListenerException(
+                                                "Kafka consumer [" + consumerBean + "] failed to commit offsets: " + e.getMessage(),
+                                                e,
+                                                consumerBean,
+                                                kafkaConsumer,
+                                                null
+
+                                        ));
                                     }
                                 } else if (offsetStrategy == OffsetStrategy.ASYNC) {
                                     kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
@@ -317,10 +357,15 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                             } catch (WakeupException e) {
                                 throw e;
                             } catch (Throwable e) {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Kafka consumer [" + consumerBean + "] produced error: " + e.getMessage(), e);
-                                }
+                                exceptionHandler.handle(new KafkaListenerException(
+                                        e,
+                                        consumerBean,
+                                        kafkaConsumer,
+                                        null
+
+                                ));
                             }
+
                         }
                     } catch (WakeupException e) {
                         // ignore for shutdown
@@ -347,6 +392,65 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             consumer.wakeup();
         }
         consumers.clear();
+    }
+
+    @SuppressWarnings("SubscriberImplementation")
+    private void handleResultFlowable(
+            KafkaListener kafkaListener,
+            Object consumerBean,
+            ExecutableMethod<?, ?> method,
+            KafkaConsumer kafkaConsumer,
+            ConsumerRecord<?, ?> consumerRecord,
+            Flowable<?> resultFlowable) {
+        resultFlowable.subscribeOn(executorScheduler)
+                      .subscribe(new Subscriber<Object>() {
+              private Subscription subscription;
+
+                          @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(1);
+            }
+
+            @Override
+            public void onNext(Object o) {
+                // TODO: handle send to
+                // ask for next
+                subscription.request(1);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                subscription.cancel();
+
+                exceptionHandler.handle(
+                        new KafkaListenerException(
+                                "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
+                                t,
+                                consumerBean,
+                                kafkaConsumer,
+                                consumerRecord
+                        )
+                );
+
+                if (kafkaListener.redelivery()) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
+                    }
+
+                    Object key = consumerRecord.key();
+                    Object value = consumerRecord.value();
+
+                    // TODO: handle redelivery
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                // no-op
+            }
+        });
+
     }
 
     private Argument findBodyArgument(ExecutableMethod<?, ?> method) {

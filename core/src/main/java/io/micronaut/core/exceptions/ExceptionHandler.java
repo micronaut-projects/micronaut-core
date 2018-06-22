@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
-package io.micronaut.messaging.exceptions;
+package io.micronaut.core.exceptions;
 
 /**
- * An exception thrown when an unrecoverable error occurs with a messaging client.
+ * Common interface for types that handle exceptions.
  *
- * @author Graeme Rocher
+ * @param <T>
+ * @author graemerocher
  * @since 1.0
  */
-public class MessagingClientException extends MessagingException {
-    /**
-     * @param message The message
-     */
-    public MessagingClientException(String message) {
-        super(message);
-    }
+@FunctionalInterface
+public interface ExceptionHandler<T extends Throwable> {
 
     /**
-     * @param message The message
-     * @param cause   The throwable
+     * Handle the given exception.
+     *
+     * @param exception The exception to handle
      */
-    public MessagingClientException(String message, Throwable cause) {
-        super(message, cause);
-    }
+    void handle(T exception);
 }
