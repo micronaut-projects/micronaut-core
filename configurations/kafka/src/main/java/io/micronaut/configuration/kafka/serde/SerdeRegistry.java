@@ -16,12 +16,16 @@
 
 package io.micronaut.configuration.kafka.serde;
 
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.util.CollectionUtils;
-import org.apache.kafka.common.serialization.*;
+import io.micronaut.core.type.Argument;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serializer;
 
-import java.util.Collections;
-import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Future;
 
 
 /**
@@ -33,44 +37,83 @@ import java.util.Map;
 public interface SerdeRegistry extends Ordered {
 
     /**
-     * Default deserializers.
-     */
-    @SuppressWarnings({"unused", "unchecked"})
-    Map<Class, Deserializer> DEFAULT_DESERIALIZERS = Collections.unmodifiableMap(
-            CollectionUtils.mapOf(
-                    String.class, new StringDeserializer(),
-                    Integer.class, new IntegerDeserializer(),
-                    Float.class, new FloatDeserializer(),
-                    Short.class, new ShortDeserializer(),
-                    Long.class, new LongDeserializer(),
-                    Double.class, new DoubleDeserializer(),
-                    byte[].class, new ByteArrayDeserializer()
-            )
-    );
-
-
-    /**
-     * Default deserializers.
-     */
-    @SuppressWarnings({"unused", "unchecked"})
-    Map<Class, Serializer> DEFAULT_SERIALIZERS = Collections.unmodifiableMap(
-            CollectionUtils.mapOf(
-                    String.class, new StringSerializer(),
-                    Integer.class, new IntegerSerializer(),
-                    Float.class, new FloatSerializer(),
-                    Short.class, new ShortSerializer(),
-                    Long.class, new LongSerializer(),
-                    Double.class, new DoubleSerializer(),
-                    byte[].class, new ByteArraySerializer()
-            )
-    );
-
-    /**
      * Obtain a {@link Serde} for the given type.
      *
-     * @param type The type
      * @param <T>  The generic type
+     * @param type The type
      * @return The {@link Serde}
      */
     <T> Serde<T> getSerde(Class<T> type);
+
+    /**
+     * Obtain a {@link Serializer} for the given type.
+     *
+     * @param <T>  The generic type
+     * @param type The type
+     * @return The {@link Serde}
+     */
+    @SuppressWarnings("unchecked")
+    default <T> Serializer<T> getSerializer(Class<T> type) {
+        return getSerde(type).serializer();
+    }
+
+    /**
+     * Obtain a {@link Deserializer} for the given type.
+     *
+     * @param <T>  The generic type
+     * @param type The type
+     * @return The {@link Serde}
+     */
+    @SuppressWarnings("unchecked")
+    default <T> Deserializer<T> getDeserializer(Class<T> type) {
+        return getSerde(type).deserializer();
+    }
+
+    /**
+     * Picks the most appropriate {@link Deserializer} for the given argument.
+     *
+     * @param argument The argument
+     * @param <T> The generic type
+     * @return The {@link Deserializer}
+     */
+    @SuppressWarnings("unchecked")
+    default <T> Deserializer<T> pickDeserializer(Argument<T> argument) {
+        Class<T> type = argument.getType();
+
+        if (Publishers.isConvertibleToPublisher(type) || Future.class.isAssignableFrom(type)) {
+            Optional<Argument<?>> typeArg = argument.getFirstTypeVariable();
+
+            if (typeArg.isPresent()) {
+                type = (Class<T>) typeArg.get().getType();
+            } else {
+                return (Deserializer<T>) new ByteArrayDeserializer();
+            }
+        }
+
+        return getDeserializer(type);
+    }
+
+    /**
+     * Picks the most appropriate {@link Deserializer} for the given argument.
+     *
+     * @param argument The argument
+     * @param <T> The generic type
+     * @return The {@link Deserializer}
+     */
+    @SuppressWarnings("unchecked")
+    default <T> Serializer<T> pickSerializer(Argument<T> argument) {
+        Class<T> type = argument.getType();
+
+        if (Publishers.isConvertibleToPublisher(type) || Future.class.isAssignableFrom(type)) {
+            Optional<Argument<?>> typeArg = argument.getFirstTypeVariable();
+
+            if (typeArg.isPresent()) {
+                type = (Class<T>) typeArg.get().getType();
+            } else {
+                return (Serializer<T>) new ByteArrayDeserializer();
+            }
+        }
+
+        return getSerializer(type);
+    }
 }

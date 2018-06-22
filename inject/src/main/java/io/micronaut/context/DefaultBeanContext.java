@@ -211,9 +211,17 @@ public class DefaultBeanContext implements BeanContext {
                 }
             );
 
-            objects.forEach(beanRegistration -> {
+
+            Set<Integer> processed = new HashSet<>();
+            for (BeanRegistration beanRegistration : objects) {
                 BeanDefinition def = beanRegistration.beanDefinition;
                 Object bean = beanRegistration.bean;
+                int sysId = System.identityHashCode(bean);
+                if (processed.contains(sysId)) {
+                    continue;
+                }
+
+                processed.add(sysId);
                 if (def instanceof DisposableBeanDefinition) {
                     try {
                         //noinspection unchecked
@@ -236,7 +244,7 @@ public class DefaultBeanContext implements BeanContext {
                 if (bean instanceof LifeCycle) {
                     ((LifeCycle) bean).stop();
                 }
-            });
+            }
         }
         return this;
     }

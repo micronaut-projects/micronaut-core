@@ -31,9 +31,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
@@ -157,7 +154,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
                     if (v != null) {
 
-                        Serializer serializer = pickSerializer(argument);
+                        Serializer serializer = serdeRegistry.pickSerializer(argument);
                         if (serializer != null) {
 
                             try {
@@ -255,6 +252,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                         sendFlowable = sendFlowable.toList().toFlowable();
                     }
 
+                    //noinspection SubscriberImplementation
                     sendFlowable.subscribe(new Subscriber() {
                         boolean completed = false;
                         @Override
@@ -323,8 +321,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                     if (Iterable.class.isAssignableFrom(javaReturnType)) {
                         return conversionService
                                 .convert(sendFlowable.toList().blockingGet(), returnTypeArgument).orElse(null);
-                    }
-                    else if (void.class.isAssignableFrom(javaReturnType)) {
+                    } else if (void.class.isAssignableFrom(javaReturnType)) {
                         // a maybe will return null, and not throw an exception
                         Maybe<Object> maybe = sendFlowable.firstElement();
                         return maybe.blockingGet();
@@ -400,6 +397,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
         Class<?> finalJavaReturnType = javaReturnType;
         Flowable<Object> sendFlowable = valueFlowable.flatMap(o -> {
             ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, o);
+            //noinspection unchecked
             return Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     emitter.onError(wrapException(context, exception));
@@ -432,6 +430,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
         );
     }
 
+    @SuppressWarnings("unchecked")
     private ProducerRecord buildProducerRecord(KafkaClient client, String topic, List<Header> kafkaHeaders, Object key, Object value) {
         return new ProducerRecord(
                         topic,
@@ -486,7 +485,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             Serializer<?> keySerializer = newConfiguration.getKeySerializer().orElse(null);
             if (keySerializer == null) {
                 if (keyArgument != null) {
-                    keySerializer = pickSerializer(keyArgument);
+                    keySerializer = serdeRegistry.pickSerializer(keyArgument);
                 } else {
                     keySerializer = new ByteArraySerializer();
                 }
@@ -496,7 +495,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             Serializer<?> valueSerializer = newConfiguration.getValueSerializer().orElse(null);
 
             if (valueSerializer == null) {
-                valueSerializer = pickSerializer(bodyArgument);
+                valueSerializer = serdeRegistry.pickSerializer(bodyArgument);
                 newConfiguration.setValueSerializer((Serializer) valueSerializer);
             }
 
@@ -514,24 +513,6 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                                 .findFirst()
                                 .orElse(null)
                 );
-    }
-
-    private Serializer<?> pickSerializer(Argument<?> argument) {
-        Class<?> type = argument.getType();
-        Serializer<?> deserializer;
-
-        if (ClassUtils.isJavaLangType(type) || byte[].class == type) {
-            Class wrapperType = ReflectionUtils.getWrapperType(type);
-            deserializer = SerdeRegistry.DEFAULT_SERIALIZERS.get(wrapperType);
-        } else {
-            deserializer = serdeRegistry.getSerde(argument.getType()).serializer();
-        }
-
-        if (deserializer == null) {
-            throw new SerializationException("No Kafka serializer found for argument: " + argument);
-        }
-
-        return deserializer;
     }
 
 

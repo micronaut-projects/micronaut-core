@@ -53,7 +53,7 @@ public @interface KafkaClient {
      *
      * @return The id of the client
      */
-    @AliasFor(member = "name")
+    @AliasFor(member = "id")
     String value() default "";
 
     /**

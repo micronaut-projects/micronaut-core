@@ -17,11 +17,10 @@
 package io.micronaut.configuration.kafka.processor;
 
 import io.micronaut.configuration.kafka.KafkaConsumerAware;
+import io.micronaut.configuration.kafka.annotation.*;
+import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
 import io.micronaut.configuration.kafka.config.DefaultKafkaConsumerConfiguration;
-import io.micronaut.configuration.kafka.annotation.*;
-import io.micronaut.configuration.kafka.annotation.KafkaListener;
-import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.configuration.kafka.config.KafkaDefaultConfiguration;
 import io.micronaut.configuration.kafka.exceptions.KafkaListenerException;
 import io.micronaut.configuration.kafka.exceptions.KafkaListenerExceptionHandler;
@@ -34,9 +33,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -44,6 +40,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.messaging.annotation.Body;
+import io.micronaut.messaging.annotation.SendTo;
 import io.micronaut.messaging.exceptions.MessagingSystemException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
@@ -52,7 +49,8 @@ import io.reactivex.Scheduler;
 import io.reactivex.schedulers.Schedulers;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.*;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -65,7 +63,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 
@@ -414,7 +411,13 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
             @Override
             public void onNext(Object o) {
-                // TODO: handle send to
+//                String[] destinationTopics = method.getValue(SendTo.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+//                if (ArrayUtils.isNotEmpty(destinationTopics)) {
+//                    Object key = consumerRecord.key();
+//                    for (String destinationTopic : destinationTopics) {
+//                    }
+//                }
+
                 // ask for next
                 subscription.request(1);
             }
@@ -474,7 +477,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
             if (keyArgument.isPresent()) {
                 consumerConfiguration.setKeyDeserializer(
-                        pickDeserializer(keyArgument.get())
+                        serdeRegistry.pickDeserializer(keyArgument.get())
                 );
             } else {
                 //noinspection SingleStatementInBlock
@@ -482,7 +485,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                     Optional<Argument<?>> keyType = bodyArgument.getTypeVariable("K");
                     if (keyType.isPresent()) {
                         consumerConfiguration.setKeyDeserializer(
-                                pickDeserializer(keyType.get())
+                                serdeRegistry.pickDeserializer(keyType.get())
                         );
                     } else {
                         consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
@@ -501,7 +504,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                     Optional<Argument<?>> valueType = bodyArgument.getTypeVariable("V");
                     if (valueType.isPresent()) {
                         consumerConfiguration.setValueDeserializer(
-                                pickDeserializer(valueType.get())
+                                serdeRegistry.pickDeserializer(valueType.get())
                         );
                     } else {
                         consumerConfiguration.setValueDeserializer(new StringDeserializer());
@@ -509,7 +512,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                 } else {
                     consumerConfiguration.setValueDeserializer(
-                            pickDeserializer(bodyArgument)
+                            serdeRegistry.pickDeserializer(bodyArgument)
                     );
                 }
             } else {
@@ -531,32 +534,4 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         };
     }
 
-    private Deserializer pickDeserializer(Argument<?> argument) {
-        Class<?> type = argument.getType();
-
-        if (Publishers.isConvertibleToPublisher(type) || Future.class.isAssignableFrom(type)) {
-            Optional<Argument<?>> typeArg = argument.getFirstTypeVariable();
-
-            if (typeArg.isPresent()) {
-                type = typeArg.get().getType();
-            } else {
-                return new ByteArrayDeserializer();
-            }
-        }
-
-        Deserializer deserializer;
-
-        if (ClassUtils.isJavaLangType(type) || byte[].class == type) {
-            Class wrapperType = ReflectionUtils.getWrapperType(type);
-            deserializer = SerdeRegistry.DEFAULT_DESERIALIZERS.get(wrapperType);
-        } else {
-            deserializer = serdeRegistry.getSerde(type).deserializer();
-        }
-
-        if (deserializer == null) {
-            throw new SerializationException("No Kafka serializer found for argument: " + argument);
-        }
-
-        return deserializer;
-    }
 }
