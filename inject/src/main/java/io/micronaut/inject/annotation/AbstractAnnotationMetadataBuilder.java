@@ -205,6 +205,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
 
+                if (member == null) continue;
+
                 Optional<?> aliases = getAnnotationValues(member, Aliases.class).get("value");
                 Object annotationValue = entry.getValue();
 
