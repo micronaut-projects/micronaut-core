@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -582,15 +583,25 @@ public class DefaultBeanContext implements BeanContext {
                     );
                     if (args.length > i) {
                         Object val = args[i];
-                        argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                            new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                        ));
+                        if (val != null) {
+                            argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                    new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
+                            ));
+                        } else {
+                            if (!requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
+                                throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Argument cannot be null");
+                            }
+                        }
                     } else {
                         // attempt resolve from context
                         Optional<?> existingBean = findBean(resolutionContext, requiredArgument.getType(), null);
-                        argumentValues.put(requiredArgument.getName(), existingBean.orElseThrow(() ->
-                            new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + requiredArgument.getType())
-                        ));
+                        if (existingBean.isPresent()) {
+                            argumentValues.put(requiredArgument.getName(), existingBean.get());
+                        } else {
+                            if (!requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
+                                throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + requiredArgument.getType());
+                            }
+                        }
                     }
                 } finally {
                     path.pop();
@@ -1181,13 +1192,17 @@ public class DefaultBeanContext implements BeanContext {
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
                         Object val = argumentValues.get(requiredArgument.getName());
-                        if (val == null) {
+                        if (val == null && !requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
                             throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;
-                        convertedValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                            new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                        ));
+                        Object convertedValue = null;
+                        if (val != null) {
+                            convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                    new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
+                            );
+                        }
+                        convertedValues.put(requiredArgument.getName(), convertedValue);
                     }
 
                     bean = parametrizedBeanFactory.build(

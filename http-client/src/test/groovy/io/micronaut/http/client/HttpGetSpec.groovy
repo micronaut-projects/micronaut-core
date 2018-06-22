@@ -250,7 +250,17 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
+    }
 
+    void "test get with @Client"() {
+        given:
+        MyGetHelper helper = embeddedServer.applicationContext.getBean(MyGetHelper)
+
+        expect:
+        helper.simple() == "success"
+        helper.simpleSlash() == "success"
+        helper.simplePreceedingSlash() == "success"
+        helper.simpleDoubleSlash() == "success"
     }
 
     @Controller("/get")
@@ -283,5 +293,33 @@ class HttpGetSpec extends Specification {
 
     static class Error {
         String message
+    }
+
+    @javax.inject.Singleton
+    static class MyGetHelper {
+        private final RxStreamingHttpClient rxClientSlash
+        private final RxStreamingHttpClient rxClient
+
+        MyGetHelper(@Client("/get/") RxStreamingHttpClient rxClientSlash,
+                    @Client("/get") RxStreamingHttpClient rxClient) {
+            this.rxClient = rxClient
+            this.rxClientSlash = rxClientSlash
+        }
+
+        String simple() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+        }
+
+        String simplePreceedingSlash() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+        }
+
+        String simpleSlash() {
+            rxClientSlash.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+        }
+
+        String simpleDoubleSlash() {
+            rxClientSlash.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+        }
     }
 }

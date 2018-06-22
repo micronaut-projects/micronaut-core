@@ -101,10 +101,8 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.Closeable;
+import java.net.*;
 import java.net.Proxy.Type;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -142,6 +140,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
+    private final String contextPath;
     private final SslContext sslContext;
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private final ThreadFactory threadFactory;
@@ -165,6 +164,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     @Inject
     public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
                              @Parameter HttpClientConfiguration configuration,
+                             @Parameter @Nullable String contextPath,
                              @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
@@ -173,6 +173,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
+        this.contextPath = contextPath;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build().orElse(null);
@@ -213,7 +214,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
+        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
     }
 
     /**
@@ -222,6 +223,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     public DefaultHttpClient(LoadBalancer loadBalancer) {
         this(loadBalancer,
             new DefaultHttpClientConfiguration(),
+            null,
             new DefaultThreadFactory(MultithreadEventLoopGroup.class),
             new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
             createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
@@ -240,7 +242,20 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
-                LoadBalancer.fixed(url), configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                createSslBuilder(), createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT
+        );
+    }
+
+    /**
+     * @param url           The URL
+     * @param configuration The {@link HttpClientConfiguration} object
+     * @param contextPath   The context path
+     */
+    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
+        this(
+                LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 createSslBuilder(), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
@@ -252,9 +267,20 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      */
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
-            configuration, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+            configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
             new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
             createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+    }
+
+    /**
+     * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
+     * @param configuration The {@link HttpClientConfiguration} object
+     */
+    public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
+        this(loadBalancer,
+                configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
     @Override
@@ -746,7 +772,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         );
         // apply filters
         streamResponsePublisher = Flowable.fromPublisher(
-                applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher)
+                applyFilterToResponsePublisher(request, requestURI, requestWrapper, streamResponsePublisher)
         );
 
         return streamResponsePublisher.subscribeOn(scheduler);
@@ -778,7 +804,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                             boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
 
                             NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) finalRequest;
-                            NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestContentType, permitsBody);
+                            NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody);
                             io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
                             prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
@@ -803,7 +829,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                     }
                 });
             }, BackpressureStrategy.ERROR);
-            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(request, requestWrapper, responsePublisher);
+            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(request, requestURI, requestWrapper, responsePublisher);
             Flowable<io.micronaut.http.HttpResponse<O>> finalFlowable;
             if (finalPublisher instanceof Flowable) {
                 finalFlowable = (Flowable<io.micronaut.http.HttpResponse<O>>) finalPublisher;
@@ -862,14 +888,31 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
             return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
                     Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                    if (authInfo.isPresent() && request instanceof MutableHttpRequest) {
-                        ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
+                    if (request instanceof MutableHttpRequest) {
+                        if (authInfo.isPresent()) {
+                            ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
+                        }
                     }
-                    return server.resolve(requestURI);
+                    return server.resolve(resolveRequestURI(requestURI));
                 }
-
             );
         }
+    }
+
+    /**
+     * @param requestURI The request URI
+     * @return A URI that is prepended with the contextPath, if set
+     */
+    protected URI resolveRequestURI(URI requestURI) {
+        if (StringUtils.isNotEmpty(contextPath)) {
+            String rawPath = requestURI.getRawPath();
+            try {
+                return new URI(StringUtils.prependUri(contextPath, rawPath));
+            } catch (URISyntaxException e) {
+                //should never happen
+            }
+        }
+        return requestURI;
     }
 
     /**
@@ -997,9 +1040,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      * @param request The path
      * @return The filters
      */
-    protected List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request) {
+    protected List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI) {
         List<HttpClientFilter> filterList = new ArrayList<>();
-        String requestPath = request.getPath();
+        String requestPath = requestURI.getPath();
         io.micronaut.http.HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
@@ -1081,9 +1124,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      * @param <O>               The output type
      * @return The {@link Publisher} for the response
      */
-    protected <I, O> Publisher<io.micronaut.http.HttpResponse<O>> applyFilterToResponsePublisher(io.micronaut.http.HttpRequest<I> request, AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
+    protected <I, O> Publisher<io.micronaut.http.HttpResponse<O>> applyFilterToResponsePublisher(
+            io.micronaut.http.HttpRequest<I> request,
+            URI requestURI,
+            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
         if (filters.length > 0) {
-            List<HttpClientFilter> httpClientFilters = resolveFilters(request);
+            List<HttpClientFilter> httpClientFilters = resolveFilters(request, requestURI);
             OrderUtil.reverseSort(httpClientFilters);
             httpClientFilters.add((req, chain) -> responsePublisher);
 
@@ -1105,7 +1152,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      */
     protected NettyRequestWriter buildNettyRequest(
         io.micronaut.http.MutableHttpRequest request,
-        MediaType requestContentType, boolean permitsBody) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        URI requestURI,
+        MediaType requestContentType,
+        boolean permitsBody) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
@@ -1208,6 +1257,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             }
         } else {
             nettyRequest = clientHttpRequest.getFullRequest(null);
+        }
+        try {
+            nettyRequest.setUri(requestURI.toURL().getFile());
+        } catch (MalformedURLException e) {
+            //should never happen
         }
         return new NettyRequestWriter(nettyRequest, postRequestEncoder);
     }
@@ -1460,7 +1514,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
-        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestContentType, permitsBody);
+        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody);
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
         return requestWriter;

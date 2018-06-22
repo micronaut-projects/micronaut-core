@@ -41,7 +41,7 @@ public class HelloController {
     // tag::nonblocking[]
     @Get("/hello/{name}")
     Maybe<String> hello(String name) { // <1>
-        return httpClient.retrieve( GET("/endpoint/hello/" + name) )
+        return httpClient.retrieve( GET("/hello/" + name) )
                          .firstElement(); // <2>
     }
     // end::nonblocking[]
