@@ -17,12 +17,6 @@
 package io.micronaut.configuration.kafka.exceptions;
 
 import io.micronaut.core.exceptions.ExceptionHandler;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * Interface that {@link io.micronaut.configuration.kafka.annotation.KafkaListener} beans can implement to handle exceptions.
