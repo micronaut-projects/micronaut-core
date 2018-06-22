@@ -45,7 +45,7 @@ public abstract class AbstractKafkaConfiguration<K, V> {
     public static final String EMBEDDED = "kafka.embedded.enabled";
 
     /**
-     * The topics that should be created
+     * The topics that should be created.
      */
     @SuppressWarnings("WeakerAccess")
     public static final String EMBEDDED_TOPICS = "kafka.embedded.topics";
