@@ -27,7 +27,7 @@ class KafkaListenerSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             CollectionUtils.mapOf(
                     AbstractKafkaConfiguration.EMBEDDED, true,
-                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["word", "book"]
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["words", "books", "words-records", "books-records"]
             )
     )
 
