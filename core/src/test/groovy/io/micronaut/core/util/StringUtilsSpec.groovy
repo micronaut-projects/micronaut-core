@@ -33,4 +33,30 @@ class StringUtilsSpec extends Specification {
         "micronaut"              | "MICRONAUT"
         null                     | null
     }
+
+    @Unroll
+    void "test prependUri(#base, #uri) == #expected"() {
+
+        expect:
+        StringUtils.prependUri(base, uri) == expected
+
+        where:
+        base  | uri   | expected
+        "a"   | "b"   | "a/b"
+        "a/"  | "b"   | "a/b"
+        "/a"  | "b"   | "/a/b"
+        "/a/" | "b"   | "/a/b"
+        "a"   | "b/"  | "a/b/"
+        "a/"  | "b/"  | "a/b/"
+        "/a"  | "b/"  | "/a/b/"
+        "/a/" | "b/"  | "/a/b/"
+        "a"   | "/b"  | "a/b"
+        "a/"  | "/b"  | "a/b"
+        "/a"  | "/b"  | "/a/b"
+        "/a/" | "/b"  | "/a/b"
+        "a"   | "/b/" | "a/b/"
+        "a/"  | "/b/" | "a/b/"
+        "/a"  | "/b/" | "/a/b/"
+        "/a/" | "/b/" | "/a/b/"
+    }
 }
