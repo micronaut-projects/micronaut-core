@@ -152,7 +152,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             String groupId = consumerAnnotation.groupId();
 
             if (StringUtils.isEmpty(groupId)) {
-                groupId = applicationConfiguration.getName().orElse(beanDefinition.getBeanType().getSimpleName());
+                groupId = applicationConfiguration.getName().orElse(beanDefinition.getBeanType().getName());
             }
 
             String clientId = consumerAnnotation.clientId();
