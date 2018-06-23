@@ -76,6 +76,14 @@ public @interface KafkaClient {
     boolean timestamp() default false;
 
     /**
+     * By default when specifying an array or List the object will be serializes to a JSON array. By specifying {@code true} this will instead
+     * send each record in the the array or list as an individual {@link org.apache.kafka.clients.producer.ProducerRecord}.
+     *
+     * @return Whether to receive a batch of records or not
+     */
+    boolean batch() default false;
+
+    /**
      * Additional properties to configure with for Consumer.
      *
      * @return The properties
