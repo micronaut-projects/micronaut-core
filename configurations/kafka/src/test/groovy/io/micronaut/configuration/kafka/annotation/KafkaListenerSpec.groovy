@@ -29,9 +29,8 @@ class KafkaListenerSpec extends Specification {
                     AbstractKafkaConfiguration.EMBEDDED, true,
                     AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["word", "book"]
             )
-
-
     )
+
     void "test simple consumer"() {
         when:
         MyClient myClient = context.getBean(MyClient)
