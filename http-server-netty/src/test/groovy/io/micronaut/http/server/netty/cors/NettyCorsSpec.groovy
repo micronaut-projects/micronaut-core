@@ -237,7 +237,8 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.cors.configurations.bar.allowedHeaders': ['Content-Type', 'Accept'],
         'micronaut.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
         'micronaut.server.cors.configurations.bar.maxAge': 150,
-        'micronaut.server.cors.configurations.bar.allowCredentials': false]
+        'micronaut.server.cors.configurations.bar.allowCredentials': false,
+        'micronaut.server.dateHeader': false]
     }
 
     @Controller
