@@ -94,6 +94,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -966,6 +967,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         finalPublisher =  finalPublisher.map((response) -> {
             Optional<MediaType> specifiedMediaType = response.getContentType();
             MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
+
+            MutableHttpHeaders headers = response.getHeaders();
+            if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
+                headers.date(LocalDateTime.now());
+            }
+            serverConfiguration.getServerHeader().ifPresent((server) -> {
+                if (!headers.contains(HttpHeaders.SERVER)) {
+                    headers.add(HttpHeaders.SERVER, server);
+                }
+            });
 
             Optional<?> responseBody = response.getBody();
             if (responseBody.isPresent()) {
