@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.docs.basics.Message
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
@@ -95,6 +96,28 @@ class HttpGetSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.message == "Server error"
+        e.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
+
+    void "test 500 request with json body"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/jsonError")
+        ))
+
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
@@ -281,9 +304,14 @@ class HttpGetSpec extends Specification {
             return [ new Book(title: "The Stand") ]
         }
 
-        @Get("/error")
+        @Get(uri = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error() {
-            return HttpResponse.serverError().body(new Error(message: "Server error"))
+            return HttpResponse.serverError().body("Server error")
+        }
+
+        @Get("/jsonError")
+        HttpResponse jsonError() {
+            return HttpResponse.serverError().body([foo: "bar"])
         }
     }
 

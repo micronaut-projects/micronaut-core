@@ -58,6 +58,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         action                | status                        | body                       | headers
         "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
         "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"             | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
         "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
@@ -89,6 +90,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         action                | status                       | body                       | headers
         "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
         "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"            | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
         "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
