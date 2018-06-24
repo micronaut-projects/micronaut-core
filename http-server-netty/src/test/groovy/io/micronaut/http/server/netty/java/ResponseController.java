@@ -56,6 +56,11 @@ public class ResponseController {
         return HttpResponse.ok("some text");
     }
 
+    @Get(produces = MediaType.TEXT_PLAIN)
+    public HttpResponse errorWithBody() {
+        return HttpResponse.serverError().body("some text");
+    }
+
     @Get
     public HttpResponse<Foo> okWithBodyObject() {
         return HttpResponse.ok(new Foo("blah", 10))

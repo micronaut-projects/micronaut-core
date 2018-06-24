@@ -56,12 +56,9 @@ public class HttpClientResponseException extends HttpClientException {
 
     @Override
     public String getMessage() {
-        Optional<JsonError> body = getResponse().getBody(JsonError.class);
-        if (body.isPresent() && body.get().getMessage() != null) {
-            return body.get().getMessage();
-        } else {
-            return super.getMessage();
-        }
+        return getResponse().getBody(JsonError.class).map(JsonError::getMessage).orElseGet(() -> {
+            return getResponse().getBody(String.class).orElse(super.getMessage());
+        });
     }
 
     /**
@@ -86,6 +83,8 @@ public class HttpClientResponseException extends HttpClientException {
                 response.getBody(JsonError.class);
             } else if (contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
                 response.getBody(VndError.class);
+            } else {
+                response.getBody(String.class);
             }
         }
     }
