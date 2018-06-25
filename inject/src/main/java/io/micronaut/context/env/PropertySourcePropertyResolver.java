@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
-    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+)\\}");
+    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
 
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
@@ -353,29 +353,41 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 if (value instanceof String) {
                     String str = (String) value;
-                    if (str.contains(propertyPlaceholderResolver.getPrefix())) {
+                    if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.contains(propertyPlaceholderResolver.getPrefix())) {
+                        StringBuffer newValue = new StringBuffer();
                         Matcher matcher = RANDOM_PATTERN.matcher(str);
-                        if (matcher.find()) {
+                        boolean hasRandoms = false;
+                        while (matcher.find()) {
+                            hasRandoms = true;
                             String type = matcher.group(1).trim().toLowerCase();
+                            String randomValue;
                             switch (type) {
                                 case "port":
-                                    value = SocketUtils.findAvailableTcpPort();
+                                    randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
                                 break;
                                 case "int":
                                 case "integer":
-                                    value = random.nextInt();
+                                    randomValue = String.valueOf(random.nextInt());
                                 break;
                                 case "long":
-                                    value = random.nextLong();
+                                    randomValue = String.valueOf(random.nextLong());
                                 break;
                                 case "float":
-                                    value = random.nextFloat();
+                                    randomValue = String.valueOf(random.nextFloat());
                                 break;
                                 default:
                                     throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
                             }
+                            matcher.appendReplacement(newValue, randomValue);
                         }
+
+                        if (hasRandoms) {
+                            matcher.appendTail(newValue);
+                            value = newValue.toString();
+                        }
+
                     }
+
 
                 }
 

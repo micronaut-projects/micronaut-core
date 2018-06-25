@@ -22,6 +22,21 @@ class RandomPropertySpec extends Specification {
 
     }
 
+    void "test random localhost port"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                'my.address':'localhost:${random.port}',
+                'my.addresses':'localhost:${random.port},localhost:${random.port}'
+        )
+
+        expect:
+        context.getProperty('my.address', String).isPresent()
+        context.getProperty('my.address', String).get() ==~ /localhost:\d+/
+        context.getProperty('my.addresses', String).isPresent()
+        context.getProperty('my.addresses', String).get() ==~ /localhost:\d+,localhost:\d+/
+
+    }
+
     void "test random integer"() {
         given:
         ApplicationContext context = ApplicationContext.run(
