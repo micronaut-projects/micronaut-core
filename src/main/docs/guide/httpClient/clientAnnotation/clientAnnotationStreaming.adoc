@@ -1,8 +1,8 @@
-The ann:http.client.Client[] annotation can also handled streaming responses.
+The ann:http.client.Client[] annotation can also handle streaming HTTP responses.
 
 === Streaming JSON with @Client
 
-For example to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation you can simply define a client that returns an unbound rs:Publisher[] such as an rx:Flowable[] or Reactor `Flux`:
+For example to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation you can simply define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
 
 .HeadlineClient.java
 [source,java]
@@ -40,7 +40,7 @@ The example defined in the previous section expects the server to respond with a
 {"title":"The Shining"}
 ----
 
-The reason for this is simple, a sequence of JSON object is not, in fact , valid JSON and hence the response content type cannot be `application/json`. For the JSON to be valid it would have to return an array:
+The reason for this is simple, a sequence of JSON object is not, in fact, valid JSON and hence the response content type cannot be `application/json`. For the JSON to be valid it would have to return an array:
 
 .A JSON Array
 [source,json]
