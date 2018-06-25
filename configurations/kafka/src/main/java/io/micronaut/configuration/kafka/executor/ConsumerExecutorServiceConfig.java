@@ -45,6 +45,6 @@ public class ConsumerExecutorServiceConfig {
     @Bean
     @Named(TaskExecutors.MESSAGE_CONSUMER)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
+        return UserExecutorConfiguration.of(ExecutorType.FIXED, 75);
     }
 }
