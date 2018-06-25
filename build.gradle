@@ -40,7 +40,7 @@ ext {
                     version:groovyVersion,
                     group:'org.codehaus.groovy',
                     name: 'groovy',
-                    modules:['groovy-test','groovy-ant','groovy-json','groovy-jmx']
+                    modules:['groovy-test','groovy-ant','groovy-json','groovy-jmx', 'groovy-templates']
             ],
             gorm: [
                     version:gormVersion,
