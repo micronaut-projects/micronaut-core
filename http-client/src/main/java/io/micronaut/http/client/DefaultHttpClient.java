@@ -1368,6 +1368,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                         } else {
                             emitter.onNext(response);
                         }
+                        fullResponse.content().release();
                         emitter.onComplete();
                     } finally {
                         closeChannelAsync(channel);
