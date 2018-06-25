@@ -35,6 +35,8 @@ In this you can return a api:core.io.Writable[] object from any controller metho
 
 When returning a api:core.io.Writable[] object the blocking I/O operation will be shifted to the I/O thread pool so that the Netty event loop is not blocked.
 
+TIP: See the section on configuring <<threadPools, Server Thread Pools>> for details on how to configure the I/O thread pool to meet the requirements of your application.
+
 The following example demonstrates how to use this API with Groovy's `SimpleTemplateEngine` to write a server side template:
 
 .Performing Blocking I/O
