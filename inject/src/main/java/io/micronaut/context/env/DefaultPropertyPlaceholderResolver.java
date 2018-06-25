@@ -52,6 +52,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     }
 
     @Override
+    public String getPrefix() {
+        return this.prefix;
+    }
+
+    @Override
     public Optional<String> resolvePlaceholders(String str) {
         try {
             int i = str.indexOf(prefix);
