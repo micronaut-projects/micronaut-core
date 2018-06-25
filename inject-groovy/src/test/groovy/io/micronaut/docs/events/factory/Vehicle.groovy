@@ -26,7 +26,7 @@ import javax.inject.Singleton
 @Singleton
 class Vehicle {
     final Engine engine
-    @Inject Vehicle(Engine engine) {
+    Vehicle(Engine engine) {
         this.engine = engine
     }
 
