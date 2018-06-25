@@ -23,6 +23,7 @@ class KafkaReactiveListenerSpec extends Specification{
     public static final String TOPIC_NAME = "KafkaReactiveListenerSpec-books"
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             CollectionUtils.mapOf(
+                    "kafka.bootstrap.servers", 'localhost:${random.port}',
                     AbstractKafkaConfiguration.EMBEDDED, true,
                     AbstractKafkaConfiguration.EMBEDDED_TOPICS, [TOPIC_NAME]
             )

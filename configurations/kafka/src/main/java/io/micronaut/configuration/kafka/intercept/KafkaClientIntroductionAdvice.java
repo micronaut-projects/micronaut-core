@@ -282,6 +282,10 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 } else {
 
                     ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("@KafkaClient method [" + context + "] Sending producer record: " + record);
+                    }
+
                     kafkaProducer.send(record, (metadata, exception) -> {
                         if (exception != null) {
                             completableFuture.completeExceptionally(wrapException(context, exception));
@@ -332,6 +336,11 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 } else {
                     try {
                         ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
+
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("@KafkaClient method [" + context + "] Sending producer record: " + record);
+                        }
+
                         Object result;
                         if (maxBlock != null) {
                             result = kafkaProducer.send(record).get(maxBlock.toMillis(), TimeUnit.MILLISECONDS);
@@ -397,6 +406,11 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
         Class<?> finalJavaReturnType = javaReturnType;
         Flowable<Object> sendFlowable = valueFlowable.flatMap(o -> {
             ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, o);
+
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("@KafkaClient method [" + context + "] Sending producer record: " + record);
+            }
+
             //noinspection unchecked
             return Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
