@@ -48,3 +48,7 @@ The command line has also been updated with a `openfaas` feature which will crea
 ----
 $ mn create-function foo --features openfaas
 ----
+
+=== Kotlin Optional Type Support
+
+Beans can now be injected optionally using Kotlin nullable types without the need for the `@Nullable` annotation.
