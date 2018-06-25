@@ -12,15 +12,19 @@ import spock.lang.Specification
 
 class KafkaBatchListenerSpec extends Specification {
 
+    public static final String BOOKS_TOPIC = 'KafkaBatchListenerSpec-books'
+    public static final String TITLES_TOPIC = 'KafkaBatchListenerSpec-titles'
+
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             CollectionUtils.mapOf(
+                    "kafka.bootstrap.servers", 'localhost:${random.port}',
                     AbstractKafkaConfiguration.EMBEDDED, true,
-                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["titles", "books"]
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, [TITLES_TOPIC, BOOKS_TOPIC]
             )
     )
 
     @io.micronaut.configuration.kafka.annotation.KafkaClient(batch = true)
-    @Topic('books')
+    @Topic(KafkaBatchListenerSpec.BOOKS_TOPIC)
     static interface KafkaClient {
 
         void sendBooks(List<Book> books)
@@ -34,7 +38,7 @@ class KafkaBatchListenerSpec extends Specification {
     }
 
     @KafkaListener(batch = true)
-    @Topic("books")
+    @Topic(KafkaBatchListenerSpec.BOOKS_TOPIC)
     static class BookListener {
         List<Book> books
 

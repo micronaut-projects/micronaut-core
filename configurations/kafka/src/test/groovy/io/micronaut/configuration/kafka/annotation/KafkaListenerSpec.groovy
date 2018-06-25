@@ -26,6 +26,7 @@ class KafkaListenerSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             CollectionUtils.mapOf(
+                    "kafka.bootstrap.servers", 'localhost:${random.port}',
                     AbstractKafkaConfiguration.EMBEDDED, true,
                     AbstractKafkaConfiguration.EMBEDDED_TOPICS, ["words", "books", "words-records", "books-records"]
             )

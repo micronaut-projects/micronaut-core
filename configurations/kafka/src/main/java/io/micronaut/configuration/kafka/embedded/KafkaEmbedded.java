@@ -42,7 +42,9 @@ import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 /**
@@ -80,15 +82,29 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
     public AbstractKafkaConfiguration onCreated(BeanCreatedEvent<AbstractKafkaConfiguration> event) {
 
         AbstractKafkaConfiguration config = event.getBean();
+        if (kafkaServer != null) {
+            return config;
+        }
 
         String bootstrapServer = config.getConfig().getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG);
 
+        String[] hostAndPort = bootstrapServer.split(",")[0].split(":");
+        int kafkaPort = -1;
+        if (hostAndPort.length == 2) {
+            try {
+                kafkaPort = Integer.parseInt(hostAndPort[1]);
+            } catch (NumberFormatException e) {
+                return config;
+            }
+        } else if (SocketUtils.isTcpPortAvailable(AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT)) {
+            kafkaPort = AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT;
+        }
 
         // only handle localhost
         if (embeddedConfiguration.isEnabled() &&
                 kafkaServer == null &&
-                AbstractKafkaConfiguration.DEFAULT_BOOTSTRAP_SERVERS.equals(bootstrapServer) &&
-                SocketUtils.isTcpPortAvailable(AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT)) {
+                kafkaPort > -1 &&
+                SocketUtils.isTcpPortAvailable(kafkaPort)) {
             try {
                 if (zkServer == null) {
                     initZooKeeper();
@@ -100,6 +116,7 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
 
                 brokerProps.setProperty("zookeeper.connect", zkConnect);
                 brokerProps.putIfAbsent("broker.id", "0");
+                brokerProps.put("port", kafkaPort);
                 brokerProps.putIfAbsent("offsets.topic.replication.factor" , "1");
 
                 brokerProps.computeIfAbsent("log.dirs", o -> {
@@ -112,7 +129,7 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
 
                 brokerProps.setProperty(
                         "listeners",
-                        "PLAINTEXT://127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT
+                        "PLAINTEXT://127.0.0.1:" + kafkaPort
                 );
                 KafkaConfig kafkaConfig = new KafkaConfig(brokerProps);
                 this.kafkaServer = TestUtils.createServer(kafkaConfig, new MockTime());
@@ -121,7 +138,7 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
 
                 if (!topics.isEmpty()) {
                     Properties properties = new Properties();
-                    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, ("127.0.0.1:" + AbstractKafkaConfiguration.DEFAULT_KAFKA_PORT));
+                    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, ("127.0.0.1:" + kafkaPort));
                     AdminClient adminClient = AdminClient.create(properties);
                     adminClient.createTopics(topics.stream().map(s -> new NewTopic(s, 1, (short) 1)).collect(Collectors.toList()))
                                .all().get();
