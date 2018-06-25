@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
@@ -69,6 +70,7 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -797,7 +799,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     finalRoute.getAnnotationMetadata().getValue(Produces.class, "single", Boolean.class).orElse(false);
 
             // build the result emitter. This result emitter emits the response from a controller action
-            Flowable<?> resultEmitter = buildResultEmitter(finalRoute, requestReference, isReactiveReturnType, isSingle);
+            Flowable<?> resultEmitter = buildResultEmitter(
+                    context,
+                    finalRoute,
+                    requestReference,
+                    isReactiveReturnType,
+                    isSingle
+            );
 
 
             // here we transform the result of the controller action into a MutableHttpResponse
@@ -1086,7 +1094,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     // builds the result emitter for a given route action
     private Flowable<?> buildResultEmitter(
-            RouteMatch<?> finalRoute,
+            ChannelHandlerContext context, RouteMatch<?> finalRoute,
             AtomicReference<HttpRequest<?>> requestReference,
             boolean isReactiveReturnType,
             boolean isSingleResult) {
@@ -1141,7 +1149,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     emitter.onComplete();
                 } else {
                     // emit the result
-                    emitter.onNext(result);
+                    if (result instanceof Writable) {
+                        ByteBuf byteBuf = context.alloc().ioBuffer(128);
+                        ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
+                        Writable writable = (Writable) result;
+                        writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
+                        emitter.onNext(byteBuf);
+                    } else {
+                        emitter.onNext(result);
+                    }
                     emitter.onComplete();
                 }
 
