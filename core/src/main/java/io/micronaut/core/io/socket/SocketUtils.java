@@ -36,10 +36,15 @@ public class SocketUtils {
      */
     public static final String LOCALHOST = "localhost";
 
-    private static final int MIN_PORT_RANGE = 1024;
+    /**
+     * The minimum port number.
+     */
+    public static final int MIN_PORT_RANGE = 1024;
 
-    // no unsigned short type in Java so use constant
-    private static final int MAX_PORT_RANGE = 65535;
+    /**
+     * The maximum port number.
+     */
+    public static final int MAX_PORT_RANGE = 65535;
 
     @SuppressWarnings("ConstantName")
     private static final Random random = new Random(System.currentTimeMillis());
