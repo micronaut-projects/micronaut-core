@@ -1,0 +1,50 @@
+This section covers what's new since the previous release of Micronaut.
+
+=== Metrics Support
+
+The first version of support for Metrics via http://micrometer.io[Micrometer] is now available. Metrics are exposed via the <<metricsEndpoint,Metrics Endpoint>> and can be extensively customized.
+
+The first version of Metrics support includes support for Statsd, Atlas, Graphite and Prometheus with more Metrics backends coming in the future.
+
+See the section on the <<metricsEndpoint,Metrics Endpoint>> for more information.
+
+=== Server Sent Event (SSE) Client
+
+A new api:http.client.sse.SseClient[] interface has been introduced that provides a client for streaming Server Sent Events (SSE) on the server. The client can also be used for testing SSE controllers.
+
+In additional the `@Client` annotation has been updated to add support for automatically implementing streaming interfaces for both JSON and SSE streaming.
+
+See the section on <<clientAnnotationStreaming, Client Streaming>> for more information.
+
+=== Blocking I/O Support
+
+It is now possible to return a api:core.io.Writable[] and have the operation offloaded to a the I/O thread pool, thus improving the ability to interface with APIs that do not yet support non-blocking I/O:
+
+[source,java]
+----
+@Get(uri = "/welcome", produces = MediaType.TEXT_PLAIN)
+Writable render() { // <2>
+    return writer -> template.make( // <3>
+        CollectionUtils.mapOf(
+                "firstName", "Fred",
+                "lastName", "Flintstone"
+        )
+    ).writeTo(writer);
+}
+----
+
+See the section on <<serverIO, Writing Response Data>> for more information.
+
+=== Support for OpenFaaS
+
+Micronaut functions can now be executed from the CLI and will read from `System.in` the data required to execute a function.
+
+This means it is possible to deploy functions developed with Micronaut to Serverless platforms that package functions within containers such as OpenFaaS, Fn etc.
+
+The command line has also been updated with a `openfaas` feature which will create the necessary `Dockerfile` ready for deployment to OpenFaaS:
+
+.Creating an OpenFaaS Function
+[source,bash]
+----
+$ mn create-function foo --features openfaas
+----

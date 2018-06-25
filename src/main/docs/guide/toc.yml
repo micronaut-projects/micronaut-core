@@ -1,4 +1,6 @@
-introduction: Introduction
+introduction:
+  title: Introduction
+  whatsNew: What's New?
 quickStart:
   title: Quick Start
   buildCLI:
