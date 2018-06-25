@@ -16,9 +16,11 @@
 
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.CollectionUtils;
@@ -29,19 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -52,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
+    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+)\\}");
 
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
@@ -60,7 +54,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[57];
-
+    private final Random random = new Random();
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
@@ -356,6 +350,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         synchronized (catalog) {
             for (String property : properties) {
                 Object value = properties.get(property);
+
+                if (value instanceof String) {
+                    String str = (String) value;
+                    if (str.contains(propertyPlaceholderResolver.getPrefix())) {
+                        Matcher matcher = RANDOM_PATTERN.matcher(str);
+                        if (matcher.find()) {
+                            String type = matcher.group(1).trim().toLowerCase();
+                            switch (type) {
+                                case "port":
+                                    value = SocketUtils.findAvailableTcpPort();
+                                break;
+                                case "int":
+                                case "integer":
+                                    value = random.nextInt();
+                                break;
+                                case "long":
+                                    value = random.nextLong();
+                                break;
+                                case "float":
+                                    value = random.nextFloat();
+                                break;
+                                default:
+                                    throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                            }
+                        }
+                    }
+
+                }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 for (String resolvedProperty : resolvedProperties) {
