@@ -55,6 +55,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[57];
     private final Random random = new Random();
+
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
@@ -226,8 +227,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         Class<T> requiredType = conversionContext.getArgument().getType();
         if (Properties.class.isAssignableFrom(requiredType)) {
             return Optional.of((T) new Properties());
-        }
-        else if (Map.class.isAssignableFrom(requiredType)) {
+        } else if (Map.class.isAssignableFrom(requiredType)) {
             return Optional.of((T) Collections.emptyMap());
         }
         return Optional.empty();
