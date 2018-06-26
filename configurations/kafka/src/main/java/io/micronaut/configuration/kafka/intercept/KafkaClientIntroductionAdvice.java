@@ -107,6 +107,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
         if (context.hasAnnotation(Topic.class) && context.hasAnnotation(KafkaClient.class)) {
             KafkaClient client = context.getAnnotation(KafkaClient.class);
+            boolean isBatchSend = client.batch();
             String topic = context.getValue(Topic.class, String.class).orElse(null);
 
             if (StringUtils.isEmpty(topic)) {
@@ -211,25 +212,28 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                             maxBlock);
 
                 } else {
-                    ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
-                    Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
-                    returnFlowable = Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
-                        if (exception != null) {
-                            emitter.onError(wrapException(context, exception));
+                    if (isBatchSend) {
+                        Object batchValue;
+                        if (value.getClass().isArray()) {
+                            batchValue = Arrays.asList((Object[]) value);
                         } else {
-                            if (firstTypeVariable.isPresent()) {
-                                Argument<?> argument = firstTypeVariable.get();
-                                Optional<?> converted = conversionService.convert(metadata, argument);
-
-                                if (converted.isPresent()) {
-                                    emitter.onNext(converted.get());
-                                } else if (argument.getType() == bodyArgument.getType()) {
-                                    emitter.onNext(value);
-                                }
-                            }
-                            emitter.onComplete();
+                            batchValue = value;
                         }
-                    }), BackpressureStrategy.ERROR);
+
+                        Flowable<Object> bodyEmitter;
+                        if (batchValue instanceof Iterable) {
+                            bodyEmitter = Flowable.fromIterable((Iterable) batchValue);
+                        } else {
+                            bodyEmitter = Flowable.just(batchValue);
+                        }
+
+                        returnFlowable = bodyEmitter.flatMap(o ->
+                                buildSendFlowable(context, client, topic, bodyArgument, kafkaProducer, kafkaHeaders, returnType, key, o)
+                        );
+
+                    } else {
+                        returnFlowable = buildSendFlowable(context, client, topic, bodyArgument, kafkaProducer, kafkaHeaders, returnType, key, value);
+                    }
                 }
                 return Publishers.convertPublisher(returnFlowable, javaReturnType);
             } else if (Future.class.isAssignableFrom(javaReturnType)) {
@@ -335,6 +339,40 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                     }
                 } else {
                     try {
+                        if (isBatchSend) {
+                            Iterable batchValue;
+                            if (value.getClass().isArray()) {
+                                batchValue = Arrays.asList((Object[]) value);
+                            } else if (!(value instanceof Iterable)) {
+                                batchValue = Collections.singletonList(value);
+                            } else {
+                                batchValue = (Iterable) value;
+                            }
+
+                            List results = new ArrayList();
+                            for (Object o : batchValue) {
+                                ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, o);
+
+                                if (LOG.isTraceEnabled()) {
+                                    LOG.trace("@KafkaClient method [" + context + "] Sending producer record: " + record);
+                                }
+
+                                Object result;
+                                if (maxBlock != null) {
+                                    result = kafkaProducer.send(record).get(maxBlock.toMillis(), TimeUnit.MILLISECONDS);
+                                } else {
+                                    result = kafkaProducer.send(record).get();
+                                }
+                                results.add(result);
+                            }
+                            return conversionService.convert(results, returnTypeArgument).orElseGet(() -> {
+                                if (javaReturnType == bodyArgument.getType()) {
+                                    return value;
+                                } else {
+                                    return null;
+                                }
+                            });
+                        }
                         ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
 
                         if (LOG.isTraceEnabled()) {
@@ -384,6 +422,37 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
         } finally {
             producerMap.clear();
         }
+    }
+
+    private Flowable buildSendFlowable(
+            MethodInvocationContext<Object, Object> context,
+            KafkaClient client,
+            String topic,
+            Argument bodyArgument,
+            KafkaProducer kafkaProducer,
+            List<Header> kafkaHeaders,
+            ReturnType<Object> returnType, Object key, Object value) {
+        Flowable returnFlowable;
+        ProducerRecord record = buildProducerRecord(client, topic, kafkaHeaders, key, value);
+        Optional<Argument<?>> firstTypeVariable = returnType.getFirstTypeVariable();
+        returnFlowable = Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
+            if (exception != null) {
+                emitter.onError(wrapException(context, exception));
+            } else {
+                if (firstTypeVariable.isPresent()) {
+                    Argument<?> argument = firstTypeVariable.get();
+                    Optional<?> converted = conversionService.convert(metadata, argument);
+
+                    if (converted.isPresent()) {
+                        emitter.onNext(converted.get());
+                    } else if (argument.getType() == bodyArgument.getType()) {
+                        emitter.onNext(value);
+                    }
+                }
+                emitter.onComplete();
+            }
+        }), BackpressureStrategy.ERROR);
+        return returnFlowable;
     }
 
     private Flowable<Object> buildSendFlowable(
@@ -509,10 +578,14 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             Serializer<?> valueSerializer = newConfiguration.getValueSerializer().orElse(null);
 
             if (valueSerializer == null) {
-                valueSerializer = serdeRegistry.pickSerializer(bodyArgument);
+                boolean batch = metadata.getValue(KafkaClient.class, "batch", Boolean.class).orElse(false);
+                valueSerializer = serdeRegistry.pickSerializer(batch ? bodyArgument.getFirstTypeVariable().orElse(bodyArgument) : bodyArgument);
                 newConfiguration.setValueSerializer((Serializer) valueSerializer);
             }
 
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Creating new KafkaProducer. Key serializer: [{}]. Value serializer: [{}]", keySerializer, valueSerializer);
+            }
             return producerFactory.createProducer(newConfiguration);
         });
     }

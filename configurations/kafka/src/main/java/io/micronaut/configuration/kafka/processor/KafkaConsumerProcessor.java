@@ -20,6 +20,7 @@ import io.micronaut.configuration.kafka.KafkaConsumerAware;
 import io.micronaut.configuration.kafka.KafkaProducerRegistry;
 import io.micronaut.configuration.kafka.annotation.*;
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
+import io.micronaut.configuration.kafka.bind.batch.BatchConsumerRecordsBinderRegistry;
 import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
 import io.micronaut.configuration.kafka.config.DefaultKafkaConsumerConfiguration;
 import io.micronaut.configuration.kafka.config.KafkaDefaultConfiguration;
@@ -34,6 +35,7 @@ import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
+import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -96,6 +98,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     private final Scheduler executorScheduler;
     private final KafkaListenerExceptionHandler exceptionHandler;
     private final KafkaProducerRegistry producerRegistry;
+    private final BatchConsumerRecordsBinderRegistry batchBinderRegistry;
 
     /**
      * Creates a new processor using the given {@link ExecutorService} to schedule consumers on.
@@ -105,6 +108,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
      * @param beanContext                  The bean context
      * @param defaultConsumerConfiguration The default consumer config
      * @param binderRegistry               The {@link ConsumerRecordBinderRegistry}
+     * @param batchBinderRegistry          The {@link BatchConsumerRecordsBinderRegistry}
      * @param serdeRegistry                The {@link org.apache.kafka.common.serialization.Serde} registry
      * @param producerRegistry             The {@link KafkaProducerRegistry}
      * @param exceptionHandler             The exception handler to use
@@ -115,6 +119,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             BeanContext beanContext,
             AbstractKafkaConsumerConfiguration defaultConsumerConfiguration,
             ConsumerRecordBinderRegistry binderRegistry,
+            BatchConsumerRecordsBinderRegistry batchBinderRegistry,
             SerdeRegistry serdeRegistry,
             KafkaProducerRegistry producerRegistry,
             KafkaListenerExceptionHandler exceptionHandler) {
@@ -123,6 +128,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         this.beanContext = beanContext;
         this.defaultConsumerConfiguration = defaultConsumerConfiguration;
         this.binderRegistry = binderRegistry;
+        this.batchBinderRegistry = batchBinderRegistry;
         this.executableBinder = new DefaultExecutableBinder<>();
         this.serdeRegistry = serdeRegistry;
         this.executorScheduler = Schedulers.from(executorService);
@@ -151,6 +157,8 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             Duration heartbeatInterval = method.getValue(KafkaListener.class, "heartbeatInterval", Duration.class)
                     .orElse(null);
 
+            boolean isBatch = method.getValue(KafkaListener.class, "batch", Boolean.class)
+                    .orElse(false);
 
             String groupId = consumerAnnotation.groupId();
 
@@ -298,54 +306,65 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                             try {
                                 if (consumerRecords != null && consumerRecords.count() > 0) {
 
-                                    for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
+                                    if (isBatch) {
 
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Kafka consumer [{}] received record: {}", method, consumerRecord);
-                                        }
+                                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
+                                        BoundExecutable boundExecutable = batchBinder.bind(method, batchBinderRegistry, consumerRecords);
+                                        Object result = boundExecutable.invoke(consumerBean);
 
-                                        try {
-                                            BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
-                                            Object result = boundExecutable.invoke(
-                                                    consumerBean
-                                            );
+                                        // handle batch result
 
-                                            if (result != null) {
-                                                Flowable<?> resultFlowable;
-                                                boolean isBlocking;
-                                                if (Publishers.isConvertibleToPublisher(result)) {
-                                                    resultFlowable = Publishers.convertPublisher(result, Flowable.class);
-                                                    isBlocking = method.hasAnnotation(Blocking.class);
-                                                } else {
-                                                    resultFlowable = Flowable.just(result);
-                                                    isBlocking = true;
-                                                }
+                                    } else {
+                                        for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
 
-                                                handleResultFlowable(
-                                                        consumerAnnotation,
-                                                        consumerBean,
-                                                        method,
-                                                        kafkaConsumer,
-                                                        consumerRecord,
-                                                        resultFlowable,
-                                                        isBlocking
-                                                );
+                                            if (LOG.isTraceEnabled()) {
+                                                LOG.trace("Kafka consumer [{}] received record: {}", method, consumerRecord);
                                             }
-                                        } catch (Throwable e) {
-                                            handleException(kafkaConsumer, consumerBean, consumerRecord, e);
-                                            continue;
-                                        }
 
-                                        if (offsetStrategy == OffsetStrategy.SYNC_PER_RECORD) {
                                             try {
-                                                kafkaConsumer.commitSync();
-                                            } catch (CommitFailedException e) {
+                                                BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
+                                                Object result = boundExecutable.invoke(
+                                                        consumerBean
+                                                );
+
+                                                if (result != null) {
+                                                    Flowable<?> resultFlowable;
+                                                    boolean isBlocking;
+                                                    if (Publishers.isConvertibleToPublisher(result)) {
+                                                        resultFlowable = Publishers.convertPublisher(result, Flowable.class);
+                                                        isBlocking = method.hasAnnotation(Blocking.class);
+                                                    } else {
+                                                        resultFlowable = Flowable.just(result);
+                                                        isBlocking = true;
+                                                    }
+
+                                                    handleResultFlowable(
+                                                            consumerAnnotation,
+                                                            consumerBean,
+                                                            method,
+                                                            kafkaConsumer,
+                                                            consumerRecord,
+                                                            resultFlowable,
+                                                            isBlocking
+                                                    );
+                                                }
+                                            } catch (Throwable e) {
                                                 handleException(kafkaConsumer, consumerBean, consumerRecord, e);
+                                                continue;
                                             }
-                                        } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
-                                            kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
+
+                                            if (offsetStrategy == OffsetStrategy.SYNC_PER_RECORD) {
+                                                try {
+                                                    kafkaConsumer.commitSync();
+                                                } catch (CommitFailedException e) {
+                                                    handleException(kafkaConsumer, consumerBean, consumerRecord, e);
+                                                }
+                                            } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
+                                                kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
+                                            }
                                         }
                                     }
+
                                 }
 
                                 if (offsetStrategy == OffsetStrategy.SYNC) {
@@ -579,6 +598,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         if (!consumerConfiguration.getValueDeserializer().isPresent()) {
 
             if (bodyArgument != null) {
+
                 if (ConsumerRecord.class.isAssignableFrom(bodyArgument.getType())) {
                     Optional<Argument<?>> valueType = bodyArgument.getTypeVariable("V");
                     if (valueType.isPresent()) {
@@ -590,8 +610,10 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                     }
 
                 } else {
+                    boolean batch = method.getValue(KafkaListener.class, "batch", Boolean.class).orElse(false);
+
                     consumerConfiguration.setValueDeserializer(
-                            serdeRegistry.pickDeserializer(bodyArgument)
+                            serdeRegistry.pickDeserializer(batch ? bodyArgument.getFirstTypeVariable().orElse(bodyArgument) : bodyArgument)
                     );
                 }
             } else {
